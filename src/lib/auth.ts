@@ -82,12 +82,12 @@ export const authOptions: NextAuthOptions = {
   // ===== SESSION CONFIGURATION =====
   session: {
     strategy: "jwt", // Use JWT for stateless sessions
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+     maxAge: 30 * 60,  // 30 days
   },
 
   // ===== JWT CONFIGURATION =====
   jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 60,  // 30 days
   },
 
   // ===== CUSTOM PAGES =====
