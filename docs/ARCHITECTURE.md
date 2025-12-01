@@ -109,3 +109,5 @@ Rendered assets & variants
 - `docs/DIAGRAMS_RENDERING.md` — instructions and npm scripts to export the Mermaid diagram to `docs/architecture.svg` and `docs/architecture.png` using `@mermaid-js/mermaid-cli` (`npx` works, no global install required).
 - `.azure/architecture-azure.copilotmd` — an alternate Mermaid diagram that maps Trigger.dev -> Azure Functions and scrapers -> AKS (useful when targeting Azure-only deployments).
 - `docs/DEPLOYMENT-AZURE.md` — concise Azure deployment guidance and a sample Bicep skeleton to get started.
+ - `infra/terraform/` — a starter Terraform skeleton for the same resources (postgres, redis, storage, aks) if you prefer Terraform to Bicep.
+ - `.github/workflows/deploy-appservice.yml` — example workflow to build and deploy the Next.js app to Azure App Service.
