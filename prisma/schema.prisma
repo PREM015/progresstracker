@@ -68,18 +68,27 @@ model Session {
 }
 
 //platforms
+//platforms
+
+
 model Platform {
-  id        String   @id @default(cuid())
-  name      String
-  category  String
-  icon      String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug            String    @unique
+
+  category    String
+  icon        String?
+  color       String?
+  website     String?
+  authType    String?
+  supportsAutoSync Boolean @default(false)
+  description String?
+  displayName String?
+  createdAt   DateTime @default(now())
 
   users UserPlatform[]
-
-  @@unique([name])
+  syncLogs SyncLog[]
 }
-
 model UserPlatform {
   id         String   @id @default(cuid())
   userId     String
@@ -154,11 +163,11 @@ model SyncLog {
   message    String?
   createdAt  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
 }
-
 model UserSettings {
   id            String  @id @default(cuid())
   userId        String  @unique

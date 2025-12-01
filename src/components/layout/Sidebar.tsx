@@ -11,6 +11,8 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: "📈" },
   { name: "Goals", href: "/goals", icon: "🎯" },
   { name: "Settings", href: "/settings", icon: "⚙️" },
+  // Inside your navigation links array:
+ 
 ];
 
 export default function Sidebar() {
