@@ -16,7 +16,12 @@
     "test:ci": "jest --ci",
     "test:e2e": "playwright test",
     "test:coverage": "jest --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "diagrams:export:svg": "npx @mermaid-js/mermaid-cli -i .azure/architecture.mmd -o docs/architecture.svg",
+    "diagrams:export:png": "npx @mermaid-js/mermaid-cli -i .azure/architecture.mmd -o docs/architecture.png",
+    "diagrams:export:azure:svg": "npx @mermaid-js/mermaid-cli -i .azure/architecture-azure.mmd -o docs/architecture-azure.svg",
+    "diagrams:export:azure:png": "npx @mermaid-js/mermaid-cli -i .azure/architecture-azure.mmd -o docs/architecture-azure.png",
+    "diagrams:render-all": "npm run diagrams:export:svg && npm run diagrams:export:png && npm run diagrams:export:azure:svg && npm run diagrams:export:azure:png"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
