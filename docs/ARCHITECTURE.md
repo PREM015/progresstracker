@@ -111,3 +111,4 @@ Rendered assets & variants
 - `docs/DEPLOYMENT-AZURE.md` — concise Azure deployment guidance and a sample Bicep skeleton to get started.
  - `infra/terraform/` — a starter Terraform skeleton for the same resources (postgres, redis, storage, aks) if you prefer Terraform to Bicep.
  - `.github/workflows/deploy-appservice.yml` — example workflow to build and deploy the Next.js app to Azure App Service.
+ - `infra/azure/` — Bicep modules with production hardening options (VNet + private endpoints, Key Vault, Managed Identity, AKS with autoscaler). See `infra/azure/README.md` for details.

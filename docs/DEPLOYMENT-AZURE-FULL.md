@@ -47,6 +47,27 @@ Post-deployment
 - The workflow exposes template outputs (storage account name, postgres host) — check the workflow logs or `az` to inspect the resources.
 - For production create appropriate Key Vault secrets, private endpoints and enable backups.
 
+Production hardening (added by infra modules)
+-------------------------------------------
+
+This repository now includes an opinionated production-hardening scaffold in `infra/azure`:
+
+- Virtual Network with subnets for AKS, services and an isolated subnet for private endpoints (used for Postgres and Redis). This limits public exposure of these services.
+- Key Vault is created and the deployment stores the Postgres admin password in Key Vault. The infra also creates a user-assigned managed identity and grants it access to Key Vault; services (AKS, Function App) are configured to use this identity so workloads can fetch secrets securely.
+- Postgres Flexible Server has configurable backup retention (default 7 days). Consider increasing to meet RTO/RPO needs and enable zone redundancy for high availability.
+- AKS has optional autoscaler configuration to scale scraper workers automatically (default min=1, max=3). Use cluster autoscaler with horizontal pod autoscaler (HPA) for workload-level autoscaling.
+
+Recommended production steps
+---------------------------
+
+1) Use Azure Key Vault for all secrets; rotate credentials regularly and integrate with managed identity (already in the templates).
+2) Configure private endpoints for all managed services (DB, Redis, Storage) and lock down public network access.
+3) Harden AKS: enable network policies, use pod identities / workload identities, configure RBAC for cluster and enable Azure Monitor for logs & metrics.
+4) Configure redundancy: use multi-zone DB configuration and regional failover where required.
+5) Enable backups and retention according to your SLAs.
+
+Note: templates provide a base — review the `infra/azure` modules and tune SKUs, sizing, network CIDRs, and availability options before production rollout.
+
 Next steps / production checklist
 
 - Lock down the resource group RBAC and use managed identities for services where needed.
