@@ -21,7 +21,8 @@
     "diagrams:export:png": "npx @mermaid-js/mermaid-cli -i .azure/architecture.mmd -o docs/architecture.png",
     "diagrams:export:azure:svg": "npx @mermaid-js/mermaid-cli -i .azure/architecture-azure.mmd -o docs/architecture-azure.svg",
     "diagrams:export:azure:png": "npx @mermaid-js/mermaid-cli -i .azure/architecture-azure.mmd -o docs/architecture-azure.png",
-    "diagrams:render-all": "npm run diagrams:export:svg && npm run diagrams:export:png && npm run diagrams:export:azure:svg && npm run diagrams:export:azure:png"
+    "diagrams:render-all": "npm run diagrams:export:svg && npm run diagrams:export:png && npm run diagrams:export:azure:svg && npm run diagrams:export:azure:png",
+    "diagrams:watch": "chokidar \".azure/*.mmd\" -c \"npm run diagrams:render-all\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
@@ -95,6 +96,7 @@
     "babel-jest": "^30.2.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "baseline-browser-mapping": "^2.8.32",
+    "chokidar-cli": "^3.0.0",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.6",
     "husky": "^9.1.7",

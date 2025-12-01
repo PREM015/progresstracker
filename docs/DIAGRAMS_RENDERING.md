@@ -50,3 +50,10 @@ npx @mermaid-js/mermaid-cli -i .azure/architecture-azure.mmd -o docs/architectur
 ```
 
 If you'd like, I can add pre-rendered images into `docs/` (SVG/PNG) — but rendering requires mermaid-cli in the environment. Let me know and I can attempt to pre-render and commit images here if allowed to run the generator in this workspace.
+
+CI automatic rendering
+---------------------
+
+This repository includes a GitHub Actions workflow that automatically renders the Mermaid diagrams on push to `main` and for pull requests. The workflow will run `npm ci` and `npm run diagrams:render-all` and commit any changed outputs (`docs/architecture*.svg/png`) back to `main` so rendered diagrams are kept in sync.
+
+If you prefer not to auto-commit generated files to `main`, we can update the workflow to only run validations in CI and leave image updates out of the repository.
