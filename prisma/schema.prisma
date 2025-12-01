@@ -13,3 +13,168 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+//user
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  platforms      UserPlatform[]
+  trackerEntries TrackerEntry[]
+  goals          Goal[]
+  achievements   UserAchievement[]
+  notifications  NotificationPreferences?
+  settings       UserSettings?
+  syncLogs       SyncLog[]
+}
+
+//account
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  type              String
+  access_token      String?
+  refresh_token     String?
+  scope             String?
+  expires_at        Int?
+  token_type        String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([provider, providerAccountId], name: "provider_account_idx")
+}
+
+//sessions
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionToken], name: "session_token_idx")
+}
+
+//platforms
+model Platform {
+  id        String   @id @default(cuid())
+  name      String
+  category  String
+  icon      String
+  createdAt DateTime @default(now())
+
+  users UserPlatform[]
+
+  @@unique([name])
+}
+
+model UserPlatform {
+  id         String   @id @default(cuid())
+  userId     String
+  platformId String
+  username   String?
+  token      String?
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platformId])
+}
+
+model TrackerEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  platform  String?
+  problems  Int?     @default(0)
+  timeSpent Int?     @default(0)
+  notes     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model Goal {
+  id          String    @id @default(cuid())
+  userId      String
+  title       String
+  target      Int
+  progress    Int       @default(0)
+  deadline    DateTime?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  name        String
+  description String
+  icon        String
+
+  users UserAchievement[]
+
+  @@unique([name])
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+}
+
+model SyncLog {
+  id         String   @id @default(cuid())
+  userId     String
+  platformId String?
+  status     String
+  message    String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model UserSettings {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  theme         String  @default("light")
+  autoSync      Boolean @default(true)
+  syncFrequency String  @default("daily")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreferences {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  emailReminders    Boolean @default(true)
+  weeklySummary     Boolean @default(true)
+  achievementAlerts Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
