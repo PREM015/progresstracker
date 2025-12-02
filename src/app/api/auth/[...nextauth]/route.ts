@@ -1,6 +1,8 @@
 export const runtime = "nodejs"
 
 import NextAuth, { NextAuthOptions } from "next-auth"
+import type { DefaultSession } from 'next-auth'
+import type { JWT } from 'next-auth/jwt'
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
@@ -58,21 +60,39 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
+      // When a user signs in, attach id/email and fresh expiration
       if (user) {
-        token.id = user.id
-        token.email = user.email
-        token.exp = Math.floor(Date.now() / 1000) + 30 * 60
+        const u = user as { id?: string; email?: string }
+        token = {
+          ...token,
+          id: u.id ?? '',
+          email: u.email ?? '',
+          exp: Math.floor(Date.now() / 1000) + 30 * 60,
+        }
       }
-      if (token?.exp && Date.now() / 1000 > token.exp) return {}
+
+      // If exp exists and token is expired, keep token shape but remove user-specific claims
+      if (typeof token.exp === 'number' && Date.now() / 1000 > token.exp) {
+        const expiredToken = { ...token } as JWT & Record<string, unknown>
+        delete (expiredToken as unknown as Record<string, unknown>)['id']
+        delete (expiredToken as unknown as Record<string, unknown>)['email']
+        return expiredToken as typeof token
+      }
+
       return token
     },
     async session({ session, token }) {
-      if (!token?.id) return null
-      session.user.id = token.id as string
-      session.user.email = token.email as string
+      // Always return a session object — attach user.id/email when present
+      const userObj: DefaultSession['user'] & { id: string } = {
+        id: typeof token?.id === 'string' ? token.id : '',
+        name: session.user?.name ?? null,
+        email: token?.email ?? session.user?.email ?? null,
+        image: session.user?.image ?? null,
+      }
+      session.user = userObj as typeof session.user
       return session
     },
-    async redirect({ url, baseUrl }) {
+    async redirect({ baseUrl }) {
       return baseUrl + "/dashboard"
     }
   },

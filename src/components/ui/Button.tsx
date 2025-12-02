@@ -1,19 +1,19 @@
-import React, { ButtonHTMLAttributes, ReactNode } from "react";
+import React, { ButtonHTMLAttributes } from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "danger" | "ghost";
+  variant?: "primary" | "secondary" | "danger" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
-  leftIcon?: ReactNode;
-  rightIcon?: ReactNode;
-  className?: string;
+  leftIcon?: React.ReactNode;
+  isLoading?: boolean;
 }
 
 const variantStyles: Record<string, string> = {
   primary: "bg-blue-600 text-white hover:bg-blue-700",
   secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300",
   danger: "bg-red-600 text-white hover:bg-red-700",
-  ghost: "bg-transparent text-gray-800 hover:bg-gray-100",
+  ghost: "bg-transparent hover:bg-gray-100",
+  outline: "border border-gray-300 hover:bg-gray-100",
 };
 
 const sizeStyles: Record<string, string> = {
@@ -27,23 +27,27 @@ const Button: React.FC<ButtonProps> = ({
   size = "md",
   className,
   leftIcon,
-  rightIcon,
+  isLoading,
   children,
-  ...props
+  ...buttonProps // ✅ safe
 }) => {
   return (
     <button
+      {...buttonProps}
       className={clsx(
-        "flex items-center justify-center gap-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2",
+        "inline-flex items-center justify-center gap-2 rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed",
         variantStyles[variant],
         sizeStyles[size],
         className
       )}
-      {...props} // native button props like onClick, type, disabled, etc.
+      disabled={isLoading || buttonProps.disabled}
     >
-      {leftIcon && <span className="flex items-center">{leftIcon}</span>}
-      {children}
-      {rightIcon && <span className="flex items-center">{rightIcon}</span>}
+      {isLoading ? "Loading..." : (
+        <>
+          {leftIcon}
+          {children}
+        </>
+      )}
     </button>
   );
 };

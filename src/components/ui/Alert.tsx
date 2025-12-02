@@ -5,6 +5,7 @@ interface AlertProps {
   variant?: "success" | "error" | "warning" | "info";
   title?: string;
   description?: string;
+  children?: React.ReactNode;
   className?: string;
 }
 
@@ -20,6 +21,7 @@ const Alert: React.FC<AlertProps> = ({
   title,
   description,
   className,
+  children,
 }) => {
   return (
     <div
@@ -32,6 +34,7 @@ const Alert: React.FC<AlertProps> = ({
     >
       {title && <p className="font-bold">{title}</p>}
       {description && <p>{description}</p>}
+      {children}
     </div>
   );
 };

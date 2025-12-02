@@ -1,17 +1,6 @@
 import useSWR from 'swr';
 import axios from 'axios';
-
-interface Stats {
-  totalProblems: number;
-  totalTime: number;
-  activeDays: number;
-  currentStreak: number;
-  longestStreak: number;
-  avgProblemsPerDay: number;
-  avgTimePerDay: number;
-  platformStats: any[];
-  recentActivity: any[];
-}
+import type { Stats as StatsType, MonthlyData, HeatmapData } from '@/types/analytics';
 
 export function useStats(period: number = 30) {
   const {
@@ -19,15 +8,15 @@ export function useStats(period: number = 30) {
     error,
     mutate,
     isLoading,
-  } = useSWR<{ stats: Stats }>(
+  } = useSWR<{ stats: StatsType }>(
     `/api/stats?period=${period}`,
-    async (url) => {
-      const response = await axios.get(url);
+    async (url: string) => {
+      const response = await axios.get<{ stats: StatsType }>(url);
       return response.data;
     },
     {
       revalidateOnFocus: true,
-      revalidateInterval: 30000, // Auto-refresh every 30 seconds
+      refreshInterval: 30000, // Auto-refresh every 30 seconds
     }
   );
 
@@ -44,10 +33,10 @@ export function useMonthlyStats(months: number = 6) {
     data,
     error,
     isLoading,
-  } = useSWR<{ monthlyStats: any[] }>(
+  } = useSWR<{ monthlyStats: MonthlyData[] }>(
     `/api/stats/monthly?months=${months}`,
-    async (url) => {
-      const response = await axios.get(url);
+    async (url: string) => {
+      const response = await axios.get<{ monthlyStats: MonthlyData[] }>(url);
       return response.data;
     }
   );
@@ -64,10 +53,10 @@ export function useHeatmapData() {
     data,
     error,
     isLoading,
-  } = useSWR<{ heatmap: any[] }>(
+  } = useSWR<{ heatmap: HeatmapData[] }>(
     '/api/stats/heatmap',
-    async (url) => {
-      const response = await axios.get(url);
+    async (url: string) => {
+      const response = await axios.get<{ heatmap: HeatmapData[] }>(url);
       return response.data;
     }
   );

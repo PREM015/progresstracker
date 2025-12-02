@@ -4,10 +4,11 @@ import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import Dropdown from '@/components/ui/Dropdown';
 import { Download, FileSpreadsheet, FileJson } from 'lucide-react';
+import { TrackerEntry } from '@/types/tracker';
 import { format } from 'date-fns';
 
 interface ExportButtonProps {
-  entries: any[];
+  entries: TrackerEntry[];
   dateRange: { start: Date; end: Date };
 }
 

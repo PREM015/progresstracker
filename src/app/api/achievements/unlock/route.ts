@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-// TODO: Implement route.ts
-export async function GET(req: NextRequest) {
-  return NextResponse.json({ message: "Not implemented" }, { status: 501 });
+// Example GET handler for unlock endpoint
+export async function GET(req: Request) {
+  return NextResponse.json({ message: "Unlock API works!" });
+}
+
+// Example POST handler (optional)
+export async function POST(req: Request) {
+  const data = await req.json();
+  return NextResponse.json({ received: data });
 }
