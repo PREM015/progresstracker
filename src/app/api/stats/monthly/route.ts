@@ -11,18 +11,18 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const period = searchParams.get('period') || '30'; // days
+    const months = parseInt(searchParams.get('months') || '6');
 
-    const stats = await StatsService.getOverallStats(
+    const monthlyStats = await StatsService.getMonthlyBreakdown(
       session.user.id,
-      parseInt(period)
+      months
     );
 
-    return NextResponse.json({ stats });
+    return NextResponse.json({ monthlyStats });
   } catch (error) {
-    console.error('Stats API error:', error);
+    console.error('Monthly stats API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
+      { error: 'Failed to fetch monthly statistics' },
       { status: 500 }
     );
   }

@@ -10,19 +10,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const period = searchParams.get('period') || '30'; // days
+    const heatmap = await StatsService.getHeatmapData(session.user.id);
 
-    const stats = await StatsService.getOverallStats(
-      session.user.id,
-      parseInt(period)
-    );
-
-    return NextResponse.json({ stats });
+    return NextResponse.json({ heatmap });
   } catch (error) {
-    console.error('Stats API error:', error);
+    console.error('Heatmap API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
+      { error: 'Failed to fetch heatmap data' },
       { status: 500 }
     );
   }

@@ -12,7 +12,7 @@ export function usePlatforms(category?: string, search?: string) {
   // Build query params - ✅ FIX: Filter out empty/null values
   const params = new URLSearchParams()
   if (category && category !== "all") params.append("category", category)
-  if (search && search.trim()) params.append("search", search.trim())
+  if (search?.trim()) params.append("search", search.trim())
 
   const queryString = params.toString()
   const url = `/api/platforms${queryString ? `?${queryString}` : ""}`

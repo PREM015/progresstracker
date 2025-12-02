@@ -6,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
+import Footer from "@/components/layout/Footer";
 
 export default async function DashboardLayout({
   children,
@@ -36,6 +37,7 @@ export default async function DashboardLayout({
           </div>
         </main>
       </div>
+       <Footer />
     </div>
   );
 }

@@ -1,128 +1,194 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
-import { Activity, Target, TrendingUp, CalendarCheck, Award, Layers } from "lucide-react";
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Activity, Target, TrendingUp, CalendarCheck, Award } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
+import { useStats, useMonthlyStats } from '@/hooks/useStats';
+import { useUser}  from '@/hooks/useUser';
+import {useGoals}  from '@/hooks/useGoals';
+import  Spinner  from '@/components/ui/Spinner';
+import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner';
+import { StatsCards } from '@/components/dashboard/StatsCards';
+import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
+import { ProgressOverview } from '@/components/dashboard/ProgressOverview';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { GoalWidget } from '@/components/dashboard/GoalWidget';
+import { PlatformBreakdown } from '@/components/dashboard/PlatformBreakdown';
+import { TrendChart } from '@/components/dashboard/TrendChart';
+import axios from 'axios';
 
 export default function DashboardPage() {
+  const { user } = useUser();
+  const { stats, isLoading: statsLoading, refresh } = useStats(30);
+  const { monthlyStats, isLoading: monthlyLoading } = useMonthlyStats(6);
+  const { goals, isLoading: goalsLoading } = useGoals();
+  const { toast } = useToast();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      await axios.post('/api/sync/trigger-all');
+      await refresh();
+      toast({
+        title: 'Sync completed',
+        description: 'All platforms synced successfully',
+        variant: 'success',
+      });
+    } catch (error) {
+      toast({
+        title: 'Sync failed',
+        description: 'Failed to sync platforms. Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  if (statsLoading || !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  // Today's problems count
+  const todayProblems = stats.recentActivity
+    .filter((a) => new Date(a.date).toDateString() === new Date().toDateString())
+    .reduce((sum, a) => sum + (a.problems || 0), 0);
+
   return (
     <div className="space-y-10">
-      {/* HEADER */}
-      <header>
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
-          Welcome back! 👋
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2 text-lg">
-          Track your coding progress, goals, achievements & more.
-        </p>
-      </header>
+      {/* Welcome Banner */}
+      <WelcomeBanner
+        userName={user?.name?.split(' ')[0]}
+        streak={stats.currentStreak}
+        todayProblems={todayProblems}
+      />
 
-      {/* METRIC CARDS */}
+      {/* Quick Actions */}
+      <QuickActions onSync={handleSync} isSyncing={isSyncing} />
+
+      {/* Metric Cards */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           icon={<Activity className="h-7 w-7 text-blue-600" />}
           title="Daily Activity"
-          value="37 problems"
+          value={`${todayProblems} problems`}
           trend="+12%"
         />
         <MetricCard
           icon={<Target className="h-7 w-7 text-green-600" />}
           title="Goal Progress"
-          value="68% done"
+          value={`${stats.goalProgress || 0}% done`}
           trend="+4%"
         />
         <MetricCard
           icon={<TrendingUp className="h-7 w-7 text-purple-600" />}
           title="Weekly Growth"
-          value="12 hrs"
+          value={`${stats.weeklyHours || 0} hrs`}
           trend="+9%"
         />
         <MetricCard
           icon={<CalendarCheck className="h-7 w-7 text-yellow-600" />}
           title="Current Streak"
-          value="7 days 🔥"
+          value={`${stats.currentStreak} days 🔥`}
           trend="+2 days"
         />
       </section>
 
-      {/* PLATFORM ACTIVITY */}
-      <section className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Layers className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Platform Activity Overview
-          </h2>
+      {/* Stats Cards */}
+      <StatsCards
+        stats={{
+          totalProblems: stats.totalProblems,
+          totalApplications: 0,
+          totalCommits: 0,
+          currentStreak: stats.currentStreak,
+          problemsChange: 12,
+          applicationsChange: 8,
+          commitsChange: 15,
+          streakChange: 2,
+        }}
+      />
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Progress Overview */}
+          {!monthlyLoading && monthlyStats.length > 0 && <ProgressOverview data={monthlyStats} />}
+
+          {/* Activity Heatmap */}
+          {stats && (
+            <ActivityHeatmap
+              data={Array.from({ length: 365 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (364 - i));
+                return { date: date.toISOString().split('T')[0], count: Math.floor(Math.random() * 10) };
+              })}
+            />
+          )}
+
+          {/* Recent Activity */}
+          <RecentActivity activities={stats.recentActivity} />
         </div>
 
-        <div className="space-y-5">
-          <ProgressRow platform="LeetCode" percent={80} color="bg-yellow-400" />
-          <ProgressRow platform="CodeChef" percent={55} color="bg-purple-500" />
-          <ProgressRow platform="Codeforces" percent={40} color="bg-blue-500" />
-          <ProgressRow platform="GitHub Commits" percent={90} color="bg-green-600" />
-        </div>
-      </section>
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Goal Widget */}
+          {!goalsLoading && <GoalWidget goals={goals || []} />}
 
-      {/* ACHIEVEMENTS */}
+          {/* Platform Breakdown */}
+          {stats.platformStats.length > 0 && <PlatformBreakdown data={stats.platformStats} />}
+
+          {/* Trend Chart */}
+          <TrendChart
+            data={monthlyStats.map((item) => ({
+              date: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
+              problems: item.problems,
+            }))}
+            title="Monthly Trend"
+          />
+        </div>
+      </div>
+
+      {/* Achievements */}
       <section className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow-sm p-6">
         <div className="flex items-center gap-2 mb-4">
           <Award className="h-5 w-5 text-orange-500" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Recent Achievements
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Recent Achievements</h2>
         </div>
 
         <div className="flex flex-wrap gap-4">
-          <AchievementBadge title="100 Problems Solved" />
-          <AchievementBadge title="7 Day Streak" />
-          <AchievementBadge title="Top 5% on Codeforces" />
-          <AchievementBadge title="GitHub Power Contributor" />
+          {stats.achievements?.map((a, idx) => (
+            <AchievementBadge key={idx} title={a.title} />
+          ))}
         </div>
       </section>
     </div>
   );
 }
 
-/* ------------------------------------------------ */
-/*                 INTERNAL COMPONENTS             */
-/* ------------------------------------------------ */
+/* ---------------------- INTERNAL COMPONENTS ---------------------- */
 
 function MetricCard({ icon, title, value, trend }) {
   return (
     <motion.div
       whileHover={{ scale: 1.03 }}
-      transition={{ type: "spring", stiffness: 180 }}
+      transition={{ type: 'spring', stiffness: 180 }}
       className="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl p-6 shadow-sm"
     >
       <div className="flex items-center gap-3">
         {icon}
         <p className="text-sm text-gray-600 dark:text-gray-400">{title}</p>
       </div>
-
-      <p className="text-3xl font-bold text-gray-900 dark:text-white mt-3">
-        {value}
-      </p>
-
-      <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">
-        {trend}
-      </p>
+      <p className="text-3xl font-bold text-gray-900 dark:text-white mt-3">{value}</p>
+      <p className="text-sm text-green-600 dark:text-green-400 font-medium mt-1">{trend}</p>
     </motion.div>
-  );
-}
-
-function ProgressRow({ platform, percent, color }) {
-  return (
-    <div>
-      <div className="flex justify-between mb-2">
-        <span className="text-sm text-gray-700 dark:text-gray-300">{platform}</span>
-        <span className="text-sm text-gray-600 dark:text-gray-400">{percent}%</span>
-      </div>
-
-      <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div
-          className={`h-full ${color}`}
-          style={{ width: `${percent}%` }}
-        ></div>
-      </div>
-    </div>
   );
 }
 

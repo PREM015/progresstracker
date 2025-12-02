@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+
 import AuthProvider from "@/components/auth/AuthProvider";
-import AutoLogout from "@/components/auth/AutoLogout"; // ✅ Add this
+import AutoLogout from "@/components/auth/AutoLogout";
+import { ToastProvider } from '@/context/ToastContext';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,8 +22,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <AutoLogout /> {/* ✅ Add auto-logout */}
-          {children}
+          <ToastProvider>
+            <AutoLogout />
+            {children}
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

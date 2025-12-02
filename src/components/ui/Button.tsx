@@ -1,9 +1,11 @@
-import React, { ButtonHTMLAttributes } from "react";
+import React, { ButtonHTMLAttributes, ReactNode } from "react";
 import clsx from "clsx";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost";
   size?: "sm" | "md" | "lg";
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
   className?: string;
 }
 
@@ -24,18 +26,25 @@ const Button: React.FC<ButtonProps> = ({
   variant = "primary",
   size = "md",
   className,
+  leftIcon,
+  rightIcon,
+  children,
   ...props
 }) => {
   return (
     <button
       className={clsx(
-        "rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2",
+        "flex items-center justify-center gap-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2",
         variantStyles[variant],
         sizeStyles[size],
         className
       )}
-      {...props}
-    />
+      {...props} // native button props like onClick, type, disabled, etc.
+    >
+      {leftIcon && <span className="flex items-center">{leftIcon}</span>}
+      {children}
+      {rightIcon && <span className="flex items-center">{rightIcon}</span>}
+    </button>
   );
 };
 
