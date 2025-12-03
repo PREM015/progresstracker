@@ -1,6 +1,6 @@
 // src/services/goalService.ts
 
-import prisma from '@/lib/prisma';
+import {prisma} from '@/lib/prisma';
 import { 
   Goal, 
   GoalFormData, 

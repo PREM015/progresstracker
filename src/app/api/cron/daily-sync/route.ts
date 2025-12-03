@@ -1,7 +1,7 @@
 // src/app/api/cron/daily-sync/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import {prisma} from '@/lib/prisma';
 import { SyncService } from '@/services/syncService';
 
 // Verify cron secret (Vercel Cron or custom)

@@ -1119,22 +1119,80 @@ export const categories: PlatformCategory[] = [
         color: '#64748b',
         order: 7,
     },
-]// ========================================
-// HELPER FUNCTIONS
+]/// ========================================
+// HELPER FUNCTIONS (CATEGORY FILTERS)
 // ========================================
-export function getPlatformsByCategory(category: string): Platform[] {
-    return platforms.filter(p => p.category === category)
-} export function getPlatformBySlug(slug: string): Platform | undefined {
-    return platforms.find(p => p.slug === slug)
-} export function getPlatformById(id: string): Platform | undefined {
-    return platforms.find(p => p.id === id)
-} export function getAutoSyncablePlatforms(): Platform[] {
-    return platforms.filter(p => p.supportsAutoSync)
-} export function getOAuthPlatforms(): Platform[] {
-    return platforms.filter(p => p.authType === 'oauth')
-} export function getCategoryById(id: string): PlatformCategory | undefined {
-    return categories.find(c => c.id === id)
-}// ========================================
+
+/**
+ * Get all platforms in a specific category
+ */
+export function getPlatformsByCategory(categoryId: string): Platform[] {
+    return platforms.filter(platform => platform.category === categoryId)
+}
+
+/**
+ * Get a platform by its slug
+ */
+export function getPlatformBySlug(slug: string): Platform | undefined {
+    return platforms.find(platform => platform.slug === slug)
+}
+
+/**
+ * Get a platform by its ID
+ */
+export function getPlatformById(id: string): Platform | undefined {
+    return platforms.find(platform => platform.id === id)
+}
+
+/**
+ * Get all platforms that support auto-sync
+ */
+export function getAutoSyncablePlatforms(): Platform[] {
+    return platforms.filter(platform => platform.supportsAutoSync)
+}
+
+/**
+ * Get all OAuth-based platforms
+ */
+export function getOAuthPlatforms(): Platform[] {
+    return platforms.filter(platform => platform.authType === 'oauth')
+}
+
+/**
+ * Get category details by ID
+ */
+export function getCategoryById(id: string): PlatformCategory | undefined {
+    return categories.find(category => category.id === id)
+}
+
+/**
+ * Get all platforms grouped by category
+ */
+export function getPlatformsGroupedByCategory(): Record<string, Platform[]> {
+    return categories.reduce((acc, category) => {
+        acc[category.id] = getPlatformsByCategory(category.id)
+        return acc
+    }, {} as Record<string, Platform[]>)
+}
+
+/**
+ * Get total count of platforms in a specific category
+ */
+export function getPlatformCountByCategory(categoryId: string): number {
+    return getPlatformsByCategory(categoryId).length
+}
+
+/**
+ * Get total number of platforms
+ */
+export function getTotalPlatformCount(): number {
+    return platforms.length
+}
+
+
+
+
+// ========================================
 // PLATFORM COUNTS BY CATEGORY
 // ========================================
 export const platformCounts = {

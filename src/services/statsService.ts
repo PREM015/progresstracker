@@ -1,44 +1,58 @@
-import {prisma} from '@/lib/prisma';
-import { subDays, startOfDay, endOfDay, format, eachDayOfInterval } from 'date-fns';
+import { prisma } from '@/lib/prisma'
+import {
+  subDays,
+  startOfDay,
+  endOfDay,
+  format,
+  eachDayOfInterval,
+} from 'date-fns'
 
 export class StatsService {
-  // Get overall statistics
+  // ======================================================
+  // OVERALL STATS
+  // ======================================================
   static async getOverallStats(userId: string, days: number = 30) {
-    const startDate = startOfDay(subDays(new Date(), days));
-    const endDate = endOfDay(new Date());
+    const startDate = startOfDay(subDays(new Date(), days))
+    const endDate = endOfDay(new Date())
 
-    // Get tracker entries
     const entries = await prisma.trackerEntry.findMany({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
+        date: { gte: startDate, lte: endDate },
       },
       orderBy: { date: 'desc' },
-    });
+    })
 
-    // Calculate totals
-    const totalProblems = entries.reduce((sum, e) => sum + (e.problems || 0), 0);
-    const totalTime = entries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
-    const uniqueDays = new Set(entries.map((e) => format(e.date, 'yyyy-MM-dd'))).size;
+    const totalProblems = entries.reduce(
+      (sum, e) => sum + (e.problemsSolved ?? 0),
+      0
+    )
 
-    // Calculate streak
-    const streak = await this.calculateStreak(userId);
+    const totalTime = entries.reduce(
+      (sum, e) => sum + (e.timeSpent ?? 0),
+      0
+    )
 
-    // Get platform breakdown
-    const platformStats = await this.getPlatformBreakdown(userId, startDate, endDate);
+    const uniqueDays = new Set(
+      entries.map(e => format(e.date, 'yyyy-MM-dd'))
+    ).size
 
-    // Get recent activity
-    const recentActivity = entries.slice(0, 10).map((entry) => ({
+    const streak = await this.calculateStreak(userId)
+
+    const platformStats = await this.getPlatformBreakdown(
+      userId,
+      startDate,
+      endDate
+    )
+
+    const recentActivity = entries.slice(0, 10).map(entry => ({
       id: entry.id,
       date: entry.date,
-      platform: entry.platform,
-      problems: entry.problems,
+      platformId: entry.platformId,
+      problemsSolved: entry.problemsSolved,
       timeSpent: entry.timeSpent,
       notes: entry.notes,
-    }));
+    }))
 
     return {
       totalProblems,
@@ -46,224 +60,230 @@ export class StatsService {
       activeDays: uniqueDays,
       currentStreak: streak.current,
       longestStreak: streak.longest,
-      avgProblemsPerDay: uniqueDays > 0 ? Math.round(totalProblems / uniqueDays) : 0,
-      avgTimePerDay: uniqueDays > 0 ? Math.round(totalTime / uniqueDays) : 0,
+      avgProblemsPerDay:
+        uniqueDays > 0 ? Math.round(totalProblems / uniqueDays) : 0,
+      avgTimePerDay:
+        uniqueDays > 0 ? Math.round(totalTime / uniqueDays) : 0,
       platformStats,
       recentActivity,
-    };
+    }
   }
 
-  // Calculate current and longest streak
+  // ======================================================
+  // STREAK CALCULATION
+  // ======================================================
   static async calculateStreak(userId: string) {
     const entries = await prisma.trackerEntry.findMany({
       where: { userId },
       orderBy: { date: 'desc' },
       select: { date: true },
-    });
+    })
 
-    if (entries.length === 0) {
-      return { current: 0, longest: 0 };
-    }
+    if (!entries.length) return { current: 0, longest: 0 }
 
-    const dates = entries.map((e) => format(e.date, 'yyyy-MM-dd'));
-    const uniqueDates = [...new Set(dates)].sort().reverse();
+    const uniqueDates = [
+      ...new Set(entries.map(e => format(e.date, 'yyyy-MM-dd'))),
+    ]
 
-    let currentStreak = 0;
-    let longestStreak = 0;
-    let tempStreak = 1;
+    let current = 0
+    let longest = 1
+    let temp = 1
 
-    // Check current streak
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
     if (uniqueDates[0] === today || uniqueDates[0] === yesterday) {
-      currentStreak = 1;
-
+      current = 1
       for (let i = 1; i < uniqueDates.length; i++) {
-        const expectedDate = format(subDays(new Date(uniqueDates[i - 1]), 1), 'yyyy-MM-dd');
-        if (uniqueDates[i] === expectedDate) {
-          currentStreak++;
-        } else {
-          break;
-        }
+        const expected = format(
+          subDays(new Date(uniqueDates[i - 1]), 1),
+          'yyyy-MM-dd'
+        )
+        if (uniqueDates[i] === expected) current++
+        else break
       }
     }
 
-    // Calculate longest streak
     for (let i = 1; i < uniqueDates.length; i++) {
-      const expectedDate = format(subDays(new Date(uniqueDates[i - 1]), 1), 'yyyy-MM-dd');
-      if (uniqueDates[i] === expectedDate) {
-        tempStreak++;
-        longestStreak = Math.max(longestStreak, tempStreak);
+      const expected = format(
+        subDays(new Date(uniqueDates[i - 1]), 1),
+        'yyyy-MM-dd'
+      )
+      if (uniqueDates[i] === expected) {
+        temp++
+        longest = Math.max(longest, temp)
       } else {
-        tempStreak = 1;
+        temp = 1
       }
     }
 
-    longestStreak = Math.max(longestStreak, tempStreak, currentStreak);
-
-    return { current: currentStreak, longest: longestStreak };
+    return { current, longest }
   }
 
-  // Get platform breakdown
-  static async getPlatformBreakdown(userId: string, startDate: Date, endDate: Date) {
+  // ======================================================
+  // PLATFORM BREAKDOWN
+  // ======================================================
+  static async getPlatformBreakdown(
+    userId: string,
+    startDate: Date,
+    endDate: Date
+  ) {
     const entries = await prisma.trackerEntry.findMany({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-        platform: { not: null },
+        date: { gte: startDate, lte: endDate },
+        platformId: { not: null },
       },
-    });
+    })
 
-    const breakdown: Record<string, { problems: number; time: number; count: number }> = {};
+    const breakdown: Record<
+      string,
+      { problems: number; time: number; count: number }
+    > = {}
 
-    entries.forEach((entry) => {
-      const platform = entry.platform || 'Other';
-      if (!breakdown[platform]) {
-        breakdown[platform] = { problems: 0, time: 0, count: 0 };
+    entries.forEach(entry => {
+      const key = entry.platformId!
+      if (!breakdown[key]) {
+        breakdown[key] = { problems: 0, time: 0, count: 0 }
       }
-      breakdown[platform].problems += entry.problems || 0;
-      breakdown[platform].time += entry.timeSpent || 0;
-      breakdown[platform].count += 1;
-    });
+      breakdown[key].problems += entry.problemsSolved ?? 0
+      breakdown[key].time += entry.timeSpent ?? 0
+      breakdown[key].count++
+    })
 
     return Object.entries(breakdown)
-      .map(([platform, stats]) => ({
-        platform,
+      .map(([platformId, stats]) => ({
+        platformId,
         ...stats,
       }))
-      .sort((a, b) => b.problems - a.problems);
+      .sort((a, b) => b.problems - a.problems)
   }
 
-  // Get monthly breakdown
+  // ======================================================
+  // MONTHLY BREAKDOWN
+  // ======================================================
   static async getMonthlyBreakdown(userId: string, months: number = 6) {
-    const startDate = startOfDay(subDays(new Date(), months * 30));
-    const endDate = endOfDay(new Date());
+    const startDate = startOfDay(subDays(new Date(), months * 30))
+    const endDate = endOfDay(new Date())
 
     const entries = await prisma.trackerEntry.findMany({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
+        date: { gte: startDate, lte: endDate },
       },
-    });
+    })
 
-    const monthlyData: Record<string, { problems: number; time: number; days: Set<string> }> = {};
+    const monthly: Record<
+      string,
+      { problems: number; time: number; days: Set<string> }
+    > = {}
 
-    entries.forEach((entry) => {
-      const monthKey = format(entry.date, 'yyyy-MM');
-      if (!monthlyData[monthKey]) {
-        monthlyData[monthKey] = { problems: 0, time: 0, days: new Set() };
+    entries.forEach(entry => {
+      const key = format(entry.date, 'yyyy-MM')
+      if (!monthly[key]) {
+        monthly[key] = { problems: 0, time: 0, days: new Set() }
       }
-      monthlyData[monthKey].problems += entry.problems || 0;
-      monthlyData[monthKey].time += entry.timeSpent || 0;
-      monthlyData[monthKey].days.add(format(entry.date, 'yyyy-MM-dd'));
-    });
+      monthly[key].problems += entry.problemsSolved ?? 0
+      monthly[key].time += entry.timeSpent ?? 0
+      monthly[key].days.add(format(entry.date, 'yyyy-MM-dd'))
+    })
 
-    return Object.entries(monthlyData)
-      .map(([month, stats]) => ({
+    return Object.entries(monthly)
+      .map(([month, data]) => ({
         month,
-        problems: stats.problems,
-        time: stats.time,
-        activeDays: stats.days.size,
+        problems: data.problems,
+        time: data.time,
+        activeDays: data.days.size,
       }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+      .sort((a, b) => a.month.localeCompare(b.month))
   }
 
-  // Get heatmap data (365 days)
+  // ======================================================
+  // HEATMAP (365 DAYS)
+  // ======================================================
   static async getHeatmapData(userId: string) {
-    const startDate = startOfDay(subDays(new Date(), 365));
-    const endDate = endOfDay(new Date());
+    const startDate = startOfDay(subDays(new Date(), 365))
+    const endDate = endOfDay(new Date())
 
     const entries = await prisma.trackerEntry.findMany({
       where: {
         userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
+        date: { gte: startDate, lte: endDate },
       },
-    });
+    })
 
-    const dailyData: Record<string, number> = {};
+    const daily: Record<string, number> = {}
 
-    entries.forEach((entry) => {
-      const dateKey = format(entry.date, 'yyyy-MM-dd');
-      dailyData[dateKey] = (dailyData[dateKey] || 0) + (entry.problems || 0);
-    });
+    entries.forEach(entry => {
+      const key = format(entry.date, 'yyyy-MM-dd')
+      daily[key] = (daily[key] || 0) + (entry.problemsSolved ?? 0)
+    })
 
-    // Fill in all days
-    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
-    
-    return allDays.map((day) => {
-      const dateKey = format(day, 'yyyy-MM-dd');
-      return {
-        date: dateKey,
-        count: dailyData[dateKey] || 0,
-      };
-    });
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate })
+
+    return allDays.map(day => {
+      const key = format(day, 'yyyy-MM-dd')
+      return { date: key, count: daily[key] || 0 }
+    })
   }
 
-  // Get summary statistics
+  // ======================================================
+  // SUMMARY STATS
+  // ======================================================
   static async getSummaryStats(userId: string, startDate: Date, endDate: Date) {
     const entries = await prisma.trackerEntry.findMany({
-      where: {
-        userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
+      where: { userId, date: { gte: startDate, lte: endDate } },
+    })
 
-    const totalProblems = entries.reduce((sum, e) => sum + (e.problems || 0), 0);
-    const totalTime = entries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
-    const uniqueDays = new Set(entries.map((e) => format(e.date, 'yyyy-MM-dd'))).size;
+    const totalProblems = entries.reduce(
+      (s, e) => s + (e.problemsSolved ?? 0),
+      0
+    )
 
-    // Get connected platforms count
+    const totalTime = entries.reduce(
+      (s, e) => s + (e.timeSpent ?? 0),
+      0
+    )
+
+    const activeDays = new Set(
+      entries.map(e => format(e.date, 'yyyy-MM-dd'))
+    ).size
+
     const connectedPlatforms = await prisma.userPlatform.count({
       where: { userId },
-    });
+    })
 
-    // Get active goals count
     const activeGoals = await prisma.goal.count({
-      where: {
-        userId,
-        completedAt: null,
-      },
-    });
+      where: { userId, completedAt: null },
+    })
 
-    // Get achievements count
     const achievementsUnlocked = await prisma.userAchievement.count({
       where: { userId },
-    });
+    })
 
-    // Calculate streak
-    const streak = await this.calculateStreak(userId);
+    const streak = await this.calculateStreak(userId)
 
     return {
       totalProblems,
       totalTime,
-      activeDays: uniqueDays,
+      activeDays,
       currentStreak: streak.current,
       longestStreak: streak.longest,
       connectedPlatforms,
       activeGoals,
       achievementsUnlocked,
-      avgProblemsPerDay: uniqueDays > 0 ? Math.round(totalProblems / uniqueDays) : 0,
-      avgTimePerDay: uniqueDays > 0 ? Math.round(totalTime / uniqueDays) : 0,
+      avgProblemsPerDay:
+        activeDays > 0 ? Math.round(totalProblems / activeDays) : 0,
+      avgTimePerDay:
+        activeDays > 0 ? Math.round(totalTime / activeDays) : 0,
       periodStart: startDate,
       periodEnd: endDate,
-    };
+    }
   }
 
-  // Get trend data for charts
+  // ======================================================
+  // TREND DATA
+  // ======================================================
   static async getTrendData(
     userId: string,
     startDate: Date,
@@ -271,140 +291,88 @@ export class StatsService {
     metric: 'problems' | 'time' | 'commits' = 'problems'
   ) {
     const entries = await prisma.trackerEntry.findMany({
-      where: {
-        userId,
-        date: {
-          gte: startDate,
-          lte: endDate,
-        },
-      },
-      orderBy: { date: 'asc' },
-    });
+      where: { userId, date: { gte: startDate, lte: endDate } },
+    })
 
-    // Group by date
-    const dailyData: Record<string, number> = {};
+    const daily: Record<string, number> = {}
 
-    entries.forEach((entry) => {
-      const dateKey = format(entry.date, 'yyyy-MM-dd');
-      if (!dailyData[dateKey]) {
-        dailyData[dateKey] = 0;
-      }
+    entries.forEach(entry => {
+      const key = format(entry.date, 'yyyy-MM-dd')
+      if (!daily[key]) daily[key] = 0
 
-      switch (metric) {
-        case 'problems':
-          dailyData[dateKey] += entry.problems || 0;
-          break;
-        case 'time':
-          dailyData[dateKey] += entry.timeSpent || 0;
-          break;
-        case 'commits':
-          // TODO: Implement commits tracking
-          dailyData[dateKey] += 0;
-          break;
-      }
-    });
+      if (metric === 'problems') daily[key] += entry.problemsSolved ?? 0
+      if (metric === 'time') daily[key] += entry.timeSpent ?? 0
+    })
 
-    // Fill in missing days with 0
-    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
-    
-    return allDays.map((day) => {
-      const dateKey = format(day, 'yyyy-MM-dd');
-      return {
-        date: dateKey,
-        value: dailyData[dateKey] || 0,
-      };
-    });
+    const days = eachDayOfInterval({ start: startDate, end: endDate })
+
+    return days.map(d => ({
+      date: format(d, 'yyyy-MM-dd'),
+      value: daily[format(d, 'yyyy-MM-dd')] || 0,
+    }))
   }
 
-  // Get weekly comparison
+  // ======================================================
+  // WEEKLY COMPARISON
+  // ======================================================
   static async getWeeklyComparison(userId: string) {
-    const thisWeekStart = startOfDay(subDays(new Date(), 7));
-    const thisWeekEnd = endOfDay(new Date());
-    const lastWeekStart = startOfDay(subDays(new Date(), 14));
-    const lastWeekEnd = endOfDay(subDays(new Date(), 7));
+    const now = new Date()
+    const thisWeekStart = startOfDay(subDays(now, 7))
+    const lastWeekStart = startOfDay(subDays(now, 14))
+    const lastWeekEnd = endOfDay(subDays(now, 7))
 
-    const thisWeekEntries = await prisma.trackerEntry.findMany({
-      where: {
-        userId,
-        date: { gte: thisWeekStart, lte: thisWeekEnd },
-      },
-    });
+    const [thisWeek, lastWeek] = await Promise.all([
+      prisma.trackerEntry.findMany({
+        where: { userId, date: { gte: thisWeekStart } },
+      }),
+      prisma.trackerEntry.findMany({
+        where: { userId, date: { gte: lastWeekStart, lte: lastWeekEnd } },
+      }),
+    ])
 
-    const lastWeekEntries = await prisma.trackerEntry.findMany({
-      where: {
-        userId,
-        date: { gte: lastWeekStart, lte: lastWeekEnd },
-      },
-    });
-
-    const thisWeekProblems = thisWeekEntries.reduce((sum, e) => sum + (e.problems || 0), 0);
-    const lastWeekProblems = lastWeekEntries.reduce((sum, e) => sum + (e.problems || 0), 0);
-
-    const thisWeekTime = thisWeekEntries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
-    const lastWeekTime = lastWeekEntries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
-
-    const problemsChange = lastWeekProblems > 0
-      ? ((thisWeekProblems - lastWeekProblems) / lastWeekProblems) * 100
-      : 0;
-
-    const timeChange = lastWeekTime > 0
-      ? ((thisWeekTime - lastWeekTime) / lastWeekTime) * 100
-      : 0;
+    const sum = (arr: typeof thisWeek) =>
+      arr.reduce((s, e) => s + (e.problemsSolved ?? 0), 0)
 
     return {
-      thisWeek: {
-        problems: thisWeekProblems,
-        time: thisWeekTime,
-        days: thisWeekEntries.length,
-      },
-      lastWeek: {
-        problems: lastWeekProblems,
-        time: lastWeekTime,
-        days: lastWeekEntries.length,
-      },
-      changes: {
-        problems: Math.round(problemsChange * 10) / 10,
-        time: Math.round(timeChange * 10) / 10,
-      },
-    };
+      thisWeek: sum(thisWeek),
+      lastWeek: sum(lastWeek),
+      change:
+        lastWeek.length > 0 ? ((sum(thisWeek) - sum(lastWeek)) / sum(lastWeek)) * 100 : 0,
+    }
   }
 
-  // Get platform-wise trends
+  // ======================================================
+  // PLATFORM TRENDS
+  // ======================================================
   static async getPlatformTrends(userId: string, days: number = 30) {
-    const startDate = startOfDay(subDays(new Date(), days));
-    const endDate = endOfDay(new Date());
+    const startDate = startOfDay(subDays(new Date(), days))
 
     const entries = await prisma.trackerEntry.findMany({
       where: {
         userId,
-        date: { gte: startDate, lte: endDate },
-        platform: { not: null },
+        date: { gte: startDate },
+        platformId: { not: null },
       },
-    });
+    })
 
-    const platformData: Record<string, { dates: Record<string, number> }> = {};
+    const map: Record<string, Record<string, number>> = {}
 
-    entries.forEach((entry) => {
-      const platform = entry.platform || 'Other';
-      const dateKey = format(entry.date, 'yyyy-MM-dd');
+    entries.forEach(e => {
+      const platform = e.platformId!
+      const dateKey = format(e.date, 'yyyy-MM-dd')
 
-      if (!platformData[platform]) {
-        platformData[platform] = { dates: {} };
-      }
-      if (!platformData[platform].dates[dateKey]) {
-        platformData[platform].dates[dateKey] = 0;
-      }
+      map[platform] ??= {}
+      map[platform][dateKey] =
+        (map[platform][dateKey] || 0) + (e.problemsSolved ?? 0)
+    })
 
-      platformData[platform].dates[dateKey] += entry.problems || 0;
-    });
-
-    return Object.entries(platformData).map(([platform, data]) => ({
-      platform,
-      data: Object.entries(data.dates).map(([date, value]) => ({
+    return Object.entries(map).map(([platformId, dates]) => ({
+      platformId,
+      total: Object.values(dates).reduce((a, b) => a + b, 0),
+      data: Object.entries(dates).map(([date, value]) => ({
         date,
         value,
       })),
-      total: Object.values(data.dates).reduce((sum, val) => sum + val, 0),
-    }));
+    }))
   }
-} // ✅ CLOSING BRACE WAS MISSING - NOW FIXED
+}

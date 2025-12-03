@@ -3,6 +3,23 @@ import { ScraperFactory } from './scrapers';
 import { nanoid } from 'nanoid';
 
 export class SyncService {
+  static async getSyncHistory(userId: string, { platformId, limit }: { platformId: string; limit: number; }) {
+    const logs = await prisma.syncLog.findMany({
+      where: {
+        userId,
+        platformId,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        platform: {
+          select: { name: true, icon: true, slug: true },
+        },
+      },
+    });
+
+    return logs;
+  }
   // Sync all platforms for a user
   static async syncAllPlatforms(userId: string) {
     const jobId = nanoid();
@@ -85,9 +102,21 @@ export class SyncService {
 
       // Save entries to database
       let entriesAdded = 0;
+      let entriesUpdated = 0;
 
       if (result.entries && result.entries.length > 0) {
         for (const entry of result.entries) {
+          // Check if entry exists
+          const existingEntry = await prisma.trackerEntry.findUnique({
+            where: {
+              userId_date_platform: {
+                userId,
+                date: entry.date,
+                platform: userPlatform.platform.name,
+              },
+            },
+          });
+
           // Create or update entry
           await prisma.trackerEntry.upsert({
             where: {
@@ -111,7 +140,12 @@ export class SyncService {
               notes: entry.notes,
             },
           });
-          entriesAdded++;
+
+          if (existingEntry) {
+            entriesUpdated++;
+          } else {
+            entriesAdded++;
+          }
         }
       }
 
@@ -128,14 +162,16 @@ export class SyncService {
         platform: userPlatform.platform.name,
         status: 'success',
         entriesAdded,
+        entriesUpdated,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Update sync log with error
+      const errorMessage = error instanceof Error ? error.message : 'Sync failed';
       await prisma.syncLog.update({
         where: { id: syncLog.id },
         data: {
           status: 'failed',
-          message: error.message || 'Sync failed',
+          message: errorMessage,
         },
       });
 

@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
+// src/app/api/tracker/[id]/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
 
 const updateEntrySchema = z.object({
   platform: z.string().optional(),
@@ -11,79 +13,104 @@ const updateEntrySchema = z.object({
   notes: z.string().optional(),
 });
 
-// PUT update entry
+interface RouteContext {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+/**
+ * ✅ PUT – Update tracker entry
+ */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
     const body = await request.json();
     const validated = updateEntrySchema.parse(body);
 
-    // Check if entry belongs to user
     const existing = await prisma.trackerEntry.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing || existing.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Entry not found" },
+        { status: 404 }
+      );
     }
 
     const updated = await prisma.trackerEntry.update({
-      where: { id: params.id },
+      where: { id },
       data: validated,
     });
 
     return NextResponse.json(updated);
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation error', details: error.errors },
+        { error: "Validation error", details: error.errors },
         { status: 400 }
       );
     }
-    console.error('Error updating tracker entry:', error);
+
+    console.error("Error updating tracker entry:", error);
     return NextResponse.json(
-      { error: 'Failed to update entry' },
+      { error: error?.message || "Failed to update entry" },
       { status: 500 }
     );
   }
 }
 
-// DELETE entry
+/**
+ * ✅ DELETE – Delete tracker entry
+ */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    // Check if entry belongs to user
     const existing = await prisma.trackerEntry.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing || existing.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Entry not found" },
+        { status: 404 }
+      );
     }
 
     await prisma.trackerEntry.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting tracker entry:', error);
+  } catch (error: any) {
+    console.error("Error deleting tracker entry:", error);
     return NextResponse.json(
-      { error: 'Failed to delete entry' },
+      { error: error?.message || "Failed to delete entry" },
       { status: 500 }
     );
   }

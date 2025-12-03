@@ -12,9 +12,10 @@ import {
   TrendingUp,
   Award
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Avatar } from '@/components/ui/Avatar';
-import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardContent } from '@/components/ui/Card';
+
+import  Avatar  from '@/components/ui/Avatar';
+import  Badge  from '@/components/ui/Badge';
 import { Progress } from '@/components/ui/Progress';
 import { format } from 'date-fns';
 
@@ -70,7 +71,7 @@ export function PublicProfile({
             <Avatar
               src={user.avatar}
               alt={user.name}
-              size="2xl"
+              sizes="2xl"
               className="mx-auto md:mx-0"
             />
 

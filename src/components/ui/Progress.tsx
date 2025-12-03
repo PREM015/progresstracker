@@ -8,7 +8,7 @@ interface ProgressProps {
   color?: string;
 }
 
-const Progress: React.FC<ProgressProps> = ({
+export const Progress: React.FC<ProgressProps> = ({
   value,
   className,
   height = "h-3",

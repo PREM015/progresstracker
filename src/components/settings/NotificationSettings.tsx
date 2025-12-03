@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Loader2, Mail, Bell, Calendar, Trophy, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import  Button  from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
 

@@ -1,6 +1,6 @@
 // src/services/achievementService.ts
 
-import prisma from '@/lib/prisma';
+import {prisma} from '@/lib/prisma';
 import { 
   Achievement, 
   UserAchievement, 

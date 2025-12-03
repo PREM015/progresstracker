@@ -2,9 +2,9 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { Share2, Check, Copy, Twitter, Linkedin, Facebook } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { useState } from 'react';
+import { Share2, Check, Copy } from 'lucide-react';
+import  Button  from '@/components/ui/Button';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { useToast } from '@/hooks/useToast';
 

@@ -1,85 +1,145 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface TabsContextValue {
   value: string;
-  onChange: (value: string) => void;
+  setValue: (value: string) => void;
 }
 
-const TabsContext = createContext<TabsContextValue | undefined>(undefined);
+const TabsContext = React.createContext<TabsContextValue | null>(null);
 
-function useTabsContext() {
-  const context = useContext(TabsContext);
-  if (!context) {
-    throw new Error("Tabs components must be used within a Tabs component");
+function useTabs() {
+  const ctx = React.useContext(TabsContext);
+  if (!ctx) {
+    throw new Error("Tabs components must be used inside <Tabs />");
   }
-  return context;
+  return ctx;
 }
 
-interface TabsProps {
-  defaultValue: string;
-  children: ReactNode;
+/* -------------------------------- Tabs -------------------------------- */
+
+export interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
 }
 
-export function Tabs({ defaultValue, children }: TabsProps) {
-  const [value, setValue] = useState(defaultValue);
+export function Tabs({
+  value: controlledValue,
+  defaultValue,
+  onValueChange,
+  className,
+  children,
+  ...props
+}: TabsProps) {
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(
+    defaultValue
+  );
+
+  const value = controlledValue ?? uncontrolledValue;
+
+  const setValue = (val: string) => {
+    if (controlledValue === undefined) {
+      setUncontrolledValue(val);
+    }
+    onValueChange?.(val);
+  };
 
   return (
-    <TabsContext.Provider value={{ value, onChange: setValue }}>
-      <div>{children}</div>
+    <TabsContext.Provider value={{ value: value!, setValue }}>
+      <div className={cn("w-full", className)} {...props}>
+        {children}
+      </div>
     </TabsContext.Provider>
   );
 }
 
-interface TabsListProps {
-  children: ReactNode;
-  className?: string;
+/* ----------------------------- TabsList ----------------------------- */
+
+export interface TabsListProps
+  extends React.HTMLAttributes<HTMLDivElement> {}
+
+export function TabsList({ className, ...props }: TabsListProps) {
+  return (
+    <div
+      className={cn(
+        "flex gap-2 border-b border-gray-200 dark:border-gray-700",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
-function TabsList({ children, className }: TabsListProps) {
-  return <div className={cn("flex gap-4", className)}>{children}</div>;
-}
+/* --------------------------- TabsTrigger --------------------------- */
 
-interface TabsTriggerProps {
+export interface TabsTriggerProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   value: string;
-  children: ReactNode;
 }
 
-function TabsTrigger({ value, children }: TabsTriggerProps) {
-  const { value: selectedValue, onChange } = useTabsContext();
-  const isActive = selectedValue === value;
+export function TabsTrigger({
+  value,
+  className,
+  children,
+  ...props
+}: TabsTriggerProps) {
+  const { value: activeValue, setValue } = useTabs();
+  const isActive = activeValue === value;
 
   return (
     <button
-      onClick={() => onChange(value)}
+      type="button"
+      onClick={() => setValue(value)}
       className={cn(
-        "px-4 py-2 text-sm font-medium transition-colors border-b-2",
+        "px-4 py-2 text-sm font-medium transition-all",
+        "border-b-2 -mb-px",
         isActive
           ? "border-blue-600 text-blue-600 dark:text-blue-400"
-          : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white",
+        className
       )}
+      {...props}
     >
       {children}
     </button>
   );
 }
 
-interface TabsContentProps {
+/* --------------------------- TabsContent --------------------------- */
+
+export interface TabsContentProps
+  extends React.HTMLAttributes<HTMLDivElement> {
   value: string;
-  children: ReactNode;
 }
 
-function TabsContent({ value, children }: TabsContentProps) {
-  const { value: selectedValue } = useTabsContext();
+export function TabsContent({
+  value,
+  className,
+  children,
+  ...props
+}: TabsContentProps) {
+  const { value: activeValue } = useTabs();
 
-  if (selectedValue !== value) return null;
+  if (activeValue !== value) return null;
 
-  return <div>{children}</div>;
+  return (
+    <div className={cn("pt-4", className)} {...props}>
+      {children}
+    </div>
+  );
 }
 
-// Attach sub-components
+/* ----------------------- shadcn-style aliases ----------------------- */
+
 Tabs.List = TabsList;
 Tabs.Trigger = TabsTrigger;
 Tabs.Content = TabsContent;
+
+/* -----------------------------------------------------------------------------
+ Default export (backward compatibility ✅)
+----------------------------------------------------------------------------- */
+
+export default Tabs;

@@ -3,6 +3,16 @@ import axios from 'axios';
 import { useSession } from 'next-auth/react';
 
 interface User {
+  avatar(avatar: (avatar: any) => unknown): unknown;
+  website: string;
+  location: string;
+  bio: string;
+  [x: string]: string;
+  username: string;
+  bio: string;
+  location: string;
+  website: string;
+  avatar(avatar: any): unknown;
   id: string;
   name?: string;
   email?: string;

@@ -2,12 +2,12 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Save, Loader2, RefreshCw, Clock, Zap } from 'lucide-react';
+import  { useState, useEffect } from 'react';
+import { Save, Loader2, Zap, Clock, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import  Button  from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
-import { RadioGroup } from '@/components/ui/RadioGroup';
+import  RadioGroup  from '@/components/ui/RadioGroup'
 import { useToast } from '@/hooks/useToast';
 
 const syncFrequencies = [

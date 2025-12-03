@@ -1,35 +1,41 @@
-"use client";
+"use client"
 
-import Button  from "@/components/ui/Button";
+import Button from "@/components/ui/Button"
+import { PlatformCategory } from "@/types/platform"
 
-const categories = [
-  { name: "All", value: "ALL" },
-  { name: "DSA", value: "DSA" },
-  { name: "Development", value: "DEVELOPMENT" },
-  { name: "Jobs", value: "JOBS" },
-  { name: "Learning", value: "LEARNING" },
-  { name: "Hackathons", value: "HACKATHONS" },
-  { name: "Design", value: "DESIGN" },
-];
+const categories: { label: string; value: PlatformCategory | null }[] = [
+  { label: "All", value: null },
+  { label: "DSA", value: "dsa" },
+  { label: "Jobs", value: "job" },
+  { label: "Hackathons", value: "hackathon" },
+  { label: "Git", value: "git" },
+  { label: "Learning", value: "learning" },
+  { label: "Open Source", value: "opensource" },
+  { label: "Companies", value: "company" },
+]
 
-export default function CategoryFilter() {
-  const handleCategoryChange = (category: string) => {
-    // This will be implemented with context or state management
-    console.log("Selected category:", category);
-  };
+type Props = {
+  selected: PlatformCategory | null
+  onSelect: (category: PlatformCategory | null) => void
+}
 
+export default function CategoryFilter({ selected, onSelect }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
-      {categories.map((category) => (
-        <Button
-          key={category.value}
-          variant="outline"
-          size="sm"
-          onClick={() => handleCategoryChange(category.value)}
-        >
-          {category.name}
-        </Button>
-      ))}
+      {categories.map((c) => {
+        const active = selected === c.value
+
+        return (
+          <Button
+            key={c.label}
+            size="sm"
+            variant={active ? "primary" : "outline"}
+            onClick={() => onSelect(c.value)}
+          >
+            {c.label}
+          </Button>
+        )
+      })}
     </div>
-  );
+  )
 }

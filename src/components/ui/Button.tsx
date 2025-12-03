@@ -1,3 +1,5 @@
+"use client";
+
 import React, { ButtonHTMLAttributes } from "react";
 import clsx from "clsx";
 
@@ -5,7 +7,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "danger" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
   leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
   isLoading?: boolean;
+  fullWidth?: boolean;
+  rounded?: "none" | "sm" | "md" | "full";
+  bgColor?: string; // custom background color
+  textColor?: string; // custom text color
 }
 
 const variantStyles: Record<string, string> = {
@@ -22,30 +29,73 @@ const sizeStyles: Record<string, string> = {
   lg: "px-5 py-3 text-lg",
 };
 
+const roundedStyles: Record<string, string> = {
+  none: "rounded-none",
+  sm: "rounded-sm",
+  md: "rounded-md",
+  full: "rounded-full",
+};
+
 const Button: React.FC<ButtonProps> = ({
   variant = "primary",
   size = "md",
+  rounded = "md",
   className,
   leftIcon,
-  isLoading,
+  rightIcon,
+  isLoading = false,
+  fullWidth = false,
+  bgColor,
+  textColor,
   children,
-  ...buttonProps // ✅ safe
+  ...buttonProps
 }) => {
   return (
     <button
       {...buttonProps}
+      disabled={isLoading || buttonProps.disabled}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-md font-medium disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
         variantStyles[variant],
         sizeStyles[size],
+        roundedStyles[rounded],
+        fullWidth && "w-full",
         className
       )}
-      disabled={isLoading || buttonProps.disabled}
+      style={{
+        backgroundColor: bgColor,
+        color: textColor,
+      }}
     >
-      {isLoading ? "Loading..." : (
+      {isLoading ? (
+        <span className="flex items-center gap-2">
+          <svg
+            className="animate-spin h-4 w-4 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+          Loading...
+        </span>
+      ) : (
         <>
-          {leftIcon}
+          {leftIcon && <span>{leftIcon}</span>}
           {children}
+          {rightIcon && <span>{rightIcon}</span>}
         </>
       )}
     </button>

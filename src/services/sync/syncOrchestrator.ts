@@ -1,9 +1,9 @@
 // src/services/sync/syncOrchestrator.ts
 
-import prisma from '@/lib/prisma';
+import{ prisma} from '@/lib/prisma';
 import { ScraperFactory } from '../scrapers';
 import { SyncService } from '../syncService';
-import { SyncJob, SyncResult, SyncStatus } from '@/types/sync';
+import { SyncJob, SyncStatus } from '@/types/sync';
 
 interface SyncJobOptions {
   userId: string;
@@ -25,9 +25,9 @@ interface SyncQueueItem {
 class SyncOrchestrator {
   private queue: SyncQueueItem[] = [];
   private isProcessing: boolean = false;
-  private maxConcurrent: number = 5;
-  private maxRetries: number = 3;
-  private activeJobs: Map<string, SyncJob> = new Map();
+  private readonly maxConcurrent: number = 5;
+  private readonly maxRetries: number = 3;
+  private readonly activeJobs: Map<string, SyncJob> = new Map();
 
   // Add job to queue
   async enqueue(options: SyncJobOptions): Promise<string> {
@@ -132,7 +132,7 @@ class SyncOrchestrator {
       item.status = 'running';
 
       // Execute sync
-      await SyncService.syncSinglePlatform(item.userId, item.platformId);
+      await SyncService.syncPlatform(item.userId, item.platformId);
 
       // Update job
       job.completedPlatforms++;
@@ -141,7 +141,7 @@ class SyncOrchestrator {
       );
 
       item.status = 'success';
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Sync failed for platform ${item.platformId}:`, error);
 
       // Retry logic
@@ -199,7 +199,7 @@ class SyncOrchestrator {
   // Cancel job
   cancelJob(jobId: string): boolean {
     const job = this.activeJobs.get(jobId);
-    if (!job || job.status !== 'running') return false;
+    if (job?.status !== 'running') return false;
 
     // Remove pending items from queue
     this.queue = this.queue.filter(

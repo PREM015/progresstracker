@@ -17,9 +17,9 @@ import {
   Save 
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
+import  Button  from '@/components/ui/Button';
+import  Input  from '@/components/ui/Input';
+import Modal  from '@/components/ui/Modal';
 import { useToast } from '@/hooks/useToast';
 import { signOut } from 'next-auth/react';
 

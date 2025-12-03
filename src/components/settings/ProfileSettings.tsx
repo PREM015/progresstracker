@@ -9,8 +9,9 @@ import { z } from 'zod';
 import { Camera, Save, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
+import  Button  from '@/components/ui/Button';
+import  Avatar  from '@/components/ui/Avatar';
+
 import { useToast } from '@/hooks/useToast';
 import { useUser } from '@/hooks/useUser';
 
@@ -29,7 +30,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export function ProfileSettings() {
-  const { user, mutate } = useUser();
+  const { user, mutate }= useUser();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);

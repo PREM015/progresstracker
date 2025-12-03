@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useState } from 'react';
@@ -22,7 +23,7 @@ export default function AnalyticsPage() {
 
   const { trends, metrics, insights, comparison, isLoading } = useAnalytics(selectedDays, selectedMetric);
   const { stats } = useStats(selectedDays);
-  const { connectedPlatforms } = usePlatforms();
+  usePlatforms();
 
   if (isLoading || !stats) {
     return (
