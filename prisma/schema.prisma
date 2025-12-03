@@ -1,41 +1,46 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
 }
-
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+
 }
 
-//user
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+
 model User {
   id            String    @id @default(cuid())
   name          String?
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-
-  accounts      Account[]
-  sessions      Session[]
-
-  // your other fields
   password      String?
+  username      String?   @unique
+  bio           String?
+  location      String?
+  website       String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  platforms     UserPlatform[]
-  trackerEntries TrackerEntry[]
-  goals         Goal[]
-  achievements  UserAchievement[]
-  notifications NotificationPreferences?
-  settings      UserSettings?
-  syncLogs      SyncLog[]
+
+  // Relations
+  accounts              Account[]
+  sessions              Session[]
+  platforms             UserPlatform[]
+  trackerEntries        TrackerEntry[]
+  goals                 Goal[]
+  achievements          UserAchievement[]
+  notificationPreferences NotificationPreferences?
+  settings              UserSettings?
+  syncLogs              SyncLog[]
+
+  @@index([email])
+  @@index([username])
 }
 
 model Account {
@@ -44,19 +49,19 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
-
 
 model Session {
   id           String   @id @default(cuid())
@@ -65,82 +70,130 @@ model Session {
   expires      DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
-//platforms
-//platforms
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
+  @@unique([identifier, token])
+}
+
+// ==========================================
+// PLATFORMS
+// ==========================================
 
 model Platform {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug            String    @unique
+  id               String   @id @default(cuid())
+  name             String   @unique
+  slug             String   @unique
+  category         String
+  icon             String?
+  color            String?
+  website          String?
+  authType         String?  @default("none")
+  supportsAutoSync Boolean  @default(false)
+  description      String?
+  displayName      String?
+  apiEndpoint      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  category    String
-  icon        String?
-  color       String?
-  website     String?
-  authType    String?
-  supportsAutoSync Boolean @default(false)
-  description String?
-  displayName String?
-  createdAt   DateTime @default(now())
-
-  users UserPlatform[]
+  // Relations
+  users    UserPlatform[]
   syncLogs SyncLog[]
+
+  @@index([category])
+  @@index([slug])
 }
+
 model UserPlatform {
-  id         String   @id @default(cuid())
-  userId     String
-  platformId String
-  username   String?
-  token      String?
-  createdAt  DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+  platformId    String
+  username      String?
+  credentials   String?   @db.Text
+  isActive      Boolean   @default(true)
+  lastSyncedAt  DateTime?
+  syncStatus    String?   @default("pending")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platformId])
+  @@index([userId])
+  @@index([platformId])
 }
 
+// ==========================================
+// TRACKER
+// ==========================================
+
 model TrackerEntry {
-  id        String   @id @default(cuid())
-  userId    String
-  date      DateTime
-  platform  String?
-  problems  Int?     @default(0)
-  timeSpent Int?     @default(0)
-  notes     String?
+  id                    String   @id @default(cuid())
+  userId                String
+  date                  DateTime
+  platformId            String?
+  category              String?
+  problemsSolved        Int?     @default(0)
+  projectsCompleted     Int?     @default(0)
+  applicationsSubmitted Int?     @default(0)
+  coursesCompleted      Int?     @default(0)
+  timeSpent             Int?     @default(0)
+  mood                  String?
+  notes                 String?  @db.Text
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, date, platformId])
   @@index([userId, date])
+  @@index([date])
 }
+
+// ==========================================
+// GOALS & ACHIEVEMENTS
+// ==========================================
 
 model Goal {
   id          String    @id @default(cuid())
   userId      String
   title       String
+  description String?   @db.Text
+  category    String
   target      Int
   progress    Int       @default(0)
+  status      String    @default("active")
   deadline    DateTime?
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([status])
+  @@index([userId, status])
 }
 
 model Achievement {
-  id          String @id @default(cuid())
-  name        String
+  id          String   @id @default(cuid())
+  title       String
   description String
-  icon        String
+  category    String
+  icon        String?
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
 
   users UserAchievement[]
 
-  @@unique([name])
+  @@unique([title])
 }
 
 model UserAchievement {
@@ -153,44 +206,65 @@ model UserAchievement {
   achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
 
   @@unique([userId, achievementId])
+  @@index([userId])
 }
+
+// ==========================================
+// SYNC LOGS
+// ==========================================
 
 model SyncLog {
   id         String   @id @default(cuid())
   userId     String
   platformId String?
   status     String
-  message    String?
+  message    String?  @db.Text
+  duration   Int?
   createdAt  DateTime @default(now())
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([platformId])
+  @@index([status])
 }
+
+// ==========================================
+// USER PREFERENCES
+// ==========================================
+
 model UserSettings {
-  id            String  @id @default(cuid())
-  userId        String  @unique
-  theme         String  @default("light")
-  autoSync      Boolean @default(true)
-  syncFrequency String  @default("daily")
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  theme         String   @default("system")
+  language      String   @default("en")
+  timezone      String   @default("UTC")
+  dateFormat    String   @default("MM/DD/YYYY")
+  autoSync      Boolean  @default(true)
+  syncFrequency String   @default("daily")
+  publicProfile Boolean  @default(false)
+  showEmail     Boolean  @default(false)
+  showStats     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model NotificationPreferences {
-  id                String  @id @default(cuid())
-  userId            String  @unique
-  emailReminders    Boolean @default(true)
-  weeklySummary     Boolean @default(true)
-  achievementAlerts Boolean @default(true)
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(false)
+  weeklyReport       Boolean  @default(true)
+  dailyReminder      Boolean  @default(false)
+  goalReminders      Boolean  @default(true)
+  achievementAlerts  Boolean  @default(true)
+  syncFailures       Boolean  @default(true)
+  newFeatures        Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
 }

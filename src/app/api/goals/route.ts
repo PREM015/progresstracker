@@ -1,57 +1,87 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import {prisma} from "@/lib/prisma";
+// src/app/api/goals/route.ts
 
-/**
- * GET /api/goals
- * Fetch all goals for logged-in user
- */
-export async function GET() {
-  const session = await getServerSession(authOptions);
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { GoalService } from '@/services/goalService';
+import { CreateGoalRequest } from '@/types/goal';
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+// GET - Get all goals for user
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const goals = await prisma.goal.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-  });
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status') as any;
+    const type = searchParams.get('type') as any;
+    const category = searchParams.get('category') as any;
 
-  return NextResponse.json(goals);
-}
+    const goals = await GoalService.getUserGoals(session.user.id, {
+      status,
+      type,
+      category,
+    });
 
-/**
- * POST /api/goals
- * Create a new goal
- */
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+    const stats = await GoalService.getGoalStats(session.user.id);
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await req.json();
-  const { title, target, deadline } = body;
-
-  if (!title || !target) {
+    return NextResponse.json({
+      goals,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('Get goals error:', error);
     return NextResponse.json(
-      { error: "Title and target are required" },
-      { status: 400 }
+      { error: error.message || 'Failed to get goals' },
+      { status: 500 }
     );
   }
+}
 
-  const goal = await prisma.goal.create({
-    data: {
-      userId: session.user.id,
-      title,
-      target: Number(target),
-      progress: 0,
-      deadline: deadline ? new Date(deadline) : null,
-    },
-  });
+// POST - Create new goal
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  return NextResponse.json(goal, { status: 201 });
+    const body: CreateGoalRequest = await req.json();
+
+    // Validation
+    if (!body.title || !body.target) {
+      return NextResponse.json(
+        { error: 'Title and target are required' },
+        { status: 400 }
+      );
+    }
+
+    if (body.target <= 0) {
+      return NextResponse.json(
+        { error: 'Target must be a positive number' },
+        { status: 400 }
+      );
+    }
+
+    const goal = await GoalService.createGoal(session.user.id, {
+      title: body.title,
+      description: body.description,
+      type: body.type || 'custom',
+      category: body.category || 'custom',
+      target: body.target,
+      unit: body.unit,
+      deadline: body.deadline,
+      platformId: body.platformId,
+    });
+
+    return NextResponse.json(goal, { status: 201 });
+  } catch (error: any) {
+    console.error('Create goal error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create goal' },
+      { status: 500 }
+    );
+  }
 }

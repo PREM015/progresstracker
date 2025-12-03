@@ -1,50 +1,79 @@
-"use client";
+// src/components/settings/SettingsTabs.tsx
 
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import ProfileSettings from "./ProfileSettings";
-import AppearanceSettings from "./AppearanceSettings";
-import SyncSettings from "./SyncSettings";
-import NotificationSettings from "./NotificationSettings";
-import AccountSettings from "./AccountSettings";
+'use client';
+
+import React, { useState } from 'react';
+import { User, Bell, Palette, RefreshCw, Shield } from 'lucide-react';
+import { Tabs } from '@/components/ui/Tabs';
+import { ProfileSettings } from './ProfileSettings';
+import { NotificationSettings } from './NotificationSettings';
+import { AppearanceSettings } from './AppearanceSettings';
+import { SyncSettings } from './SyncSettings';
+import { AccountSettings } from './AccountSettings';
 
 const tabs = [
-  { id: "profile", label: "Profile", component: ProfileSettings },
-  { id: "appearance", label: "Appearance", component: AppearanceSettings },
-  { id: "sync", label: "Sync", component: SyncSettings },
-  { id: "notifications", label: "Notifications", component: NotificationSettings },
-  { id: "account", label: "Account", component: AccountSettings },
+  {
+    id: 'profile',
+    label: 'Profile',
+    icon: User,
+    component: ProfileSettings,
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    component: NotificationSettings,
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: Palette,
+    component: AppearanceSettings,
+  },
+  {
+    id: 'sync',
+    label: 'Sync',
+    icon: RefreshCw,
+    component: SyncSettings,
+  },
+  {
+    id: 'account',
+    label: 'Account',
+    icon: Shield,
+    component: AccountSettings,
+  },
 ];
 
-export default function SettingsTabs() {
-  const [activeTab, setActiveTab] = useState("profile");
+export function SettingsTabs() {
+  const [activeTab, setActiveTab] = useState('profile');
 
-  const ActiveComponent = tabs.find((tab) => tab.id === activeTab)?.component || ProfileSettings;
+  const ActiveComponent =
+    tabs.find((tab) => tab.id === activeTab)?.component || ProfileSettings;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-      {/* Tab Headers */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <div className="flex flex-wrap gap-2 px-6 py-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                activeTab === tab.id
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="border-b">
+          <div className="flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-1 py-4 border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <tab.icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </Tabs>
 
-      {/* Tab Content */}
-      <div className="p-6">
+      <div className="py-6">
         <ActiveComponent />
       </div>
     </div>

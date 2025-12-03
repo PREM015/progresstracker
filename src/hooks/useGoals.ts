@@ -1,188 +1,187 @@
-import useSWR from 'swr';
-import axios from 'axios';
-import { useToast } from './useToast';
+// src/hooks/useGoals.ts
 
-interface Goal {
-  id: string;
-  userId: string;
-  title: string;
-  target: number;
-  progress: number;
-  deadline?: Date;
-  createdAt: Date;
-  completedAt?: Date;
+import { useState, useCallback } from 'react';
+import useSWR, { mutate } from 'swr';
+import { 
+  Goal, 
+  GoalWithProgress, 
+  GoalStats, 
+  CreateGoalRequest,
+  UpdateGoalRequest,
+  GoalFilter 
+} from '@/types/goal';
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
+
+interface UseGoalsReturn {
+  goals: GoalWithProgress[];
+  activeGoals: GoalWithProgress[];
+  completedGoals: Goal[];
+  stats: GoalStats | null;
+  isLoading: boolean;
+  error: Error | null;
+  createGoal: (data: CreateGoalRequest) => Promise<Goal>;
+  updateGoal: (id: string, data: UpdateGoalRequest) => Promise<Goal>;
+  updateProgress: (id: string, progress: number) => Promise<Goal>;
+  incrementProgress: (id: string, increment?: number) => Promise<Goal>;
+  deleteGoal: (id: string) => Promise<void>;
+  completeGoal: (id: string) => Promise<Goal>;
+  refresh: () => Promise<void>;
 }
 
-interface CreateGoalData {
-  title: string;
-  target: number;
-  deadline?: Date;
-}
+export function useGoals(filter?: GoalFilter): UseGoalsReturn {
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-interface UpdateGoalData {
-  title?: string;
-  target?: number;
-  progress?: number;
-  deadline?: Date;
-}
+  // Build query string
+  const queryParams = new URLSearchParams();
+  if (filter?.status) queryParams.set('status', filter.status);
+  if (filter?.type) queryParams.set('type', filter.type);
+  if (filter?.category) queryParams.set('category', filter.category);
+  
+  const queryString = queryParams.toString();
+  const url = `/api/goals${queryString ? `?${queryString}` : ''}`;
 
-export function useGoals() {
-  const { toast } = useToast();
+  const { data, error, isLoading } = useSWR(url, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 5000,
+  });
 
-  const {
-    data,
-    error,
-    mutate,
-    isLoading,
-  } = useSWR<{ goals: Goal[] }>(
-    '/api/goals',
-    async (url) => {
-      const response = await axios.get(url);
-      return response.data;
-    },
-    {
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-    }
-  );
+  const goals = data?.goals || [];
+  const stats = data?.stats || null;
 
-  // Create new goal
-  const createGoal = async (goalData: CreateGoalData) => {
+  // Active goals
+  const activeGoals = goals.filter((g: GoalWithProgress) => g.status === 'active');
+  
+  // Completed goals
+  const completedGoals = goals.filter((g: GoalWithProgress) => g.status === 'completed');
+
+  const refresh = useCallback(async () => {
+    await mutate(url);
+  }, [url]);
+
+  const createGoal = useCallback(async (goalData: CreateGoalRequest): Promise<Goal> => {
+    setIsSubmitting(true);
     try {
-      const response = await axios.post('/api/goals', goalData);
-      await mutate();
-      toast({
-        title: 'Goal created',
-        description: 'Your new goal has been set!',
-        variant: 'success',
+      const response = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(goalData),
       });
-      return response.data.goal;
-    } catch (error: any) {
-      toast({
-        title: 'Failed to create goal',
-        description: error.response?.data?.error || 'Please try again.',
-        variant: 'error',
-      });
-      throw error;
-    }
-  };
 
-  // Update goal
-  const updateGoal = async (id: string, data: UpdateGoalData) => {
-    try {
-      const response = await axios.put(`/api/goals/${id}`, data);
-      await mutate();
-      toast({
-        title: 'Goal updated',
-        description: 'Your changes have been saved.',
-        variant: 'success',
-      });
-      return response.data.goal;
-    } catch (error: any) {
-      toast({
-        title: 'Failed to update goal',
-        description: error.response?.data?.error || 'Please try again.',
-        variant: 'error',
-      });
-      throw error;
-    }
-  };
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create goal');
+      }
 
-  // Delete goal
-  const deleteGoal = async (id: string) => {
-    try {
-      await axios.delete(`/api/goals/${id}`);
-      await mutate();
-      toast({
-        title: 'Goal deleted',
-        description: 'The goal has been removed.',
-        variant: 'success',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Failed to delete goal',
-        description: error.response?.data?.error || 'Please try again.',
-        variant: 'error',
-      });
-      throw error;
+      const goal = await response.json();
+      await refresh();
+      return goal;
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [refresh]);
 
-  // Complete goal
-  const completeGoal = async (id: string) => {
+  const updateGoal = useCallback(async (
+    id: string, 
+    goalData: UpdateGoalRequest
+  ): Promise<Goal> => {
+    setIsSubmitting(true);
     try {
-      const response = await axios.put(`/api/goals/${id}`, {
-        completedAt: new Date().toISOString(),
+      const response = await fetch(`/api/goals/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(goalData),
       });
-      await mutate();
-      toast({
-        title: 'Goal completed! 🎉',
-        description: 'Congratulations on achieving your goal!',
-        variant: 'success',
-        duration: 7000,
-      });
-      return response.data.goal;
-    } catch (error: any) {
-      toast({
-        title: 'Failed to complete goal',
-        description: error.response?.data?.error || 'Please try again.',
-        variant: 'error',
-      });
-      throw error;
-    }
-  };
 
-  // Update progress
-  const updateProgress = async (id: string, progress: number) => {
-    try {
-      const response = await axios.put(`/api/goals/${id}`, { progress });
-      await mutate();
-      return response.data.goal;
-    } catch (error: any) {
-      toast({
-        title: 'Failed to update progress',
-        description: error.response?.data?.error || 'Please try again.',
-        variant: 'error',
-      });
-      throw error;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update goal');
+      }
+
+      const goal = await response.json();
+      await refresh();
+      return goal;
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [refresh]);
+
+  const updateProgress = useCallback(async (
+    id: string, 
+    progress: number
+  ): Promise<Goal> => {
+    const response = await fetch(`/api/goals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ progress }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update progress');
+    }
+
+    const goal = await response.json();
+    await refresh();
+    return goal;
+  }, [refresh]);
+
+  const incrementProgress = useCallback(async (
+    id: string, 
+    increment: number = 1
+  ): Promise<Goal> => {
+    const response = await fetch(`/api/goals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ increment }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to increment progress');
+    }
+
+    const goal = await response.json();
+    await refresh();
+    return goal;
+  }, [refresh]);
+
+  const deleteGoal = useCallback(async (id: string): Promise<void> => {
+    const response = await fetch(`/api/goals/${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete goal');
+    }
+
+    await refresh();
+  }, [refresh]);
+
+  const completeGoal = useCallback(async (id: string): Promise<Goal> => {
+    const goal = goals.find((g: GoalWithProgress) => g.id === id);
+    if (goal) {
+      return updateProgress(id, goal.target);
+    }
+    throw new Error('Goal not found');
+  }, [goals, updateProgress]);
 
   return {
-    goals: data?.goals || [],
-    isLoading,
+    goals,
+    activeGoals,
+    completedGoals,
+    stats,
+    isLoading: isLoading || isSubmitting,
     error,
     createGoal,
     updateGoal,
+    updateProgress,
+    incrementProgress,
     deleteGoal,
     completeGoal,
-    updateProgress,
-    refresh: mutate,
+    refresh,
   };
 }
 
-// Hook to get active goals only
-export function useActiveGoals() {
-  const { goals, isLoading, error } = useGoals();
-
-  const activeGoals = goals.filter((goal) => !goal.completedAt);
-
-  return {
-    goals: activeGoals,
-    isLoading,
-    error,
-  };
-}
-
-// Hook to get completed goals only
-export function useCompletedGoals() {
-  const { goals, isLoading, error } = useGoals();
-
-  const completedGoals = goals.filter((goal) => goal.completedAt);
-
-  return {
-    goals: completedGoals,
-    isLoading,
-    error,
-  };
-}
+export default useGoals;

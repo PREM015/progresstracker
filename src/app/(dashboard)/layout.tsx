@@ -7,7 +7,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import Footer from "@/components/layout/Footer";
-
+import { SyncProvider}  from "@/context/SyncContext";
 export default async function DashboardLayout({
   children,
 }: {
@@ -21,7 +21,9 @@ export default async function DashboardLayout({
   }
 
   return (
+
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+          <SyncProvider>
       {/* Navbar */}
       <Navbar />
 
@@ -38,6 +40,7 @@ export default async function DashboardLayout({
         </main>
       </div>
        <Footer />
+       </SyncProvider>
     </div>
   );
 }
