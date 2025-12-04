@@ -1,18 +1,18 @@
 // src/app/[username]/page.tsx
 
-import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/prisma';
-import { PublicProfile } from '@/components/profile/PublicProfile';
-import { ShareButton } from '@/components/profile/ShareButton';
+import { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { PublicProfile } from "@/components/profile/PublicProfile";
+import { ShareButton } from "@/components/profile/ShareButton";
 
-interface PublicProfilePageProps {
-  params: {
-    username: string;
-  };
-}
+type PageProps = {
+  params: Promise<{ username: string }>;
+};
 
-async function getUserData(username: string) {
+async function getUserData(username?: string) {
+  if (!username) return null;
+
   const user = await prisma.user.findUnique({
     where: { username },
     include: {
@@ -21,7 +21,7 @@ async function getUserData(username: string) {
         select: {
           trackerEntries: true,
           goals: true,
-          userAchievements: true,
+          achievements: true, // FIXED: use correct relation name
         },
       },
     },
@@ -31,25 +31,23 @@ async function getUserData(username: string) {
     return null;
   }
 
-  // Get stats
   const [completedGoals, achievements, trackerEntries] = await Promise.all([
     prisma.goal.count({
-      where: { userId: user.id, status: 'COMPLETED' },
+      where: { userId: user.id, status: "COMPLETED" },
     }),
     prisma.userAchievement.findMany({
       where: { userId: user.id },
       include: { achievement: true },
-      orderBy: { unlockedAt: 'desc' },
+      orderBy: { unlockedAt: "desc" },
       take: 6,
     }),
     prisma.trackerEntry.findMany({
       where: { userId: user.id },
-      orderBy: { date: 'desc' },
+      orderBy: { date: "desc" },
       take: 100,
     }),
   ]);
 
-  // Calculate stats
   const totalProblemsSolved = trackerEntries.reduce(
     (sum, entry) => sum + (entry.problemsSolved || 0),
     0
@@ -59,9 +57,9 @@ async function getUserData(username: string) {
 
   return {
     user: {
-      name: user.name || '',
-      username: user.username || '',
-      avatar: user.avatar,
+      name: user.name ?? "",
+      username: user.username ?? "",
+      avatar: user.image, // matches your schema field
       bio: user.bio,
       location: user.location,
       website: user.website,
@@ -73,7 +71,7 @@ async function getUserData(username: string) {
       longestStreak: currentStreak,
       totalProblemsSolved,
       completedGoals,
-      achievements: user._count.userAchievements,
+      achievements: user._count.achievements, // FIXED
     },
     achievements: achievements.map((ua) => ({
       id: ua.id,
@@ -87,21 +85,20 @@ async function getUserData(username: string) {
 }
 
 function calculateStreak(entries: any[]): number {
-  if (entries.length === 0) return 0;
+  if (!entries.length) return 0;
 
   let streak = 0;
-  let currentDate = new Date();
-  currentDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   for (const entry of entries) {
     const entryDate = new Date(entry.date);
     entryDate.setHours(0, 0, 0, 0);
 
-    const diffDays = Math.floor(
-      (currentDate.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    const diffDays =
+      (today.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24);
 
-    if (diffDays === streak) {
+    if (Math.floor(diffDays) === streak) {
       streak++;
     } else {
       break;
@@ -113,23 +110,29 @@ function calculateStreak(entries: any[]): number {
 
 export async function generateMetadata({
   params,
-}: PublicProfilePageProps): Promise<Metadata> {
-  const data = await getUserData(params.username);
+}: PageProps): Promise<Metadata> {
+  const { username } = await params;
+
+  const data = await getUserData(username);
 
   if (!data) {
     return {
-      title: 'User Not Found',
+      title: "User Not Found",
     };
   }
 
   return {
     title: `${data.user.name} (@${data.user.username}) | CodeSync Pro`,
-    description: data.user.bio || `Check out ${data.user.name}'s coding progress on CodeSync Pro`,
+    description:
+      data.user.bio ||
+      `Check out ${data.user.name}'s coding progress on CodeSync Pro`,
   };
 }
 
-export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
-  const data = await getUserData(params.username);
+export default async function PublicProfilePage({ params }: PageProps) {
+  const { username } = await params;
+
+  const data = await getUserData(username);
 
   if (!data) {
     notFound();
@@ -138,9 +141,9 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-4xl mx-auto mb-6 flex justify-end">
-        <ShareButton username={params.username} />
+        <ShareButton username={username} />
       </div>
-      
+
       <PublicProfile {...data} />
     </div>
   );

@@ -1,14 +1,15 @@
-export const runtime = "nodejs"
+// src/app/api/auth/[...nextauth]/route.ts
+export const runtime = "nodejs";
 
-import NextAuth, { NextAuthOptions } from "next-auth"
-import type { DefaultSession } from 'next-auth'
-import type { JWT } from 'next-auth/jwt'
-import CredentialsProvider from "next-auth/providers/credentials"
-import GoogleProvider from "next-auth/providers/google"
-import GitHubProvider from "next-auth/providers/github"
-import { PrismaAdapter } from "@next-auth/prisma-adapter"
-import bcrypt from "bcryptjs"
-import { prisma } from "@/lib/prisma"
+import NextAuth, { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import GitHubProvider from "next-auth/providers/github";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import type { DefaultSession } from "next-auth";
+import type { JWT } from "next-auth/jwt";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -17,8 +18,8 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 30 * 60, // 30 min
-    updateAge: 0, // no sliding
+    maxAge: 30 * 60, // 30 minutes
+    updateAge: 0,
   },
 
   providers: [
@@ -29,18 +30,33 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null
-        const user = await prisma.user.findUnique({ where: { email: credentials.email } })
-        if (!user?.password) return null
-        const valid = await bcrypt.compare(credentials.password, user.password)
-        if (!valid) return null
-        return user
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+
+        if (!user || !user.password) return null;
+
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) return null;
+
+        return user;
       },
     }),
+
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
+
     GitHubProvider({
       clientId: process.env.GITHUB_AUTH_CLIENT_ID!,
       clientSecret: process.env.GITHUB_AUTH_CLIENT_SECRET!,
@@ -54,49 +70,53 @@ export const authOptions: NextAuthOptions = {
 
   useSecureCookies: false,
   cookies: {
-    sessionToken: { name: "next-auth.session-token", options: { httpOnly: true, sameSite: "lax", path: "/", secure: false } },
-    state: { name: "next-auth.state", options: { httpOnly: true, sameSite: "lax", path: "/", secure: false } },
+    sessionToken: {
+      name: "next-auth.session-token",
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: false },
+    },
+    state: {
+      name: "next-auth.state",
+      options: { httpOnly: true, sameSite: "lax", path: "/", secure: false },
+    },
   },
 
   callbacks: {
     async jwt({ token, user }) {
-      // When a user signs in, attach id/email and fresh expiration
       if (user) {
-        const u = user as { id?: string; email?: string }
+        const u = user as { id?: string; email?: string };
         token = {
           ...token,
-          id: u.id ?? '',
-          email: u.email ?? '',
+          id: u.id ?? "",
+          email: u.email ?? "",
           exp: Math.floor(Date.now() / 1000) + 30 * 60,
-        }
+        };
       }
 
-      // If exp exists and token is expired, keep token shape but remove user-specific claims
-      if (typeof token.exp === 'number' && Date.now() / 1000 > token.exp) {
-        const expiredToken = { ...token } as JWT & Record<string, unknown>
-        delete (expiredToken as unknown as Record<string, unknown>)['id']
-        delete (expiredToken as unknown as Record<string, unknown>)['email']
-        return expiredToken as typeof token
+      if (typeof token.exp === "number" && Date.now() / 1000 > token.exp) {
+        const expiredToken = { ...token } as JWT & Record<string, unknown>;
+        delete (expiredToken as Record<string, unknown>).id;
+        delete (expiredToken as Record<string, unknown>).email;
+        return expiredToken as typeof token;
       }
 
-      return token
+      return token;
     },
+
     async session({ session, token }) {
-      // Always return a session object — attach user.id/email when present
-      const userObj: DefaultSession['user'] & { id: string } = {
-        id: typeof token?.id === 'string' ? token.id : '',
+      session.user = {
+        id: token.id as string,
         name: session.user?.name ?? null,
-        email: token?.email ?? session.user?.email ?? null,
+        email: token.email ?? session.user?.email ?? null,
         image: session.user?.image ?? null,
-      }
-      session.user = userObj as typeof session.user
-      return session
+      };
+      return session;
     },
-    async redirect({ baseUrl }) {
-      return baseUrl + "/dashboard"
-    }
-  },
-}
 
-const handler = NextAuth(authOptions)
-export { handler as GET, handler as POST }
+    async redirect({ url, baseUrl }) {
+      return url.startsWith(baseUrl) ? url : baseUrl + "/dashboard";
+    },
+  },
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };

@@ -8,25 +8,25 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md" | "lg";
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-  isLoading?: boolean;
+  loading?: boolean; // ✅ Fixed: renamed from isLoading for consistency
   fullWidth?: boolean;
   rounded?: "none" | "sm" | "md" | "full";
-  bgColor?: string; // custom background color
-  textColor?: string; // custom text color
+  bgColor?: string;
+  textColor?: string;
 }
 
 const variantStyles: Record<string, string> = {
-  primary: "bg-blue-600 text-white hover:bg-blue-700",
-  secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300",
-  danger: "bg-red-600 text-white hover:bg-red-700",
-  ghost: "bg-transparent hover:bg-gray-100",
-  outline: "border border-gray-300 hover:bg-gray-100",
+  primary: "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600",
+  secondary: "bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600",
+  danger: "bg-red-600 text-white hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600",
+  ghost: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800",
+  outline: "border border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800",
 };
 
 const sizeStyles: Record<string, string> = {
-  sm: "px-3 py-1 text-sm",
+  sm: "px-3 py-1.5 text-sm",
   md: "px-4 py-2 text-base",
-  lg: "px-5 py-3 text-lg",
+  lg: "px-6 py-3 text-lg",
 };
 
 const roundedStyles: Record<string, string> = {
@@ -43,19 +43,22 @@ const Button: React.FC<ButtonProps> = ({
   className,
   leftIcon,
   rightIcon,
-  isLoading = false,
+  loading = false,
   fullWidth = false,
   bgColor,
   textColor,
   children,
+  disabled,
   ...buttonProps
 }) => {
   return (
     <button
       {...buttonProps}
-      disabled={isLoading || buttonProps.disabled}
+      disabled={loading || disabled}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+        "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200",
+        "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
         variantStyles[variant],
         sizeStyles[size],
         roundedStyles[rounded],
@@ -67,10 +70,10 @@ const Button: React.FC<ButtonProps> = ({
         color: textColor,
       }}
     >
-      {isLoading ? (
-        <span className="flex items-center gap-2">
+      {loading ? (
+        <>
           <svg
-            className="animate-spin h-4 w-4 text-white"
+            className="animate-spin h-4 w-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -89,8 +92,8 @@ const Button: React.FC<ButtonProps> = ({
               d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
             ></path>
           </svg>
-          Loading...
-        </span>
+          <span>Loading...</span>
+        </>
       ) : (
         <>
           {leftIcon && <span>{leftIcon}</span>}
