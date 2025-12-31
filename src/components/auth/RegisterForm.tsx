@@ -115,8 +115,7 @@ export default function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-indigo-100 via-white to-purple-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-      <div className="w-full max-w-[440px]">
+  <div className="w-full max-w-[440px]">
         <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 overflow-hidden">
           
           {/* Compact Header */}
@@ -315,32 +314,10 @@ export default function RegisterForm() {
               <a href="#" className="text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 font-medium">Privacy</a>
             </p>
 
-            {/* Sign In Link */}
-            <p className="mt-5 text-center text-sm text-gray-600 dark:text-gray-400">
-              Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 transition">
-                Sign in
-              </Link>
-            </p>
+        
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="mt-6 text-center text-xs text-gray-500 dark:text-gray-500">
-          Protected by enterprise-grade security
-        </p>
       </div>
-
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-10px); }
-          75% { transform: translateX(10px); }
-        }
-        .animate-shake {
-          animation: shake 0.4s ease-in-out;
-        }
-      `}</style>
-    </div>
   );
 }
