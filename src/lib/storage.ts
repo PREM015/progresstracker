@@ -3,20 +3,19 @@
 /**
  * Local storage utilities with error handling
  */
-
 export const storage = {
   /**
    * Get item from localStorage
    */
   get<T>(key: string, defaultValue?: T): T | null {
-    if (typeof window === 'undefined') return defaultValue || null;
+    if (typeof window === 'undefined') return defaultValue ?? null;
 
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue || null;
+      return item ? (JSON.parse(item) as T) : defaultValue ?? null;
     } catch (error) {
       console.error(`Error getting ${key} from localStorage:`, error);
-      return defaultValue || null;
+      return defaultValue ?? null;
     }
   },
 
@@ -65,7 +64,12 @@ export const storage = {
   has(key: string): boolean {
     if (typeof window === 'undefined') return false;
 
-    return window.localStorage.getItem(key) !== null;
+    try {
+      return window.localStorage.getItem(key) !== null;
+    } catch (error) {
+      console.error(`Error checking ${key} in localStorage:`, error);
+      return false;
+    }
   },
 };
 
@@ -74,14 +78,14 @@ export const storage = {
  */
 export const sessionStorage = {
   get<T>(key: string, defaultValue?: T): T | null {
-    if (typeof window === 'undefined') return defaultValue || null;
+    if (typeof window === 'undefined') return defaultValue ?? null;
 
     try {
       const item = window.sessionStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue || null;
+      return item ? (JSON.parse(item) as T) : defaultValue ?? null;
     } catch (error) {
       console.error(`Error getting ${key} from sessionStorage:`, error);
-      return defaultValue || null;
+      return defaultValue ?? null;
     }
   },
 
@@ -112,6 +116,17 @@ export const sessionStorage = {
       window.sessionStorage.clear();
     } catch (error) {
       console.error('Error clearing sessionStorage:', error);
+    }
+  },
+
+  has(key: string): boolean {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      return window.sessionStorage.getItem(key) !== null;
+    } catch (error) {
+      console.error(`Error checking ${key} in sessionStorage:`, error);
+      return false;
     }
   },
 };

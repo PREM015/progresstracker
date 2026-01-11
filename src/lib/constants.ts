@@ -13,6 +13,8 @@ export const ROUTES = {
   SETTINGS: "/settings",
 } as const
 
+export type Route = typeof ROUTES[keyof typeof ROUTES]
+
 /**
  * Platform Categories
  */
@@ -27,7 +29,7 @@ export const PLATFORM_CATEGORIES = {
   OTHER: "OTHER",
 } as const
 
-export type PlatformCategory = keyof typeof PLATFORM_CATEGORIES
+export type PlatformCategory = typeof PLATFORM_CATEGORIES[keyof typeof PLATFORM_CATEGORIES]
 
 /**
  * Sync Statuses
@@ -39,7 +41,7 @@ export const SYNC_STATUS = {
   SYNCING: "SYNCING",
 } as const
 
-export type SyncStatus = keyof typeof SYNC_STATUS
+export type SyncStatus = typeof SYNC_STATUS[keyof typeof SYNC_STATUS]
 
 /**
  * Theme Options
@@ -50,7 +52,7 @@ export const THEMES = {
   SYSTEM: "system",
 } as const
 
-export type Theme = (typeof THEMES)[keyof typeof THEMES]
+export type Theme = typeof THEMES[keyof typeof THEMES]
 
 /**
  * Sync Frequencies
@@ -61,7 +63,7 @@ export const SYNC_FREQUENCIES = {
   WEEKLY: "weekly",
 } as const
 
-export type SyncFrequency = (typeof SYNC_FREQUENCIES)[keyof typeof SYNC_FREQUENCIES]
+export type SyncFrequency = typeof SYNC_FREQUENCIES[keyof typeof SYNC_FREQUENCIES]
 
 /**
  * Date Formats
@@ -74,6 +76,8 @@ export const DATE_FORMATS = {
   DATETIME: "MMM dd, yyyy HH:mm",
 } as const
 
+export type DateFormat = typeof DATE_FORMATS[keyof typeof DATE_FORMATS]
+
 /**
  * API Response Messages
  */
@@ -84,6 +88,8 @@ export const API_MESSAGES = {
   NOT_FOUND: "Resource not found",
   VALIDATION_ERROR: "Validation failed",
 } as const
+
+export type ApiMessage = typeof API_MESSAGES[keyof typeof API_MESSAGES]
 
 /**
  * Pagination Defaults
@@ -99,8 +105,10 @@ export const PAGINATION = {
  */
 export const UPLOAD_LIMITS = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
-  ALLOWED_IMAGE_TYPES: ["image/jpeg", "image/png", "image/webp"],
+  ALLOWED_IMAGE_TYPES: ["image/jpeg", "image/png", "image/webp"] as const,
 } as const
+
+export type AllowedImageType = typeof UPLOAD_LIMITS.ALLOWED_IMAGE_TYPES[number]
 
 /**
  * Achievement Thresholds
@@ -133,4 +141,4 @@ export const GOAL_TYPES = {
   CUSTOM: "custom",
 } as const
 
-export type GoalType = (typeof GOAL_TYPES)[keyof typeof GOAL_TYPES]
+export type GoalType = typeof GOAL_TYPES[keyof typeof GOAL_TYPES]

@@ -48,3 +48,6 @@ next-env.d.ts
 
 .trigger
 infra/terraform/terraform.tfvars
+p.py
+phase3.txt
+src/t.txt

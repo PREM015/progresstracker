@@ -17,11 +17,15 @@ class Logger {
    * Format log entry
    */
   private formatLog(entry: LogEntry): string {
-    const { level, message, timestamp, context } = entry;
+    const { level, message, timestamp, context, error } = entry;
     let formatted = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
 
-    if (context) {
-      formatted += ` ${JSON.stringify(context)}`;
+    if (context && Object.keys(context).length > 0) {
+      formatted += ` | context: ${JSON.stringify(context)}`;
+    }
+
+    if (error) {
+      formatted += ` | error: ${error.name}: ${error.message}`;
     }
 
     return formatted;
@@ -76,11 +80,11 @@ class Logger {
    */
   error(message: string, error?: Error, context?: Record<string, any>): void {
     const entry = this.createEntry('error', message, context, error);
-    console.error(this.formatLog(entry), error);
+    console.error(this.formatLog(entry));
 
     // In production, send to error tracking service (Sentry, etc.)
     if (!this.isDevelopment && error) {
-      // Sentry.captureException(error, { contexts: { custom: context } });
+      // Example: Sentry.captureException(error, { contexts: { custom: context } });
     }
   }
 }

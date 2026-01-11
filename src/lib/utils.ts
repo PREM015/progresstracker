@@ -1,4 +1,4 @@
-import { type ClassValue, clsx } from "clsx"
+import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 /**
@@ -86,7 +86,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null
+  let timeout: ReturnType<typeof setTimeout> | null = null
 
   return function executedFunction(...args: Parameters<T>) {
     const later = () => {
@@ -141,21 +141,22 @@ export function formatNumber(num: number): string {
 export function calculateStreak(dates: Date[]): number {
   if (dates.length === 0) return 0
 
-  const sortedDates = dates
-    .map((d) => new Date(d).setHours(0, 0, 0, 0))
-    .sort((a, b) => b - a)
+  // Remove duplicates and sort
+  const uniqueDates = [...new Set(
+    dates.map((d) => new Date(d).setHours(0, 0, 0, 0))
+  )].sort((a, b) => b - a)
 
   let streak = 1
   const today = new Date().setHours(0, 0, 0, 0)
   const oneDayMs = 24 * 60 * 60 * 1000
 
   // Check if last entry was today or yesterday
-  if (sortedDates[0] !== today && sortedDates[0] !== today - oneDayMs) {
+  if (uniqueDates[0] !== today && uniqueDates[0] !== today - oneDayMs) {
     return 0
   }
 
-  for (let i = 0; i < sortedDates.length - 1; i++) {
-    const diff = sortedDates[i] - sortedDates[i + 1]
+  for (let i = 0; i < uniqueDates.length - 1; i++) {
+    const diff = uniqueDates[i] - uniqueDates[i + 1]
     if (diff === oneDayMs) {
       streak++
     } else {
@@ -164,4 +165,25 @@ export function calculateStreak(dates: Date[]): number {
   }
 
   return streak
+}
+
+/** Convert bytes to human-readable format
+ */
+export function formatBytes(bytes: number, decimals: number = 2): string {  
+  if (bytes === 0) return "0 Bytes"
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k)) 
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i]  
+}
+
+/** Parse JSON safely
+ */
+export function safeJsonParse<T>(jsonString: string, defaultValue: T): T {
+  try {
+    return JSON.parse(jsonString) as T
+  } catch {
+    return defaultValue
+  }   
 }
