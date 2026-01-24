@@ -1,11 +1,26 @@
 import CryptoJS from "crypto-js";
 
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET;
+// Strict validation: ENCRYPTION_KEY is mandatory and must be separate from NEXTAUTH_SECRET
+if (!ENCRYPTION_KEY) {
+  const errorMsg =
+    "ENCRYPTION_KEY environment variable is not set. " +
+    "This is required for secure encryption of OAuth tokens and sensitive data. " +
+    "Set ENCRYPTION_KEY to a random 32+ character string in your .env file. " +
+    "Generate with: openssl rand -base64 32";
 
-if (process.env.NODE_ENV === "production" && !ENCRYPTION_KEY) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(errorMsg);
+  } else {
+    console.warn(`⚠️ WARNING: ${errorMsg}`);
+  }
+}
+
+// Warn if key is too short
+if (ENCRYPTION_KEY && ENCRYPTION_KEY.length < 32) {
   console.warn(
-    "⚠️ WARNING: ENCRYPTION_KEY not set in production. Encryption may be insecure!"
+    "⚠️ WARNING: ENCRYPTION_KEY should be at least 32 characters for security"
   );
 }
 

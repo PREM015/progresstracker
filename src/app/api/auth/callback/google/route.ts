@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";import { logger } from '@/lib/logger';
 /**
  * Google OAuth Callback Handler
  * NextAuth handles this automatically

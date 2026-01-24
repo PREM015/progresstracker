@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ comparison });
   } catch (error) {
-    console.error('Comparison API error:', error);
+    logger.error('Comparison API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch comparison data' },
       { status: 500 }

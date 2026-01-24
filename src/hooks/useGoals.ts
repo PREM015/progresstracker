@@ -50,10 +50,10 @@ export function useGoals(filter?: GoalFilter): UseGoalsReturn {
   const stats = data?.stats || null;
 
   // Active goals
-  const activeGoals = goals.filter((g: GoalWithProgress) => g.status === 'active');
+  const activeGoals = goals.filter((g: GoalWithProgress) => g?.status === 'active');
   
   // Completed goals
-  const completedGoals = goals.filter((g: GoalWithProgress) => g.status === 'completed');
+  const completedGoals = goals.filter((g: GoalWithProgress) => g?.status === 'completed');
 
   const refresh = useCallback(async () => {
     await mutate(url);
@@ -173,7 +173,7 @@ export function useGoals(filter?: GoalFilter): UseGoalsReturn {
     completedGoals,
     stats,
     isLoading: isLoading || isSubmitting,
-    error,
+    error: error ? new Error(error instanceof Error ? error.message : typeof error === 'string' ? error : 'Failed to load goals') : null,
     createGoal,
     updateGoal,
     updateProgress,

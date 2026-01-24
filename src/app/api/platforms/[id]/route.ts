@@ -2,8 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { PlatformService } from "@/services/platformService";
+import { authOptions } from "@/lib/auth";import { logger } from '@/lib/logger';import { PlatformService } from "@/services/platformService";
 
 interface RouteContext {
   params: Promise<{

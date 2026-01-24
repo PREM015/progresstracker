@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ExportData, ExportResult } from '@/types/export';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export async function generatePDF(data: ExportData): Promise<ExportResult> {
   try {
@@ -144,7 +145,7 @@ export async function generatePDF(data: ExportData): Promise<ExportResult> {
       data: Buffer.from(pdfBuffer),
     };
   } catch (error) {
-    console.error('PDF generation error:', error);
+    logger.error('PDF generation error:', error as Error);
     return {
       success: false,
       format: 'pdf',

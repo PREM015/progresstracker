@@ -1,6 +1,7 @@
 // src/trigger/sync-user-platforms.ts
 
 import { task } from "@trigger.dev/sdk/v3";
+import { logger } from "@/lib/logger";
 import { SyncService } from "@/services/syncService";
 
 export const syncSingleUserTask = task({
@@ -13,7 +14,7 @@ export const syncSingleUserTask = task({
   run: async (payload: { userId: string; platformIds?: string[] }) => {
     const { userId, platformIds } = payload;
 
-    console.log(`Syncing platforms for user: ${userId}`);
+    logger.info(`Syncing platforms for user: ${userId}`);
 
     const job = await SyncService.syncAllPlatforms(userId, {
       platforms: platformIds,

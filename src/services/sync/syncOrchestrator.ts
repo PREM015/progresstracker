@@ -1,6 +1,7 @@
 // src/services/sync/syncOrchestrator.ts
 
 import{ prisma} from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { ScraperFactory } from '../scrapers';
 import { SyncService } from '../syncService';
 import { SyncJob, SyncStatus } from '@/types/sync';
@@ -142,7 +143,7 @@ class SyncOrchestrator {
 
       item.status = 'success';
     } catch (error: unknown) {
-      console.error(`Sync failed for platform ${item.platformId}:`, error);
+      logger.error(`Sync failed for platform ${item.platformId}:`, error instanceof Error ? error : new Error(String(error)));
 
       // Retry logic
       if (item.retries < this.maxRetries) {

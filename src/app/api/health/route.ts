@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 /**
  * GET /api/health - Health check endpoint
@@ -28,7 +29,7 @@ export async function GET() {
 
     return NextResponse.json(healthStatus, { status: 200 });
   } catch (error) {
-    console.error('Health check failed:', error);
+    logger.error('Health check failed:', error instanceof Error ? error : new Error(String(error)));
 
     return NextResponse.json(
       {

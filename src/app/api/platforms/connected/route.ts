@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/logger"
 import { PlatformService } from "@/services/platformService"
 
 /**
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
       stats,
     })
   } catch (error: any) {
-    console.error("Error fetching connected platforms:", error)
+    logger.error("Error fetching connected platforms:", error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: "Failed to fetch connected platforms", message: error.message },
       { status: 500 }

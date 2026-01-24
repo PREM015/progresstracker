@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/logger"
 import { PlatformService } from "@/services/platformService"
 import { z } from "zod"
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       connection,
     })
   } catch (error: any) {
-    console.error("Error connecting platform:", error)
+    logger.error("Error connecting platform:", error instanceof Error ? error : new Error(String(error)))
     
     if (error.message === "Platform already connected") {
       return NextResponse.json(

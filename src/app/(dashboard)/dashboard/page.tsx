@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await axios.post('/api/sync/trigger-all');
+      await axios.post('/api/sync');
       await refresh();
       toast({
         title: 'Sync completed',
@@ -39,6 +39,7 @@ export default function DashboardPage() {
       });
     } catch (error) {
       toast({
+      
         title: 'Sync failed',
         description: 'Failed to sync platforms. Please try again.',
         variant: 'error',

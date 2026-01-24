@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 import { SyncService } from "@/services/syncService";
 import { prisma } from "@/lib/prisma";
 
@@ -121,7 +122,7 @@ export async function POST(
       message: `Synced ${result.entriesAdded} new entries`,
     });
   } catch (error: any) {
-    console.error("Platform sync error:", error);
+    logger.error("Platform sync error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       {
         error: error?.message || "Failed to sync platform",

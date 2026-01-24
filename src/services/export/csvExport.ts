@@ -3,6 +3,7 @@
 import Papa from 'papaparse';
 import type { ExportData, ExportResult } from '@/types/export';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export async function generateCSV(data: ExportData): Promise<ExportResult> {
   try {
@@ -36,7 +37,7 @@ export async function generateCSV(data: ExportData): Promise<ExportResult> {
       data: csv,
     };
   } catch (error) {
-    console.error('CSV generation error:', error);
+    logger.error('CSV generation error:', error as Error);
     return {
       success: false,
       format: 'csv',

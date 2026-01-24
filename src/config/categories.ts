@@ -1,23 +1,81 @@
 // src/config/categories.ts
 
-export const PLATFORM_CATEGORIES = [
-  { value: 'dsa', label: 'DSA Practice', color: '#3b82f6' },
-  { value: 'development', label: 'Development', color: '#10b981' },
-  { value: 'jobs', label: 'Job Search', color: '#f59e0b' },
-  { value: 'learning', label: 'Learning', color: '#8b5cf6' },
-  { value: 'design', label: 'Design', color: '#ec4899' },
-  { value: 'hackathons', label: 'Hackathons', color: '#ef4444' },
-  { value: 'opensource', label: 'Open Source', color: '#06b6d4' },
-] as const;
+/**
+ * IMPORTANT RULE:
+ * ----------------
+ * Platform categories MUST match Prisma enum values exactly.
+ * Database is the single source of truth.
+ *
+ * Any new category must be added FIRST in:
+ * prisma/schema.prisma -> enum PlatformCategory
+ */
 
-export type PlatformCategory = typeof PLATFORM_CATEGORIES[number]['value'];
+import type { PlatformCategory } from "@/generated/prisma";
 
-export function getCategoryColor(category: string): string {
-  const found = PLATFORM_CATEGORIES.find((c) => c.value === category);
-  return found?.color || '#6b7280';
+/**
+ * Canonical category configuration
+ * Key = Prisma enum value
+ */
+export const PLATFORM_CATEGORIES: Record<
+  PlatformCategory,
+  {
+    value: PlatformCategory;
+    label: string;
+    color: string;
+  }
+> = {
+  DSA: {
+    value: "DSA",
+    label: "DSA Practice",
+    color: "#3b82f6",
+  },
+
+  JOB: {
+    value: "JOB",
+    label: "Job Search",
+    color: "#f59e0b",
+  },
+
+  GIT: {
+    value: "GIT",
+    label: "Open Source / Git",
+    color: "#06b6d4",
+  },
+
+  LEARNING: {
+    value: "LEARNING",
+    label: "Learning",
+    color: "#8b5cf6",
+  },
+
+  HACKATHON: {
+    value: "HACKATHON",
+    label: "Hackathons",
+    color: "#ef4444",
+  },
+
+  OTHER: {
+    value: "OTHER",
+    label: "Other",
+    color: "#6b7280",
+  },
+} as const;
+
+/**
+ * Array version (useful for dropdowns, filters, UI loops)
+ */
+export const PLATFORM_CATEGORY_LIST = Object.values(PLATFORM_CATEGORIES);
+
+/**
+ * Get category color safely
+ */
+export function getCategoryColor(category: PlatformCategory): string {
+  return PLATFORM_CATEGORIES[category].color;
 }
 
-export function getCategoryLabel(category: string): string {
-  const found = PLATFORM_CATEGORIES.find((c) => c.value === category);
-  return found?.label || category;
+/**
+ * Get category label safely
+ */
+export function getCategoryLabel(category: PlatformCategory): string {
+  return PLATFORM_CATEGORIES[category].label;
 }

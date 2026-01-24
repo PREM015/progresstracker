@@ -1,14 +1,15 @@
 // src/trigger/daily-sync-task.ts
 
 import { schedules } from "@trigger.dev/sdk/v3";
-import prisma from "@/lib/prisma";
+import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 import { syncUserPlatformsTask } from "./sync-all-platforms";
 
 export const dailySyncTask = schedules.task({
   id: "daily-platform-sync",
   cron: "0 2 * * *", // 2 AM UTC
   run: async () => {
-    console.log("Running daily sync task...");
+    logger.info("Running daily sync task...");
 
     const usersWithAutoSync = await prisma.userSettings.findMany({
       where: { autoSync: true },
@@ -23,7 +24,7 @@ export const dailySyncTask = schedules.task({
         await syncUserPlatformsTask.trigger({ userId });
         triggered++;
       } catch (error) {
-        console.error(`Failed to trigger sync for ${userId}:`, error);
+        logger.error(`Failed to trigger sync for ${userId}:`, error instanceof Error ? error : new Error(String(error)));
         failed++;
       }
     }

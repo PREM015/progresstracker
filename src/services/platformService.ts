@@ -86,7 +86,11 @@ export class PlatformService {
         userId,
         platformId,
         username,
-        token,
+        credentials: token ? JSON.stringify({
+          access_token: token,
+          refresh_token: '',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        }) : undefined,
       },
       include: {
         platform: true,

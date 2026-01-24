@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from "react"
 import { usePlatforms, useConnectedPlatforms } from "@/hooks/usePlatforms"
+import { PlatformCategory } from "@/types/platform"
+
 import PlatformGrid from "@/components/connections/PlatformGrid"
 import CategoryFilter from "@/components/connections/CategoryFilter"
 import SearchBar from "@/components/connections/SearchBar"
@@ -11,7 +13,10 @@ import Card from "@/components/ui/Card"
 import Spinner from "@/components/ui/Spinner"
 
 export default function ConnectionsPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] =
+    useState<PlatformCategory | null>(null)
+
+
   const [searchQuery, setSearchQuery] = useState("")
   const [showAddCustom, setShowAddCustom] = useState(false)
 
@@ -62,9 +67,12 @@ export default function ConnectionsPage() {
     setSearchQuery(query)
   }, [])
 
-  const handleCategorySelect = useCallback((category: string | null) => {
+const handleCategorySelect = useCallback(
+  (category: PlatformCategory | null) => {
     setSelectedCategory(category)
-  }, [])
+  },
+  []
+)
 
   return (
     <div className="space-y-6">

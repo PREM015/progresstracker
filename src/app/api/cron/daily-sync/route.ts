@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import {prisma} from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { SyncService } from '@/services/syncService';
 
 // Verify cron secret (Vercel Cron or custom)
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Starting daily sync cron job...');
+    logger.info('Starting daily sync cron job...');
 
     // Get all users with auto-sync enabled
     const usersWithAutoSync = await prisma.userSettings.findMany({
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;
 
-    console.log(`Daily sync completed: ${successCount} success, ${failCount} failed`);
+    logger.info(`Daily sync completed: ${successCount} success, ${failCount} failed`);
 
     return NextResponse.json({
       success: true,

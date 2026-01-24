@@ -1,6 +1,7 @@
 // src/services/exportService.ts
 
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import type { ExportOptions, ExportData, ExportResult } from '@/types/export';
 import { generateCSV } from './export/csvExport';
 import { generateJSON } from './export/jsonExport';
@@ -196,7 +197,7 @@ export class ExportService {
           throw new Error(`Unsupported format: ${options.format}`);
       }
     } catch (error) {
-      console.error('Export error:', error);
+      logger.error('Export error:', error as Error);
       return {
         success: false,
         format: options.format,

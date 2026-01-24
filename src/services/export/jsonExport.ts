@@ -2,6 +2,7 @@
 
 import type { ExportData, ExportResult } from '@/types/export';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 export async function generateJSON(data: ExportData): Promise<ExportResult> {
   try {
@@ -41,7 +42,7 @@ export async function generateJSON(data: ExportData): Promise<ExportResult> {
       data: json,
     };
   } catch (error) {
-    console.error('JSON generation error:', error);
+    logger.error('JSON generation error:', error as Error);
     return {
       success: false,
       format: 'json',

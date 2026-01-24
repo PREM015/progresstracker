@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import { StatsService } from '@/services/statsService';
 
 export async function GET(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ monthlyStats });
   } catch (error) {
-    console.error('Monthly stats API error:', error);
+    logger.error('Monthly stats API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch monthly statistics' },
       { status: 500 }

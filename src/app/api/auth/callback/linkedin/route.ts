@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";import { logger } from '@/lib/logger';
 /**
  * LinkedIn OAuth Callback Handler (Optional)
  * Enable when you have LinkedIn OAuth credentials

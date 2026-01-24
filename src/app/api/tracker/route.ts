@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 const createEntrySchema = z.object({
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(entries);
   } catch (error) {
-    console.error('Error fetching tracker entries:', error);
+    logger.error('Error fetching tracker entries:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch entries' },
       { status: 500 }
@@ -70,8 +71,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         date: new Date(validated.date),
-        platform: validated.platform,
-        problems: validated.problems || 0,
+        problemsSolved: validated.problems || 0,
         timeSpent: validated.timeSpent || 0,
         notes: validated.notes,
       },
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error('Error creating tracker entry:', error);
+    logger.error('Error creating tracker entry:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to create entry' },
       { status: 500 }

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ platforms })
   } catch (error: any) {
-    console.error("Error fetching platforms:", error)
+    logger.error("Error fetching platforms:", error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: "Failed to fetch platforms", message: error.message },
       { status: 500 }

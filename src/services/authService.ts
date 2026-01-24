@@ -1,6 +1,7 @@
+// ===== FILE: src/services/authService.ts (REPLACE) =====
+
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { encrypt } from "@/lib/crypto";
 
 export const authService = {
   /**
@@ -17,25 +18,46 @@ export const authService = {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name: name || email.split("@")[0], // Use email prefix as default name
-      },
+    // Create user with settings in transaction
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name: name || email.split("@")[0],
+        },
+      });
+
+      // Create default settings
+      await tx.userSettings.create({
+        data: {
+          userId: newUser.id,
+          theme: "system",
+          autoSync: true,
+          syncFrequency: "daily",
+        },
+      });
+
+      // Create notification preferences
+      await tx.notificationPreferences.create({
+        data: {
+          userId: newUser.id,
+          emailNotifications: true,
+          weeklyReport: true,
+          achievementAlerts: true,
+        },
+      });
+
+      return newUser;
     });
-
-    // Create default settings
-    await this.createDefaultUserSettings(user.id);
 
     return user;
   },
 
   /**
-   * Verify user credentials for login
+   * Verify user credentials
    */
   async verifyCredentials(email: string, password: string) {
     const user = await prisma.user.findUnique({
@@ -43,85 +65,11 @@ export const authService = {
     });
 
     if (!user || !user.password) {
-      return null; // User not found or OAuth-only user
-    }
-
-    // Compare password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-
-    if (!isValidPassword) {
       return null;
     }
 
-    return user;
-  },
-
-  /**
-   * Save OAuth tokens for platform syncing
-   */
-  async saveOAuthToken(
-    userId: string,
-    provider: string,
-    accessToken: string,
-    refreshToken?: string | null,
-    expiresAt?: number | null
-  ) {
-    // Encrypt tokens before storing
-    const encryptedAccessToken = encrypt(accessToken);
-    const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : null;
-
-    // Update or create account
-    await prisma.account.upsert({
-      where: {
-        provider_providerAccountId: {
-          provider,
-          providerAccountId: userId,
-        },
-      },
-      update: {
-        access_token: encryptedAccessToken,
-        refresh_token: encryptedRefreshToken,
-        expires_at: expiresAt,
-      },
-      create: {
-        userId,
-        provider,
-        providerAccountId: userId,
-        type: "oauth",
-        access_token: encryptedAccessToken,
-        refresh_token: encryptedRefreshToken,
-        expires_at: expiresAt,
-      },
-    });
-  },
-
-  /**
-   * Create default settings and preferences for new users
-   */
-  async createDefaultUserSettings(userId: string) {
-    // Create user settings
-    await prisma.userSettings.upsert({
-      where: { userId },
-      update: {},
-      create: {
-        userId,
-        theme: "light",
-        autoSync: true,
-        syncFrequency: "daily",
-      },
-    });
-
-    // Create notification preferences
-    await prisma.notificationPreferences.upsert({
-      where: { userId },
-      update: {},
-      create: {
-        userId,
-        emailReminders: true,
-        weeklySummary: true,
-        achievementAlerts: true,
-      },
-    });
+    const isValid = await bcrypt.compare(password, user.password);
+    return isValid ? user : null;
   },
 
   /**
@@ -141,61 +89,27 @@ export const authService = {
   },
 
   /**
-   * Update user profile
-   */
-  async updateUser(userId: string, data: { name?: string; image?: string }) {
-    return prisma.user.update({
-      where: { id: userId },
-      data,
-    });
-  },
-
-  /**
-   * Change user password
+   * Change password
    */
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || !user.password) {
-      throw new Error("User not found or password not set");
+    if (!user?.password) {
+      throw new Error("Cannot change password for OAuth-only users");
     }
 
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!isValidPassword) {
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
       throw new Error("Current password is incorrect");
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
-    });
-  },
-
-  /**
-   * Soft delete user account
-   */
-  async deleteUser(userId: string) {
-    // Option 1: Hard delete (removes all data)
-    // await prisma.user.delete({
-    //   where: { id: userId },
-    // });
-
-    // Option 2: Soft delete (anonymize data)
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        email: `deleted_${userId}@deleted.com`,
-        name: "Deleted User",
-        password: null,
-        image: null,
-      },
     });
   },
 };

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import { AchievementService } from '@/services/achievementService';
 
 // POST - Manually unlock an achievement (admin or special cases)

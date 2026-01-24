@@ -1,29 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+// ===== FILE: src/app/api/auth/session/route.ts =====
 
-export async function GET(request: NextRequest) {
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { logger } from "@/lib/logger";
+import { authOptions } from "@/lib/auth"; // ✅ Now imports from correct location
+
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
-      return NextResponse.json(
-        { authenticated: false, user: null },
-        { status: 200 }
-      );
-    }
-
+    return NextResponse.json({
+      authenticated: !!session,
+      user: session?.user ?? null,
+    });
+  } catch (error) {
+    logger.error("Session error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
-      {
-        authenticated: true,
-        user: session.user,
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error("Session error:", error);
-    return NextResponse.json(
-      { authenticated: false, error: error.message },
+      { authenticated: false, user: null, error: "Session check failed" },
       { status: 500 }
     );
   }

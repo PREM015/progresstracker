@@ -2,6 +2,7 @@
 
 import { task, schedules } from "@trigger.dev/sdk/v3";
 import{ prisma} from "@/lib/prisma";
+import { logger } from "@/lib/logger";
 import { SyncService } from "@/services/syncService";
 
 // Task to sync all platforms for a single user
@@ -16,7 +17,7 @@ export const syncUserPlatformsTask = task({
   run: async (payload: { userId: string }) => {
     const { userId } = payload;
 
-    console.log(`Starting sync for user: ${userId}`);
+    logger.info(`Starting sync for user: ${userId}`);
 
     try {
       const job = await SyncService.syncAllPlatforms(userId);
@@ -27,7 +28,7 @@ export const syncUserPlatformsTask = task({
         platformCount: job.totalPlatforms,
       };
     } catch (error: any) {
-      console.error(`Sync failed for user ${userId}:`, error);
+      logger.error(`Sync failed for user ${userId}:`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   },
@@ -39,7 +40,7 @@ export const dailySyncAllUsersTask = schedules.task({
   cron: "0 2 * * *", // 2 AM UTC daily
   maxDuration: 1800, // 30 minutes
   run: async () => {
-    console.log("Starting daily sync for all users...");
+    logger.info("Starting daily sync for all users...");
 
     // Get users with auto-sync enabled
     const users = await prisma.userSettings.findMany({
@@ -47,7 +48,7 @@ export const dailySyncAllUsersTask = schedules.task({
       select: { userId: true },
     });
 
-    console.log(`Found ${users.length} users with auto-sync enabled`);
+    logger.info(`Found ${users.length} users with auto-sync enabled`);
 
     const results: Array<{ userId: string; success: boolean; error?: string }> = [];
 
@@ -76,7 +77,7 @@ export const dailySyncAllUsersTask = schedules.task({
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    console.log(`Daily sync complete: ${successCount} success, ${failCount} failed`);
+    logger.info(`Daily sync complete: ${successCount} success, ${failCount} failed`);
 
     return {
       totalUsers: users.length,

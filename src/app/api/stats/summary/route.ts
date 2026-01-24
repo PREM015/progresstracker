@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import { StatsService } from '@/services/statsService';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ summary });
   } catch (error) {
-    console.error('Summary stats API error:', error);
+    logger.error('Summary stats API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch summary statistics' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { logger } from "@/lib/logger"
 import { PlatformService } from "@/services/platformService"
 import { z } from "zod"
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       message: "Platform disconnected successfully",
     })
   } catch (error: any) {
-    console.error("Error disconnecting platform:", error)
+    logger.error("Error disconnecting platform:", error instanceof Error ? error : new Error(String(error)))
     
     if (error.message === "Platform not connected") {
       return NextResponse.json(

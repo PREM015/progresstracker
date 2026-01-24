@@ -1,4 +1,5 @@
 import {prisma} from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { ScraperFactory } from './scrapers';
 import { nanoid } from 'nanoid';
 
@@ -91,9 +92,21 @@ export class SyncService {
       }
 
       // Fetch data from platform
+      let token = '';
+      if (userPlatform.credentials) {
+        try {
+          const creds = typeof userPlatform.credentials === 'string' 
+            ? JSON.parse(userPlatform.credentials) 
+            : userPlatform.credentials;
+          token = creds.access_token || '';
+        } catch (e) {
+          logger.error('Failed to parse credentials:', e instanceof Error ? e : new Error(String(e)));
+        }
+      }
+      
       const result = await scraper.fetchData({
         username: userPlatform.username || '',
-        token: userPlatform.token || '',
+        token: token,
       });
 
       if (!result.success) {
@@ -109,10 +122,10 @@ export class SyncService {
           // Check if entry exists
           const existingEntry = await prisma.trackerEntry.findUnique({
             where: {
-              userId_date_platform: {
+              userId_date_platformId: {
                 userId,
                 date: entry.date,
-                platform: userPlatform.platform.name,
+                platformId: userPlatform.platformId || null,
               },
             },
           });
@@ -120,22 +133,22 @@ export class SyncService {
           // Create or update entry
           await prisma.trackerEntry.upsert({
             where: {
-              userId_date_platform: {
+              userId_date_platformId: {
                 userId,
                 date: entry.date,
-                platform: userPlatform.platform.name,
+                platformId: userPlatform.platformId || null,
               },
             },
             update: {
-              problems: entry.problems || 0,
+              problemsSolved: entry.problems || 0,
               timeSpent: entry.timeSpent || 0,
               notes: entry.notes,
             },
             create: {
               userId,
               date: entry.date,
-              platform: userPlatform.platform.name,
-              problems: entry.problems || 0,
+              platformId: userPlatform.platformId,
+              problemsSolved: entry.problems || 0,
               timeSpent: entry.timeSpent || 0,
               notes: entry.notes,
             },

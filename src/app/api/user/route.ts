@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import { UserService } from '@/services/userService';
 import { z } from 'zod';
 
@@ -31,7 +32,7 @@ export async function GET() {
 
     return NextResponse.json({ user });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch user' },
       { status: 500 }

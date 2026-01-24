@@ -1,20 +1,70 @@
+// ===== FILE: src/lib/auth.ts (REPLACE COMPLETELY) =====
+
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter"; // ✅ FIXED: Use @auth/prisma-adapter
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+// Extend types for session
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+    };
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    email?: string;
+  }
+}
+
+// Validate NextAuth secret on app startup
+if (!process.env.NEXTAUTH_SECRET) {
+  const errorMsg =
+    "NEXTAUTH_SECRET environment variable is not set. " +
+    "This is required for session encryption. " +
+    "Generate one with: openssl rand -base64 32";
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(errorMsg);
+  } else {
+    console.warn(`⚠️ WARNING: ${errorMsg}`);
+  }
+}
+
 export const authOptions: NextAuthOptions = {
+  // ===== ADAPTER =====
   adapter: PrismaAdapter(prisma),
-  
+
+  // ===== SECRET =====
+  secret: process.env.NEXTAUTH_SECRET,
+
+  // ===== DEBUG =====
+  debug: process.env.NODE_ENV === "development",
+
+  // ===== SESSION =====
+  session: {
+    strategy: "jwt",
+    // Default: 30 days (2,592,000 seconds). Can be overridden by SESSION_MAX_AGE env var
+    maxAge: parseInt(process.env.SESSION_MAX_AGE || "2592000"),
+  },
+
+  // ===== PROVIDERS =====
   providers: [
-    // ===== EMAIL/PASSWORD PROVIDER =====
+    // Email/Password
     CredentialsProvider({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "you@example.com" },
+        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -22,16 +72,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password are required");
         }
 
-        // ✅ FIXED: Direct Prisma query instead of authService
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email }
+          where: { email: credentials.email },
         });
 
         if (!user || !user.password) {
           throw new Error("Invalid email or password");
         }
 
-        // Verify password
         const isValid = await bcrypt.compare(credentials.password, user.password);
 
         if (!isValid) {
@@ -47,47 +95,53 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-    // ===== GITHUB OAUTH PROVIDER =====
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID!, // ✅ FIXED: Use GITHUB_ID not GITHUB_CLIENT_ID
-      clientSecret: process.env.GITHUB_SECRET!, // ✅ FIXED: Use GITHUB_SECRET
-      allowDangerousEmailAccountLinking: true, // ✅ ADDED: Allow linking accounts
+    // Google OAuth
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
     }),
 
-    // ===== GOOGLE OAUTH PROVIDER =====
-    GoogleProvider({
-      clientId: process.env.GOOGLE_ID!, // ✅ FIXED: Use GOOGLE_ID
-      clientSecret: process.env.GOOGLE_SECRET!, // ✅ FIXED: Use GOOGLE_SECRET
-      allowDangerousEmailAccountLinking: true, // ✅ ADDED
+    // GitHub OAuth
+    GitHubProvider({
+      clientId: process.env.GITHUB_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
 
-  // ===== SESSION CONFIGURATION =====
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 60, // ✅ FIXED: 30 minutes (not 30 days)
-  },
-
-  // ===== CUSTOM PAGES =====
+  // ===== PAGES =====
   pages: {
     signIn: "/login",
     error: "/login",
-    newUser: "/dashboard",
+  },
+
+  // ===== COOKIES =====
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" 
+        ? "__Secure-next-auth.session-token" 
+        : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
 
   // ===== CALLBACKS =====
   callbacks: {
     async jwt({ token, user, account }) {
+      // Initial sign in
       if (user) {
         token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
+        token.email = user.email ?? undefined;
       }
 
-      // Store OAuth access token
-      if (account?.access_token) {
-        token.accessToken = account.access_token;
+      // Store provider info
+      if (account) {
         token.provider = account.provider;
       }
 
@@ -97,57 +151,66 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.image = token.picture as string;
+        session.user.email = token.email ?? null;
+        session.user.image = token.picture as string ?? null;
       }
       return session;
     },
 
-    async signIn({ user, account, profile }) {
-      // ✅ ADDED: Always allow sign in
+    async signIn() {
+      // Allow all sign ins
       return true;
+    },
+
+    async redirect({ url, baseUrl }) {
+      // Redirect to dashboard after login
+      if (url.startsWith(baseUrl)) return url;
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      return `${baseUrl}/dashboard`;
     },
   },
 
   // ===== EVENTS =====
   events: {
     async signIn({ user, account, isNewUser }) {
-      console.log(`✅ User signed in: ${user.email} (${account?.provider})`);
+      console.log(`✅ User signed in: ${user.email} via ${account?.provider}`);
 
       // Create default settings for new users
-      if (isNewUser) {
+      if (isNewUser && user.id) {
         try {
-          await prisma.userSettings.create({
-            data: {
+          // Create UserSettings
+          await prisma.userSettings.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: {
               userId: user.id,
-              theme: "dark",
+              theme: "system",
               autoSync: true,
               syncFrequency: "daily",
             },
           });
 
-          await prisma.notificationPreferences.create({
-            data: {
+          // Create NotificationPreferences (use correct field names!)
+          await prisma.notificationPreferences.upsert({
+            where: { userId: user.id },
+            update: {},
+            create: {
               userId: user.id,
-              emailReminders: true,
-              weeklySummary: true,
+              emailNotifications: true,  // ✅ Correct field name
+              weeklyReport: true,        // ✅ Correct field name
               achievementAlerts: true,
             },
           });
+
+          console.log(`✅ Created default settings for user: ${user.id}`);
         } catch (error) {
           console.error("Failed to create user settings:", error);
         }
       }
     },
+
     async signOut({ token }) {
       console.log(`🚪 User signed out: ${token?.email}`);
     },
   },
-
-  // ===== DEBUG MODE =====
-  debug: process.env.NODE_ENV === "development",
-
-  // ===== SECRET =====
-  secret: process.env.NEXTAUTH_SECRET,
 };

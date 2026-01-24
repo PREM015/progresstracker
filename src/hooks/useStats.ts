@@ -22,8 +22,8 @@ export function useStats(period: number = 30) {
 
   return {
     stats: data?.stats,
-    isLoading,
-    error,
+    isLoading: isLoading && !data,
+    error: error?.message || (error ? 'Failed to load statistics' : undefined),
     refresh: mutate,
   };
 }
@@ -38,13 +38,17 @@ export function useMonthlyStats(months: number = 6) {
     async (url: string) => {
       const response = await axios.get<{ monthlyStats: MonthlyData[] }>(url);
       return response.data;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
     }
   );
 
   return {
     monthlyStats: data?.monthlyStats || [],
-    isLoading,
-    error,
+    isLoading: isLoading && !data,
+    error: error?.message || (error ? 'Failed to load monthly data' : undefined),
   };
 }
 
@@ -58,12 +62,16 @@ export function useHeatmapData() {
     async (url: string) => {
       const response = await axios.get<{ heatmap: HeatmapData[] }>(url);
       return response.data;
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
     }
   );
 
   return {
     heatmapData: data?.heatmap || [],
-    isLoading,
-    error,
+    isLoading: isLoading && !data,
+    error: error?.message || (error ? 'Failed to load heatmap data' : undefined),
   };
 }

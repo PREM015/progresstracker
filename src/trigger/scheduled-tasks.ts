@@ -1,24 +1,79 @@
 // src/trigger/scheduled-tasks.ts
 
-import { schedules, task } from "@trigger.dev/sdk/v3";
-import {prisma} from "@/lib/prisma";
+import { schedules } from "@trigger.dev/sdk/v3";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 // Weekly stats email (Mondays at 9 AM UTC)
 export const weeklyStatsEmailTask = schedules.task({
   id: "weekly-stats-email",
   cron: "0 9 * * 1", // Monday 9 AM UTC
   run: async () => {
-    console.log("Sending weekly stats emails...");
+    logger.info("Starting weekly stats email task...");
 
     const users = await prisma.notificationPreferences.findMany({
       where: { weeklySummary: true },
-      include: { user: { select: { email: true, name: true } } },
+      include: { user: { select: { id: true, email: true, name: true } } },
     });
 
-    // TODO: Implement email sending
-    console.log(`Would send emails to ${users.length} users`);
+    let successCount = 0;
+    let failureCount = 0;
 
-    return { usersNotified: users.length };
+    for (const { user } of users) {
+      try {
+        // Get user's weekly stats
+        const startOfWeek = new Date();
+        startOfWeek.setDate(startOfWeek.getDate() - 7);
+
+        const stats = await prisma.trackerEntry.findMany({
+          where: {
+            userId: user.id,
+            date: { gte: startOfWeek },
+          },
+        });
+
+        const totalProblems = stats.reduce(
+          (sum, entry) => sum + entry.problemsSolved,
+          0
+        );
+        const totalTime = stats.reduce((sum, entry) => sum + entry.timeSpent, 0);
+        const entriesCount = stats.length;
+
+        // Send email
+        await sendEmail({
+          to: user.email || "",
+          subject: "📊 Your Weekly Progress Report",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Your Weekly Progress Report 📊</h2>
+              <p>Hi ${user.name || "Coder"},</p>
+              <p>Here's your progress summary for this week:</p>
+              <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Problems Solved:</strong> ${totalProblems}</p>
+                <p><strong>Time Spent:</strong> ${Math.round(totalTime / 60)} hours</p>
+                <p><strong>Entries Logged:</strong> ${entriesCount}</p>
+              </div>
+              <a href="${process.env.NEXTAUTH_URL}/dashboard" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+                View Full Dashboard
+              </a>
+              <p>Keep up the great work! 🚀</p>
+            </div>
+          `,
+        });
+
+        successCount++;
+        logger.success(`Weekly email sent to ${user.email}`);
+      } catch (error) {
+        failureCount++;
+        logger.error(`Failed to send email to ${user.email}:`, error as Error);
+      }
+    }
+
+    logger.info(
+      `Weekly stats email task completed: ${successCount} sent, ${failureCount} failed`
+    );
+    return { usersNotified: successCount, failures: failureCount };
   },
 });
 
@@ -27,11 +82,11 @@ export const dailyReminderTask = schedules.task({
   id: "daily-reminder",
   cron: "0 18 * * *", // 6 PM UTC
   run: async () => {
-    console.log("Sending daily reminders...");
+    logger.info("Starting daily reminder email task...");
 
     const users = await prisma.notificationPreferences.findMany({
       where: { emailReminders: true },
-      include: { user: { select: { id: true, email: true } } },
+      include: { user: { select: { id: true, email: true, name: true } } },
     });
 
     // Check who hasn't logged today
@@ -39,22 +94,54 @@ export const dailyReminderTask = schedules.task({
     today.setHours(0, 0, 0, 0);
 
     let remindersNeeded = 0;
+    let remindersSent = 0;
+    let remindersFailed = 0;
 
     for (const { user } of users) {
-      const todayEntry = await prisma.trackerEntry.findFirst({
-        where: {
-          userId: user.id,
-          date: { gte: today },
-        },
-      });
+      try {
+        const todayEntry = await prisma.trackerEntry.findFirst({
+          where: {
+            userId: user.id,
+            date: { gte: today },
+          },
+        });
 
-      if (!todayEntry) {
-        // TODO: Send reminder email
-        remindersNeeded++;
+        // Only send reminder if no entry today
+        if (!todayEntry && user.email) {
+          remindersNeeded++;
+
+          await sendEmail({
+            to: user.email,
+            subject: "⏰ Don't forget to log your progress today!",
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Time to Log Your Progress! ⏰</h2>
+                <p>Hi ${user.name || "Coder"},</p>
+                <p>You haven't logged any progress today yet. Don't break your streak!</p>
+                <p>Quick actions:</p>
+                <ul>
+                  <li><a href="${process.env.NEXTAUTH_URL}/dashboard">View Dashboard</a></li>
+                  <li><a href="${process.env.NEXTAUTH_URL}/dashboard/new-entry">Log Entry</a></li>
+                  <li><a href="${process.env.NEXTAUTH_URL}/sync">Sync Platforms</a></li>
+                </ul>
+                <p>Every day counts! 💪</p>
+              </div>
+            `,
+          });
+
+          remindersSent++;
+          logger.success(`Reminder sent to ${user.email}`);
+        }
+      } catch (error) {
+        remindersFailed++;
+        logger.error(`Failed to send reminder to ${user.email}:`, error as Error);
       }
     }
 
-    return { remindersNeeded };
+    logger.info(
+      `Daily reminder task completed: ${remindersSent} sent, ${remindersFailed} failed, ${remindersNeeded - remindersSent} pending`
+    );
+    return { remindersNeeded, remindersSent, remindersFailed };
   },
 });
 
@@ -73,7 +160,7 @@ export const cleanupOldLogsTask = schedules.task({
       },
     });
 
-    console.log(`Cleaned up ${result.count} old sync logs`);
+    logger.info(`Cleaned up ${result.count} old sync logs`);
 
     return { deletedCount: result.count };
   },
@@ -116,7 +203,7 @@ export const checkStaleConnectionsTask = schedules.task({
       }
     }
 
-    console.log(`Found ${stale.length} stale connections`);
+    logger.info(`Found ${stale.length} stale connections`);
 
     return { staleCount: stale.length, connections: stale };
   },

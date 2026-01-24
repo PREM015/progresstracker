@@ -10,10 +10,8 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
-    '^@/components/(.*)$': '<rootDir>/components/$1',
-    '^@/lib/(.*)$': '<rootDir>/lib/$1',
-    '^@/utils/(.*)$': '<rootDir>/utils/$1',
+    // Match tsconfig.json path aliases
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: [
     '<rootDir>/tests/**/*.test.ts',
@@ -22,9 +20,11 @@ const customJestConfig = {
     '<rootDir>/**/__tests__/**/*.tsx',
   ],
   collectCoverageFrom: [
-    'app/**/*.{js,jsx,ts,tsx}',
-    'components/**/*.{js,jsx,ts,tsx}',
-    'lib/**/*.{js,jsx,ts,tsx}',
+    'src/app/**/*.{js,jsx,ts,tsx}',
+    'src/components/**/*.{js,jsx,ts,tsx}',
+    'src/lib/**/*.{js,jsx,ts,tsx}',
+    'src/hooks/**/*.{js,jsx,ts,tsx}',
+    'src/services/**/*.{js,jsx,ts,tsx}',
     '!**/*.d.ts',
     '!**/node_modules/**',
     '!**/.next/**',
@@ -38,6 +38,8 @@ const customJestConfig = {
   transformIgnorePatterns: [
     'node_modules/(?!(nanoid|uuid)/)',
   ],
+  // Ensure ts/tsx files use ts-jest
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 }
 
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 import { InsightsService } from '@/services/analytics/insightsService';
 
 export async function GET(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ insights });
   } catch (error) {
-    console.error('Insights API error:', error);
+    logger.error('Insights API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to generate insights' },
       { status: 500 }

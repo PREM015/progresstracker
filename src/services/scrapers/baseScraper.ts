@@ -1,6 +1,7 @@
 // src/services/scrapers/baseScraper.ts
 
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { logger } from '@/lib/logger';
 
 export interface ScraperCredentials {
   username?: string;
@@ -103,7 +104,7 @@ export abstract class BaseScraper {
       return await fn();
     } catch (error: any) {
       if (retries > 0 && this.isRetryableError(error)) {
-        console.log(`[${this.platformName}] Retrying in ${delay}ms... (${retries} attempts left)`);
+        logger.info(`[${this.platformName}] Retrying in ${delay}ms... (${retries} attempts left)`);
         await this.sleep(delay);
         return this.retryRequest(fn, retries - 1, Math.min(delay * 2, 30000));
       }
@@ -130,7 +131,7 @@ export abstract class BaseScraper {
 
   // Error handler - returns standardized error result
   protected handleError(error: any): ScraperResult {
-    console.error(`[${this.platformName}] Scraper error:`, error.message || error);
+    logger.error(`[${this.platformName}] Scraper error:`, error instanceof Error ? error : new Error(String(error)));
 
     let errorMessage = 'An unknown error occurred';
 
