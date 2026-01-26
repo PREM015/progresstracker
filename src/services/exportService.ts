@@ -140,8 +140,8 @@ export class ExportService {
       },
       trackerEntries: trackerEntries.map((entry) => ({
         date: entry.date.toISOString(),
-        platform: entry.platform.name,
-        category: entry.platform.category,
+        platform: entry.platform?.name || 'Manual Entry',
+        category: entry.platform?.category || 'OTHER',
         problemsSolved: entry.problemsSolved || undefined,
         projectsCompleted: entry.projectsCompleted || undefined,
         applicationsSubmitted: entry.applicationsSubmitted || undefined,

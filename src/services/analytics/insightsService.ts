@@ -39,7 +39,7 @@ export class InsightsService {
     }
 
     // Calculate metrics
-    const totalProblems = entries.reduce((sum, e) => sum + (e.problems || 0), 0);
+    const totalProblems = entries.reduce((sum, e) => sum + (e.problemsSolved || 0), 0);
     const totalTime = entries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
     const avgProblems = totalProblems / days;
     const avgTime = totalTime / days;
@@ -151,7 +151,7 @@ export class InsightsService {
     const dayActivity: Record<string, number> = {};
     entries.forEach(entry => {
       const day = format(entry.date, 'EEEE');
-      dayActivity[day] = (dayActivity[day] || 0) + (entry.problems || 0);
+      dayActivity[day] = (dayActivity[day] || 0) + (entry.problemsSolved || 0);
     });
 
     const bestDay = Object.entries(dayActivity).sort((a, b) => b[1] - a[1])[0];

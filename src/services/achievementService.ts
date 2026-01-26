@@ -273,10 +273,10 @@ export class AchievementService {
   static async checkProblemAchievements(userId: string): Promise<UserAchievement[]> {
     const totalProblems = await prisma.trackerEntry.aggregate({
       where: { userId },
-      _sum: { problems: true },
+      _sum: { problemsSolved: true },
     });
 
-    const count = totalProblems._sum.problems || 0;
+    const count = totalProblems._sum.problemsSolved || 0;
     const problemAchievements = achievements.filter(
       a => a.category === 'problems' && a.requirement.metric === 'problems_solved'
     );

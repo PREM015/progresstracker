@@ -73,7 +73,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    console.error('Update settings error:', error);
+    logger.error('Update settings error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to update settings' },
       { status: 500 }

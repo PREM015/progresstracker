@@ -93,14 +93,30 @@ export class SyncService {
 
       // Fetch data from platform
       let token = '';
+      
+      // First try to get stored credentials (API key, password, etc.)
       if (userPlatform.credentials) {
         try {
           const creds = typeof userPlatform.credentials === 'string' 
             ? JSON.parse(userPlatform.credentials) 
             : userPlatform.credentials;
-          token = creds.access_token || '';
+          token = creds.access_token || creds.token || '';
         } catch (e) {
           logger.error('Failed to parse credentials:', e instanceof Error ? e : new Error(String(e)));
+        }
+      }
+      
+      // If no token in credentials, try to get OAuth token for this platform
+      if (!token && userPlatform.platform.slug === 'github') {
+        // Get GitHub OAuth token from Account table
+        const githubAccount = await prisma.account.findFirst({
+          where: {
+            userId,
+            provider: 'github',
+          },
+        });
+        if (githubAccount?.access_token) {
+          token = githubAccount.access_token;
         }
       }
       

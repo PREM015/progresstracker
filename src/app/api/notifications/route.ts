@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       unreadCount,
     });
   } catch (error) {
-    console.error('Get notifications error:', error);
+    logger.error('Get notifications error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch notifications' },
       { status: 500 }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.error('Create notification error:', error);
+    logger.error('Create notification error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to create notification' },
       { status: 500 }
@@ -118,7 +118,7 @@ export async function PUT(req: NextRequest) {
       message: 'Notifications marked as read',
     });
   } catch (error) {
-    console.error('Update notifications error:', error);
+    logger.error('Update notifications error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to update notifications' },
       { status: 500 }
@@ -153,7 +153,7 @@ export async function DELETE(req: NextRequest) {
       message: 'Notification deleted successfully',
     });
   } catch (error) {
-    console.error('Delete notification error:', error);
+    logger.error('Delete notification error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to delete notification' },
       { status: 500 }

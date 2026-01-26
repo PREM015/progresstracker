@@ -355,7 +355,7 @@ export class GoalService {
     });
 
     // Calculate totals
-    const totalProblems = todayEntries.reduce((sum, e) => sum + (e.problems || 0), 0);
+    const totalProblems = todayEntries.reduce((sum, e) => sum + (e.problemsSolved || 0), 0);
     const totalTime = todayEntries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
 
     // Get active goals

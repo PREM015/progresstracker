@@ -7,8 +7,8 @@ import { z } from 'zod';
 
 const createEntrySchema = z.object({
   date: z.string().datetime(),
-  platform: z.string().optional(),
-  problems: z.number().int().min(0).optional(),
+  platformId: z.string().optional(),
+  problemsSolved: z.number().int().min(0).optional(),
   timeSpent: z.number().int().min(0).optional(),
   notes: z.string().optional(),
 });
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (platform) {
-      where.platform = platform;
+      where.platformId = platform;
     }
 
     const entries = await prisma.trackerEntry.findMany({
@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         date: new Date(validated.date),
-        problemsSolved: validated.problems || 0,
+        platformId: validated.platformId,
+        problemsSolved: validated.problemsSolved || 0,
         timeSpent: validated.timeSpent || 0,
         notes: validated.notes,
       },

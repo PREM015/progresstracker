@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { TrackerEntry } from '@/types/tracker';
 
 export class TrackerService {
@@ -7,7 +7,7 @@ export class TrackerService {
     userId: string,
     startDate: Date,
     endDate: Date,
-    platform?: string
+    platformId?: string
   ) {
     const where: any = {
       userId,
@@ -17,8 +17,8 @@ export class TrackerService {
       },
     };
 
-    if (platform && platform !== 'all') {
-      where.platform = platform;
+    if (platformId && platformId !== 'all') {
+      where.platformId = platformId;
     }
 
     return await prisma.trackerEntry.findMany({
@@ -28,7 +28,7 @@ export class TrackerService {
   }
 
   // Get entry for specific date
-  static async getEntryByDate(userId: string, date: Date, platform?: string) {
+  static async getEntryByDate(userId: string, date: Date, platformId?: string) {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -43,8 +43,8 @@ export class TrackerService {
       },
     };
 
-    if (platform) {
-      where.platform = platform;
+    if (platformId) {
+      where.platformId = platformId;
     }
 
     return await prisma.trackerEntry.findFirst({ where });
@@ -54,8 +54,8 @@ export class TrackerService {
   static async createEntry(data: {
     userId: string;
     date: Date;
-    platform?: string;
-    problems?: number;
+    platformId?: string;
+    problemsSolved?: number;
     timeSpent?: number;
     notes?: string;
   }) {
@@ -63,8 +63,8 @@ export class TrackerService {
       data: {
         userId: data.userId,
         date: data.date,
-        platform: data.platform,
-        problems: data.problems || 0,
+        platformId: data.platformId,
+        problemsSolved: data.problemsSolved || 0,
         timeSpent: data.timeSpent || 0,
         notes: data.notes,
       },
@@ -75,10 +75,10 @@ export class TrackerService {
   static async updateEntry(
     id: string,
     data: {
-      problems?: number;
+      problemsSolved?: number;
       timeSpent?: number;
       notes?: string;
-      platform?: string;
+      platformId?: string;
     }
   ) {
     return await prisma.trackerEntry.update({
@@ -108,7 +108,7 @@ export class TrackerService {
   static async getStats(userId: string, startDate: Date, endDate: Date) {
     const entries = await this.getEntries(userId, startDate, endDate);
 
-    const totalProblems = entries.reduce((sum, e) => sum + (e.problems || 0), 0);
+    const totalProblems = entries.reduce((sum, e) => sum + (e.problemsSolved || 0), 0);
     const totalTime = entries.reduce((sum, e) => sum + (e.timeSpent || 0), 0);
     const totalDays = entries.length;
 

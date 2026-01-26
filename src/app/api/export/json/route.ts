@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('JSON export error:', error);
+    logger.error('JSON export error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to export JSON' },
       { status: 500 }

@@ -80,7 +80,7 @@ async function getUserData(username?: string) {
       category: ua.achievement.category,
       unlockedAt: ua.unlockedAt,
     })),
-    showStats: user.settings?.showStats ?? true,
+    showStats: user.settings?.publicProfile ?? true,
   };
 }
 

@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Sync logs error:', error);
+    logger.error('Sync logs error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: error.message || 'Failed to get sync logs' },
       { status: 500 }

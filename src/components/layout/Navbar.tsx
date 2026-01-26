@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useAuth}  from "@/hooks/useAuth";
 import  Button  from "@/components/ui/Button";
 import  Avatar  from "@/components/ui/Avatar";

@@ -36,20 +36,23 @@ export const Card: React.FC<CardProps> = ({
   rounded = "md",
   hoverEffect = false,
   fullWidth = false,
-  bgColor = "white",
+  bgColor,
 }) => {
+  const bgClass = bgColor ? "" : "bg-white dark:bg-gray-800";
+  
   return (
     <div
       className={clsx(
         "p-4",
         shadowStyles[shadow],
         roundedStyles[rounded],
-        border && "border border-gray-200",
+        border && "border border-gray-200 dark:border-gray-700",
         hoverEffect && "hover:shadow-lg transition-shadow",
         fullWidth && "w-full",
+        bgClass,
         className
       )}
-      style={{ backgroundColor: bgColor }}
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
     >
       {children}
     </div>

@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Trends API error:', error);
+    logger.error('Trends API error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch trend data' },
       { status: 500 }

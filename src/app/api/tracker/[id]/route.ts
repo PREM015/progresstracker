@@ -6,8 +6,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";import { logger } from '@/lib/logger';import { z } from "zod";
 
 const updateEntrySchema = z.object({
-  platform: z.string().optional(),
-  problems: z.number().int().min(0).optional(),
+  platformId: z.string().optional(),
+  problemsSolved: z.number().int().min(0).optional(),
   timeSpent: z.number().int().min(0).optional(),
   notes: z.string().optional(),
 });
@@ -64,7 +64,7 @@ export async function PUT(
       );
     }
 
-    console.error("Error updating tracker entry:", error);
+    logger.error("Error updating tracker entry:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: error?.message || "Failed to update entry" },
       { status: 500 }
@@ -107,7 +107,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting tracker entry:", error);
+    logger.error("Error deleting tracker entry:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: error?.message || "Failed to delete entry" },
       { status: 500 }

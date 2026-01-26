@@ -13,7 +13,7 @@ export const weeklyStatsEmailTask = schedules.task({
     logger.info("Starting weekly stats email task...");
 
     const users = await prisma.notificationPreferences.findMany({
-      where: { weeklySummary: true },
+      where: { weeklyReport: true },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
 
@@ -34,10 +34,10 @@ export const weeklyStatsEmailTask = schedules.task({
         });
 
         const totalProblems = stats.reduce(
-          (sum, entry) => sum + entry.problemsSolved,
+          (sum: number, entry: { problemsSolved?: number; }) => sum + (entry.problemsSolved || 0),
           0
         );
-        const totalTime = stats.reduce((sum, entry) => sum + entry.timeSpent, 0);
+        const totalTime = stats.reduce((sum: number, entry: { timeSpent?: number; }) => sum + (entry.timeSpent || 0), 0);
         const entriesCount = stats.length;
 
         // Send email
@@ -63,7 +63,7 @@ export const weeklyStatsEmailTask = schedules.task({
         });
 
         successCount++;
-        logger.success(`Weekly email sent to ${user.email}`);
+        logger.info(`Weekly email sent to ${user.email}`);
       } catch (error) {
         failureCount++;
         logger.error(`Failed to send email to ${user.email}:`, error as Error);
@@ -85,7 +85,7 @@ export const dailyReminderTask = schedules.task({
     logger.info("Starting daily reminder email task...");
 
     const users = await prisma.notificationPreferences.findMany({
-      where: { emailReminders: true },
+      where: { dailyReminder: true },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
 
@@ -130,7 +130,7 @@ export const dailyReminderTask = schedules.task({
           });
 
           remindersSent++;
-          logger.success(`Reminder sent to ${user.email}`);
+          logger.info(`Reminder sent to ${user.email}`);
         }
       } catch (error) {
         remindersFailed++;

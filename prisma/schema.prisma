@@ -1,14 +1,14 @@
-// This is your Prisma schema file
-// https://pris.ly/d/prisma-schema
+// ========================================
+// Prisma Schema – Progress Tracker (Phase-1)
+// ========================================
+// Docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
- 
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 /**
@@ -23,6 +23,8 @@ enum PlatformCategory {
   GIT
   LEARNING
   HACKATHON
+  OPENSOURCE
+  COMPANY
   OTHER
 }
 
@@ -45,7 +47,6 @@ enum SyncStatus {
  * USER MANAGEMENT
  * =========================
  */
-
 model User {
   id       String  @id @default(cuid())
   name     String?
@@ -60,6 +61,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
   accounts       Account[]
   sessions       Session[]
   platforms      UserPlatform[]
@@ -135,13 +137,14 @@ model Platform {
 
   supportsAutoSync Boolean @default(false)
 
+  // Defines what metrics a platform provides
   dataPoints Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   users          UserPlatform[]
-  trackerEntries TrackerEntry[] // ✅ THIS WAS MISSING
+  trackerEntries TrackerEntry[]
   syncLogs       SyncLog[]
 
   @@index([category])
@@ -177,7 +180,7 @@ model UserPlatform {
 
 /**
  * =========================
- * TRACKER
+ * TRACKER (CORE ANALYTICS)
  * =========================
  */
 
@@ -185,15 +188,16 @@ model TrackerEntry {
   id         String   @id @default(cuid())
   userId     String
   platformId String?
-  date       DateTime
+  date       DateTime @db.Date // daily aggregation
 
+  // Stored for historical accuracy
   category PlatformCategory?
 
   problemsSolved        Int @default(0)
   projectsCompleted     Int @default(0)
   applicationsSubmitted Int @default(0)
   coursesCompleted      Int @default(0)
-  timeSpent             Int @default(0)
+  timeSpent             Int @default(0) // minutes
 
   mood  String?
   notes String? @db.Text
@@ -204,8 +208,11 @@ model TrackerEntry {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, date, platformId])
+  // One entry per user + platform + day
+  @@unique([userId, platformId, date])
+  // Fast dashboard queries
   @@index([userId, date])
+  @@index([platformId, date])
 }
 
 /**
@@ -224,7 +231,7 @@ model Goal {
   target   Int
   progress Int              @default(0)
 
-  status      String    @default("active")
+  status      String    @default("active") // Phase-1 string (enum later)
   deadline    DateTime?
   completedAt DateTime?
 
@@ -274,7 +281,7 @@ model SyncLog {
 
   status   SyncStatus
   message  String?    @db.Text
-  duration Int?
+  duration Int? // ms
 
   createdAt DateTime @default(now())
 

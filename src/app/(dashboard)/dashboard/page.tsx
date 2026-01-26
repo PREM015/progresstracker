@@ -30,16 +30,52 @@ export default function DashboardPage() {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await axios.post('/api/sync');
-      await refresh();
-      toast({
-        title: 'Sync completed',
-        description: 'All platforms synced successfully',
-        variant: 'success',
-      });
-    } catch (error) {
-      toast({
+      const response = await axios.post('/api/sync');
+      const jobId = response.data.jobId;
       
+      // Poll for job completion
+      let completed = false;
+      let attempts = 0;
+      const maxAttempts = 120; // 4 minutes with 2s intervals
+      
+      while (!completed && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        try {
+          const statusResponse = await axios.get(`/api/sync?jobId=${jobId}`);
+          const job = statusResponse.data;
+          
+          if (job.status === 'completed' || job.status === 'success') {
+            completed = true;
+            toast({
+              title: 'Sync completed',
+              description: `Synced ${job.completedPlatforms || 0} platform(s)`,
+              variant: 'success',
+            });
+            await refresh();
+          } else if (job.status === 'failed') {
+            completed = true;
+            toast({
+              title: 'Sync failed',
+              description: job.error || 'Sync failed',
+              variant: 'error',
+            });
+          }
+        } catch (err) {
+          // Continue polling
+          attempts++;
+        }
+      }
+      
+      if (!completed) {
+        toast({
+          title: 'Sync started',
+          description: 'Syncing in background. Check sync history for updates.',
+          variant: 'default',
+        });
+      }
+    } catch (_error) {
+      toast({
         title: 'Sync failed',
         description: 'Failed to sync platforms. Please try again.',
         variant: 'error',
@@ -179,7 +215,7 @@ export default function DashboardPage() {
 
 /* ---------------------- INTERNAL COMPONENTS ---------------------- */
 
-function MetricCard({ icon, title, value, trend }: any) {
+function MetricCard({ icon, title, value, trend }: { icon: React.ReactNode; title: string; value: string | number; trend: string }) {
   return (
     <motion.div
       whileHover={{ scale: 1.03 }}
@@ -196,11 +232,11 @@ function MetricCard({ icon, title, value, trend }: any) {
   );
 }
 
-function AchievementBadge({ title }: any) {
+function AchievementBadge({ title }: { title: string }) {
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
-      className="px-5 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl shadow-sm text-sm font-semibold"
+      className="px-5 py-2 bg-linear-to-r from-indigo-500 to-purple-600 text-white rounded-xl shadow-sm text-sm font-semibold"
     >
       {title}
     </motion.div>

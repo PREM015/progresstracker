@@ -9,28 +9,35 @@ interface Platform {
   name: string;
   category: string;
   icon: string;
+  slug?: string;
+  displayName?: string;
+  color?: string;
+  website?: string;
 }
 
-export default function PlatformGrid() {
-  const [platforms, setPlatforms] = useState<Platform[]>([]);
-  const [loading, setLoading] = useState(true);
+interface PlatformGridProps {
+  platforms: Platform[];
+  connectedPlatforms: string[];
+  onConnect: (platformId: string, username?: string, token?: string) => Promise<void>;
+  onDisconnect: (platformId: string) => Promise<void>;
+}
+
+export default function PlatformGrid({
+  platforms: initialPlatforms = [],
+  connectedPlatforms = [],
+  onConnect,
+  onDisconnect,
+}: PlatformGridProps) {
+  const [platforms, setPlatforms] = useState<Platform[]>(initialPlatforms);
+  const [loading, setLoading] = useState(!initialPlatforms.length);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
   useEffect(() => {
-    fetchPlatforms();
-  }, []);
-
-  const fetchPlatforms = async () => {
-    try {
-      const response = await fetch("/api/platforms");
-      const data = await response.json();
-      setPlatforms(data.platforms || []);
-    } catch (error) {
-      console.error("Failed to fetch platforms:", error);
-    } finally {
+    if (initialPlatforms.length) {
+      setPlatforms(initialPlatforms);
       setLoading(false);
     }
-  };
+  }, [initialPlatforms]);
 
   const filteredPlatforms =
     selectedCategory === "ALL"
@@ -55,7 +62,13 @@ export default function PlatformGrid() {
         </div>
       ) : (
         filteredPlatforms.map((platform) => (
-          <PlatformCard key={platform.id} platform={platform} />
+          <PlatformCard 
+            key={platform.id} 
+            platform={platform}
+            isConnected={connectedPlatforms.includes(platform.id)}
+            onConnect={onConnect}
+            onDisconnect={onDisconnect}
+          />
         ))
       )}
     </div>

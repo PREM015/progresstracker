@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       totalPlatforms: job.totalPlatforms,
     });
   } catch (error: any) {
-    console.error('Trigger all sync error:', error);
+    logger.error('Trigger all sync error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: error.message || 'Failed to trigger sync' },
       { status: 500 }

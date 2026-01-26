@@ -52,7 +52,7 @@ export function useSync(options?: UseSyncOptions): UseSyncReturn {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch('/api/sync/trigger-all', {
+      const response = await fetch('/api/sync', {
         method: 'POST',
       });
 

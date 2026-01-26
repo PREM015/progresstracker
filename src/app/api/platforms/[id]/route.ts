@@ -51,7 +51,7 @@ export async function GET(
       isConnected,
     });
   } catch (error: any) {
-    console.error("Error fetching platform:", error);
+    logger.error("Error fetching platform:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       {
         error: "Failed to fetch platform",

@@ -4,7 +4,7 @@
 
 import  { useState, useEffect } from 'react';
 import { Save, Loader2, Zap, Clock, RefreshCw } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import Card, { CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import  Button  from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import  RadioGroup  from '@/components/ui/RadioGroup'
@@ -141,7 +141,7 @@ export function SyncSettings() {
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <div
                         className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
                           settings.syncFrequency === frequency.value

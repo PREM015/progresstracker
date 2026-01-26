@@ -47,21 +47,21 @@ export const syncLeetCodeTask = task({
       for (const entry of result.entries) {
         await prisma.trackerEntry.upsert({
           where: {
-            userId_date_platform: {
+            userId_date_platformId: {
               userId,
               date: entry.date,
-              platform: "LeetCode",
+              platformId: platformId,
             },
           },
           create: {
             userId,
             date: entry.date,
-            platform: "LeetCode",
-            problems: entry.problems || 0,
+            platformId: platformId,
+            problemsSolved: entry.problems || 0,
             notes: entry.notes,
           },
           update: {
-            problems: entry.problems || 0,
+            problemsSolved: entry.problems || 0,
             notes: entry.notes,
           },
         });

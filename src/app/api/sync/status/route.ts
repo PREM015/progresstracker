@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Sync status error:", error);
+    logger.error("Sync status error:", error instanceof Error ? error : new Error(String(error)));
 
     // 🔥 NEVER fail fetch
     return NextResponse.json(

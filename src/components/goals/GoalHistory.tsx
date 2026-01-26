@@ -5,7 +5,7 @@
 import React from 'react';
 import { CheckCircle, Calendar, Target, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import Badge from '@/components/ui/Badge';
 import { Goal } from '@/types/goal';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';

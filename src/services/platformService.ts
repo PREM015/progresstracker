@@ -15,8 +15,24 @@ export class PlatformService {
    * Get platforms by category
    */
   static async getPlatformsByCategory(category: PlatformCategoryId) {
+    // Map category to enum value
+    const categoryMap: Record<PlatformCategoryId, string> = {
+      dsa: 'DSA',
+      job: 'JOB',
+      git: 'GIT',
+      learning: 'LEARNING',
+      hackathon: 'HACKATHON',
+      opensource: 'OPENSOURCE',
+      company: 'COMPANY',
+    }
+    
+    const enumCategory = categoryMap[category]
+    if (!enumCategory) {
+      throw new Error(`Invalid category: ${category}`)
+    }
+    
     return await prisma.platform.findMany({
-      where: { category },
+      where: { category: enumCategory as any },
       orderBy: { name: "asc" },
     })
   }

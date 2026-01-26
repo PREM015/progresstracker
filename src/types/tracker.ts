@@ -2,9 +2,13 @@ export interface TrackerEntry {
   id: string;
   userId: string;
   date: Date;
-  platform?: string;
-  problems?: number;
+  platformId?: string;
+  problemsSolved?: number;
+  projectsCompleted?: number;
+  applicationsSubmitted?: number;
+  coursesCompleted?: number;
   timeSpent?: number; // in minutes
+  mood?: string;
   notes?: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -20,15 +24,15 @@ export interface TrackerStats {
 
 export interface CreateTrackerEntryData {
   date: Date;
-  platform?: string;
-  problems?: number;
+  platformId?: string;
+  problemsSolved?: number;
   timeSpent?: number;
   notes?: string;
 }
 
 export interface UpdateTrackerEntryData {
-  platform?: string;
-  problems?: number;
+  platformId?: string;
+  problemsSolved?: number;
   timeSpent?: number;
   notes?: string;
 }

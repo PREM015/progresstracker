@@ -18,11 +18,11 @@ export function ExportButton({ entries, dateRange }: ExportButtonProps) {
   const exportAsCSV = () => {
     setIsExporting(true);
     try {
-      const headers = ['Date', 'Platform', 'Problems', 'Time (hrs)', 'Notes'];
+      const headers = ['Date', 'Platform', 'Problems Solved', 'Time (hrs)', 'Notes'];
       const rows = entries.map((entry) => [
         format(new Date(entry.date), 'yyyy-MM-dd'),
-        entry.platform || '',
-        entry.problems || 0,
+        entry.platformId || '',
+        entry.problemsSolved || 0,
         ((entry.timeSpent || 0) / 60).toFixed(2),
         entry.notes || '',
       ]);

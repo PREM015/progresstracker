@@ -1,8 +1,8 @@
 'use client';
 
-import  Card  from '@/components/ui/Card';
-
+import Card from '@/components/ui/Card';
 import { TrendingUp, TrendingDown, Code2, Briefcase, GitCommit, Flame } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface StatsCardsProps {
   stats: {
@@ -24,77 +24,106 @@ export function StatsCards({ stats }: StatsCardsProps) {
       value: stats.totalProblems,
       change: stats.problemsChange || 0,
       icon: Code2,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-100 dark:bg-blue-900/20',
+      gradient: 'from-blue-600 to-cyan-500',
+      bgGradient: 'from-blue-600/10 to-cyan-500/10',
+      iconBg: 'bg-blue-600/20',
+      textColor: 'text-blue-600',
+      unit: 'problems',
     },
     {
-      title: 'Applications Sent',
+      title: 'Job Applications',
       value: stats.totalApplications || 0,
       change: stats.applicationsChange || 0,
       icon: Briefcase,
-      color: 'text-green-600 dark:text-green-400',
-      bgColor: 'bg-green-100 dark:bg-green-900/20',
+      gradient: 'from-emerald-600 to-teal-500',
+      bgGradient: 'from-emerald-600/10 to-teal-500/10',
+      iconBg: 'bg-emerald-600/20',
+      textColor: 'text-emerald-600',
+      unit: 'applications',
     },
     {
-      title: 'Commits Made',
+      title: 'GitHub Commits',
       value: stats.totalCommits || 0,
       change: stats.commitsChange || 0,
       icon: GitCommit,
-      color: 'text-purple-600 dark:text-purple-400',
-      bgColor: 'bg-purple-100 dark:bg-purple-900/20',
+      gradient: 'from-violet-600 to-purple-500',
+      bgGradient: 'from-violet-600/10 to-purple-500/10',
+      iconBg: 'bg-violet-600/20',
+      textColor: 'text-violet-600',
+      unit: 'commits',
     },
     {
       title: 'Current Streak',
       value: stats.currentStreak,
       change: stats.streakChange || 0,
       icon: Flame,
-      color: 'text-orange-600 dark:text-orange-400',
-      bgColor: 'bg-orange-100 dark:bg-orange-900/20',
-      suffix: ' days',
+      gradient: 'from-orange-600 to-red-500',
+      bgGradient: 'from-orange-600/10 to-red-500/10',
+      iconBg: 'bg-orange-600/20',
+      textColor: 'text-orange-600',
+      unit: 'days',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {cards.map((card) => {
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {cards.map((card, idx) => {
         const Icon = card.icon;
         const isPositive = card.change >= 0;
 
         return (
-          <Card key={card.title} className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {card.title}
-                </p>
-                <p className="text-3xl font-bold mt-2">
-                  {card.value}
-                  {card.suffix && <span className="text-lg">{card.suffix}</span>}
-                </p>
-                {card.change !== 0 && (
-                  <div className="flex items-center gap-1 mt-2">
-                    {isPositive ? (
-                      <TrendingUp className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <TrendingDown className="w-4 h-4 text-red-600" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${
-                        isPositive ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {isPositive ? '+' : ''}
-                      {card.change}%
-                    </span>
-                    <span className="text-sm text-gray-500">vs last month</span>
-                  </div>
-                )}
+          <motion.div
+            key={card.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: idx * 0.1 }}
+          >
+            <Card className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.bgGradient} border border-white/20 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105 group p-6`}>
+              {/* Header */}
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                    {card.title}
+                  </p>
+                </div>
+                <div className={`p-3 rounded-xl ${card.iconBg}`}>
+                  <Icon className={`w-5 h-5 ${card.textColor}`} />
+                </div>
               </div>
-              <div className={`p-3 rounded-lg ${card.bgColor}`}>
-                <Icon className={`w-6 h-6 ${card.color}`} />
+
+              {/* Main Value */}
+              <div className="mb-4">
+                <p className="text-5xl font-bold text-gray-900 dark:text-white">
+                  {card.value.toLocaleString()}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">
+                  {card.unit}
+                </p>
               </div>
-            </div>
-          </Card>
+
+              {/* Change Indicator */}
+              {card.change !== 0 && (
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  {isPositive ? (
+                    <>
+                      <TrendingUp className="w-4 h-4 text-green-500" />
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        +{card.change}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="w-4 h-4 text-red-500" />
+                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        {card.change}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-xs text-gray-500 dark:text-gray-400">this week</span>
+                </div>
+              )}
+            </Card>
+          </motion.div>
         );
       })}
     </div>

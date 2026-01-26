@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Download, Loader2, FileText, FileJson, FileCode } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
+import Button from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { DateRangeExport } from './DateRangeExport';
 import { FormatSelector } from './FormatSelector';

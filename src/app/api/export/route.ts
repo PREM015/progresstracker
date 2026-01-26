@@ -26,7 +26,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error('Get export options error:', error);
+    logger.error('Get export options error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to fetch export options' },
       { status: 500 }

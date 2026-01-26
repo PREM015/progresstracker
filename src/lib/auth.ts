@@ -148,11 +148,14 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    async session({ session, token }) {
+    async session({ session, token, user }) {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.email = token.email ?? null;
-        session.user.image = token.picture as string ?? null;
+        // Get full user data to include image
+        if (user) {
+          session.user.image = user.image ?? null;
+        }
       }
       return session;
     },

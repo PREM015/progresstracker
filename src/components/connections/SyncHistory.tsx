@@ -12,8 +12,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { SyncLog } from '@/types/sync';
 import { formatDistanceToNow, format } from 'date-fns';

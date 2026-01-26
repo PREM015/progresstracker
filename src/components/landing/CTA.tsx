@@ -1,10 +1,10 @@
-import { Button } from '@/components/ui/Button';
+import Button from '@/components/ui/Button';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CTA() {
   return (
-    <section className="py-24 px-4 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700">
+    <section className="py-24 px-4 bg-linear-to-r from-blue-600 to-purple-600 dark:from-blue-700 dark:to-purple-700">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 font-heading">
           Ready to Track Your Coding Journey?

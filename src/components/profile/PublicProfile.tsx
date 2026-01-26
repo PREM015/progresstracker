@@ -234,7 +234,7 @@ export function PublicProfile({
                   key={achievement.id}
                   className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
                 >
-                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center shrink-0">
                     <Trophy className="h-6 w-6 text-yellow-600" />
                   </div>
                   <div className="flex-1 min-w-0">

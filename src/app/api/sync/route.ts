@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
-import { SyncService } from '@/services/syncService';
+import { syncOrchestrator } from '@/services/sync/syncOrchestrator';
 
 // GET - Get sync status
 export async function GET(req: NextRequest) {
@@ -19,20 +19,20 @@ export async function GET(req: NextRequest) {
 
     if (jobId) {
       // Get specific job status
-      const job = SyncService.getJobStatus(jobId);
+      const job = syncOrchestrator.getJobStatus(jobId);
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
       }
       return NextResponse.json(job);
     }
 
-    // Get overall sync state
-    const state = await SyncService.getSyncState(session.user.id);
-    return NextResponse.json(state);
-  } catch (error: any) {
-    console.error('Sync status error:', error);
+    // Get overall queue state
+    const queueStatus = syncOrchestrator.getQueueStatus();
+    return NextResponse.json(queueStatus);
+  } catch (error: unknown) {
+    logger.error('Sync status error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
-      { error: error.message || 'Failed to get sync status' },
+      { error: (error instanceof Error ? error.message : 'Failed to get sync status') || 'Failed to get sync status' },
       { status: 500 }
     );
   }
@@ -47,23 +47,27 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { platforms, force } = body;
+    const { platformIds, force, priority } = body;
 
-    const job = await SyncService.syncAllPlatforms(session.user.id, {
-      platforms,
+    const jobId = await syncOrchestrator.enqueue({
+      userId: session.user.id,
+      platformIds,
       force,
+      priority: priority || 'normal',
     });
+
+    const job = syncOrchestrator.getJobStatus(jobId);
 
     return NextResponse.json({
       success: true,
-      jobId: job.id,
-      message: `Syncing ${job.totalPlatforms} platform(s)`,
-      platformCount: job.totalPlatforms,
+      jobId,
+      message: `Syncing ${job?.totalPlatforms || 0} platform(s)`,
+      platformCount: job?.totalPlatforms || 0,
     });
-  } catch (error: any) {
-    console.error('Sync trigger error:', error);
+  } catch (error: unknown) {
+    logger.error('Sync trigger error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
-      { error: error.message || 'Failed to trigger sync' },
+      { error: (error instanceof Error ? error.message : 'Failed to trigger sync') || 'Failed to trigger sync' },
       { status: 500 }
     );
   }
@@ -84,15 +88,16 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Job ID required' }, { status: 400 });
     }
 
-    const cancelled = SyncService.cancelJob(jobId);
+    const cancelled = syncOrchestrator.cancelJob(jobId);
     
     return NextResponse.json({
       success: cancelled,
       message: cancelled ? 'Sync cancelled' : 'Could not cancel sync',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    logger.error('Sync cancel error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel sync' },
+      { error: (error instanceof Error ? error.message : 'Failed to cancel sync') || 'Failed to cancel sync' },
       { status: 500 }
     );
   }

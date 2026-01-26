@@ -6,7 +6,7 @@ import React from 'react';
 import { Loader2, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/Progress';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import Button from '@/components/ui/Button';
 import { useSync } from '@/context/SyncContext';
 import { cn } from '@/lib/utils';
 

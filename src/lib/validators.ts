@@ -104,9 +104,14 @@ export type SettingsInput = z.infer<typeof settingsSchema>
  * Notification Preferences Validation
  */
 export const notificationPreferencesSchema = z.object({
-  emailReminders: z.boolean(),
-  weeklySummary: z.boolean(),
-  achievementAlerts: z.boolean(),
+  emailNotifications: z.boolean().optional(),
+  pushNotifications: z.boolean().optional(),
+  weeklyReport: z.boolean().optional(),
+  dailyReminder: z.boolean().optional(),
+  goalReminders: z.boolean().optional(),
+  achievementAlerts: z.boolean().optional(),
+  syncFailures: z.boolean().optional(),
+  newFeatures: z.boolean().optional(),
 })
 
 export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>

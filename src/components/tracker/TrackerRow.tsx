@@ -23,8 +23,8 @@ export function TrackerRow({
 }: TrackerRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState({
-    platform: entry.platform || '',
-    problems: entry.problems || 0,
+    platformId: entry.platformId || '',
+    problemsSolved: entry.problemsSolved || 0,
     timeSpent: entry.timeSpent || 0,
     notes: entry.notes || '',
   });
@@ -44,8 +44,8 @@ export function TrackerRow({
 
   const handleCancel = () => {
     setEditData({
-      platform: entry.platform || '',
-      problems: entry.problems || 0,
+      platformId: entry.platformId || '',
+      problemsSolved: entry.problemsSolved || 0,
       timeSpent: entry.timeSpent || 0,
       notes: entry.notes || '',
     });
@@ -86,29 +86,29 @@ export function TrackerRow({
         {isEditing ? (
           <input
             type="text"
-            value={editData.platform}
+            value={editData.platformId}
             onChange={(e) =>
-              setEditData({ ...editData, platform: e.target.value })
+              setEditData({ ...editData, platformId: e.target.value })
             }
             className="w-full px-2 py-1 border rounded"
           />
         ) : (
-          entry.platform || '-'
+          entry.platformId || '-'
         )}
       </td>
       <td className="px-4 py-3 text-sm">
         {isEditing ? (
           <input
             type="number"
-            value={editData.problems}
+            value={editData.problemsSolved}
             onChange={(e) =>
-              setEditData({ ...editData, problems: parseInt(e.target.value) || 0 })
+              setEditData({ ...editData, problemsSolved: parseInt(e.target.value) || 0 })
             }
             className="w-20 px-2 py-1 border rounded"
             min="0"
           />
         ) : (
-          entry.problems || 0
+          entry.problemsSolved || 0
         )}
       </td>
       <td className="px-4 py-3 text-sm">

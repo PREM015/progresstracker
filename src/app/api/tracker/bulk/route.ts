@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, deleted: ids.length });
   } catch (error) {
-    console.error('Error bulk deleting entries:', error);
+    logger.error('Error bulk deleting entries:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to delete entries' },
       { status: 500 }

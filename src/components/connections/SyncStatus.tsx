@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Progress } from '@/components/ui/Progress';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 import { useSync } from '@/context/SyncContext';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';

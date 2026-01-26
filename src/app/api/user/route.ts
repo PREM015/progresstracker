@@ -75,7 +75,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    console.error('Update profile error:', error);
+    logger.error('Update profile error:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: 'Failed to update profile' },
       { status: 500 }

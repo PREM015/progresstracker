@@ -28,7 +28,7 @@ export class TrendService {
 
       switch (metric) {
         case 'problems':
-          dailyData[dateKey] += entry.problems || 0;
+          dailyData[dateKey] += entry.problemsSolved || 0;
           break;
         case 'time':
           dailyData[dateKey] += entry.timeSpent || 0;

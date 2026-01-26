@@ -1,29 +1,88 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Modern beautiful light mode */
+  --background: #f9fafb;
+  --foreground: #111827;
+  --primary: #3b82f6;
+  --primary-dark: #1e40af;
+  --secondary: #8b5cf6;
+  --accent: #ec4899;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --text-muted: #6b7280;
+  --text-secondary: #4b5563;
+  --sidebar-bg: #f3f4f6;
+  --border-light: #f0f0f0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: "Fira Code", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Modern beautiful dark mode */
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+    --primary: #60a5fa;
+    --primary-dark: #3b82f6;
+    --secondary: #a78bfa;
+    --accent: #f472b6;
+    --success: #34d399;
+    --warning: #fbbf24;
+    --destructive: #f87171;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --text-muted: #94a3b8;
+    --text-secondary: #cbd5e1;
+    --sidebar-bg: #1e293b;
+    --border-light: #2d3a4a;
   }
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, var(--background) 0%, var(--background) 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
+  font-smooth: always;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Beautiful gradient backgrounds */
+.gradient-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+button, a {
+  transition: all 0.3s ease;
+}
+
 /* Add this to your existing globals.css */
 
 @keyframes slideIn {

@@ -37,8 +37,19 @@ export const syncGitHubTask = task({
 
     try {
       const scraper = new GitHubScraper();
+      let token = '';
+      if (userPlatform.credentials) {
+        try {
+          const creds = typeof userPlatform.credentials === 'string'
+            ? JSON.parse(userPlatform.credentials)
+            : userPlatform.credentials;
+          token = creds.access_token || '';
+        } catch (e) {
+          console.error('Failed to parse credentials:', e);
+        }
+      }
       const result = await scraper.fetchData({
-        token: userPlatform.token || "",
+        token: token,
         username: userPlatform.username || "",
       });
 
@@ -51,21 +62,21 @@ export const syncGitHubTask = task({
       for (const entry of result.entries) {
         await prisma.trackerEntry.upsert({
           where: {
-            userId_date_platform: {
+            userId_date_platformId: {
               userId,
               date: entry.date,
-              platform: "GitHub",
+              platformId: platformId,
             },
           },
           create: {
             userId,
             date: entry.date,
-            platform: "GitHub",
-            problems: entry.problems || 0,
+            platformId: platformId,
+            problemsSolved: entry.problems || 0,
             notes: entry.notes,
           },
           update: {
-            problems: entry.problems || 0,
+            problemsSolved: entry.problems || 0,
             notes: entry.notes,
           },
         });

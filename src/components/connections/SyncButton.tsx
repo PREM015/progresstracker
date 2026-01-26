@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { RefreshCw, X, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import Button from '@/components/ui/Button';
 import { useSync } from '@/context/SyncContext';
 import { cn } from '@/lib/utils';
 
