@@ -24,6 +24,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     email?: string;
+    provider?: string;
   }
 }
 
@@ -54,7 +55,6 @@ export const authOptions: NextAuthOptions = {
   // ===== SESSION =====
   session: {
     strategy: "jwt",
-    // Default: 30 days (2,592,000 seconds). Can be overridden by SESSION_MAX_AGE env var
     maxAge: parseInt(process.env.SESSION_MAX_AGE || "2592000"),
   },
 
@@ -119,9 +119,10 @@ export const authOptions: NextAuthOptions = {
   // ===== COOKIES =====
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" 
-        ? "__Secure-next-auth.session-token" 
-        : "next-auth.session-token",
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
@@ -133,7 +134,7 @@ export const authOptions: NextAuthOptions = {
 
   // ===== CALLBACKS =====
   callbacks: {
-    async jwt({ token, user, account }) {
+    jwt: async ({ token, user, account }) => {
       // Initial sign in
       if (user) {
         token.id = user.id;
@@ -148,25 +149,19 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    async session({ session, token, user }) {
+    session: async ({ session, token }) => {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.email = token.email ?? null;
-        // Get full user data to include image
-        if (user) {
-          session.user.image = user.image ?? null;
-        }
+        session.user.email = (token.email as string) ?? null;
       }
       return session;
     },
 
-    async signIn() {
-      // Allow all sign ins
+    signIn: async () => {
       return true;
     },
 
-    async redirect({ url, baseUrl }) {
-      // Redirect to dashboard after login
+    redirect: async ({ url, baseUrl }) => {
       if (url.startsWith(baseUrl)) return url;
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       return `${baseUrl}/dashboard`;
@@ -193,21 +188,64 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          // Create NotificationPreferences (use correct field names!)
+          // Create NotificationPreferences with CORRECT field names from schema
           await prisma.notificationPreferences.upsert({
             where: { userId: user.id },
             update: {},
             create: {
               userId: user.id,
-              emailNotifications: true,  // ✅ Correct field name
-              weeklyReport: true,        // ✅ Correct field name
-              achievementAlerts: true,
+              // Core settings
+              enabled: true,
+              emailEnabled: true,
+              pushEnabled: false,
+              inAppEnabled: true,
+              smsEnabled: false,
+              
+              // Goal notifications
+              goalReminders: true,
+              goalCompleted: true,
+              
+              // Streak & sync notifications
+              streakAlerts: true,
+              syncComplete: false,
+              syncFailed: true,
+              
+              // Report notifications
+              weeklyReport: true,
+              monthlyReport: false,
+              
+              // Security & system
+              securityAlerts: true,
+              billingAlerts: true,
+              
+              // Marketing & updates
+              newFeatures: true,
+              tips: true,
+              communityUpdates: false,
+              marketingEmails: false,
+              
+              // Quiet hours (disabled by default)
+              quietHoursEnabled: false,
+              quietHoursStart: "22:00",
+              quietHoursEnd: "08:00",
+              quietHoursTimezone: "UTC",
+              
+              // Digest settings
+              digestEnabled: false,
+              digestFrequency: "daily",
+              digestTime: "09:00",
+              digestDay: 1, // Monday
+              
+              // Do not disturb
+              dndEnabled: false,
+              dndUntil: null,
             },
           });
 
           console.log(`✅ Created default settings for user: ${user.id}`);
         } catch (error) {
           console.error("Failed to create user settings:", error);
+          // Don't throw - allow sign in to continue even if settings creation fails
         }
       }
     },
