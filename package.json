@@ -106,7 +106,7 @@
     "@types/lodash": "^4.17.21",
     "@types/ms": "^2.1.0",
     "@types/mysql": "^2.15.27",
-    "@types/node": "^24.10.1",
+    "@types/node": "^24.10.9",
     "@types/node-cron": "^3.0.11",
     "@types/papaparse": "^5.5.0",
     "@types/pg": "^8.15.6",
@@ -135,6 +135,7 @@
     "tailwindcss": "^4.1.17",
     "test-exclude": "^7.0.1",
     "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { InputHTMLAttributes } from "react";
@@ -6,7 +7,7 @@ import clsx from "clsx";
 export type InputVariant = "default" | "outline" | "ghost" | "error";
 export type InputSize = "sm" | "md" | "lg";
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label?: string;
   helperText?: string;
   variant?: InputVariant;

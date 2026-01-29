@@ -1,26 +1,49 @@
+import { useEffect, useState } from "react";
 
+type SyncTask = {
+  id: string;
+  name: string;
+  status: "pending" | "running" | "completed" | "failed";
+  lastRun: Date | null;
+};
 
-import { cn } from '@/lib/utils';
+export default function SyncMonitor() {
+  const [tasks, setTasks] = useState<SyncTask[]>([]);
+  const [loading, setLoading] = useState(true);
 
-/**
- * SyncMonitor Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+  useEffect(() => {
+    async function fetchTasks() {
+      try {
+        const res = await fetch("/api/admin/sync-tasks");
+        const data = await res.json();
+        setTasks(data);
+      } catch (err) {
+        console.error("Failed to load sync tasks:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-interface SyncMonitorProps {
-  className?: string;
-  // TODO: Add more props
-}
+    fetchTasks();
+  }, []);
 
-export function SyncMonitor({ className }: SyncMonitorProps) {
+  if (loading) return <p>Loading sync tasks...</p>;
+  if (!tasks.length) return <p>No sync tasks found</p>;
+
   return (
-    <div className={cn('syncmonitor', className)}>
-      {/* TODO: Implement component */}
-      <p>SyncMonitor Component</p>
+    <div>
+      <h2 className="text-xl font-bold mb-4">Sync Monitor</h2>
+      <ul className="space-y-2">
+        {tasks.map((task) => (
+          <li key={task.id} className="p-2 border rounded flex justify-between">
+            <span>{task.name}</span>
+            <span>
+              {task.status}{" "}
+              {task.lastRun ? `- Last run: ${new Date(task.lastRun).toLocaleString()}` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
-
-export default SyncMonitor;

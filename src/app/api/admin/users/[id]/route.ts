@@ -1,135 +1,92 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+type Params = {
+  params: {
+    id: string;
+  };
+};
 
 /**
- * API Route: /api/admin/users/[id]
- * 
- * @description TODO: Add description
- * @created 2026-01-26
+ * GET /api/admin/users/[id]
+ * Fetch single user
  */
-
-// GET - Fetch data
-export async function GET(
-  request: NextRequest, { params }: { params: { id: string } }
-) {
+export async function GET(_: Request, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "User not found" },
+        { status: 404 }
       );
     }
 
-    // TODO: Implement GET logic
-
-    return NextResponse.json({
-      success: true,
-      data: {},
-    });
+    return NextResponse.json({ success: true, data: user });
   } catch (error) {
-    console.error('[ADMIN_USERS_ID_GET]', error);
+    console.error("ADMIN USER GET ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to fetch user" },
       { status: 500 }
     );
   }
 }
 
-// POST - Create new data
-export async function POST(request: NextRequest) {
+/**
+ * PATCH /api/admin/users/[id]
+ * Update user
+ */
+export async function PATCH(req: Request, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const body = await req.json();
+    const { name, role } = body;
 
-    const body = await request.json();
+    const user = await prisma.user.update({
+      where: { id: params.id },
+      data: {
+        ...(name && { name }),
+        ...(role && { role }),
+      },
+    });
 
-    // TODO: Validate body
-    // TODO: Implement POST logic
-
-    return NextResponse.json({
-      success: true,
-      data: {},
-    }, { status: 201 });
+    return NextResponse.json({ success: true, data: user });
   } catch (error) {
-    console.error('[ADMIN_USERS_ID_POST]', error);
+    console.error("ADMIN USER PATCH ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to update user" },
       { status: 500 }
     );
   }
 }
 
-// PUT - Update data
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+/**
+ * DELETE /api/admin/users/[id]
+ * Remove user
+ */
+export async function DELETE(_: Request, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-    const { id } = params;
-
-    // TODO: Validate body
-    // TODO: Implement PUT logic
+    await prisma.user.delete({
+      where: { id: params.id },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {},
+      message: "User deleted successfully",
     });
   } catch (error) {
-    console.error('[ADMIN_USERS_ID_PUT]', error);
+    console.error("ADMIN USER DELETE ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE - Remove data
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const { id } = params;
-
-    // TODO: Implement DELETE logic
-
-    return NextResponse.json({
-      success: true,
-      message: 'Deleted successfully',
-    });
-  } catch (error) {
-    console.error('[ADMIN_USERS_ID_DELETE]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to delete user" },
       { status: 500 }
     );
   }

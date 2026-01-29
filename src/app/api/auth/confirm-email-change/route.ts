@@ -1,73 +1,96 @@
+// app/api/auth/confirm-email-change/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import crypto from 'crypto';
+
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
-/**
- * API Route: /api/auth/confirm-email-change
- * 
- * @description TODO: Add description
- * @created 2026-01-26
- */
+const CONSTANT_TIME_MS = 250;
 
-// GET - Fetch data
-export async function GET(
-  request: NextRequest
-) {
+function hashToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+async function constantTimeDelay(start: number) {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+}
+
+function secureResponse(body: object, status: number) {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  return res;
+}
+
+export async function GET(req: NextRequest) {
+  const start = Date.now();
+
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const token = req.nextUrl.searchParams.get('token');
+    const type = req.nextUrl.searchParams.get('type'); // 'old' or 'new'
+
+    if (!token || !type || !['old', 'new'].includes(type)) {
+      return secureResponse({ error: 'Invalid request' }, 400);
     }
 
-    // TODO: Implement GET logic
+    const tokenHash = hashToken(token);
 
-    return NextResponse.json({
-      success: true,
-      data: {},
+    const request = await prisma.emailChangeRequest.findFirst({
+      where: type === 'old' ? { oldEmailToken: tokenHash } : { newEmailToken: tokenHash },
+      include: { user: true },
     });
-  } catch (error) {
-    console.error('[AUTH_CONFIRM-EMAIL-CHANGE_GET]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
 
-// POST - Create new data
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    if (!request) {
+      await constantTimeDelay(start);
+      return secureResponse({ error: 'Invalid or expired token' }, 400);
     }
 
-    const body = await request.json();
+    if (request.expiresAt < new Date() || request.cancelledAt) {
+      await constantTimeDelay(start);
+      return secureResponse({ error: 'Token expired or request cancelled' }, 400);
+    }
 
-    // TODO: Validate body
-    // TODO: Implement POST logic
+    // Update verification status
+    if (type === 'old') {
+      if (request.oldEmailVerified) {
+        return secureResponse({ message: 'Old email already verified' }, 200);
+      }
+      await prisma.emailChangeRequest.update({
+        where: { id: request.id },
+        data: { oldEmailVerified: true },
+      });
+    } else {
+      if (!request.oldEmailVerified) {
+        return secureResponse({ error: 'Old email must be verified first' }, 400);
+      }
+      if (request.newEmailVerified) {
+        return secureResponse({ message: 'New email already verified' }, 200);
+      }
+      await prisma.emailChangeRequest.update({
+        where: { id: request.id },
+        data: { newEmailVerified: true, completedAt: new Date() },
+      });
 
-    return NextResponse.json({
-      success: true,
-      data: {},
-    }, { status: 201 });
+      // Update user email in DB
+      await prisma.user.update({
+        where: { id: request.userId },
+        data: { email: request.newEmail, emailVerified: new Date() },
+      });
+    }
+
+    await constantTimeDelay(start);
+    return secureResponse({ message: 'Email verification successful' }, 200);
   } catch (error) {
-    console.error('[AUTH_CONFIRM-EMAIL-CHANGE_POST]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error('Confirm email change error', error);
+    await constantTimeDelay(start);
+    return secureResponse({ error: 'Something went wrong' }, 500);
   }
-}
+};
 
-
-
+export async function POST() { return secureResponse({ error: 'Method not allowed' }, 405); }
+export async function PUT() { return secureResponse({ error: 'Method not allowed' }, 405); }
+export async function DELETE() { return secureResponse({ error: 'Method not allowed' }, 405); }

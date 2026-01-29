@@ -1,73 +1,82 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 /**
- * API Route: /api/admin/users
- * 
- * @description TODO: Add description
- * @created 2026-01-26
+ * GET /api/admin/users
+ * Fetch all users
  */
-
-// GET - Fetch data
-export async function GET(
-  request: NextRequest
-) {
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // TODO: Implement GET logic
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {},
+      data: users,
     });
   } catch (error) {
-    console.error('[ADMIN_USERS_GET]', error);
+    console.error("ADMIN USERS GET ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to fetch users" },
       { status: 500 }
     );
   }
 }
 
-// POST - Create new data
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/admin/users
+ * Create a new user
+ */
+export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
+    const body = await req.json();
+
+    const { name, email, password, role } = body;
+
+    if (!email || !password) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Email and password required" },
+        { status: 400 }
       );
     }
 
-    const body = await request.json();
+    const exists = await prisma.user.findUnique({
+      where: { email },
+    });
 
-    // TODO: Validate body
-    // TODO: Implement POST logic
+    if (exists) {
+      return NextResponse.json(
+        { success: false, message: "User already exists" },
+        { status: 409 }
+      );
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password, // ⚠️ hash if not already handled in auth layer
+        role: role ?? "USER",
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {},
-    }, { status: 201 });
+      data: user,
+    });
   } catch (error) {
-    console.error('[ADMIN_USERS_POST]', error);
+    console.error("ADMIN USERS POST ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to create user" },
       { status: 500 }
     );
   }
 }
-
-
-

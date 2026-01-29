@@ -1,63 +1,111 @@
-"use client";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// src/components/layout/Sidebar.tsx
+'use client';
 
-import React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  Target,
+  Award,
+  TrendingUp,
+  Calendar,
+  Settings,
+  GitBranch,
+  BarChart3,
+  FileText,
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: "📊" },
-  { name: "Connections", href: "/connections", icon: "🔗" },
-  { name: "Tracker", href: "/tracker", icon: "📝" },
-  { name: "Analytics", href: "/analytics", icon: "📈" },
-  { name: "Goals", href: "/goals", icon: "🎯" },
-  { name: "Settings", href: "/settings", icon: "⚙️" },
-  // Inside your navigation links array:
- 
+interface SidebarProps {
+  isCollapsed?: boolean;
+  onToggle?: () => void;
+}
+
+const menuItems = [
+  { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/goals', icon: Target, label: 'Goals' },
+  { href: '/achievements', icon: Award, label: 'Achievements' },
+  { href: '/activity', icon: TrendingUp, label: 'Activity' },
+  { href: '/platforms', icon: GitBranch, label: 'Platforms' },
+  { href: '/calendar', icon: Calendar, label: 'Calendar' },
+  { href: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { href: '/reports', icon: FileText, label: 'Reports' },
 ];
 
-export default function Sidebar() {
+const bottomItems = [
+  { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/help', icon: HelpCircle, label: 'Help & Support' },
+];
+
+export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 pb-4">
-        {/* Logo */}
-        <div className="flex h-16 shrink-0 items-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            CodeSync Pro
-          </h1>
-        </div>
+    <aside
+      className={`${
+        isCollapsed ? 'w-20' : 'w-64'
+      } bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 flex flex-col h-[calc(100vh-4rem)] sticky top-16`}
+    >
+      {/* Toggle Button */}
+      <button
+        onClick={onToggle}
+        className="absolute -right-3 top-6 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-10"
+        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+        ) : (
+          <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+        )}
+      </button>
 
-        {/* Navigation */}
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-7">
-            <li>
-              <ul role="list" className="-mx-2 space-y-1">
-                {navigation.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors",
-                          isActive
-                            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        )}
-                      >
-                        <span className="text-xl">{item.icon}</span>
-                        {item.name}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </div>
+      {/* Main Menu */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {menuItems.map(({ href, icon: Icon, label }) => {
+          const isActive = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+              title={isCollapsed ? label : undefined}
+            >
+              <Icon className="w-5 h-5 shrink-0" />
+              {!isCollapsed && <span className="font-medium">{label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom Menu */}
+      <nav className="px-3 py-4 space-y-1 border-t border-gray-200 dark:border-gray-800">
+        {bottomItems.map(({ href, icon: Icon, label }) => {
+          const isActive = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+              title={isCollapsed ? label : undefined}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span className="font-medium">{label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
   );
 }

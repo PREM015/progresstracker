@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/logger.ts
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -7,7 +8,7 @@ interface LogEntry {
   message: string;
   timestamp: string;
   context?: Record<string, any>;
-  error?: Error;
+  error?: unknown; // <-- Accept any type now
 }
 
 class Logger {
@@ -25,7 +26,15 @@ class Logger {
     }
 
     if (error) {
-      formatted += ` | error: ${error.name}: ${error.message}`;
+      // Handle Error objects specially, else stringify
+      if (error instanceof Error) {
+        formatted += ` | error: ${error.name}: ${error.message}`;
+        if (this.isDevelopment && error.stack) {
+          formatted += `\nStack: ${error.stack}`;
+        }
+      } else {
+        formatted += ` | error: ${JSON.stringify(error)}`;
+      }
     }
 
     return formatted;
@@ -38,7 +47,7 @@ class Logger {
     level: LogLevel,
     message: string,
     context?: Record<string, any>,
-    error?: Error
+    error?: unknown
   ): LogEntry {
     return {
       level,
@@ -49,36 +58,23 @@ class Logger {
     };
   }
 
-  /**
-   * Debug log (development only)
-   */
-  debug(message: string, context?: Record<string, any>): void {
+  debug(message: string, context?: Record<string, any>, error?: unknown): void {
     if (!this.isDevelopment) return;
-
-    const entry = this.createEntry('debug', message, context);
+    const entry = this.createEntry('debug', message, context, error);
     console.debug(this.formatLog(entry));
   }
 
-  /**
-   * Info log
-   */
-  info(message: string, context?: Record<string, any>): void {
-    const entry = this.createEntry('info', message, context);
+  info(message: string, context?: Record<string, any>, error?: unknown): void {
+    const entry = this.createEntry('info', message, context, error);
     console.info(this.formatLog(entry));
   }
 
-  /**
-   * Warning log
-   */
-  warn(message: string, context?: Record<string, any>): void {
-    const entry = this.createEntry('warn', message, context);
+  warn(message: string, context?: Record<string, any>, error?: unknown): void {
+    const entry = this.createEntry('warn', message, context, error);
     console.warn(this.formatLog(entry));
   }
 
-  /**
-   * Error log
-   */
-  error(message: string, error?: Error, context?: Record<string, any>): void {
+  error(message: string, error?: unknown, context?: Record<string, any>): void {
     const entry = this.createEntry('error', message, context, error);
     console.error(this.formatLog(entry));
 

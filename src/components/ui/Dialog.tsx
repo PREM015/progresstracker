@@ -71,14 +71,11 @@ export function DialogTrigger({
 
 /* ----------------------------- Content ----------------------------- */
 
-export interface DialogContentProps
-  extends React.HTMLAttributes<HTMLDivElement> {}
-
 export function DialogContent({
   className,
   children,
   ...props
-}: DialogContentProps) {
+}: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) {
   const { open, setOpen } = useDialog();
 
   React.useEffect(() => {

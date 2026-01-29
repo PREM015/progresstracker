@@ -1,0 +1,1005 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 084B-A865
+D:.
+¦   proxy.ts
+¦   t.txt
+¦   tf.txt
+¦   
++---app
+¦   ¦   error.tsx
+¦   ¦   favicon.ico
+¦   ¦   global-error.tsx
+¦   ¦   globals.css
+¦   ¦   layout.tsx
+¦   ¦   manifest.ts
+¦   ¦   not-found.tsx
+¦   ¦   page.tsx
+¦   ¦   robots.ts
+¦   ¦   sitemap.ts
+¦   ¦   
+¦   +---(admin)
+¦   ¦   ¦   error.tsx
+¦   ¦   ¦   layout.tsx
+¦   ¦   ¦   not-found.tsx
+¦   ¦   ¦   
+¦   ¦   +---admin
+¦   ¦       ¦   page.tsx
+¦   ¦       ¦   
+¦   ¦       +---analytics
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---platforms
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---settings
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---sync
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---users
+¦   ¦               page.tsx
+¦   ¦               
+¦   +---(auth)
+¦   ¦   ¦   error.tsx
+¦   ¦   ¦   layout.tsx
+¦   ¦   ¦   not-found.tsx
+¦   ¦   ¦   
+¦   ¦   +---forgot-password
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---login
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---register
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---reset-password
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---two-factor
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---verify-email
+¦   ¦           page.tsx
+¦   ¦           
+¦   +---(dashboard)
+¦   ¦   ¦   error.tsx
+¦   ¦   ¦   layout.tsx
+¦   ¦   ¦   not-found.tsx
+¦   ¦   ¦   
+¦   ¦   +---analytics
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---billing
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---connections
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---dashboard
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---goals
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---settings
+¦   ¦   ¦   ¦   page.tsx
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---data
+¦   ¦   ¦   ¦       page.tsx
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---privacy
+¦   ¦   ¦   ¦       page.tsx
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---security
+¦   ¦   ¦           page.tsx
+¦   ¦   ¦           
+¦   ¦   +---tracker
+¦   ¦           page.tsx
+¦   ¦           
+¦   +---about
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---api
+¦   ¦   +---achievements
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---available
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---unlock
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---admin
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---platforms
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---stats
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---sync
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---users
+¦   ¦   ¦       ¦   route.ts
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---[id]
+¦   ¦   ¦               route.ts
+¦   ¦   ¦               
+¦   ¦   +---analytics
+¦   ¦   ¦   +---comparison
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---export
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---goals
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---insights
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---leaderboard
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---report
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---trends
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---auth
+¦   ¦   ¦   +---change-email
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---confirm-email-change
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---forgot-password
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---logout
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---refresh
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---register
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---resend-verification
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---reset-password
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---session
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---verify-email
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[...nextauth]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---contact
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---cron
+¦   ¦   ¦   +---daily-sync
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---docs
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---export
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---csv
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---download
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---history
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---json
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---pdf
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---scheduled
+¦   ¦   ¦       ¦   route.ts
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---[id]
+¦   ¦   ¦               route.ts
+¦   ¦   ¦               
+¦   ¦   +---goals
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---active
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---archive
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---duplicate
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---share
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---templates
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦       ¦   route.ts
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---complete
+¦   ¦   ¦       ¦       route.ts
+¦   ¦   ¦       ¦       
+¦   ¦   ¦       +---progress
+¦   ¦   ¦               route.ts
+¦   ¦   ¦               
+¦   ¦   +---health
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---logs
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---metrics
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---newsletter
+¦   ¦   ¦   +---subscribe
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---notifications
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---mark-all-read
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---mark-read
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---preferences
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---subscribe
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---unread-count
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---unsubscribe
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---platforms
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---connect
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---connected
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---custom
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---disconnect
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---search
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---profile
+¦   ¦   ¦   +---[username]
+¦   ¦   ¦       ¦   route.ts
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---stats
+¦   ¦   ¦               route.ts
+¦   ¦   ¦               
+¦   ¦   +---sse
+¦   ¦   ¦   +---notifications
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---sync
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---stats
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---heatmap
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---monthly
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---summary
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---trends
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---stripe
+¦   ¦   ¦   +---cancel
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---create-checkout
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---customer-portal
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---invoices
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---resume
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---subscription
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---update-payment
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---webhook
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---sync
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---logs
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---queue
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---retry
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---status
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---trigger-all
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---webhook
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---bitbucket
+¦   ¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦   ¦       
+¦   ¦   ¦   ¦   +---github
+¦   ¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦   ¦       
+¦   ¦   ¦   ¦   +---gitlab
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---[platformId]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---tracker
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---bulk
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---duplicate
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---export
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---import
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---stats
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---user
+¦   ¦       ¦   route.ts
+¦   ¦       ¦   
+¦   ¦       +---2fa
+¦   ¦       ¦   ¦   route.ts
+¦   ¦       ¦   ¦   
+¦   ¦       ¦   +---verify
+¦   ¦       ¦           route.ts
+¦   ¦       ¦           
+¦   ¦       +---avatar
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---delete
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---export-data
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---notifications
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---password
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---preferences
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---profile
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---sessions
+¦   ¦       ¦   ¦   route.ts
+¦   ¦       ¦   ¦   
+¦   ¦       ¦   +---[id]
+¦   ¦       ¦           route.ts
+¦   ¦       ¦           
+¦   ¦       +---settings
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---username
+¦   ¦               route.ts
+¦   ¦               
+¦   +---blog
+¦   ¦   ¦   page.tsx
+¦   ¦   ¦   
+¦   ¦   +---[slug]
+¦   ¦           page.tsx
+¦   ¦           
+¦   +---changelog
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---checkout
+¦   ¦   +---cancel
+¦   ¦   ¦       page.tsx
+¦   ¦   ¦       
+¦   ¦   +---success
+¦   ¦           page.tsx
+¦   ¦           
+¦   +---contact
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---docs
+¦   ¦   ¦   page.tsx
+¦   ¦   ¦   
+¦   ¦   +---api
+¦   ¦           page.tsx
+¦   ¦           
+¦   +---embed
+¦   ¦   +---[username]
+¦   ¦           route.tsx
+¦   ¦           
+¦   +---maintenance
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---offline
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---pricing
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---privacy
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---terms
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---[username]
+¦           error.tsx
+¦           loading.tsx
+¦           not-found.tsx
+¦           opengraph-image.tsx
+¦           page.tsx
+¦           
++---components
+¦   +---admin
+¦   ¦       PlatformManager.tsx
+¦   ¦       SyncMonitor.tsx
+¦   ¦       SystemStats.tsx
+¦   ¦       UserTable.tsx
+¦   ¦       
+¦   +---analytics
+¦   ¦       ActivityHeatmap.tsx
+¦   ¦       AnalyticsDashboard.tsx
+¦   ¦       CategoryPieChart.tsx
+¦   ¦       ComparisonChart.tsx
+¦   ¦       DateRangeSelector.tsx
+¦   ¦       ExportChart.tsx
+¦   ¦       GoalAnalytics.tsx
+¦   ¦       InsightsPanel.tsx
+¦   ¦       Leaderboard.tsx
+¦   ¦       MetricCard.tsx
+¦   ¦       MonthlyComparison.tsx
+¦   ¦       PeriodSelector.tsx
+¦   ¦       PlatformBarChart.tsx
+¦   ¦       PlatformComparison.tsx
+¦   ¦       ProgressChart.tsx
+¦   ¦       ReportGenerator.tsx
+¦   ¦       SkillRadar.tsx
+¦   ¦       StreakCalendar.tsx
+¦   ¦       TimeDistribution.tsx
+¦   ¦       TrendIndicator.tsx
+¦   ¦       WeeklyReport.tsx
+¦   ¦       
+¦   +---auth
+¦   ¦       AuthProvider.tsx
+¦   ¦       AutoLogout.tsx
+¦   ¦       ForgotPasswordForm.tsx
+¦   ¦       LoginForm.tsx
+¦   ¦       RegisterForm.tsx
+¦   ¦       ResetPasswordForm.tsx
+¦   ¦       SocialAuthButtons.tsx
+¦   ¦       TwoFactorForm.tsx
+¦   ¦       VerifyEmailStatus.tsx
+¦   ¦       
+¦   +---billing
+¦   ¦       CancelModal.tsx
+¦   ¦       InvoiceHistory.tsx
+¦   ¦       PaymentMethod.tsx
+¦   ¦       PricingCard.tsx
+¦   ¦       PricingTable.tsx
+¦   ¦       SubscriptionStatus.tsx
+¦   ¦       UpgradeModal.tsx
+¦   ¦       UsageStats.tsx
+¦   ¦       
+¦   +---connections
+¦   ¦       AddCustomPlatform.tsx
+¦   ¦       CategoryFilter.tsx
+¦   ¦       ConnectionStatus.tsx
+¦   ¦       ConnectModal.tsx
+¦   ¦       ConnectPlatformModal.tsx
+¦   ¦       ConnectPlatformModal_Beautiful.tsx
+¦   ¦       PlatformCard.tsx
+¦   ¦       PlatformGrid.tsx
+¦   ¦       SearchBar.tsx
+¦   ¦       SyncButton.tsx
+¦   ¦       SyncHistory.tsx
+¦   ¦       SyncLogs.tsx
+¦   ¦       SyncProgress.tsx
+¦   ¦       SyncStatus.tsx
+¦   ¦       
+¦   +---dashboard
+¦   ¦       ActivityHeatmap.tsx
+¦   ¦       GoalWidget.tsx
+¦   ¦       PlatformBreakdown.tsx
+¦   ¦       ProgressOverview.tsx
+¦   ¦       QuickActions.tsx
+¦   ¦       RecentActivity.tsx
+¦   ¦       StatsCards.tsx
+¦   ¦       TrendChart.tsx
+¦   ¦       WelcomeBanner.tsx
+¦   ¦       
+¦   +---errors
+¦   ¦       ErrorCard.tsx
+¦   ¦       ErrorMessage.tsx
+¦   ¦       RetryButton.tsx
+¦   ¦       
+¦   +---export
+¦   ¦       DateRangeExport.tsx
+¦   ¦       ExportHistory.tsx
+¦   ¦       ExportModal.tsx
+¦   ¦       ExportProgress.tsx
+¦   ¦       ExportSettings.tsx
+¦   ¦       FormatSelector.tsx
+¦   ¦       PlatformSelector.tsx
+¦   ¦       PreviewExport.tsx
+¦   ¦       ScheduleExport.tsx
+¦   ¦       TemplateSelector.tsx
+¦   ¦       
+¦   +---goals
+¦   ¦       ArchivedGoals.tsx
+¦   ¦       CreateGoalModal.tsx
+¦   ¦       GoalAchievements.tsx
+¦   ¦       GoalCard.tsx
+¦   ¦       GoalDetail.tsx
+¦   ¦       GoalHistory.tsx
+¦   ¦       GoalMilestones.tsx
+¦   ¦       GoalProgress.tsx
+¦   ¦       GoalReminders.tsx
+¦   ¦       GoalShare.tsx
+¦   ¦       GoalStats.tsx
+¦   ¦       GoalTemplates.tsx
+¦   ¦       GoalTimeline.tsx
+¦   ¦       
+¦   +---landing
+¦   ¦       BlogPreview.tsx
+¦   ¦       Comparison.tsx
+¦   ¦       CTA.tsx
+¦   ¦       FAQ.tsx
+¦   ¦       Features.tsx
+¦   ¦       Hero.tsx
+¦   ¦       HowItWorks.tsx
+¦   ¦       IntegrationLogos.tsx
+¦   ¦       Newsletter.tsx
+¦   ¦       PlatformTable.tsx
+¦   ¦       Pricing.tsx
+¦   ¦       Stats.tsx
+¦   ¦       Testimonials.tsx
+¦   ¦       TrustBadges.tsx
+¦   ¦       VideoDemo.tsx
+¦   ¦       
+¦   +---layout
+¦   ¦       Breadcrumbs.tsx
+¦   ¦       Footer.tsx
+¦   ¦       MobileMenu.tsx
+¦   ¦       Navbar.tsx
+¦   ¦       Sidebar.tsx
+¦   ¦       
+¦   +---monitoring
+¦   ¦       PerformanceWidget.tsx
+¦   ¦       
+¦   +---notifications
+¦   ¦       NotificationBell.tsx
+¦   ¦       NotificationCenter.tsx
+¦   ¦       NotificationEmpty.tsx
+¦   ¦       NotificationFilter.tsx
+¦   ¦       NotificationItem.tsx
+¦   ¦       NotificationList.tsx
+¦   ¦       
+¦   +---profile
+¦   ¦       EmbedCode.tsx
+¦   ¦       ProfileActivity.tsx
+¦   ¦       ProfileBadges.tsx
+¦   ¦       ProfileGoals.tsx
+¦   ¦       ProfileHeader.tsx
+¦   ¦       ProfileHeatmap.tsx
+¦   ¦       ProfilePlatforms.tsx
+¦   ¦       ProfileStats.tsx
+¦   ¦       PublicProfile.tsx
+¦   ¦       ShareButton.tsx
+¦   ¦       
+¦   +---pwa
+¦   ¦       InstallPrompt.tsx
+¦   ¦       OfflineBanner.tsx
+¦   ¦       UpdatePrompt.tsx
+¦   ¦       
+¦   +---settings
+¦   ¦       AccountSettings.tsx
+¦   ¦       ApiKeys.tsx
+¦   ¦       AppearanceSettings.tsx
+¦   ¦       ConnectedAccounts.tsx
+¦   ¦       DangerZone.tsx
+¦   ¦       DataSettings.tsx
+¦   ¦       ExportData.tsx
+¦   ¦       ImportData.tsx
+¦   ¦       NotificationSettings.tsx
+¦   ¦       PrivacySettings.tsx
+¦   ¦       ProfileSettings.tsx
+¦   ¦       SecuritySettings.tsx
+¦   ¦       SessionsList.tsx
+¦   ¦       SettingsTabs.tsx
+¦   ¦       SyncSettings.tsx
+¦   ¦       ThemePreview.tsx
+¦   ¦       
+¦   +---shared
+¦   ¦       ConfirmDialog.tsx
+¦   ¦       EmptyState.tsx
+¦   ¦       ErrorBoundary.tsx
+¦   ¦       LoadingScreen.tsx
+¦   ¦       SearchBar.tsx
+¦   ¦       
+¦   +---sync
+¦   ¦       SyncErrorDetails.tsx
+¦   ¦       SyncQueueViewer.tsx
+¦   ¦       SyncSettings.tsx
+¦   ¦       
+¦   +---tracker
+¦   ¦       AddEntryModal.tsx
+¦   ¦       BulkActions.tsx
+¦   ¦       DailyWorkFields.tsx
+¦   ¦       DatePicker.tsx
+¦   ¦       EditEntryModal.tsx
+¦   ¦       ExportButton.tsx
+¦   ¦       ImportModal.tsx
+¦   ¦       ImportPreview.tsx
+¦   ¦       NotesCell.tsx
+¦   ¦       PlatformColumn.tsx
+¦   ¦       QuickAdd.tsx
+¦   ¦       TrackerCalendar.tsx
+¦   ¦       TrackerFilters.tsx
+¦   ¦       TrackerRow.tsx
+¦   ¦       TrackerStats.tsx
+¦   ¦       TrackerTable.tsx
+¦   ¦       
+¦   +---ui
+¦           Alert.tsx
+¦           Avatar.tsx
+¦           Badge.tsx
+¦           Button.tsx
+¦           Card.tsx
+¦           Checkbox.tsx
+¦           Dialog.tsx
+¦           Dropdown.tsx
+¦           Input.tsx
+¦           Label.tsx
+¦           Modal.tsx
+¦           Pagination.tsx
+¦           Progress.tsx
+¦           RadioGroup.tsx
+¦           Select.tsx
+¦           Skeleton.tsx
+¦           Slider.tsx
+¦           Spinner.tsx
+¦           Switch.tsx
+¦           Table.tsx
+¦           Tabs.tsx
+¦           Textarea.tsx
+¦           Toast.tsx
+¦           Tooltip.tsx
+¦           
++---config
+¦       achievements.ts
+¦       categories.ts
+¦       database.ts
+¦       navigation.ts
+¦       oauth.ts
+¦       phases.ts
+¦       platforms.ts
+¦       sync.ts
+¦       
++---context
+¦       NotificationContext.tsx
+¦       PlatformContext.tsx
+¦       RealtimeContext.tsx
+¦       SubscriptionContext.tsx
+¦       SyncContext.tsx
+¦       ThemeContext.tsx
+¦       ToastContext.tsx
+¦       UserContext.tsx
+¦       
++---emails
+¦   ¦   account-deleted.tsx
+¦   ¦   achievement-unlocked.tsx
+¦   ¦   goal-reminder.tsx
+¦   ¦   layout.tsx
+¦   ¦   login-alert.tsx
+¦   ¦   monthly-report.tsx
+¦   ¦   password-changed.tsx
+¦   ¦   reset-password.tsx
+¦   ¦   streak-reminder.tsx
+¦   ¦   subscription-cancelled.tsx
+¦   ¦   subscription-confirmed.tsx
+¦   ¦   sync-failed.tsx
+¦   ¦   verify-email.tsx
+¦   ¦   weekly-digest.tsx
+¦   ¦   welcome.tsx
+¦   ¦   
+¦   +---components
+¦           Button.tsx
+¦           Footer.tsx
+¦           Header.tsx
+¦           
++---hooks
+¦       useAchievements.ts
+¦       useAnalytics.ts
+¦       useAuth.ts
+¦       useDebounce.ts
+¦       useFeatureFlag.ts
+¦       useFilter.ts
+¦       useGoals.ts
+¦       useKeyPress.ts
+¦       useLocalStorage.ts
+¦       useMediaQuery.ts
+¦       useNotifications.ts
+¦       useOffline.ts
+¦       useOnClickOutside.ts
+¦       usePagination.ts
+¦       usePlatforms.ts
+¦       usePWA.ts
+¦       useRealTimeSync.ts
+¦       useSettings.ts
+¦       useSort.ts
+¦       useSSE.ts
+¦       useStats.ts
+¦       useSubscription.ts
+¦       useSync.ts
+¦       useTheme.ts
+¦       useToast.ts
+¦       useTracker.ts
+¦       useUser.ts
+¦       useWebSocket.ts
+¦       
++---lib
+¦       analytics.ts
+¦       api.ts
+¦       apiClient.ts
+¦       apiError.ts
+¦       apiHandler.ts
+¦       apiMiddleware.ts
+¦       apiResponse.ts
+¦       auth.ts
+¦       constants.ts
+¦       crypto.ts
+¦       database.ts
+¦       date.ts
+¦       email.ts
+¦       errorTracking.ts
+¦       featureFlags.ts
+¦       jwt.ts
+¦       logger.ts
+¦       monitoring.ts
+¦       offlineStorage.ts
+¦       performanceTracking.ts
+¦       prisma.ts
+¦       push.ts
+¦       rateLimit.ts
+¦       rateLimiter.ts
+¦       redis.ts
+¦       serviceWorker.ts
+¦       sse.ts
+¦       storage.ts
+¦       stripe.ts
+¦       utils.ts
+¦       validators.ts
+¦       websocket.ts
+¦       
++---middleware
+¦       adminAuth.ts
+¦       
++---scripts
+¦       seed-test-data.ts
+¦       
++---services
+¦   ¦   achievementService.ts
+¦   ¦   adminService.ts
+¦   ¦   authService.ts
+¦   ¦   cacheService.ts
+¦   ¦   exportService.ts
+¦   ¦   goalReminderService.ts
+¦   ¦   goalService.ts
+¦   ¦   notificationService.ts
+¦   ¦   platformService.ts
+¦   ¦   pushService.ts
+¦   ¦   sessionService.ts
+¦   ¦   statsService.ts
+¦   ¦   stripeService.ts
+¦   ¦   syncService.ts
+¦   ¦   trackerImportService.ts
+¦   ¦   trackerService.ts
+¦   ¦   twoFactorService.ts
+¦   ¦   userService.ts
+¦   ¦   
+¦   +---analytics
+¦   ¦       insightsService.ts
+¦   ¦       leaderboardService.ts
+¦   ¦       reportService.ts
+¦   ¦       trendService.ts
+¦   ¦       
+¦   +---export
+¦   ¦       csvExport.ts
+¦   ¦       exportQueue.ts
+¦   ¦       exportScheduler.ts
+¦   ¦       jsonExport.ts
+¦   ¦       pdfExport.ts
+¦   ¦       
+¦   +---scrapers
+¦   ¦       algoexpertScraper.ts
+¦   ¦       amazonScraper.ts
+¦   ¦       angellistScraper.ts
+¦   ¦       appleScraper.ts
+¦   ¦       atcoderScraper.ts
+¦   ¦       baseScraper.ts
+¦   ¦       behanceScraper.ts
+¦   ¦       binarysearchScraper.ts
+¦   ¦       bitbucketScraper.ts
+¦   ¦       captchaHandler.ts
+¦   ¦       codecademyScraper.ts
+¦   ¦       codechefScraper.ts
+¦   ¦       codeforcesScraper.ts
+¦   ¦       codewarsScraper.ts
+¦   ¦       codinGameScraper.ts
+¦   ¦       courseraScaper.ts
+¦   ¦       datacampScraper.ts
+¦   ¦       devfolioScraper.ts
+¦   ¦       devpostScraper.ts
+¦   ¦       diceScraper.ts
+¦   ¦       dribbbleScraper.ts
+¦   ¦       edxScraper.ts
+¦   ¦       exercismScraper.ts
+¦   ¦       freecodecampScraper.ts
+¦   ¦       geeksforgeeksScraper.ts
+¦   ¦       githubScraper.ts
+¦   ¦       gitlabScraper.ts
+¦   ¦       glassdoorScraper.ts
+¦   ¦       googleScraper.ts
+¦   ¦       gssocScraper.ts
+¦   ¦       hackathoncomScraper.ts
+¦   ¦       hackathonScraper.ts
+¦   ¦       hackerearthScraper.ts
+¦   ¦       hackerrankScraper.ts
+¦   ¦       hacktoberfestScraper.ts
+¦   ¦       hiredScraper.ts
+¦   ¦       ibmScraper.ts
+¦   ¦       indeedScraper.ts
+¦   ¦       index.ts
+¦   ¦       instahyreScraper.ts
+¦   ¦       internshalaScaper.ts
+¦   ¦       interviewbitScraper.ts
+¦   ¦       kaggleScraper.ts
+¦   ¦       khanacademyScraper.ts
+¦   ¦       kwocScraper.ts
+¦   ¦       leetcodeScraper.ts
+¦   ¦       lfxScraper.ts
+¦   ¦       linkedinlearningScraper.ts
+¦   ¦       linkedinScraper.ts
+¦   ¦       metaScraper.ts
+¦   ¦       microsoftScraper.ts
+¦   ¦       mlhScraper.ts
+¦   ¦       monsterScraper.ts
+¦   ¦       naukriScraper.ts
+¦   ¦       outreachyScraper.ts
+¦   ¦       pluralsightScraper.ts
+¦   ¦       producthuntScraper.ts
+¦   ¦       projecteulerScraper.ts
+¦   ¦       proxyManager.ts
+¦   ¦       rateLimitManager.ts
+¦   ¦       scraperFactory.ts
+¦   ¦       scraperHealthCheck.ts
+¦   ¦       scrimbaScraper.ts
+¦   ¦       simplyhiredScraper.ts
+¦   ¦       skillshareScraper.ts
+¦   ¦       sourceforgeScraper.ts
+¦   ¦       spojScraper.ts
+¦   ¦       swocScraper.ts
+¦   ¦       topcoderScraper.ts
+¦   ¦       types.ts
+¦   ¦       udacityScraper.ts
+¦   ¦       udemyScraper.ts
+¦   ¦       unstopScraper.ts
+¦   ¦       userAgentManager.ts
+¦   ¦       utils.ts
+¦   ¦       wellfoundScraper.ts
+¦   ¦       ziprecruiterScraper.ts
+¦   ¦       
+¦   +---sync
+¦           conflictResolver.ts
+¦           syncOrchestrator.ts
+¦           syncQueue.ts
+¦           syncScheduler.ts
+¦           webhookHandler.ts
+¦           
++---trigger
+¦       daily-sync-task.ts
+¦       example.ts
+¦       github-sync.ts
+¦       leetcode-sync.ts
+¦       scheduled-tasks.ts
+¦       sync-all-platforms.ts
+¦       sync-user-platforms.ts
+¦       
++---types
+        achievement.ts
+        admin.ts
+        analytics.ts
+        api.ts
+        billing.ts
+        export.ts
+        goal.ts
+        hello.tsx
+        index.ts
+        next-auth.d.ts
+        notification.ts
+        oauth.ts
+        platform.ts
+        scraper.ts
+        settings.ts
+        sync.ts
+        tracker.ts
+        user.ts
+        

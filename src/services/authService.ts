@@ -44,9 +44,13 @@ export const authService = {
       await tx.notificationPreferences.create({
         data: {
           userId: newUser.id,
-          emailNotifications: true,
-          weeklyReport: true,
-          achievementAlerts: true,
+        enabled: true,
+    emailEnabled: true,
+    pushEnabled: true,
+    inAppEnabled: true,
+
+    weeklyReport: true,
+    achievementAlerts: true,
         },
       });
 

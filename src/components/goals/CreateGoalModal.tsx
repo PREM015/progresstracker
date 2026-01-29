@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/Select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { CreateGoalRequest, GoalType, GoalCategory, goalTemplates } from '@/types/goal';
+import { CreateGoalRequest, GoalType, GoalCategory } from '@/types/goal';
 
 interface CreateGoalModalProps {
   isOpen: boolean;

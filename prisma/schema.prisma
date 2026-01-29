@@ -9,7 +9,10 @@ datasource db {
 // ============================================================================
 // ENUMS
 // ============================================================================
-
+enum Role {
+  user
+  admin  
+}
 enum PlatformCategory {
   DSA
   JOB
@@ -252,8 +255,8 @@ model User {
 
   // Admin & Roles
   isAdmin      Boolean  @default(false)
-  isSuperAdmin Boolean  @default(false)
-  role         String   @default("user") // user, moderator, admin, superadmin
+ 
+  role         String   @default("user") // user, admin
   permissions  String[] @default([])
 
   // Streak Data (denormalized for performance)
@@ -525,7 +528,6 @@ model PasswordReset {
   @@index([token])
   @@index([expiresAt])
 }
-
 model EmailVerification {
   id     String @id @default(cuid())
   userId String
@@ -537,6 +539,9 @@ model EmailVerification {
 
   // Type: initial verification or email change
   type String @default("verification") // verification, change
+
+  // Optional: store IP address when verification occurs
+  verifiedIp String?
 
   createdAt DateTime @default(now())
 

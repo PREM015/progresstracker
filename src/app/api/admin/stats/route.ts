@@ -1,73 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-/**
- * API Route: /api/admin/stats
- * 
- * @description TODO: Add description
- * @created 2026-01-26
- */
-
-// GET - Fetch data
-export async function GET(
-  request: NextRequest
-) {
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // TODO: Implement GET logic
+    const [
+      totalUsers,
+      totalPlatforms,
+      recentUsers,
+    ] = await Promise.all([
+      prisma.user.count(),
+      prisma.platform.count(),
+      prisma.user.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: {},
+      data: {
+        totals: {
+          users: totalUsers,
+          platforms: totalPlatforms,
+        },
+        recentUsers,
+      },
     });
   } catch (error) {
-    console.error('[ADMIN_STATS_GET]', error);
+    console.error("ADMIN STATS ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to load stats" },
       { status: 500 }
     );
   }
 }
-
-// POST - Create new data
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-
-    // TODO: Validate body
-    // TODO: Implement POST logic
-
-    return NextResponse.json({
-      success: true,
-      data: {},
-    }, { status: 201 });
-  } catch (error) {
-    console.error('[ADMIN_STATS_POST]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-
-

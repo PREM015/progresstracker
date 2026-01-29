@@ -1,73 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-/**
- * API Route: /api/admin/platforms
- * 
- * @description TODO: Add description
- * @created 2026-01-26
- */
-
-// GET - Fetch data
-export async function GET(
-  request: NextRequest
-) {
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // TODO: Implement GET logic
+    const platforms = await prisma.platform.findMany({
+      orderBy: { createdAt: "desc" },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {},
+      data: platforms,
     });
   } catch (error) {
-    console.error('[ADMIN_PLATFORMS_GET]', error);
+    console.error("GET PLATFORMS ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to fetch platforms" },
       { status: 500 }
     );
   }
 }
 
-// POST - Create new data
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
+    const body = await req.json();
+    const { name, description, isActive } = body;
+
+    if (!name) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { success: false, message: "Platform name is required" },
+        { status: 400 }
       );
     }
 
-    const body = await request.json();
-
-    // TODO: Validate body
-    // TODO: Implement POST logic
+    const platform = await prisma.platform.create({
+      data: {
+        name,
+        description,
+        isActive: isActive ?? true,
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: {},
-    }, { status: 201 });
+      data: platform,
+    });
   } catch (error) {
-    console.error('[ADMIN_PLATFORMS_POST]', error);
+    console.error("CREATE PLATFORM ERROR:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, message: "Failed to create platform" },
       { status: 500 }
     );
   }
 }
-
-
-

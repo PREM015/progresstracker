@@ -1,12 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
-
-/**
- * adminAuth
- * 
- * @description Middleware for authentication/authorization
- * @created 2026-01-26
- */
+// src/middleware/adminAuth.ts
+import { NextRequest, NextResponse } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 export async function adminAuth(request: NextRequest) {
   const token = await getToken({
@@ -14,17 +8,13 @@ export async function adminAuth(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  // Check if user is authenticated
   if (!token) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // TODO: Add additional authorization checks
+  if (token.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  return NextResponse.next();
+  return null; 
 }
-
-export default adminAuth;

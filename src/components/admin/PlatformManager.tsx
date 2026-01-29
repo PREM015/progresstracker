@@ -1,26 +1,60 @@
-'use client';
+import { useEffect, useState } from "react";
 
-import { cn } from '@/lib/utils';
 
-/**
- * PlatformManager Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+type Platform = {
+  id: string;
+  name: string;
+  status: "active" | "inactive";
+  lastSync: Date | null;
+};
 
-interface PlatformManagerProps {
-  className?: string;
-  // TODO: Add more props
-}
+export default function PlatformManager() {
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export function PlatformManager({ className }: PlatformManagerProps) {
+  useEffect(() => {
+    async function fetchPlatforms() {
+      try {
+        // Use Prisma on server-side API or through tRPC / Next.js API route
+        const res = await fetch("/api/admin/platforms");
+        const data = await res.json();
+        setPlatforms(data);
+      } catch (err) {
+        console.error("Failed to load platforms:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchPlatforms();
+  }, []);
+
+  if (loading) return <p>Loading platforms...</p>;
+  if (!platforms.length) return <p>No platforms found</p>;
+
   return (
-    <div className={cn('platformmanager', className)}>
-      {/* TODO: Implement component */}
-      <p>PlatformManager Component</p>
+    <div>
+      <h2 className="text-xl font-bold mb-4">Platform Manager</h2>
+      <table className="table-auto w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-200">
+            <th className="px-4 py-2">Name</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2">Last Sync</th>
+          </tr>
+        </thead>
+        <tbody>
+          {platforms.map((p) => (
+            <tr key={p.id} className="border-b">
+              <td className="px-4 py-2">{p.name}</td>
+              <td className="px-4 py-2">{p.status}</td>
+              <td className="px-4 py-2">
+                {p.lastSync ? new Date(p.lastSync).toLocaleString() : "-"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
-
-export default PlatformManager;

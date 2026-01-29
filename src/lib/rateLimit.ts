@@ -12,7 +12,7 @@ interface RateLimitResult {
   reset: number;
 }
 
-export function rateLimit(options: RateLimitOptions) {
+export function rateLimit(key: string, p0: number, p1: number, options: RateLimitOptions) {
   const tokenCache = new LRUCache<string, number[]>({
     max: options.uniqueTokenPerInterval || 500,
     ttl: options.interval || 60000,
