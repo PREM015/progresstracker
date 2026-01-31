@@ -20,110 +20,138 @@ export type DateFormat = 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
 /** Sync frequency options */
 export type SyncFrequency = 'realtime' | 'hourly' | 'daily' | 'manual';
 
+/** Digest frequency options */
+export type DigestFrequency = 'realtime' | 'daily' | 'weekly';
+
 /** Week start options */
 export type WeekStart = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday
 
 // =============================================================================
-// CORE SETTINGS INTERFACES
+// DATABASE MODELS - Match Prisma Schema Exactly
 // =============================================================================
 
-/** Complete user settings */
+/**
+ * UserSettings model from Prisma schema
+ * This matches the flat structure in the database
+ */
 export interface UserSettings {
   id: string;
   userId: string;
-  
+
   // Appearance
-  appearance: AppearanceSettings;
-  
+  theme: string;
+  accentColor: string;
+  compactMode: boolean;
+  fontSize: string;
+  reducedMotion: boolean;
+  highContrast: boolean;
+
   // Localization
-  localization: LocalizationSettings;
-  
-  // Sync
-  sync: SyncSettings;
-  
+  language: string;
+  timezone: string;
+  dateFormat: string;
+  timeFormat: string;
+  weekStartsOn: number;
+  numberFormat: string;
+
+  // Sync Preferences
+  autoSync: boolean;
+  syncFrequency: string;
+  syncOnLogin: boolean;
+  syncInBackground: boolean;
+
   // Privacy
-  privacy: PrivacySettings;
-  
+  publicProfile: boolean;
+  showInLeaderboard: boolean;
+  allowAnalytics: boolean;
+  allowCookies: boolean;
+
   // Dashboard
-  dashboard: DashboardSettings;
-  
+  dashboardLayout: DashboardLayoutConfig | null;
+  defaultDateRange: string;
+  showWelcomeBanner: boolean;
+
   // Features
-  features: FeatureSettings;
-  
+  keyboardShortcuts: boolean;
+  soundEffects: boolean;
+  desktopNotifications: boolean;
+
   // Data
-  data: DataSettings;
-  
+  dataRetentionDays: number;
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
 }
 
-/** Appearance settings */
-export interface AppearanceSettings {
-  theme: ThemeMode;
-  accentColor: string;
-  compactMode: boolean;
-  fontSize: FontSize;
-  reducedMotion: boolean;
-  highContrast: boolean;
-  sidebarCollapsed?: boolean;
-  showAnimations?: boolean;
+/**
+ * NotificationPreferences model from Prisma schema
+ */
+export interface NotificationPreferences {
+  id: string;
+  userId: string;
+
+  // Global Settings
+  enabled: boolean;
+
+  // Channels
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  inAppEnabled: boolean;
+  smsEnabled: boolean;
+
+  // Email Preferences
+emailAddress?: string
+
+  emailVerified: boolean;
+
+  // Notification Types
+  achievementAlerts: boolean;
+  goalReminders: boolean;
+  goalCompleted: boolean;
+  streakAlerts: boolean;
+  syncComplete: boolean;
+  syncFailed: boolean;
+  weeklyReport: boolean;
+  monthlyReport: boolean;
+  securityAlerts: boolean;
+  billingAlerts: boolean;
+  newFeatures: boolean;
+  tips: boolean;
+  communityUpdates: boolean;
+  marketingEmails: boolean;
+
+  // Quiet Hours
+  quietHoursEnabled: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  quietHoursTimezone: string;
+
+  // Digest Settings
+  digestEnabled: boolean;
+  digestFrequency: string;
+  digestTime: string;
+  digestDay: number;
+
+  // DND
+  dndEnabled: boolean;
+  dndUntil: Date | null;
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-/** Localization settings */
-export interface LocalizationSettings {
-  language: string;
-  timezone: string;
-  dateFormat: DateFormat;
-  timeFormat: TimeFormat;
-  weekStartsOn: WeekStart;
-  numberFormat: string;
-  currency?: string;
-}
+// =============================================================================
+// DASHBOARD LAYOUT TYPES (for JSON field)
+// =============================================================================
 
-/** Sync settings */
-export interface SyncSettings {
-  autoSync: boolean;
-  syncFrequency: SyncFrequency;
-  syncOnLogin: boolean;
-  syncInBackground: boolean;
-  syncNotifications: boolean;
-  syncErrorNotifications: boolean;
-  preferredSyncTime?: string; // HH:MM format
-  pauseSyncUntil?: Date;
-}
-
-/** Privacy settings */
-export interface PrivacySettings {
-  publicProfile: boolean;
-  showEmail: boolean;
-  showLocation: boolean;
-  showActivity: boolean;
-  showAchievements: boolean;
-  showGoals: boolean;
-  showPlatforms: boolean;
-  showStreak: boolean;
-  showInLeaderboard: boolean;
-  allowAnalytics: boolean;
-  allowCookies: boolean;
-  allowDataCollection: boolean;
-}
-
-/** Dashboard settings */
-export interface DashboardSettings {
-  defaultDateRange: string;
-  showWelcomeBanner: boolean;
-  layout: DashboardLayout;
-  widgets: DashboardWidgetConfig[];
-  refreshInterval?: number; // minutes
-  defaultView?: 'overview' | 'detailed' | 'minimal';
-}
-
-/** Dashboard layout configuration */
-export interface DashboardLayout {
+/** Dashboard layout configuration (stored as JSON in database) */
+export interface DashboardLayoutConfig {
   type: 'grid' | 'list' | 'masonry';
   columns?: number;
   gap?: number;
+  widgets?: DashboardWidgetConfig[];
 }
 
 /** Dashboard widget configuration */
@@ -137,68 +165,200 @@ export interface DashboardWidgetConfig {
   config?: Record<string, unknown>;
 }
 
-/** Feature settings */
-export interface FeatureSettings {
+// =============================================================================
+// API REQUEST/RESPONSE TYPES
+// =============================================================================
+
+/**
+ * Update profile request - matches User model fields
+ */
+export interface UpdateProfileRequest {
+  name?: string;
+  email?: string;
+  username?: string;
+  bio?: string;
+  avatar?: string; // Maps to 'image' in database
+  location?: string;
+  website?: string;
+  company?: string;
+  jobTitle?: string;
+  githubUsername?: string;
+  linkedinUrl?: string;
+  twitterHandle?: string;
+  discordUsername?: string;
+}
+
+/**
+ * Update settings request - flat structure matching UserSettings model
+ */
+export interface UpdateSettingsRequest {
+  // Appearance
+  theme?: string;
+  accentColor?: string;
+  compactMode?: boolean;
+  fontSize?: string;
+  reducedMotion?: boolean;
+  highContrast?: boolean;
+
+  // Localization
+  language?: string;
+  timezone?: string;
+  dateFormat?: string;
+  timeFormat?: string;
+  weekStartsOn?: number;
+  numberFormat?: string;
+
+  // Sync Preferences
+  autoSync?: boolean;
+  syncFrequency?: string;
+  syncOnLogin?: boolean;
+  syncInBackground?: boolean;
+
+  // Privacy
+  publicProfile?: boolean;
+  showInLeaderboard?: boolean;
+  allowAnalytics?: boolean;
+  allowCookies?: boolean;
+
+  // Dashboard
+  dashboardLayout?: DashboardLayoutConfig|null;
+  defaultDateRange?: string;
+  showWelcomeBanner?: boolean;
+
+  // Features
+  keyboardShortcuts?: boolean;
+  soundEffects?: boolean;
+  desktopNotifications?: boolean;
+
+  // Data
+  dataRetentionDays?: number;
+}
+
+/**
+ * Update notifications request - flat structure matching NotificationPreferences model
+ */
+export interface UpdateNotificationsRequest {
+  // Global Settings
+  enabled?: boolean;
+
+  // Channels
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
+  inAppEnabled?: boolean;
+  smsEnabled?: boolean;
+
+  // Email Preferences
+ emailAddress?: string
+
+
+  // Notification Types
+  achievementAlerts?: boolean;
+  goalReminders?: boolean;
+  goalCompleted?: boolean;
+  streakAlerts?: boolean;
+  syncComplete?: boolean;
+  syncFailed?: boolean;
+  weeklyReport?: boolean;
+  monthlyReport?: boolean;
+  securityAlerts?: boolean;
+  billingAlerts?: boolean;
+  newFeatures?: boolean;
+  tips?: boolean;
+  communityUpdates?: boolean;
+  marketingEmails?: boolean;
+
+  // Quiet Hours
+  quietHoursEnabled?: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+  quietHoursTimezone?: string;
+
+  // Digest Settings
+  digestEnabled?: boolean;
+  digestFrequency?: string;
+  digestTime?: string;
+  digestDay?: number;
+
+  // DND
+  dndEnabled?: boolean;
+  dndUntil?: Date | null;
+}
+
+/**
+ * Change password request
+ */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+/**
+ * Delete account request
+ */
+export interface DeleteAccountRequest {
+  password: string;
+  confirmation?: string;
+}
+
+// =============================================================================
+// GROUPED SETTINGS TYPES (for UI organization)
+// =============================================================================
+
+/** Appearance settings group (for UI) */
+export interface AppearanceSettingsGroup {
+  theme: ThemeMode;
+  accentColor: string;
+  compactMode: boolean;
+  fontSize: FontSize;
+  reducedMotion: boolean;
+  highContrast: boolean;
+}
+
+/** Localization settings group (for UI) */
+export interface LocalizationSettingsGroup {
+  language: string;
+  timezone: string;
+  dateFormat: DateFormat;
+  timeFormat: TimeFormat;
+  weekStartsOn: WeekStart;
+  numberFormat: string;
+}
+
+/** Sync settings group (for UI) */
+export interface SyncSettingsGroup {
+  autoSync: boolean;
+  syncFrequency: SyncFrequency;
+  syncOnLogin: boolean;
+  syncInBackground: boolean;
+}
+
+/** Privacy settings group (for UI) */
+export interface PrivacySettingsGroup {
+  publicProfile: boolean;
+  showInLeaderboard: boolean;
+  allowAnalytics: boolean;
+  allowCookies: boolean;
+}
+
+/** Feature settings group (for UI) */
+export interface FeatureSettingsGroup {
   keyboardShortcuts: boolean;
   soundEffects: boolean;
   desktopNotifications: boolean;
-  emailDigest: boolean;
-  betaFeatures: boolean;
-  developerMode: boolean;
-  experimentalFeatures?: string[];
 }
 
-/** Data settings */
-export interface DataSettings {
-  dataRetentionDays: number;
-  autoDeleteOldData: boolean;
-  exportFormat: 'csv' | 'json' | 'pdf';
-  backupEnabled: boolean;
-  backupFrequency?: 'daily' | 'weekly' | 'monthly';
-  lastBackupAt?: Date;
+/** Notification channels group (for UI) */
+export interface NotificationChannelsGroup {
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  inAppEnabled: boolean;
+  smsEnabled: boolean;
 }
 
-// =============================================================================
-// NOTIFICATION SETTINGS
-// =============================================================================
-
-/** Complete notification preferences */
-export interface NotificationSettings {
-  id: string;
-  userId: string;
-  
-  // Global
-  enabled: boolean;
-  
-  // Channels
-  channels: ChannelSettings;
-  
-  // Type preferences
-  types: NotificationTypeSettings;
-  
-  // Schedule
-  schedule: NotificationSchedule;
-  
-  // Timestamps
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-/** Channel settings */
-export interface ChannelSettings {
-  email: boolean;
-  push: boolean;
-  inApp: boolean;
-  sms: boolean;
-  emailAddress?: string;
-  emailVerified: boolean;
-  phoneNumber?: string;
-  phoneVerified?: boolean;
-}
-
-/** Notification type settings */
-export interface NotificationTypeSettings {
-  achievements: boolean;
+/** Notification types group (for UI) */
+export interface NotificationTypesGroup {
+  achievementAlerts: boolean;
   goalReminders: boolean;
   goalCompleted: boolean;
   streakAlerts: boolean;
@@ -214,131 +374,115 @@ export interface NotificationTypeSettings {
   marketingEmails: boolean;
 }
 
-/** Notification schedule */
-export interface NotificationSchedule {
-  // Quiet hours
+/** Quiet hours settings group (for UI) */
+export interface QuietHoursGroup {
   quietHoursEnabled: boolean;
-  quietHoursStart: string; // HH:MM
-  quietHoursEnd: string; // HH:MM
+  quietHoursStart: string;
+  quietHoursEnd: string;
   quietHoursTimezone: string;
-  
-  // Digest
+}
+
+/** Digest settings group (for UI) */
+export interface DigestSettingsGroup {
   digestEnabled: boolean;
-  digestFrequency: 'realtime' | 'daily' | 'weekly';
-  digestTime: string; // HH:MM
-  digestDay: number; // 0-6 for weekly
-  
-  // Do Not Disturb
-  dndEnabled: boolean;
-  dndUntil?: Date;
+  digestFrequency: DigestFrequency;
+  digestTime: string;
+  digestDay: number;
 }
 
 // =============================================================================
-// INPUT TYPES
+// USER PROFILE VISIBILITY SETTINGS (from User model)
 // =============================================================================
 
-/** Update settings input */
-export interface UpdateSettingsInput {
-  appearance?: Partial<AppearanceSettings>;
-  localization?: Partial<LocalizationSettings>;
-  sync?: Partial<SyncSettings>;
-  privacy?: Partial<PrivacySettings>;
-  dashboard?: Partial<DashboardSettings>;
-  features?: Partial<FeatureSettings>;
-  data?: Partial<DataSettings>;
+/** Profile visibility settings (stored on User model) */
+export interface ProfileVisibilitySettings {
+  isPublic: boolean;
+  showEmail: boolean;
+  showLocation: boolean;
+  showActivity: boolean;
+  showAchievements: boolean;
+  showGoals: boolean;
+  showPlatforms: boolean;
+  showStreak: boolean;
 }
 
-/** Update notification settings input */
-export interface UpdateNotificationSettingsInput {
-  enabled?: boolean;
-  channels?: Partial<ChannelSettings>;
-  types?: Partial<NotificationTypeSettings>;
-  schedule?: Partial<NotificationSchedule>;
+/** Update profile visibility request */
+export interface UpdateProfileVisibilityRequest {
+  isPublic?: boolean;
+  showEmail?: boolean;
+  showLocation?: boolean;
+  showActivity?: boolean;
+  showAchievements?: boolean;
+  showGoals?: boolean;
+  showPlatforms?: boolean;
+  showStreak?: boolean;
 }
 
 // =============================================================================
-// DEFAULTS
+// DEFAULTS - Match Prisma Schema Defaults
 // =============================================================================
 
-/** Default appearance settings */
-export const DEFAULT_APPEARANCE: AppearanceSettings = {
+/** Default user settings (matches Prisma defaults) */
+export const DEFAULT_USER_SETTINGS: Omit<UserSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
+  // Appearance
   theme: 'system',
   accentColor: 'blue',
   compactMode: false,
   fontSize: 'medium',
   reducedMotion: false,
   highContrast: false,
-  sidebarCollapsed: false,
-  showAnimations: true,
-};
 
-/** Default localization settings */
-export const DEFAULT_LOCALIZATION: LocalizationSettings = {
+  // Localization
   language: 'en',
   timezone: 'UTC',
   dateFormat: 'MM/DD/YYYY',
   timeFormat: '12h',
   weekStartsOn: 0,
   numberFormat: 'en-US',
-};
 
-/** Default sync settings */
-export const DEFAULT_SYNC: SyncSettings = {
+  // Sync Preferences
   autoSync: true,
   syncFrequency: 'daily',
   syncOnLogin: true,
   syncInBackground: true,
-  syncNotifications: false,
-  syncErrorNotifications: true,
-};
 
-/** Default privacy settings */
-export const DEFAULT_PRIVACY: PrivacySettings = {
+  // Privacy
   publicProfile: false,
-  showEmail: false,
-  showLocation: true,
-  showActivity: true,
-  showAchievements: true,
-  showGoals: false,
-  showPlatforms: true,
-  showStreak: true,
   showInLeaderboard: true,
   allowAnalytics: true,
   allowCookies: true,
-  allowDataCollection: false,
-};
 
-/** Default dashboard settings */
-export const DEFAULT_DASHBOARD: DashboardSettings = {
+  // Dashboard
+  dashboardLayout: null,
   defaultDateRange: '7d',
   showWelcomeBanner: true,
-  layout: { type: 'grid', columns: 3, gap: 16 },
-  widgets: [],
-  refreshInterval: 5,
-  defaultView: 'overview',
-};
 
-/** Default feature settings */
-export const DEFAULT_FEATURES: FeatureSettings = {
+  // Features
   keyboardShortcuts: true,
   soundEffects: false,
   desktopNotifications: true,
-  emailDigest: false,
-  betaFeatures: false,
-  developerMode: false,
-};
 
-/** Default data settings */
-export const DEFAULT_DATA: DataSettings = {
+  // Data
   dataRetentionDays: 365,
-  autoDeleteOldData: false,
-  exportFormat: 'csv',
-  backupEnabled: false,
 };
 
-/** Default notification type settings */
-export const DEFAULT_NOTIFICATION_TYPES: NotificationTypeSettings = {
-  achievements: true,
+/** Default notification preferences (matches Prisma defaults) */
+export const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
+  // Global Settings
+  enabled: true,
+
+  // Channels
+  emailEnabled: true,
+  pushEnabled: false,
+  inAppEnabled: true,
+  smsEnabled: false,
+
+  // Email Preferences
+  emailAddress: undefined,
+  emailVerified: false,
+
+  // Notification Types
+  achievementAlerts: true,
   goalReminders: true,
   goalCompleted: true,
   streakAlerts: true,
@@ -352,6 +496,34 @@ export const DEFAULT_NOTIFICATION_TYPES: NotificationTypeSettings = {
   tips: true,
   communityUpdates: false,
   marketingEmails: false,
+
+  // Quiet Hours
+  quietHoursEnabled: false,
+  quietHoursStart: '22:00',
+  quietHoursEnd: '08:00',
+  quietHoursTimezone: 'UTC',
+
+  // Digest Settings
+  digestEnabled: false,
+  digestFrequency: 'daily',
+  digestTime: '09:00',
+  digestDay: 1,
+
+  // DND
+  dndEnabled: false,
+  dndUntil: null,
+};
+
+/** Default profile visibility (matches Prisma User model defaults) */
+export const DEFAULT_PROFILE_VISIBILITY: ProfileVisibilitySettings = {
+  isPublic: false,
+  showEmail: false,
+  showLocation: true,
+  showActivity: true,
+  showAchievements: true,
+  showGoals: false,
+  showPlatforms: true,
+  showStreak: true,
 };
 
 // =============================================================================
@@ -377,6 +549,13 @@ export const ACCENT_COLORS: Array<{ value: string; label: string; color: string 
   { value: 'green', label: 'Green', color: '#10B981' },
   { value: 'teal', label: 'Teal', color: '#14B8A6' },
   { value: 'cyan', label: 'Cyan', color: '#06B6D4' },
+];
+
+/** Available font sizes */
+export const FONT_SIZE_OPTIONS: Array<{ value: FontSize; label: string }> = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
 ];
 
 /** Available languages */
@@ -408,45 +587,101 @@ export const TIMEZONE_OPTIONS: Array<{ value: string; label: string; offset: str
   { value: 'Australia/Sydney', label: 'Sydney', offset: '+11:00' },
 ];
 
+/** Date format options */
+export const DATE_FORMAT_OPTIONS: Array<{ value: DateFormat; label: string; example: string }> = [
+  { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY', example: '12/31/2024' },
+  { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY', example: '31/12/2024' },
+  { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD', example: '2024-12-31' },
+];
+
+/** Time format options */
+export const TIME_FORMAT_OPTIONS: Array<{ value: TimeFormat; label: string; example: string }> = [
+  { value: '12h', label: '12-hour', example: '2:30 PM' },
+  { value: '24h', label: '24-hour', example: '14:30' },
+];
+
+/** Week start options */
+export const WEEK_START_OPTIONS: Array<{ value: WeekStart; label: string }> = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 6, label: 'Saturday' },
+];
+
+/** Sync frequency options */
+export const SYNC_FREQUENCY_OPTIONS: Array<{ value: SyncFrequency; label: string; description: string }> = [
+  { value: 'realtime', label: 'Real-time', description: 'Sync immediately when changes occur' },
+  { value: 'hourly', label: 'Hourly', description: 'Sync once every hour' },
+  { value: 'daily', label: 'Daily', description: 'Sync once per day' },
+  { value: 'manual', label: 'Manual', description: 'Only sync when you request it' },
+];
+
+/** Digest frequency options */
+export const DIGEST_FREQUENCY_OPTIONS: Array<{ value: DigestFrequency; label: string }> = [
+  { value: 'realtime', label: 'Immediate' },
+  { value: 'daily', label: 'Daily digest' },
+  { value: 'weekly', label: 'Weekly digest' },
+];
+
+/** Default date range options */
+export const DATE_RANGE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '7d', label: 'Last 7 days' },
+  { value: '14d', label: 'Last 14 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
+  { value: '1y', label: 'Last year' },
+  { value: 'all', label: 'All time' },
+];
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/** Merge settings with defaults */
-export function mergeWithDefaults(settings: Partial<UserSettings>): UserSettings {
+/**
+ * Merge partial settings with defaults
+ */
+export function mergeSettingsWithDefaults(
+  partial: Partial<UpdateSettingsRequest>
+): UpdateSettingsRequest {
   return {
-    id: settings.id || '',
-    userId: settings.userId || '',
-    appearance: { ...DEFAULT_APPEARANCE, ...settings.appearance },
-    localization: { ...DEFAULT_LOCALIZATION, ...settings.localization },
-    sync: { ...DEFAULT_SYNC, ...settings.sync },
-    privacy: { ...DEFAULT_PRIVACY, ...settings.privacy },
-    dashboard: { ...DEFAULT_DASHBOARD, ...settings.dashboard },
-    features: { ...DEFAULT_FEATURES, ...settings.features },
-    data: { ...DEFAULT_DATA, ...settings.data },
-    createdAt: settings.createdAt || new Date(),
-    updatedAt: settings.updatedAt || new Date(),
+    ...DEFAULT_USER_SETTINGS,
+    ...partial,
   };
 }
 
-/** Get resolved theme (handles 'system') */
-export function getResolvedTheme(theme: ThemeMode): 'light' | 'dark' {
+/**
+ * Merge partial notification preferences with defaults
+ */
+export function mergeNotificationsWithDefaults(
+  partial: Partial<UpdateNotificationsRequest>
+): UpdateNotificationsRequest {
+  return {
+    ...DEFAULT_NOTIFICATION_PREFERENCES,
+    ...partial,
+  };
+}
+
+/**
+ * Get resolved theme (handles 'system')
+ */
+export function getResolvedTheme(theme: ThemeMode | string): 'light' | 'dark' {
   if (theme === 'system') {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     return 'light';
   }
-  return theme;
+  return theme as 'light' | 'dark';
 }
 
-/** Format date according to settings */
-export function formatDateWithSettings(date: Date, format: DateFormat): string {
+/**
+ * Format date according to settings
+ */
+export function formatDateWithSettings(date: Date | string, format: DateFormat | string): string {
   const d = new Date(date);
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
-  
+
   switch (format) {
     case 'DD/MM/YYYY':
       return `${day}/${month}/${year}`;
@@ -458,19 +693,142 @@ export function formatDateWithSettings(date: Date, format: DateFormat): string {
   }
 }
 
-/** Format time according to settings */
-export function formatTimeWithSettings(date: Date, format: TimeFormat): string {
+/**
+ * Format time according to settings
+ */
+export function formatTimeWithSettings(date: Date | string, format: TimeFormat | string): string {
   const d = new Date(date);
   const hours = d.getHours();
   const minutes = String(d.getMinutes()).padStart(2, '0');
-  
+
   if (format === '24h') {
     return `${String(hours).padStart(2, '0')}:${minutes}`;
   }
-  
+
   const period = hours >= 12 ? 'PM' : 'AM';
   const hours12 = hours % 12 || 12;
   return `${hours12}:${minutes} ${period}`;
 }
 
-export default UserSettings;
+/**
+ * Parse time string to Date
+ */
+export function parseTimeString(timeStr: string, baseDate?: Date): Date {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const date = baseDate ? new Date(baseDate) : new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+/**
+ * Check if current time is within quiet hours
+ */
+export function isWithinQuietHours(
+  quietHoursStart: string,
+  quietHoursEnd: string,
+  timezone: string = 'UTC'
+): boolean {
+  const now = new Date();
+  
+  // Simple implementation - for production, use a proper timezone library
+  const currentTime = now.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
+
+  const current = currentTime.replace(':', '');
+  const start = quietHoursStart.replace(':', '');
+  const end = quietHoursEnd.replace(':', '');
+
+  // Handle overnight quiet hours (e.g., 22:00 to 08:00)
+  if (start > end) {
+    return current >= start || current < end;
+  }
+
+  return current >= start && current < end;
+}
+
+/**
+ * Validate settings update request
+ */
+export function validateSettingsUpdate(data: UpdateSettingsRequest): string[] {
+  const errors: string[] = [];
+
+  if (data.theme && !['light', 'dark', 'system'].includes(data.theme)) {
+    errors.push('Invalid theme value');
+  }
+
+  if (data.fontSize && !['small', 'medium', 'large'].includes(data.fontSize)) {
+    errors.push('Invalid font size value');
+  }
+
+  if (data.weekStartsOn !== undefined && (data.weekStartsOn < 0 || data.weekStartsOn > 6)) {
+    errors.push('Week start day must be between 0 and 6');
+  }
+
+  if (data.dataRetentionDays !== undefined && data.dataRetentionDays < 30) {
+    errors.push('Data retention must be at least 30 days');
+  }
+
+  return errors;
+}
+
+/**
+ * Validate notification settings update request
+ */
+export function validateNotificationsUpdate(data: UpdateNotificationsRequest): string[] {
+  const errors: string[] = [];
+
+  if (data.quietHoursStart && !/^\d{2}:\d{2}$/.test(data.quietHoursStart)) {
+    errors.push('Invalid quiet hours start time format (use HH:MM)');
+  }
+
+  if (data.quietHoursEnd && !/^\d{2}:\d{2}$/.test(data.quietHoursEnd)) {
+    errors.push('Invalid quiet hours end time format (use HH:MM)');
+  }
+
+  if (data.digestTime && !/^\d{2}:\d{2}$/.test(data.digestTime)) {
+    errors.push('Invalid digest time format (use HH:MM)');
+  }
+
+  if (data.digestDay !== undefined && (data.digestDay < 0 || data.digestDay > 6)) {
+    errors.push('Digest day must be between 0 and 6');
+  }
+
+  return errors;
+}
+
+// =============================================================================
+// TYPE GUARDS
+// =============================================================================
+
+export function isValidTheme(value: unknown): value is ThemeMode {
+  return typeof value === 'string' && ['light', 'dark', 'system'].includes(value);
+}
+
+export function isValidFontSize(value: unknown): value is FontSize {
+  return typeof value === 'string' && ['small', 'medium', 'large'].includes(value);
+}
+
+export function isValidTimeFormat(value: unknown): value is TimeFormat {
+  return typeof value === 'string' && ['12h', '24h'].includes(value);
+}
+
+export function isValidDateFormat(value: unknown): value is DateFormat {
+  return typeof value === 'string' && ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'].includes(value);
+}
+
+export function isValidSyncFrequency(value: unknown): value is SyncFrequency {
+  return typeof value === 'string' && ['realtime', 'hourly', 'daily', 'manual'].includes(value);
+}
+
+// =============================================================================
+// EXPORTS
+// =============================================================================
+
+export type {
+  UserSettings as Settings,
+  NotificationPreferences as NotificationSettings,
+};

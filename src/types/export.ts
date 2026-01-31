@@ -1,17 +1,29 @@
 // ===== FILE: src/types/export.ts =====
 // Complete export types for data export functionality
 
-import type { PlatformCategory as PrismaPlatformCategory } from '@prisma/client';
+import type { 
+  PlatformCategory as PrismaPlatformCategory,
+  ExportFormat as PrismaExportFormat,
+  ExportStatus as PrismaExportStatus 
+} from '@prisma/client';
 
 // =============================================================================
-// ENUMS & CONSTANTS
+// RE-EXPORT PRISMA ENUMS FOR CONVENIENCE
 // =============================================================================
 
-/** Export file formats */
+export type { PrismaPlatformCategory };
+
+/** Export file formats - matches Prisma ExportFormat enum */
 export type ExportFormat = 'csv' | 'json' | 'pdf' | 'excel' | 'xml';
 
-/** Export status */
+/** Database export format (uppercase) */
+export type DatabaseExportFormat = PrismaExportFormat;
+
+/** Export status - matches Prisma ExportStatus enum */
 export type ExportStatus = 'queued' | 'pending' | 'processing' | 'completed' | 'failed' | 'expired' | 'cancelled';
+
+/** Database export status (uppercase) */
+export type DatabaseExportStatus = PrismaExportStatus;
 
 /** Export type */
 export type ExportType = 'full' | 'tracker' | 'goals' | 'achievements' | 'platforms' | 'analytics' | 'custom';
@@ -23,7 +35,7 @@ export type DateRangePreset = 'last_7_days' | 'last_30_days' | 'last_90_days' | 
 // CORE INTERFACES
 // =============================================================================
 
-/** Export options configuration */
+/** Export options configuration - used by ExportService */
 export interface ExportOptions {
   format: ExportFormat;
   type: ExportType;
@@ -43,52 +55,58 @@ export interface ExportOptions {
   password?: string;
 }
 
-/** Export job */
+/** Export job - matches Prisma ExportJob model */
 export interface ExportJob {
   id: string;
   userId: string;
-  name?: string;
-  format: ExportFormat;
-  type: ExportType;
-  status: ExportStatus;
+  name: string | null;
+  format: PrismaExportFormat;
+  dateFrom: Date | null;
+  dateTo: Date | null;
+  platforms: string[];
+  categories: PrismaPlatformCategory[];
+  includeNotes: boolean;
+  includeStats: boolean;
+  status: PrismaExportStatus;
   progress: number;
-  options: ExportOptions;
-  fileUrl?: string;
-  fileName?: string;
-  fileSize?: number;
-  fileMimeType?: string;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  fileMimeType: string | null;
+  hasError: boolean;
+  errorMessage: string | null;
+  expiresAt: Date | null;
   totalRecords: number;
   exportedRecords: number;
-  hasError: boolean;
-  errorMessage?: string;
-  startedAt?: Date;
-  completedAt?: Date;
-  expiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-/** Scheduled export */
+/** Scheduled export - matches Prisma ScheduledExport model */
 export interface ScheduledExport {
   id: string;
   userId: string;
   name: string;
-  description?: string;
-  frequency: 'daily' | 'weekly' | 'monthly';
-  dayOfWeek?: number;
-  dayOfMonth?: number;
+  description: string | null;
+  frequency: string;
+  dayOfWeek: number | null;
+  dayOfMonth: number | null;
   time: string;
   timezone: string;
-  options: ExportOptions;
-  deliveryMethod: 'email' | 'download' | 'webhook';
-  emailTo?: string;
-  emailSubject?: string;
-  webhookUrl?: string;
+  format: PrismaExportFormat;
+  platforms: string[];
+  categories: PrismaPlatformCategory[];
+  relativeDateRange: string;
+  deliveryMethod: string;
+  emailTo: string | null;
+  emailSubject: string | null;
   isActive: boolean;
-  lastRunAt?: Date;
-  lastRunStatus?: ExportStatus;
-  lastRunJobId?: string;
-  nextRunAt?: Date;
+  lastRunAt: Date | null;
+  lastRunStatus: string | null;
+  lastRunJobId: string | null;
+  nextRunAt: Date | null;
   runCount: number;
   failureCount: number;
   createdAt: Date;
@@ -110,19 +128,23 @@ export interface ExportTemplate {
 }
 
 // =============================================================================
-// EXPORT DATA STRUCTURES
+// EXPORT DATA STRUCTURES - Used by ExportService
 // =============================================================================
 
 /** Main export data container */
 export interface ExportData {
-  exportInfo: ExportInfo;
+  exportInfo?: ExportInfo;
   user: UserExport;
-  dateRange: DateRangeExport;
+  exportDate: Date;
+  dateRange: {
+    start: Date;
+    end: Date;
+  };
   summary?: SummaryExport;
-  trackerEntries?: TrackerEntryExport[];
-  goals?: GoalExport[];
-  achievements?: AchievementExport[];
-  platforms?: PlatformExport[];
+  trackerEntries: TrackerEntryExport[];
+  goals: GoalExport[];
+  achievements: AchievementExport[];
+  platforms: PlatformExport[];
   stats?: StatsExport;
   metadata?: MetadataExport;
 }
@@ -143,8 +165,8 @@ export interface UserExport {
   name: string;
   email: string;
   username?: string;
-  createdAt: string;
-  memberSince: string;
+  createdAt?: string;
+  memberSince?: string;
 }
 
 /** Date range for export */
@@ -172,94 +194,95 @@ export interface SummaryExport {
   platformsConnected: number;
 }
 
-/** Tracker entry export format */
+/** Tracker entry export format - matches TrackerEntry model fields */
 export interface TrackerEntryExport {
-  id: string;
+  id?: string;
   date: string;
   platform: string;
-  platformSlug: string;
+  platformSlug?: string;
   category: string;
-  problemsSolved: number;
-  problemsAttempted: number;
-  easyProblems: number;
-  mediumProblems: number;
-  hardProblems: number;
-  commits: number;
-  pullRequests: number;
-  projectsCompleted: number;
-  applicationsSubmitted: number;
-  coursesCompleted: number;
-  certificationsEarned: number;
-  timeSpent: number;
+  problemsSolved?: number;
+  problemsAttempted?: number;
+  easyProblems?: number;
+  mediumProblems?: number;
+  hardProblems?: number;
+  commits?: number;
+  pullRequests?: number;
+  projectsStarted?: number;
+  projectsCompleted?: number;
+  applicationsSubmitted?: number;
+  coursesCompleted?: number;
+  certificationsEarned?: number;
+  timeSpent?: number;
   rating?: number;
   ratingChange?: number;
   points?: number;
   mood?: string;
   notes?: string;
   tags?: string[];
-  source: string;
-  createdAt: string;
-  updatedAt: string;
+  source?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-/** Goal export format */
+/** Goal export format - matches Goal model fields */
 export interface GoalExport {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-  type: string;
-  metric: string;
-  target: number;
-  progress: number;
-  progressPercentage: number;
-  status: string;
-  startDate: string;
-  deadline?: string;
-  completedAt?: string;
-  platform?: string;
-  daysActive: number;
-  createdAt: string;
-}
-
-/** Achievement export format */
-export interface AchievementExport {
-  id: string;
-  slug: string;
+  id?: string;
   title: string;
   description: string;
   category: string;
-  rarity: string;
-  tier: string;
-  points: number;
-  unlockedAt: string;
+  goalType?: string;
+  metric?: string;
+  target: number;
   progress: number;
+  progressPercentage?: number;
+  status: string;
+  startDate?: string;
+  deadline?: string;
+  completedAt?: string;
+  platform?: string;
+  daysActive?: number;
+  createdAt?: string;
 }
 
-/** Platform export format */
+/** Achievement export format - matches Achievement/UserAchievement models */
+export interface AchievementExport {
+  id?: string;
+  slug?: string;
+  title: string;
+  description: string;
+  category: string;
+  rarity?: string;
+  tier?: string;
+  points?: number;
+  unlockedAt: string;
+  progress?: number;
+}
+
+/** Platform export format - matches UserPlatform model */
 export interface PlatformExport {
-  id: string;
+  id?: string;
   name: string;
-  slug: string;
+  slug?: string;
   category: string;
   isConnected: boolean;
   username?: string;
   profileUrl?: string;
-  lastSyncedAt?: string;
+  lastSynced?: string;
   syncStatus?: string;
-  totalEntries: number;
-  totalProblems: number;
+  totalEntries?: number;
+  totalProblems?: number;
   stats?: Record<string, unknown>;
 }
 
 /** Stats export format */
 export interface StatsExport {
-  period: {
+  period?: {
     start: string;
     end: string;
     days: number;
   };
-  totals: {
+  totals?: {
     problems: number;
     commits: number;
     pullRequests: number;
@@ -269,30 +292,39 @@ export interface StatsExport {
     courses: number;
     certifications: number;
   };
-  averages: {
+  averages?: {
     problemsPerDay: number;
     commitsPerDay: number;
     timePerDay: number;
     pointsPerDay: number;
   };
-  streaks: {
+  streaks?: {
     current: number;
     longest: number;
     startDate?: string;
   };
-  byCategory: Record<string, {
+  // Simplified stats for ExportService
+  totalEntries?: number;
+  totalGoals?: number;
+  completedGoals?: number;
+  achievements?: number;
+  currentStreak?: number;
+  longestStreak?: number;
+  totalProblemsSolved?: number;
+  totalTimeSpent?: number;
+  byCategory?: Record<string, {
     problems: number;
     commits: number;
     time: number;
     entries: number;
   }>;
-  byPlatform: Record<string, {
+  byPlatform?: Record<string, {
     problems: number;
     commits: number;
     time: number;
     entries: number;
   }>;
-  byMonth: Array<{
+  byMonth?: Array<{
     month: string;
     problems: number;
     commits: number;
@@ -329,15 +361,15 @@ export interface MetadataExport {
 /** Export result */
 export interface ExportResult {
   success: boolean;
-  jobId: string;
+  jobId?: string;
   format: ExportFormat;
   fileName: string;
   fileUrl?: string;
   fileSize?: number;
-  mimeType: string;
+  mimeType?: string;
   data?: string | Buffer | Blob;
-  recordCount: number;
-  duration: number;
+  recordCount?: number;
+  duration?: number;
   expiresAt?: Date;
   error?: string;
 }
@@ -395,6 +427,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
   description: string;
   maxRecords: number;
   supportsCompression: boolean;
+  prismaValue: PrismaExportFormat;
 }> = {
   csv: {
     label: 'CSV',
@@ -404,6 +437,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
     description: 'Comma-separated values, compatible with Excel and Google Sheets',
     maxRecords: 100000,
     supportsCompression: true,
+    prismaValue: 'CSV',
   },
   json: {
     label: 'JSON',
@@ -413,6 +447,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
     description: 'JavaScript Object Notation, ideal for developers and APIs',
     maxRecords: 50000,
     supportsCompression: true,
+    prismaValue: 'JSON',
   },
   pdf: {
     label: 'PDF',
@@ -422,6 +457,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
     description: 'Portable Document Format, great for sharing and printing',
     maxRecords: 10000,
     supportsCompression: false,
+    prismaValue: 'PDF',
   },
   excel: {
     label: 'Excel',
@@ -431,6 +467,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
     description: 'Microsoft Excel format with multiple sheets',
     maxRecords: 100000,
     supportsCompression: false,
+    prismaValue: 'EXCEL',
   },
   xml: {
     label: 'XML',
@@ -440,6 +477,7 @@ export const EXPORT_FORMAT_CONFIG: Record<ExportFormat, {
     description: 'Extensible Markup Language, structured data format',
     maxRecords: 50000,
     supportsCompression: true,
+    prismaValue: 'XML',
   },
 };
 
@@ -517,6 +555,16 @@ export const DATE_RANGE_PRESETS: Record<DateRangePreset, {
 /** Get export format config */
 export function getExportFormatConfig(format: ExportFormat) {
   return EXPORT_FORMAT_CONFIG[format];
+}
+
+/** Convert lowercase format to Prisma enum value */
+export function toPrismaExportFormat(format: ExportFormat): PrismaExportFormat {
+  return EXPORT_FORMAT_CONFIG[format].prismaValue;
+}
+
+/** Convert Prisma enum value to lowercase format */
+export function fromPrismaExportFormat(format: PrismaExportFormat): ExportFormat {
+  return format.toLowerCase() as ExportFormat;
 }
 
 /** Get date range from preset */

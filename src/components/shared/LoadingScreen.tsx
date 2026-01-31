@@ -1,46 +1,52 @@
 "use client";
 
 import React from "react";
-import clsx from "clsx";
 
 interface LoadingScreenProps {
   message?: string;
-  fullScreen?: boolean;
-  size?: "sm" | "md" | "lg";
 }
 
-export default function LoadingScreen({
-  message = "Loading...",
-  fullScreen = false,
-  size = "md",
-}: LoadingScreenProps) {
-  const spinnerSize = {
-    sm: "w-8 h-8",
-    md: "w-12 h-12",
-    lg: "w-16 h-16",
-  };
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ message }) => {
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 z-50">
+      {/* Animated emoji */}
+      <div className="animate-bounce mb-4 text-5xl">⏳</div>
 
-  const content = (
-    <div className="flex flex-col items-center justify-center gap-4">
-      <div className={clsx("relative", spinnerSize[size])}>
-        <div className="absolute inset-0 bg-linear-to-r from-blue-500 to-purple-500 rounded-full animate-spin" />
-        <div className={clsx("absolute inset-1 bg-white dark:bg-gray-900 rounded-full", spinnerSize[size])} />
-      </div>
+      {/* Spinner */}
+      <Spinner size={60} />
+
+      {/* Message */}
       {message && (
-        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+        <p className="mt-4 text-gray-700 dark:text-gray-200 text-center text-lg font-medium">
           {message}
         </p>
       )}
+
+      {/* Optional: subtle overlay shadow */}
+      <div className="absolute inset-0 bg-black/10 dark:bg-black/20 pointer-events-none"></div>
     </div>
   );
+};
 
-  if (fullScreen) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-50">
-        {content}
-      </div>
-    );
-  }
+// Inline Spinner component
+const Spinner: React.FC<{ size?: number }> = ({ size = 24 }) => (
+  <div
+    className="relative flex items-center justify-center"
+    style={{ width: size, height: size }}
+  >
+    <div
+      className="absolute border-4 border-gray-200 dark:border-gray-700 border-t-blue-600 dark:border-t-blue-400 rounded-full animate-spin"
+      style={{ width: size, height: size }}
+    />
+    <div
+      className="absolute border-4 border-gray-200 dark:border-gray-700 border-t-blue-300 dark:border-t-blue-600 rounded-full animate-spin"
+      style={{
+        width: size * 0.7,
+        height: size * 0.7,
+        animationDuration: "0.8s",
+      }}
+    />
+  </div>
+);
 
-  return <div className="flex items-center justify-center py-12">{content}</div>;
-}
+export default LoadingScreen;

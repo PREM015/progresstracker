@@ -1,9 +1,11 @@
 Folder PATH listing for volume New Volume
 Volume serial number is 084B-A865
 D:.
+¦   full.txt
+¦   instrumentation-client.ts
+¦   instrumentation.ts
 ¦   proxy.ts
 ¦   t.txt
-¦   tf.txt
 ¦   
 +---app
 ¦   ¦   error.tsx
@@ -114,6 +116,45 @@ D:.
 ¦   ¦   +---admin
 ¦   ¦   ¦   ¦   route.ts
 ¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---achievements
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---audit-logs
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---blog
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---changelog
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---feature-flags
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---maintenance
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---newsletter
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
 ¦   ¦   ¦   +---platforms
 ¦   ¦   ¦   ¦       route.ts
 ¦   ¦   ¦   ¦       
@@ -123,7 +164,19 @@ D:.
 ¦   ¦   ¦   +---sync
 ¦   ¦   ¦   ¦       route.ts
 ¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---system-settings
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[key]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
 ¦   ¦   ¦   +---users
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---waitlist
 ¦   ¦   ¦       ¦   route.ts
 ¦   ¦   ¦       ¦   
 ¦   ¦   ¦       +---[id]
@@ -149,6 +202,12 @@ D:.
 ¦   ¦   ¦   ¦       route.ts
 ¦   ¦   ¦   ¦       
 ¦   ¦   ¦   +---trends
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---api-keys
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---[id]
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
 ¦   ¦   +---auth
@@ -185,11 +244,26 @@ D:.
 ¦   ¦   ¦   +---[...nextauth]
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
+¦   ¦   +---backup-codes
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---generate
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---verify
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
 ¦   ¦   +---contact
 ¦   ¦   ¦       route.ts
 ¦   ¦   ¦       
 ¦   ¦   +---cron
 ¦   ¦   ¦   +---daily-sync
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---custom-platforms
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---[id]
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
 ¦   ¦   +---docs
@@ -220,6 +294,12 @@ D:.
 ¦   ¦   ¦       +---[id]
 ¦   ¦   ¦               route.ts
 ¦   ¦   ¦               
+¦   ¦   +---feedback
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
 ¦   ¦   +---goals
 ¦   ¦   ¦   ¦   route.ts
 ¦   ¦   ¦   ¦   
@@ -250,6 +330,9 @@ D:.
 ¦   ¦   +---health
 ¦   ¦   ¦       route.ts
 ¦   ¦   ¦       
+¦   ¦   +---login-history
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
 ¦   ¦   +---logs
 ¦   ¦   ¦       route.ts
 ¦   ¦   ¦       
@@ -257,7 +340,15 @@ D:.
 ¦   ¦   ¦       route.ts
 ¦   ¦   ¦       
 ¦   ¦   +---newsletter
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
 ¦   ¦   ¦   +---subscribe
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---unsubscribe
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---[id]
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
 ¦   ¦   +---notifications
@@ -312,6 +403,25 @@ D:.
 ¦   ¦   ¦       +---stats
 ¦   ¦   ¦               route.ts
 ¦   ¦   ¦               
+¦   ¦   +---public
+¦   ¦   ¦   +---blog
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[slug]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---changelog
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---reports
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---sentry-example-api
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
 ¦   ¦   +---sse
 ¦   ¦   ¦   +---notifications
 ¦   ¦   ¦   ¦       route.ts
@@ -334,6 +444,9 @@ D:.
 ¦   ¦   ¦   +---trends
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
+¦   ¦   +---streak-history
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
 ¦   ¦   +---stripe
 ¦   ¦   ¦   +---cancel
 ¦   ¦   ¦   ¦       route.ts
@@ -359,6 +472,15 @@ D:.
 ¦   ¦   ¦   +---webhook
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
+¦   ¦   +---support-tickets
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦       ¦   route.ts
+¦   ¦   ¦       ¦   
+¦   ¦   ¦       +---replies
+¦   ¦   ¦               route.ts
+¦   ¦   ¦               
 ¦   ¦   +---sync
 ¦   ¦   ¦   ¦   route.ts
 ¦   ¦   ¦   ¦   
@@ -415,45 +537,57 @@ D:.
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
 ¦   ¦   +---user
+¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   
+¦   ¦   ¦   +---2fa
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---verify
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---avatar
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---delete
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---export-data
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---notifications
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---password
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---preferences
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---profile
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---sessions
+¦   ¦   ¦   ¦   ¦   route.ts
+¦   ¦   ¦   ¦   ¦   
+¦   ¦   ¦   ¦   +---[id]
+¦   ¦   ¦   ¦           route.ts
+¦   ¦   ¦   ¦           
+¦   ¦   ¦   +---settings
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---username
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---waitlist
 ¦   ¦       ¦   route.ts
 ¦   ¦       ¦   
-¦   ¦       +---2fa
-¦   ¦       ¦   ¦   route.ts
-¦   ¦       ¦   ¦   
-¦   ¦       ¦   +---verify
-¦   ¦       ¦           route.ts
-¦   ¦       ¦           
-¦   ¦       +---avatar
+¦   ¦       +---join
 ¦   ¦       ¦       route.ts
 ¦   ¦       ¦       
-¦   ¦       +---delete
+¦   ¦       +---stats
 ¦   ¦       ¦       route.ts
 ¦   ¦       ¦       
-¦   ¦       +---export-data
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---notifications
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---password
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---preferences
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---profile
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---sessions
-¦   ¦       ¦   ¦   route.ts
-¦   ¦       ¦   ¦   
-¦   ¦       ¦   +---[id]
-¦   ¦       ¦           route.ts
-¦   ¦       ¦           
-¦   ¦       +---settings
-¦   ¦       ¦       route.ts
-¦   ¦       ¦       
-¦   ¦       +---username
+¦   ¦       +---unsubscribe
 ¦   ¦               route.ts
 ¦   ¦               
 ¦   +---blog
@@ -495,6 +629,9 @@ D:.
 ¦   ¦       page.tsx
 ¦   ¦       
 ¦   +---privacy
+¦   ¦       page.tsx
+¦   ¦       
+¦   +---sentry-example-page
 ¦   ¦       page.tsx
 ¦   ¦       
 ¦   +---terms
@@ -542,6 +679,7 @@ D:.
 ¦   ¦       AutoLogout.tsx
 ¦   ¦       ForgotPasswordForm.tsx
 ¦   ¦       LoginForm.tsx
+¦   ¦       PasswordStrengthMeter.tsx
 ¦   ¦       RegisterForm.tsx
 ¦   ¦       ResetPasswordForm.tsx
 ¦   ¦       SocialAuthButtons.tsx
@@ -829,6 +967,7 @@ D:.
 ¦       database.ts
 ¦       date.ts
 ¦       email.ts
+¦       encryption.ts
 ¦       errorTracking.ts
 ¦       featureFlags.ts
 ¦       jwt.ts
@@ -989,6 +1128,7 @@ D:.
         analytics.ts
         api.ts
         billing.ts
+        database.ts
         export.ts
         goal.ts
         hello.tsx

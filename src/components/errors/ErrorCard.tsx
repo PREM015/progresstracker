@@ -1,26 +1,27 @@
-
-
-import { cn } from '@/lib/utils';
-
-/**
- * ErrorCard Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+import React from "react";
+import { AlertTriangle } from "lucide-react";
+import RetryButton from "./RetryButton";
 
 interface ErrorCardProps {
+  message?: string;
+  onRetry?: () => void;
   className?: string;
-  // TODO: Add more props
 }
 
-export function ErrorCard({ className }: ErrorCardProps) {
+const ErrorCard: React.FC<ErrorCardProps> = ({
+  message = "Something went wrong. Please try again.",
+  onRetry,
+  className = "",
+}) => {
   return (
-    <div className={cn('errorcard', className)}>
-      {/* TODO: Implement component */}
-      <p>ErrorCard Component</p>
+    <div
+      className={`flex flex-col items-center justify-center p-6 bg-red-50 border border-red-200 rounded-lg text-center space-y-4 ${className}`}
+    >
+      <AlertTriangle className="w-12 h-12 text-red-500" />
+      <p className="text-red-700 font-medium">{message}</p>
+      {onRetry && <RetryButton onClick={onRetry} />}
     </div>
   );
-}
+};
 
 export default ErrorCard;

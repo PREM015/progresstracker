@@ -51,7 +51,7 @@ export interface AdminUser {
   image?: string;
   role: string;
   isAdmin: boolean;
-  isSuperAdmin: boolean;
+ 
   isActive: boolean;
   isVerified: boolean;
   isBanned: boolean;

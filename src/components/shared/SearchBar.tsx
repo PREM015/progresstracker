@@ -1,83 +1,76 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { Search, X } from "lucide-react";
-import clsx from "clsx";
+import React, { useState, useEffect, useRef } from "react";
 
 interface SearchBarProps {
-  onSearch?: (query: string) => void;
   placeholder?: string;
-  className?: string;
-  debounceMs?: number;
+  onSearch: (query: string) => void;
+  debounceTime?: number;
 }
 
-export default function SearchBar({
-  onSearch,
+const SearchBar: React.FC<SearchBarProps> = ({
   placeholder = "Search...",
-  className,
-  debounceMs = 300,
-}: SearchBarProps) {
-  const [value, setValue] = useState("");
-  const [isActive, setIsActive] = useState(false);
+  onSearch,
+  debounceTime = 300,
+}) => {
+  const [query, setQuery] = useState("");
+  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const timeoutRef = React.useRef<NodeJS.Timeout>();
-  
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = e.target.value;
-      setValue(newValue);
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        onSearch?.(newValue);
-      }, debounceMs);
-    },
-    [onSearch, debounceMs]
-  );
-
-  const handleClear = useCallback(() => {
-    setValue("");
-    onSearch?.("");
-  }, [onSearch]);
+  useEffect(() => {
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => {
+      onSearch(query);
+    }, debounceTime);
+    
+    return () => {
+      if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    };
+  }, [debounceTime, onSearch, query]);
 
   return (
-    <div className={clsx("relative w-full", className)}>
-      <div
-        className={clsx(
-          "relative flex items-center transition-all duration-200",
-          "border rounded-lg px-3 py-2",
-          isActive
-            ? "border-blue-500 ring-2 ring-blue-500/20 bg-white dark:bg-gray-900"
-            : "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
-        )}
+    <div className="flex items-center border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 w-full max-w-md mx-auto bg-white dark:bg-gray-900 shadow-sm focus-within:ring-2 focus-within:ring-blue-400 transition">
+      
+      {/* Search Icon */}
+      <svg
+        className="w-5 h-5 text-gray-400 mr-2 shrink-0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        viewBox="0 0 24 24"
       >
-        <Search className="h-4 w-4 text-gray-400 shrink-0" />
-        <input
-          type="text"
-          value={value}
-          onChange={handleChange}
-          onFocus={() => setIsActive(true)}
-          onBlur={() => setIsActive(false)}
-          placeholder={placeholder}
-          className={clsx(
-            "ml-2 flex-1 bg-transparent outline-none text-sm",
-            "placeholder-gray-400 dark:placeholder-gray-500",
-            "text-gray-900 dark:text-gray-100"
-          )}
-        />
-        {value && (
-          <button
-            onClick={handleClear}
-            className="ml-2 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            aria-label="Clear search"
+        <circle cx={11} cy={11} r={8} />
+        <line x1={21} y1={21} x2={16.65} y2={16.65} />
+      </svg>
+
+      {/* Input */}
+      <input
+        className="flex-1 bg-transparent outline-none text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
+        type="text"
+        value={query}
+        placeholder={placeholder}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+
+      {/* Clear Button */}
+      {query && (
+        <button
+          onClick={() => setQuery("")}
+          className="ml-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        >
+          <svg
+            className="w-4 h-4 text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
           >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+            <line x1={18} y1={6} x2={6} y2={18} />
+            <line x1={6} y1={6} x2={18} y2={18} />
+          </svg>
+        </button>
+      )}
     </div>
   );
-}
+};
+
+export default SearchBar;

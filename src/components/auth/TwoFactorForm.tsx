@@ -1,26 +1,39 @@
-'use client';
-
-import { cn } from '@/lib/utils';
-
-/**
- * TwoFactorForm Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+import React, { useState } from "react";
 
 interface TwoFactorFormProps {
-  className?: string;
-  // TODO: Add more props
+  onSubmit: (code: string) => void;
+  loading?: boolean;
 }
 
-export function TwoFactorForm({ className }: TwoFactorFormProps) {
+const TwoFactorForm: React.FC<TwoFactorFormProps> = ({ onSubmit, loading }) => {
+  const [code, setCode] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code) return;
+    onSubmit(code);
+  };
+
   return (
-    <div className={cn('twofactorform', className)}>
-      {/* TODO: Implement component */}
-      <p>TwoFactorForm Component</p>
-    </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <input
+        type="text"
+        placeholder="Enter 6-digit code"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        required
+        maxLength={6}
+        className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+      />
+      <button
+        type="submit"
+        disabled={loading}
+        className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        {loading ? "Verifying..." : "Verify"}
+      </button>
+    </form>
   );
-}
+};
 
 export default TwoFactorForm;

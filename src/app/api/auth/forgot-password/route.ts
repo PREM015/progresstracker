@@ -1,15 +1,15 @@
+// src/app/api/auth/forgot-password/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-// import { rateLimiter } from '@/lib/redis';
-// import { sendResetPasswordEmail } from '@/lib/mailer';
 
-/* -------------------------------------------------------------------------- */
-/*                                   SCHEMA                                   */
-/* -------------------------------------------------------------------------- */
+// =============================================================================
+// SCHEMA
+// =============================================================================
 
 const ForgotPasswordSchema = z.object({
   email: z
@@ -19,31 +19,26 @@ const ForgotPasswordSchema = z.object({
     .transform((email) => email.toLowerCase().trim()),
 });
 
-/* -------------------------------------------------------------------------- */
-/*                               CONFIGURATION                                */
-/* -------------------------------------------------------------------------- */
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
 
 const RESET_TOKEN_EXPIRY_MINUTES = 30;
-const COOLDOWN_MINUTES = 2; // Minimum time between reset requests for same email
-const MAX_PAYLOAD_SIZE = 1024; // 1KB max request size
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [];
+const COOLDOWN_MINUTES = 2;
+const MAX_PAYLOAD_SIZE = 1024;
+const CONSTANT_TIME_MS = 200;
 
 const GENERIC_RESPONSE = {
-  message:
-    'If an account with that email exists, a password reset link has been sent.',
+  message: 'If an account with that email exists, a password reset link has been sent.',
 };
 
-/* -------------------------------------------------------------------------- */
-/*                                   HELPERS                                  */
-/* -------------------------------------------------------------------------- */
+// =============================================================================
+// HELPERS
+// =============================================================================
 
 function generateResetToken(): { rawToken: string; hashedToken: string } {
   const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto
-    .createHash('sha256')
-    .update(rawToken)
-    .digest('hex');
-
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
   return { rawToken, hashedToken };
 }
 
@@ -55,42 +50,33 @@ function getClientIP(req: NextRequest): string {
   );
 }
 
-/**
- * Simulate async work to prevent timing attacks
- * Always takes approximately the same time regardless of user existence
- */
-async function constantTimeDelay(startTime: number, targetMs: number = 200): Promise<void> {
+async function constantTimeDelay(startTime: number): Promise<void> {
   const elapsed = Date.now() - startTime;
-  const remaining = Math.max(0, targetMs - elapsed);
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
   if (remaining > 0) {
     await new Promise((resolve) => setTimeout(resolve, remaining));
   }
 }
 
-function createSecureResponse(
-  data: object,
-  status: number
-): NextResponse {
+function createSecureResponse(data: object, status: number): NextResponse {
   const response = NextResponse.json(data, { status });
-  
-  // Security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   response.headers.set('Pragma', 'no-cache');
-  
   return response;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                   HANDLER                                  */
-/* -------------------------------------------------------------------------- */
+// =============================================================================
+// HANDLER
+// =============================================================================
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
+  const clientIP = getClientIP(req);
 
   try {
-    /* ------------------------ Content-Type Validation ----------------------- */
+    // Content-Type Validation
     const contentType = req.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
       return createSecureResponse(
@@ -99,141 +85,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    /* -------------------------- Origin Validation --------------------------- */
-    const origin = req.headers.get('origin');
-    if (
-      process.env.NODE_ENV === 'production' &&
-      origin &&
-      ALLOWED_ORIGINS.length > 0 &&
-      !ALLOWED_ORIGINS.includes(origin)
-    ) {
-      logger.warn('Forgot password request from unauthorized origin', {
-        origin,
-        ip: getClientIP(req),
-      });
-      
-      return createSecureResponse(
-        { error: 'Unauthorized origin' },
-        403
-      );
-    }
-
-    /* -------------------------- Payload Size Check -------------------------- */
+    // Payload Size Check
     const contentLength = parseInt(req.headers.get('content-length') || '0', 10);
     if (contentLength > MAX_PAYLOAD_SIZE) {
-      return createSecureResponse(
-        { error: 'Request payload too large' },
-        413
-      );
+      return createSecureResponse({ error: 'Request payload too large' }, 413);
     }
 
-    /* ------------------------------ Parse Body ------------------------------ */
+    // Parse Body
     let body: unknown;
     try {
       const text = await req.text();
-      
-      // Additional size check on actual content
       if (text.length > MAX_PAYLOAD_SIZE) {
-        return createSecureResponse(
-          { error: 'Request payload too large' },
-          413
-        );
+        return createSecureResponse({ error: 'Request payload too large' }, 413);
       }
-      
       body = JSON.parse(text);
     } catch {
-      return createSecureResponse(
-        { error: 'Invalid JSON payload' },
-        400
-      );
+      return createSecureResponse({ error: 'Invalid JSON payload' }, 400);
     }
 
-    /* --------------------------- Schema Validation -------------------------- */
+    // Schema Validation
     const parsed = ForgotPasswordSchema.safeParse(body);
     if (!parsed.success) {
-      // Don't leak validation details
       logger.debug('Forgot password validation failed', {
         errors: parsed.error.flatten(),
-        ip: getClientIP(req),
+        ip: clientIP,
       });
-
-      return createSecureResponse(
-        { error: 'Invalid request payload' },
-        400
-      );
+      return createSecureResponse({ error: 'Invalid request payload' }, 400);
     }
 
     const { email } = parsed.data;
-    const clientIP = getClientIP(req);
 
-    /* ---------------------------- Rate Limiting ----------------------------- */
-    // NOTE: Enable once Redis is finalized
-    /*
-    // Rate limit by IP
-    const ipRateLimit = await rateLimiter.limit(
-      `forgot-password:ip:${clientIP}`,
-      10,          // max requests
-      60 * 15      // 15 minute window
-    );
-
-    if (!ipRateLimit.allowed) {
-      logger.warn('Forgot password rate limit exceeded (IP)', {
-        ip: clientIP,
-      });
-      
-      await constantTimeDelay(startTime);
-      return createSecureResponse(
-        { error: 'Too many requests. Try again later.' },
-        429
-      );
-    }
-
-    // Rate limit by email (stricter)
-    const emailHash = crypto.createHash('sha256').update(email).digest('hex');
-    const emailRateLimit = await rateLimiter.limit(
-      `forgot-password:email:${emailHash}`,
-      3,           // max requests
-      60 * 60      // 1 hour window
-    );
-
-    if (!emailRateLimit.allowed) {
-      logger.warn('Forgot password rate limit exceeded (email)', {
-        emailHash,
-        ip: clientIP,
-      });
-      
-      await constantTimeDelay(startTime);
-      // Still return generic response to prevent enumeration
-      return createSecureResponse(GENERIC_RESPONSE, 200);
-    }
-    */
-
-    /* ------------------------------ Find User ------------------------------- */
+    // Find User
     const user = await prisma.user.findUnique({
       where: { email },
       select: {
         id: true,
         email: true,
-        emailVerified: true, // Optional: only allow for verified emails
-        deletedAt: true,     // Optional: check for soft-deleted users
+        emailVerified: true,
+        deletedAt: true,
+        isActive: true,
+        isBanned: true,
       },
     });
 
-    // IMPORTANT: Prevent user enumeration
-    // Also handles: non-existent users, unverified emails, deleted accounts
-    if (!user || user.deletedAt) {
+    // Prevent user enumeration
+    if (!user || user.deletedAt || !user.isActive || user.isBanned) {
       await constantTimeDelay(startTime);
       return createSecureResponse(GENERIC_RESPONSE, 200);
     }
 
-    // Optional: Only allow password reset for verified emails
-    // if (!user.emailVerified) {
-    //   await constantTimeDelay(startTime);
-    //   return createSecureResponse(GENERIC_RESPONSE, 200);
-    // }
-
-    /* ---------------------------- Cooldown Check ---------------------------- */
-    const recentToken = await prisma.passwordResetToken.findFirst({
+    // Cooldown Check
+    const recentToken = await prisma.passwordReset.findFirst({
       where: {
         userId: user.id,
         createdAt: {
@@ -248,17 +150,13 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         lastRequest: recentToken.createdAt,
       });
-
       await constantTimeDelay(startTime);
-      // Return success to prevent enumeration
       return createSecureResponse(GENERIC_RESPONSE, 200);
     }
 
-    /* ------------------------ Invalidate Old Tokens ------------------------- */
-    const deletedTokens = await prisma.passwordResetToken.deleteMany({
-      where: {
-        userId: user.id,
-      },
+    // Invalidate Old Tokens
+    const deletedTokens = await prisma.passwordReset.deleteMany({
+      where: { userId: user.id },
     });
 
     if (deletedTokens.count > 0) {
@@ -268,34 +166,26 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    /* -------------------------- Generate New Token -------------------------- */
+    // Generate New Token
     const { rawToken, hashedToken } = generateResetToken();
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
 
-    const expiresAt = new Date(
-      Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000
-    );
-
-    await prisma.passwordResetToken.create({
+    // ✅ FIXED: Use 'token' field instead of 'tokenHash'
+    await prisma.passwordReset.create({
       data: {
         userId: user.id,
-        tokenHash: hashedToken,
+        token: hashedToken, // ✅ Schema field is 'token'
         expiresAt,
-        // Optional: track request metadata
-        // ipAddress: clientIP,
-        // userAgent: req.headers.get('user-agent')?.slice(0, 255),
+        ipAddress: clientIP,
+        userAgent: req.headers.get('user-agent')?.slice(0, 255),
       },
     });
 
-    /* ------------------------------ Send Email ------------------------------ */
-    // TODO (Phase Email):
+    // TODO: Send Email
     // const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${rawToken}`;
-    // await sendResetPasswordEmail({
-    //   to: user.email,
-    //   resetUrl,
-    //   expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES,
-    // });
+    // await sendResetPasswordEmail({ to: user.email, resetUrl, expiresInMinutes: RESET_TOKEN_EXPIRY_MINUTES });
 
-    // For development, log the token (REMOVE IN PRODUCTION)
+    // For development
     if (process.env.NODE_ENV === 'development') {
       logger.debug('Reset token generated (DEV ONLY)', {
         rawToken,
@@ -303,34 +193,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    /* ------------------------------ Audit Log ------------------------------- */
+    // Audit Log
     logger.info('Password reset requested', {
       userId: user.id,
       email: user.email,
       expiresAt,
       ip: clientIP,
-      userAgent: req.headers.get('user-agent')?.slice(0, 100),
     });
 
-    /* ------------------------------ Response -------------------------------- */
     await constantTimeDelay(startTime);
     return createSecureResponse(GENERIC_RESPONSE, 200);
 
   } catch (error) {
-    // Determine error type for appropriate logging
-    const isDbError = error instanceof Error && 
-      error.message.includes('prisma');
-
-    logger.error('Forgot password error', {
-      error: error instanceof Error ? {
-        message: error.message,
-        name: error.name,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-      } : error,
-      type: isDbError ? 'database' : 'unknown',
-      ip: getClientIP(req),
-    });
-
+    logger.error('Forgot password error', { ip: clientIP }, error);
     await constantTimeDelay(startTime);
     return createSecureResponse(
       { error: 'Something went wrong. Please try again later.' },
@@ -339,27 +214,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                            METHOD NOT ALLOWED                              */
-/* -------------------------------------------------------------------------- */
-
 export async function GET() {
-  return createSecureResponse(
-    { error: 'Method not allowed' },
-    405
-  );
+  return createSecureResponse({ error: 'Method not allowed' }, 405);
 }
 
 export async function PUT() {
-  return createSecureResponse(
-    { error: 'Method not allowed' },
-    405
-  );
+  return createSecureResponse({ error: 'Method not allowed' }, 405);
 }
 
 export async function DELETE() {
-  return createSecureResponse(
-    { error: 'Method not allowed' },
-    405
-  );
+  return createSecureResponse({ error: 'Method not allowed' }, 405);
 }

@@ -52,3 +52,6 @@ p.py
 phase3.txt
 src/t.txt
 phase.md
+
+# Sentry Config File
+.env.sentry-build-plugin

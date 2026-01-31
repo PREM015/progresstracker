@@ -1,26 +1,38 @@
-'use client';
-
-import { cn } from '@/lib/utils';
-
-/**
- * ForgotPasswordForm Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+import React, { useState } from "react";
 
 interface ForgotPasswordFormProps {
-  className?: string;
-  // TODO: Add more props
+  onSubmit: (email: string) => void;
+  loading?: boolean;
 }
 
-export function ForgotPasswordForm({ className }: ForgotPasswordFormProps) {
+const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({ onSubmit, loading }) => {
+  const [email, setEmail] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    onSubmit(email);
+  };
+
   return (
-    <div className={cn('forgotpasswordform', className)}>
-      {/* TODO: Implement component */}
-      <p>ForgotPasswordForm Component</p>
-    </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <input
+        type="email"
+        placeholder="Email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        className="p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <button
+        type="submit"
+        disabled={loading}
+        className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        {loading ? "Sending..." : "Send Reset Link"}
+      </button>
+    </form>
   );
-}
+};
 
 export default ForgotPasswordForm;

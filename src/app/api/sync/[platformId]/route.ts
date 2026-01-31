@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/sync/[platformId]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
@@ -7,6 +6,7 @@ import { authOptions } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import { SyncService } from "@/services/syncService";
 import { prisma } from "@/lib/prisma";
+import { SyncStatus } from "@prisma/client";
 
 interface RouteContext {
   params: Promise<{
@@ -26,11 +26,17 @@ export async function GET(
 
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
+      logger.warn('Unauthorized sync status access');
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    logger.debug('Getting sync status', { 
+      userId: session.user.id, 
+      platformId 
+    });
 
     // Get platform sync history
     const logs = await SyncService.getSyncHistory(session.user.id, {
@@ -38,9 +44,9 @@ export async function GET(
       limit: 10,
     });
 
-    // Get last successful sync
+    // ✅ FIXED: Use correct enum value (uppercase)
     const lastSuccess = logs.find(
-      (log: { status: string; }) => log.status === "success"
+      (log: { status: SyncStatus }) => log.status === SyncStatus.SUCCESS
     );
 
     // Get platform
@@ -48,25 +54,53 @@ export async function GET(
       where: { id: platformId },
     });
 
+    // ✅ FIXED: Use platformId instead of platform name string
     const entriesCount = platform
       ? await prisma.trackerEntry.count({
           where: {
             userId: session.user.id,
-            platform: platform.name,
+            platformId: platform.id,  // ✅ FIXED: was platform.name (wrong field)
           },
         })
       : 0;
 
-    return NextResponse.json({
+    logger.info('Sync status retrieved', { 
+      userId: session.user.id, 
       platformId,
-      lastSync: lastSuccess?.createdAt ?? null,
-      entriesCount,
-      recentLogs: logs,
+      entriesCount 
     });
-  } catch (error: any) {
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        platformId,
+        platformName: platform?.name ?? null,
+        lastSync: lastSuccess?.completedAt ?? lastSuccess?.startedAt ?? null,
+        entriesCount,
+        recentLogs: logs.map((log: { 
+          id: string; 
+          status: SyncStatus; 
+          startedAt: Date; 
+          completedAt: Date | null; 
+          itemsCreated: number; 
+          hasError: boolean; 
+          errorMessage: string | null; 
+        }) => ({
+          id: log.id,
+          status: log.status,
+          startedAt: log.startedAt,
+          completedAt: log.completedAt,
+          itemsCreated: log.itemsCreated,
+          hasError: log.hasError,
+          errorMessage: log.errorMessage,
+        })),
+      },
+    });
+  } catch (error) {
+    logger.error('Failed to get platform sync status', { }, error);
     return NextResponse.json(
       {
-        error: error?.message || "Failed to get platform sync status",
+        error: error instanceof Error ? error.message : "Failed to get platform sync status",
       },
       { status: 500 }
     );
@@ -85,11 +119,17 @@ export async function POST(
 
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
+      logger.warn('Unauthorized sync trigger attempt');
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    logger.info('Triggering platform sync', { 
+      userId: session.user.id, 
+      platformId 
+    });
 
     // Check if platform is connected
     const userPlatform = await prisma.userPlatform.findUnique({
@@ -103,9 +143,25 @@ export async function POST(
     });
 
     if (!userPlatform) {
+      logger.warn('Platform not connected', { 
+        userId: session.user.id, 
+        platformId 
+      });
       return NextResponse.json(
         { error: "Platform not connected" },
         { status: 404 }
+      );
+    }
+
+    // Check if already syncing
+    if (userPlatform.syncStatus === SyncStatus.IN_PROGRESS) {
+      logger.info('Sync already in progress', { 
+        userId: session.user.id, 
+        platformId 
+      });
+      return NextResponse.json(
+        { error: "Sync already in progress" },
+        { status: 409 }
       );
     }
 
@@ -115,17 +171,26 @@ export async function POST(
       platformId
     );
 
+    logger.info('Platform sync completed', { 
+      userId: session.user.id, 
+      platformId,
+      entriesAdded: result.entriesAdded 
+    });
+
     return NextResponse.json({
       success: true,
-      platform: userPlatform.platform.name,
-      entriesAdded: result.entriesAdded,
-      message: `Synced ${result.entriesAdded} new entries`,
+      data: {
+        platform: userPlatform.platform.name,
+        platformId: userPlatform.platformId,
+        entriesAdded: result.entriesAdded,
+        message: `Synced ${result.entriesAdded} new entries`,
+      },
     });
-  } catch (error: any) {
-    logger.error("Platform sync error:", error instanceof Error ? error : new Error(String(error)));
+  } catch (error) {
+    logger.error('Platform sync error', { }, error);
     return NextResponse.json(
       {
-        error: error?.message || "Failed to sync platform",
+        error: error instanceof Error ? error.message : "Failed to sync platform",
       },
       { status: 500 }
     );

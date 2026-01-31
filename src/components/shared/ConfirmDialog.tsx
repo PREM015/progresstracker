@@ -1,79 +1,50 @@
 "use client";
 
-import React, { ReactNode } from "react";
-import clsx from "clsx";
-import Button from "@/components/ui/Button";
+import React from "react";
 
 interface ConfirmDialogProps {
+  title?: string;
+  message?: string;
   isOpen: boolean;
-  title: string;
-  description?: string;
-  confirmText?: string;
-  cancelText?: string;
   onConfirm: () => void;
   onCancel: () => void;
-  isDangerous?: boolean;
-  isLoading?: boolean;
-  children?: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
 }
 
-export default function ConfirmDialog({
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+  title = "Are you sure?",
+  message = "This action cannot be undone.",
   isOpen,
-  title,
-  description,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
   onConfirm,
   onCancel,
-  isDangerous = false,
-  isLoading = false,
-  children,
-}: ConfirmDialogProps) {
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+}) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onCancel}
-      />
-
-      {/* Dialog */}
-      <div className={clsx(
-        "relative bg-white dark:bg-gray-900 rounded-lg shadow-xl",
-        "max-w-md w-full mx-4 p-6 border border-gray-200 dark:border-gray-700"
-      )}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          {title}
-        </h2>
-        {description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            {description}
-          </p>
-        )}
-        {children}
-        <div className="flex gap-3 mt-6">
-          <Button
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-sm w-full text-center">
+        <h2 className="text-lg font-bold mb-2">{title}</h2>
+        <p className="text-gray-600 mb-4">{message}</p>
+        <div className="flex justify-end space-x-2">
+          <button
+            className="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 transition"
             onClick={onCancel}
-            variant="outline"
-            className="flex-1"
-            disabled={isLoading}
           >
-            {cancelText}
-          </Button>
-          <Button
+            {cancelLabel}
+          </button>
+          <button
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
             onClick={onConfirm}
-            className={clsx(
-              "flex-1",
-              isDangerous && "bg-red-600 hover:bg-red-700 text-white"
-            )}
-            disabled={isLoading}
           >
-            {isLoading ? "Loading..." : confirmText}
-          </Button>
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default ConfirmDialog;

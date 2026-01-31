@@ -11,8 +11,9 @@ datasource db {
 // ============================================================================
 enum Role {
   user
-  admin  
+  admin
 }
+
 enum PlatformCategory {
   DSA
   JOB
@@ -254,10 +255,9 @@ model User {
   bannedBy   String?
 
   // Admin & Roles
-  isAdmin      Boolean  @default(false)
- 
-  role         String   @default("user") // user, admin
-  permissions  String[] @default([])
+  isAdmin     Boolean  @default(false)
+  role        Role     @default(user) // user, admin
+  permissions String[] @default([])
 
   // Streak Data (denormalized for performance)
   currentStreak      Int       @default(0)
@@ -353,7 +353,7 @@ model User {
   // Reports (sent weekly/monthly)
   reports Report[]
 
-  // Referrals - FIXED: Added onDelete: SetNull
+  // Referrals
   referrals User[] @relation("Referrals")
   referrer  User?  @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
 
@@ -528,6 +528,7 @@ model PasswordReset {
   @@index([token])
   @@index([expiresAt])
 }
+
 model EmailVerification {
   id     String @id @default(cuid())
   userId String
@@ -738,7 +739,7 @@ model Platform {
   trackerEntries TrackerEntry[]
   syncLogs       SyncLog[]
   platformStats  PlatformDailyStats[]
-  goals          Goal[] // FIXED: Added missing relation
+  goals          Goal[]
 
   @@index([category])
   @@index([isActive])
@@ -772,7 +773,7 @@ model CustomPlatform {
   updatedAt DateTime @updatedAt
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trackerEntries TrackerEntry[] // FIXED: Added missing relation
+  trackerEntries TrackerEntry[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -838,7 +839,7 @@ model UserPlatform {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform Platform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
-  syncLogs SyncLog[] // FIXED: Added missing relation
+  syncLogs SyncLog[]
 
   @@unique([userId, platformId])
   @@index([userId])
@@ -968,19 +969,20 @@ model TrackerEntry {
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform       Platform?       @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  customPlatform CustomPlatform? @relation(fields: [customPlatformId], references: [id], onDelete: SetNull) // FIXED: Added missing relation
-  syncLog        SyncLog?        @relation(fields: [syncLogId], references: [id], onDelete: SetNull) // FIXED: Added missing relation
+  customPlatform CustomPlatform? @relation(fields: [customPlatformId], references: [id], onDelete: SetNull)
+  syncLog        SyncLog?        @relation(fields: [syncLogId], references: [id], onDelete: SetNull)
 
-  // FIXED: Updated unique constraint to handle nullable fields properly
   @@unique([userId, platformId, date])
+  @@unique([userId, date, platformId], name: "userId_date_platformId")
+
   @@index([userId, date])
   @@index([platformId, date])
   @@index([userId, category])
   @@index([userId, category, date])
   @@index([source])
   @@index([date])
-  @@index([customPlatformId]) // FIXED: Added missing index
-  @@index([syncLogId]) // FIXED: Added missing index
+  @@index([customPlatformId])
+  @@index([syncLogId])
 }
 
 model DailyStats {
@@ -1084,7 +1086,7 @@ model PlatformDailyStats {
 model Goal {
   id         String  @id @default(cuid())
   userId     String
-  platformId String? // FIXED: Now has proper relation
+  platformId String?
 
   // Basic Info
   title       String
@@ -1100,6 +1102,7 @@ model Goal {
   target             Int
   progress           Int   @default(0)
   progressPercentage Float @default(0)
+    unit               String?
 
   // Time Period
   startDate DateTime  @default(now())
@@ -1140,7 +1143,7 @@ model Goal {
   updatedAt DateTime @updatedAt
 
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform  Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull) // FIXED: Added missing relation
+  platform  Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
   reminders GoalReminder[]
 
   @@index([userId])
@@ -1149,7 +1152,7 @@ model Goal {
   @@index([deadline])
   @@index([shareCode])
   @@index([status])
-  @@index([platformId]) // FIXED: Added missing index
+  @@index([platformId])
 }
 
 model GoalReminder {
@@ -1385,7 +1388,7 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, type])
   @@index([userId, createdAt])
-  @@index([userId, isRead, createdAt]) // FIXED: Added composite index for common query
+  @@index([userId, isRead, createdAt])
   @@index([isRead])
   @@index([scheduledFor])
   @@index([expiresAt])
@@ -1480,12 +1483,12 @@ model SyncLog {
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform       Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
-  userPlatform   UserPlatform?  @relation(fields: [userPlatformId], references: [id], onDelete: SetNull) // FIXED: Added missing relation
-  trackerEntries TrackerEntry[] // FIXED: Added missing relation
+  userPlatform   UserPlatform?  @relation(fields: [userPlatformId], references: [id], onDelete: SetNull)
+  trackerEntries TrackerEntry[]
 
   @@index([userId])
   @@index([platformId])
-  @@index([userPlatformId]) // FIXED: Added missing index
+  @@index([userPlatformId])
   @@index([status])
   @@index([createdAt])
   @@index([triggeredBy])
@@ -1657,7 +1660,7 @@ model Invoice {
   @@index([subscriptionId])
   @@index([status])
   @@index([stripeInvoiceId])
-  @@index([stripePaymentIntentId]) // FIXED: Added missing index
+  @@index([stripePaymentIntentId])
   @@index([invoiceDate])
 }
 
@@ -1702,9 +1705,9 @@ model PaymentEvent {
   @@index([userId])
   @@index([subscriptionId])
   @@index([stripeEventId])
-  @@index([stripePaymentIntentId]) // FIXED: Added missing index
-  @@index([stripeInvoiceId]) // FIXED: Added missing index
-  @@index([stripeChargeId]) // FIXED: Added missing index
+  @@index([stripePaymentIntentId])
+  @@index([stripeInvoiceId])
+  @@index([stripeChargeId])
   @@index([eventType])
   @@index([status])
   @@index([createdAt])
@@ -2024,7 +2027,7 @@ model AuditLog {
   @@index([entityId])
   @@index([createdAt])
   @@index([category])
-  @@index([userId, action, createdAt]) // FIXED: Added composite index for common query
+  @@index([userId, action, createdAt])
 }
 
 // ============================================================================

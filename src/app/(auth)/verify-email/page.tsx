@@ -1,31 +1,34 @@
-import { Metadata } from 'next';
+"use client";
 
-/**
- * VerifyEmail Page
- * 
- * @created 2026-01-26
- */
+import React, { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
-export const metadata: Metadata = {
-  title: 'VerifyEmail | Progress Tracker',
-  description: 'TODO: Add page description',
-};
+const VerifyEmailPage: React.FC = () => {
+  const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
 
+  const verifyEmail = async () => {
+    try {
+      const res = await fetch("/api/auth/verify-email", { method: "POST" });
+      if (res.ok) setStatus("success");
+      else setStatus("error");
+    } catch {
+      setStatus("error");
+    }
+  };
 
-
-export default function VerifyEmailPage() {
-  
+  useEffect(() => {
+    verifyEmail();
+  }, []);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">VerifyEmail</h1>
-      
-      {/* TODO: Implement page content */}
-      <div className="bg-card rounded-lg p-6 shadow-sm">
-        <p className="text-muted-foreground">
-          This page is under construction.
-        </p>
+    <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50">
+      <div className="w-full max-w-md bg-white shadow-md rounded-lg p-6 text-center">
+        {status === "pending" && <p className="text-gray-600">Verifying your email...</p>}
+        {status === "success" && <p className="text-green-600 font-semibold">Email verified successfully!</p>}
+        {status === "error" && <p className="text-red-600 font-semibold">Failed to verify email.</p>}
       </div>
     </div>
   );
-}
+};
+
+export default VerifyEmailPage;

@@ -1,5 +1,6 @@
 // src/trigger/daily-sync-task.ts
 
+import type { UserPlatform } from '@prisma/client';
 import { schedules } from "@trigger.dev/sdk/v3";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";

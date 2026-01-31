@@ -1,5 +1,6 @@
 // src/trigger/sync-all-platforms.ts
 
+import type { UserPlatform } from '@prisma/client';
 import { task, schedules } from "@trigger.dev/sdk/v3";
 import{ prisma} from "@/lib/prisma";
 import { logger } from "@/lib/logger";

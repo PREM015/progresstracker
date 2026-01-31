@@ -6,7 +6,7 @@
 // =============================================================================
 
 /** User role */
-export type UserRole = 'user' | 'moderator' | 'admin' | 'superadmin';
+export type UserRole = 'user' | 'admin';
 
 /** Account status */
 export type AccountStatus = 'active' | 'inactive' | 'banned' | 'suspended' | 'deleted';
@@ -59,7 +59,7 @@ export interface User {
   
   // Admin & Roles
   isAdmin: boolean;
-  isSuperAdmin: boolean;
+ 
   role: UserRole;
   permissions: string[];
   
@@ -370,21 +370,13 @@ export const ROLE_CONFIG: Record<UserRole, {
     color: '#6B7280',
     permissions: ['read:own', 'write:own'],
   },
-  moderator: {
-    label: 'Moderator',
-    color: '#3B82F6',
-    permissions: ['read:own', 'write:own', 'read:users', 'moderate:content'],
-  },
+
   admin: {
     label: 'Admin',
     color: '#8B5CF6',
     permissions: ['read:all', 'write:all', 'manage:users', 'manage:content'],
   },
-  superadmin: {
-    label: 'Super Admin',
-    color: '#EF4444',
-    permissions: ['*'],
-  },
+ 
 };
 
 /** Account status configuration */
@@ -420,16 +412,10 @@ export function getUserInitials(user: User | UserProfile): string {
   return name.substring(0, 2).toUpperCase();
 }
 
-/** Check if user has permission */
-export function hasPermission(user: User, permission: string): boolean {
-  if (user.isSuperAdmin) return true;
-  if (user.permissions.includes('*')) return true;
-  return user.permissions.includes(permission);
-}
 
 /** Check if user is admin */
 export function isAdmin(user: User): boolean {
-  return user.isAdmin || user.isSuperAdmin || user.role === 'admin' || user.role === 'superadmin';
+  return user.isAdmin ||  user.role === 'admin';;
 }
 
 /** Get account status */

@@ -63,7 +63,7 @@ export default function AdminLayout({
       return;
     }
 
-    if (session?.user?.role !== "ADMIN") {
+    if (session?.user?.role !== "admin") {
       router.replace("/dashboard");
     }
   }, [session, status, router]);

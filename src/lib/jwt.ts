@@ -7,6 +7,7 @@ const ACCESS_TOKEN_EXPIRES_IN = '15m'; // Access token lifetime
 type JwtPayload = {
   userId: string;
   role: string;
+  email?: string;
 };
 
 export function signJwt(payload: JwtPayload) {

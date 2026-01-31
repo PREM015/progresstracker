@@ -15,9 +15,9 @@ declare module 'next-auth' {
       name?: string | null;
       image?: string | null;
       username?: string | null;
-      role: 'user' | 'moderator' | 'admin' | 'superadmin';
+      role: 'user' | 'admin' ;
       isAdmin: boolean;
-      isSuperAdmin: boolean;
+     
       isVerified: boolean;
       currentStreak: number;
       totalPoints: number;
@@ -39,9 +39,9 @@ declare module 'next-auth' {
     name?: string | null;
     image?: string | null;
     username?: string | null;
-    role: 'user' | 'moderator' | 'admin' | 'superadmin';
+    role: 'user' | 'admin' ;
     isAdmin: boolean;
-    isSuperAdmin: boolean;
+   
     isVerified: boolean;
     isActive: boolean;
     isBanned: boolean;
@@ -104,9 +104,9 @@ declare module 'next-auth/jwt' {
     name?: string | null;
     image?: string | null;
     username?: string | null;
-    role: 'user' | 'moderator' | 'admin' | 'superadmin';
+    role: 'user' | 'moderator' | 'admin' ;
     isAdmin: boolean;
-    isSuperAdmin: boolean;
+  
     isVerified: boolean;
     currentStreak: number;
     totalPoints: number;

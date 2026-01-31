@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// app/api/auth/logout/route.ts
+// src/app/api/auth/logout/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 
 const CONSTANT_TIME_MS = 250;
@@ -22,23 +23,66 @@ function secureResponse(body: object, status: number) {
   return res;
 }
 
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
+}
+
 export async function POST(req: NextRequest) {
   const start = Date.now();
-  try {
-    const session = await getServerSession({ req, ...authOptions });
+  const clientIP = getClientIP(req);
 
-    if (!session) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
       await constantTimeDelay(start);
       return secureResponse({ success: false, message: "Not authenticated" }, 401);
     }
 
-    // NextAuth handles session destruction automatically
-    // Optional: you can manually delete cookies or revoke tokens here
+    logger.info('User logout', { userId: session.user.id, ip: clientIP });
+
+    // Get current session token
+    const currentSessionToken = 
+      req.cookies.get('next-auth.session-token')?.value ||
+      req.cookies.get('__Secure-next-auth.session-token')?.value;
+
+    // Invalidate current active session
+    if (currentSessionToken) {
+      await prisma.activeSession.updateMany({
+        where: {
+          userId: session.user.id,
+          token: currentSessionToken,
+        },
+        data: {
+          isValid: false,
+          revokedAt: new Date(),
+          revokedReason: 'user_logout',
+        },
+      });
+    }
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: 'LOGOUT',
+        category: 'auth',
+        description: 'User logged out',
+        ipAddress: clientIP,
+        userAgent: req.headers.get('user-agent')?.slice(0, 255),
+        status: 'success',
+      },
+    });
 
     await constantTimeDelay(start);
     return secureResponse({ success: true, message: "Logged out successfully" }, 200);
-  } catch (error: any) {
-    logger.error("Logout error", error);
+
+  } catch (error) {
+    logger.error("Logout error", { ip: clientIP }, error);
     await constantTimeDelay(start);
     return secureResponse({ success: false, message: "Logout failed" }, 500);
   }

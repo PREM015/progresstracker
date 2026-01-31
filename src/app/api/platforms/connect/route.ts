@@ -19,39 +19,43 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
     const { platformId, username, token } = connectSchema.parse(body)
 
+    // ConnectPlatformInput expects userId (required)
+    const input = {
+      userId: session.user.id,
+      platformId,
+      username,
+      token,
+    }
+
     const connection = await PlatformService.connectPlatform(
       session.user.id,
       platformId,
       username,
-      token
+      token,
+      input
     )
 
     return NextResponse.json({
       message: "Platform connected successfully",
       connection,
     })
-  } catch (error: any) {
-    logger.error("Error connecting platform:", error instanceof Error ? error : new Error(String(error)))
-    
-    if (error.message === "Platform already connected") {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error))
+    logger.error("Error connecting platform:", err)
+
+    if (err.message === "Platform already connected") {
+      return NextResponse.json({ error: err.message }, { status: 400 })
     }
 
     return NextResponse.json(
-      { error: "Failed to connect platform", message: error.message },
+      { error: "Failed to connect platform", message: err.message },
       { status: 500 }
     )
   }

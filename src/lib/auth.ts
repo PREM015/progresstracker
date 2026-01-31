@@ -34,7 +34,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     id: string;
-    email?: string;
+    email: string;
     role: "admin" | "user";
     isAdmin: boolean;
     provider?: string;
@@ -122,14 +122,66 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        return {
-          id: user.id,
-          email: user.email!,
-          name: user.name,
-          image: user.image,
-          role: user.role as "admin" | "user",
-          isAdmin: user.isAdmin,
-        };
+      return {
+  id: user.id,
+  email: user.email!,
+    emailVerified: user.emailVerified,
+  name: user.name,
+  image: user.image,
+  username: user.username,
+  role: user.role as "admin" | "user",
+  isAdmin: user.isAdmin,
+
+  permissions: user.permissions,
+  isActive: user.isActive,
+  isVerified: user.isVerified,
+  isBanned: user.isBanned,
+  banReason: user.banReason,
+  currentStreak: user.currentStreak,
+  longestStreak: user.longestStreak,
+  streakStartDate: user.streakStartDate,
+  streakFreezeCount: user.streakFreezeCount,
+  streakFreezeUsedAt: user.streakFreezeUsedAt,
+  totalProblems: user.totalProblems,
+  totalCommits: user.totalCommits,
+  totalProjects: user.totalProjects,
+  totalCertifications: user.totalCertifications,
+  totalAchievements: user.totalAchievements,
+  totalPoints: user.totalPoints,
+  preferredLanguage: user.preferredLanguage,
+  timezone: user.timezone,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+  isPublic: user.isPublic ?? true,
+  showEmail: user.showEmail ?? false,
+  showLocation: user.showLocation ?? false,
+  showActivity: user.showActivity ?? true,
+  showAchievements: user.showAchievements ?? true,
+  showGoals: user.showGoals ?? true,
+  showPlatforms: user.showPlatforms ?? true,
+  showStreak: user.showStreak ?? true,
+  // Optional fields can be null/undefined if not set
+  bio: user.bio,
+  location: user.location,
+  website: user.website,
+  company: user.company,
+  jobTitle: user.jobTitle,
+  githubUsername: user.githubUsername,
+  linkedinUrl: user.linkedinUrl,
+  twitterHandle: user.twitterHandle,
+  discordUsername: user.discordUsername,
+  lastActivityDate: user.lastActivityDate,
+
+  lastLoginAt: user.lastLoginAt,
+  lastActiveAt: user.lastActiveAt,
+  passwordChangedAt: user.passwordChangedAt,
+  deletedAt: user.deletedAt,
+  referralCode: user.referralCode,
+  referredBy: user.referredBy,
+  signupSource: user.signupSource,
+  rank: user.rank,
+};
+        
       },
     }),
 

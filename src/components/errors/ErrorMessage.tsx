@@ -1,26 +1,18 @@
-
-
-import { cn } from '@/lib/utils';
-
-/**
- * ErrorMessage Component
- * 
- * @description TODO: Add component description
- * @created 2026-01-26
- */
+import React from "react";
+import { AlertTriangle } from "lucide-react";
 
 interface ErrorMessageProps {
+  message: string;
   className?: string;
-  // TODO: Add more props
 }
 
-export function ErrorMessage({ className }: ErrorMessageProps) {
+const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, className = "" }) => {
   return (
-    <div className={cn('errormessage', className)}>
-      {/* TODO: Implement component */}
-      <p>ErrorMessage Component</p>
+    <div className={`flex items-center space-x-2 text-sm text-red-600 ${className}`}>
+      <AlertTriangle className="w-4 h-4" />
+      <span>{message}</span>
     </div>
   );
-}
+};
 
 export default ErrorMessage;

@@ -1,58 +1,40 @@
 "use client";
 
-import React, { ReactNode } from "react";
-import clsx from "clsx";
+import React from "react";
+
 
 interface EmptyStateProps {
-  icon?: ReactNode;
-  title: string;
-  description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
-  className?: string;
+  message?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export default function EmptyState({
-  icon,
-  title,
-  description,
-  action,
-  className,
-}: EmptyStateProps) {
+const EmptyState: React.FC<EmptyStateProps> = ({
+  message = "No data available",
+  actionLabel,
+  onAction,
+}) => {
   return (
-    <div
-      className={clsx(
-        "flex flex-col items-center justify-center gap-4 py-12 px-6",
-        "rounded-lg border border-dashed border-gray-300 dark:border-gray-600",
-        "bg-gray-50 dark:bg-gray-900/50",
-        className
-      )}
-    >
-      {icon && (
-        <div className="text-gray-400 dark:text-gray-500">
-          {icon}
-        </div>
-      )}
-      <div className="text-center">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
-          {title}
-        </h3>
-        {description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {description}
-          </p>
-        )}
-      </div>
-      {action && (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 py-20 bg-gray-50 dark:bg-gray-900 text-center">
+      {/* Modern Icon */}
+      <div className="mb-6 text-7xl animate-bounce">📭</div>
+
+      {/* Message */}
+      <p className="text-gray-700 dark:text-gray-300 text-lg font-medium mb-6 max-w-xs">
+        {message}
+      </p>
+
+      {/* Action Button */}
+      {actionLabel && onAction && (
         <button
-          onClick={action.onClick}
-          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+          className="px-6 py-3 bg-linear-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg shadow-md hover:from-blue-600 hover:to-blue-700 transition-all duration-300"
+          onClick={onAction}
         >
-          {action.label}
+          {actionLabel}
         </button>
       )}
     </div>
   );
-}
+};
+
+export default EmptyState;
