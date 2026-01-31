@@ -1,6 +1,6 @@
 // src/types/sync.ts
 
-import type { SyncStatus as PrismaSyncStatus, PlatformCategory } from '@prisma/client';
+import type { SyncStatus as PrismaSyncStatus } from '@prisma/client';
 
 // Re-export Prisma SyncStatus for convenience
 export type { PrismaSyncStatus as SyncStatusEnum };

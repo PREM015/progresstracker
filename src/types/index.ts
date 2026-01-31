@@ -1,3 +1,4 @@
+// src/types/index.ts
 // ===== FILE: src/types/index.ts =====
 // Central export file for all types
 
@@ -8,33 +9,232 @@
 export * from './user';
 export * from './platform';
 export * from './tracker';
-export * from './goal';
 export * from './achievement';
+
+// ============================================================================
+// GOAL TYPES (explicit to avoid GoalProgress conflict with report.ts)
+// ============================================================================
+
+export type {
+  GoalType,
+  GoalStatus,
+  GoalMetric,
+  GoalCategory,
+  Goal,
+  GoalReminder,
+  GoalWithProgress,
+  GoalStats,
+  CreateGoalRequest,
+  UpdateGoalRequest,
+  GoalFormData,
+  GoalFilter,
+  GoalSortOptions,
+  GoalTemplate,
+  GoalMilestone,
+  GoalBestDay,
+} from './goal';
+
+// Re-export GoalProgress explicitly from goal.ts (not report.ts)
+export type { GoalProgress } from './goal';
 
 // ============================================================================
 // ANALYTICS & STATS
 // ============================================================================
 
-export * from './analytics';
+export type {
+  DateGrouping,
+  TimeRange,
+  ChartType,
+  InsightType,
+  InsightPriority,
+  ComparisonPeriod,
+  TrendDirection,
+  Stats,
+  PlatformStat,
+  CategoryStat,
+  Activity,
+  ChartDataPoint,
+  TimeSeriesPoint,
+  MultiSeriesData,
+  MonthlyData,
+  HeatmapData,
+  TrendData,
+  PieChartData,
+  RadarChartData,
+  ComparisonData,
+  ChangeMetric,
+  Insight,
+  WeeklyReport,
+  MonthlyReport,
+  AnalyticsQuery,
+  DashboardWidget,
+  AnalyticsExportOptions,
+  calculateChange,
+  getTrendDirection,
+  calculateActivityLevel,
+  getTimeRangeDates,
+  getInsightColor,
+  getInsightIcon,
+} from './analytics';
+
+// Re-export formatDuration explicitly from analytics (not maintenance)
+export { formatDuration as formatAnalyticsDuration } from './analytics';
 
 // ============================================================================
-// SYNC & SCRAPER
+// SYNC & SCRAPER (explicit to avoid ScrapedData/ScraperResult conflicts)
 // ============================================================================
 
-export * from './sync';
-export * from './scraper';
+export type {
+  SyncStatus,
+  SyncJob,
+  SyncPlatformStatus,
+  SyncRequestOptions,
+  SyncResult,
+  SyncLogEntry,
+  SyncQueueStatus,
+  GitHubWebhookPayload,
+  GitLabWebhookPayload,
+  BitbucketWebhookPayload,
+  PlatformSyncConfig,
+  toPrismaSyncStatus,
+} from './sync';
+
+// Re-export from sync explicitly
+export type { ScrapedData as SyncScrapedData, ScraperResult as SyncScraperResult } from './sync';
+
+export type {
+  ScraperStatus,
+  ScraperMethod,
+  DataSourceType,
+  ScraperAuthMethod,
+  ScraperConfig,
+  ScraperEndpoint,
+  EndpointParam,
+  ScraperSelectors,
+  SelectorConfig,
+  DataTransformer,
+  ProxyConfig,
+  ScrapedProfile,
+  ScrapedStats,
+  ScrapedActivity,
+  ScrapedSubmission,
+  ScrapedProblem,
+  ScrapedContest,
+  ScrapedContribution,
+  ScrapedCourse,
+  ScrapedCertification,
+  ScrapedProject,
+  ScraperMetadata,
+  ScraperError,
+  ScraperErrorCode,
+  PlatformScraperInfo,
+  SCRAPER_REGISTRY,
+  isRetryableError,
+  getRetryDelay,
+  createScraperError,
+  normalizeScrapedData,
+} from './scraper';
+
+// Re-export from scraper explicitly  
+export type { ScrapedData as ScraperScrapedData, ScraperResult as ScraperScraperResult } from './scraper';
 
 // ============================================================================
-// NOTIFICATIONS
+// NOTIFICATIONS (explicit to avoid NotificationPreferences/sortByPriority conflicts)
 // ============================================================================
 
-export * from './notification';
+export type {
+  NotificationType,
+  NotificationChannel,
+  NotificationPriority,
+  NotificationStatus,
+  Notification,
+  NotificationGroup,
+  NotificationStats,
+  CreateNotificationInput,
+  UpdateNotificationPreferencesInput,
+  MarkNotificationsInput,
+  NotificationFilter,
+  PushSubscription,
+  NOTIFICATION_TYPE_CONFIG,
+  PRIORITY_CONFIG,
+  CHANNEL_CONFIG,
+  getNotificationTypeConfig,
+  getPriorityConfig,
+  isNotificationExpired,
+  groupNotificationsByType,
+  formatNotificationTime,
+  isInQuietHours,
+} from './notification';
+
+// Re-export NotificationPreferences from notification (not settings)
+export type { NotificationPreferences } from './notification';
+
+// Re-export sortByPriority from notification (renamed to avoid conflict)
+export { sortByPriority as sortNotificationsByPriority } from './notification';
 
 // ============================================================================
 // SETTINGS & PREFERENCES
 // ============================================================================
 
-export * from './settings';
+export type {
+  ThemeMode,
+  FontSize,
+  TimeFormat,
+  DateFormat,
+  SyncFrequency,
+  DigestFrequency,
+  WeekStart,
+  UserSettings,
+  DashboardLayoutConfig,
+  DashboardWidgetConfig,
+  UpdateProfileRequest,
+  UpdateSettingsRequest,
+  UpdateNotificationsRequest,
+  ChangePasswordRequest,
+  DeleteAccountRequest,
+  AppearanceSettingsGroup,
+  LocalizationSettingsGroup,
+  SyncSettingsGroup,
+  PrivacySettingsGroup,
+  FeatureSettingsGroup,
+  NotificationChannelsGroup,
+  NotificationTypesGroup,
+  QuietHoursGroup,
+  DigestSettingsGroup,
+  ProfileVisibilitySettings,
+  UpdateProfileVisibilityRequest,
+  DEFAULT_USER_SETTINGS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  DEFAULT_PROFILE_VISIBILITY,
+  THEME_OPTIONS,
+  ACCENT_COLORS,
+  FONT_SIZE_OPTIONS,
+  LANGUAGE_OPTIONS,
+  TIMEZONE_OPTIONS,
+  DATE_FORMAT_OPTIONS,
+  TIME_FORMAT_OPTIONS,
+  WEEK_START_OPTIONS,
+  SYNC_FREQUENCY_OPTIONS,
+  DIGEST_FREQUENCY_OPTIONS,
+  DATE_RANGE_OPTIONS,
+  mergeSettingsWithDefaults,
+  mergeNotificationsWithDefaults,
+  getResolvedTheme,
+  formatDateWithSettings,
+  formatTimeWithSettings,
+  parseTimeString,
+  isWithinQuietHours,
+  validateSettingsUpdate,
+  validateNotificationsUpdate,
+  isValidTheme,
+  isValidFontSize,
+  isValidTimeFormat,
+  isValidDateFormat,
+  isValidSyncFrequency,
+} from './settings';
+
+// Re-export as aliases to avoid conflicts
+export type { UserSettings as Settings, NotificationPreferences as NotificationSettings } from './settings';
 
 // ============================================================================
 // EXPORT
@@ -55,11 +255,241 @@ export * from './api';
 export * from './oauth';
 
 // ============================================================================
+// SECURITY (explicit exports to avoid conflicts)
+// ============================================================================
+
+export type {
+  SecurityEventType,
+  SessionStatus,
+  DeviceType,
+  TwoFactorMethod,
+  RefreshToken,
+  PasswordReset,
+  EmailVerification,
+  EmailChangeRequest,
+  TwoFactorAuth,
+  BackupCode,
+  LoginAttempt,
+  LoginHistoryItem,
+  Enable2FAInput,
+  Verify2FAInput,
+  CreateApiKeyInput,
+  UpdateApiKeyInput,
+  RevokeSessionInput,
+  TwoFactorSetupData,
+  TwoFactorVerifyInput,
+  SuspiciousActivityAlert,
+} from './security';
+
+// Re-export with 'Security' prefix to avoid conflicts
+export type {
+  ActiveSession as SecurityActiveSession,
+  SessionDisplay as SecuritySessionDisplay,
+  ApiKey as SecurityApiKey,
+  ApiKeyDisplay as SecurityApiKeyDisplay,
+  SecurityEvent,
+} from './security';
+
+export {
+  SECURITY_EVENT_CONFIG,
+  getSessionStatus,
+  determineDeviceType,
+  formatDeviceLabel,
+  formatLocationLabel,
+  isSessionExpiringSoon,
+  maskApiKey,
+  isApiKeyExpired,
+  getDaysUntilExpiry,
+  generateBackupCodes,
+  hashBackupCode,
+  detectSuspiciousLogin,
+} from './security';
+
+// ============================================================================
 // ADMIN & BILLING
 // ============================================================================
 
-export * from './admin';
+export type {
+  AdminUser,
+  AdminStats,
+  SystemHealth,
+  ComponentHealth,
+  HealthCheck,
+  SystemMetrics,
+  AdminAction,
+  AdminUserFilter,
+  UpdateUserAdminRequest,
+  CreateFeatureFlagRequest,
+  CreateMaintenanceWindowRequest,
+  calculateSystemHealth,
+  formatUptime,
+  formatBytes,
+} from './admin';
+
+// Re-export with 'Admin' prefix to avoid conflicts
+export type {
+  AuditLog as AdminAuditLog,
+  AuditLogFilter as AdminAuditLogFilter,
+  FeatureFlag as AdminFeatureFlag,
+  SystemSetting as AdminSystemSetting,
+  MaintenanceWindow as AdminMaintenanceWindow,
+} from './admin';
+
+export {
+  AUDIT_ACTION_CONFIG as ADMIN_AUDIT_ACTION_CONFIG,
+  getAuditActionConfig as getAdminAuditActionConfig,
+  getComponentConfig,
+} from './admin';
+
 export * from './billing';
+
+// ============================================================================
+// AUDIT (explicit to avoid conflicts with admin.ts)
+// ============================================================================
+
+export type {
+  AuditAction,
+  AuditStatus,
+  AuditEntityType,
+  AuditLogEntry,
+  FormattedChange,
+  AuditLogSummary,
+  CreateAuditLogInput,
+  AuditLogSortOptions,
+  SuspiciousActivity,
+  AuditLogExport,
+  formatChanges,
+  createAuditLogEntry,
+  isSecurityAction,
+  isCriticalAction,
+  groupLogsByDate,
+  getLogsForUser,
+  getFailedLoginAttempts,
+  detectSuspiciousActivity,
+  exportAuditLogs,
+} from './audit';
+
+// Re-export to distinguish from admin
+export type { AuditLog, AuditLogFilter } from './audit';
+
+export { AUDIT_ACTION_CONFIG, getAuditActionConfig, getAuditStatusConfig } from './audit';
+
+// ============================================================================
+// CONTENT & COMMUNICATION
+// ============================================================================
+
+export * from './content';
+
+export type {
+  NewsletterFrequency,
+  SubscriptionStatus as NewsletterSubscriptionStatus,
+  NewsletterTopic,
+  NewsletterSubscriber,
+  NewsletterSubscriberDisplay,
+  NewsletterCampaign,
+  NewsletterStats,
+  SubscribeNewsletterInput,
+  UpdateNewsletterSubscriptionInput,
+  UnsubscribeNewsletterInput,
+  NewsletterFilter,
+  NEWSLETTER_FREQUENCY_CONFIG,
+  NEWSLETTER_TOPIC_CONFIG,
+  SUBSCRIPTION_STATUS_CONFIG as NEWSLETTER_SUBSCRIPTION_STATUS_CONFIG,
+  getNewsletterFrequencyConfig,
+  getNewsletterTopicConfig,
+  getSubscriptionStatusConfig as getNewsletterSubscriptionStatusConfig,
+  formatNewsletterSubscriber,
+  generateUnsubscribeToken,
+  getActiveSubscribers,
+  getSubscribersByFrequency,
+  getSubscribersByTopic,
+  calculateCampaignMetrics,
+} from './newsletter';
+
+// Re-export isValidEmail from newsletter (renamed to avoid conflict with waitlist)
+export { isValidEmail as isValidNewsletterEmail } from './newsletter';
+
+export {
+ 
+  sortByPriority,
+} from './feedback';
+
+
+export type {
+  ReportType,
+  ReportStatus,
+  ReportFormat,
+  ReportDeliveryMethod,
+  Report,
+  ReportData,
+  ReportStats,
+  ReportHighlight,
+  ReportInsight,
+  ReportRecommendation,
+  ReportChart,
+  ReportComparison,
+  PlatformBreakdown,
+  CategoryBreakdown,
+  DailyActivity,
+  AchievementSummary,
+  GenerateReportInput,
+  ScheduleReportInput,
+  ReportFilter,
+  REPORT_TYPE_CONFIG,
+  REPORT_STATUS_CONFIG,
+  getReportTypeConfig,
+  getReportStatusConfig,
+  generateReportTitle,
+  calculateHighlights,
+  generateInsights,
+  generateRecommendations,
+  formatPeriodString,
+  calculateComparison,
+  validateReportPeriod,
+} from './report';
+
+// ============================================================================
+// SUPPORT & MAINTENANCE
+// ============================================================================
+
+export * from './support';
+
+export type {
+  MaintenanceStatus,
+  AffectedService,
+  MaintenanceSeverity,
+  MaintenanceWindowDisplay,
+  MaintenanceSummary,
+  CreateMaintenanceWindowInput,
+  UpdateMaintenanceWindowInput,
+  MaintenanceWindowFilter,
+  SERVICE_CONFIG,
+  MAINTENANCE_STATUS_CONFIG,
+  MAINTENANCE_SEVERITY_CONFIG,
+  getMaintenanceStatus,
+  getTimeUntilStart,
+  getTimeUntilEnd,
+  calculateDuration as calculateMaintenanceDuration,
+  determineSeverity,
+  formatMaintenanceWindow,
+  isServiceAffected,
+  getCurrentMaintenance,
+  getUpcomingMaintenance,
+  validateMaintenanceWindow,
+} from './maintenance';
+
+// Re-export with prefix to avoid conflict with analytics
+export { formatDuration as formatMaintenanceDuration } from './maintenance';
+
+// Re-export MaintenanceWindow to avoid conflict with admin
+export type { MaintenanceWindow } from './maintenance';
+
+// ============================================================================
+// SYSTEM & CONFIGURATION
+// ============================================================================
+
+export * from './system';
+export * from './waitlist';
 
 // ============================================================================
 // RE-EXPORT PRISMA TYPES (for convenience)
@@ -68,22 +498,23 @@ export * from './billing';
 export type {
   PlatformCategory,
   AuthType,
-  SyncStatus,
-  NotificationType,
-  NotificationChannel,
-  NotificationPriority,
-  GoalStatus,
-  GoalType,
-  GoalMetric,
+  SyncStatus as PrismaSyncStatus,
+  NotificationType as PrismaNotificationType,
+  NotificationChannel as PrismaNotificationChannel,
+  NotificationPriority as PrismaNotificationPriority,
+  GoalStatus as PrismaGoalStatus,
+  GoalType as PrismaGoalType,
+  GoalMetric as PrismaGoalMetric,
   SubscriptionStatus,
   SubscriptionTier,
   BillingInterval,
   PaymentStatus,
-  ExportFormat,
-  ExportStatus,
-  AuditAction,
+  ExportFormat as PrismaExportFormat,
+  ExportStatus as PrismaExportStatus,
+  AuditAction as PrismaAuditAction,
   TicketStatus,
   TicketPriority,
+  Role,
 } from '@prisma/client';
 
 // ============================================================================

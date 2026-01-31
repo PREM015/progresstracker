@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Auto-generated type definitions for database models
 // This file helps with type safety across the application
 
@@ -51,7 +52,7 @@ import type {
   Report,
   VerificationToken,
   Prisma,
-  PrismaClient
+
 } from '@prisma/client';
 
 // Re-export for easier imports

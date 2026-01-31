@@ -1,3 +1,4 @@
+// src/types/export.ts
 // ===== FILE: src/types/export.ts =====
 // Complete export types for data export functionality
 
@@ -303,7 +304,6 @@ export interface StatsExport {
     longest: number;
     startDate?: string;
   };
-  // Simplified stats for ExportService
   totalEntries?: number;
   totalGoals?: number;
   completedGoals?: number;
@@ -562,9 +562,44 @@ export function toPrismaExportFormat(format: ExportFormat): PrismaExportFormat {
   return EXPORT_FORMAT_CONFIG[format].prismaValue;
 }
 
-/** Convert Prisma enum value to lowercase format */
+/** Convert Prisma enum value to lowercase format - FIXED */
 export function fromPrismaExportFormat(format: PrismaExportFormat): ExportFormat {
-  return format.toLowerCase() as ExportFormat;
+  const reverseMap: Record<PrismaExportFormat, ExportFormat> = {
+    CSV: 'csv',
+    JSON: 'json',
+    PDF: 'pdf',
+    EXCEL: 'excel',
+    XML: 'xml',
+  };
+  return reverseMap[format];
+}
+
+/** Convert lowercase status to Prisma enum value */
+export function toPrismaExportStatus(status: ExportStatus): PrismaExportStatus {
+  const statusMap: Record<ExportStatus, PrismaExportStatus> = {
+    queued: 'QUEUED',
+    pending: 'PENDING',
+    processing: 'PROCESSING',
+    completed: 'COMPLETED',
+    failed: 'FAILED',
+    expired: 'EXPIRED',
+    cancelled: 'CANCELLED',
+  };
+  return statusMap[status];
+}
+
+/** Convert Prisma enum value to lowercase status - FIXED */
+export function fromPrismaExportStatus(status: PrismaExportStatus): ExportStatus {
+  const reverseMap: Record<PrismaExportStatus, ExportStatus> = {
+    QUEUED: 'queued',
+    PENDING: 'pending',
+    PROCESSING: 'processing',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    EXPIRED: 'expired',
+    CANCELLED: 'cancelled',
+  };
+  return reverseMap[status];
 }
 
 /** Get date range from preset */

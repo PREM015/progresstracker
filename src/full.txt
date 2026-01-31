@@ -5,7 +5,6 @@ D:.
 ¦   instrumentation-client.ts
 ¦   instrumentation.ts
 ¦   proxy.ts
-¦   t.txt
 ¦   
 +---app
 ¦   ¦   error.tsx
@@ -25,84 +24,60 @@ D:.
 ¦   ¦   ¦   not-found.tsx
 ¦   ¦   ¦   
 ¦   ¦   +---admin
-¦   ¦       ¦   page.tsx
-¦   ¦       ¦   
-¦   ¦       +---analytics
+¦   ¦       +---achievements
 ¦   ¦       ¦       page.tsx
 ¦   ¦       ¦       
-¦   ¦       +---platforms
+¦   ¦       +---blog
 ¦   ¦       ¦       page.tsx
 ¦   ¦       ¦       
-¦   ¦       +---settings
+¦   ¦       +---changelog
 ¦   ¦       ¦       page.tsx
 ¦   ¦       ¦       
-¦   ¦       +---sync
+¦   ¦       +---feature-flags
 ¦   ¦       ¦       page.tsx
 ¦   ¦       ¦       
-¦   ¦       +---users
+¦   ¦       +---logs
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---maintenance
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---metrics
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---newsletter
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---system-settings
+¦   ¦       ¦       page.tsx
+¦   ¦       ¦       
+¦   ¦       +---waitlist
 ¦   ¦               page.tsx
 ¦   ¦               
 ¦   +---(auth)
-¦   ¦   ¦   error.tsx
-¦   ¦   ¦   layout.tsx
-¦   ¦   ¦   not-found.tsx
-¦   ¦   ¦   
-¦   ¦   +---forgot-password
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---login
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---register
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---reset-password
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---two-factor
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---verify-email
-¦   ¦           page.tsx
-¦   ¦           
+¦   ¦       error.tsx
+¦   ¦       layout.tsx
+¦   ¦       not-found.tsx
+¦   ¦       
 ¦   +---(dashboard)
 ¦   ¦   ¦   error.tsx
 ¦   ¦   ¦   layout.tsx
 ¦   ¦   ¦   not-found.tsx
 ¦   ¦   ¦   
-¦   ¦   +---analytics
+¦   ¦   +---feedback
 ¦   ¦   ¦       page.tsx
 ¦   ¦   ¦       
-¦   ¦   +---billing
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---connections
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---dashboard
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---goals
+¦   ¦   +---reports
 ¦   ¦   ¦       page.tsx
 ¦   ¦   ¦       
 ¦   ¦   +---settings
-¦   ¦   ¦   ¦   page.tsx
-¦   ¦   ¦   ¦   
-¦   ¦   ¦   +---data
-¦   ¦   ¦   ¦       page.tsx
-¦   ¦   ¦   ¦       
-¦   ¦   ¦   +---privacy
-¦   ¦   ¦   ¦       page.tsx
-¦   ¦   ¦   ¦       
 ¦   ¦   ¦   +---security
-¦   ¦   ¦           page.tsx
-¦   ¦   ¦           
-¦   ¦   +---tracker
+¦   ¦   ¦       +---login-history
+¦   ¦   ¦               page.tsx
+¦   ¦   ¦               
+¦   ¦   +---support
 ¦   ¦           page.tsx
 ¦   ¦           
-¦   +---about
-¦   ¦       page.tsx
-¦   ¦       
 ¦   +---api
 ¦   ¦   +---achievements
 ¦   ¦   ¦   ¦   route.ts
@@ -590,305 +565,27 @@ D:.
 ¦   ¦       +---unsubscribe
 ¦   ¦               route.ts
 ¦   ¦               
-¦   +---blog
-¦   ¦   ¦   page.tsx
-¦   ¦   ¦   
-¦   ¦   +---[slug]
-¦   ¦           page.tsx
-¦   ¦           
-¦   +---changelog
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---checkout
-¦   ¦   +---cancel
-¦   ¦   ¦       page.tsx
-¦   ¦   ¦       
-¦   ¦   +---success
-¦   ¦           page.tsx
-¦   ¦           
-¦   +---contact
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---docs
-¦   ¦   ¦   page.tsx
-¦   ¦   ¦   
-¦   ¦   +---api
-¦   ¦           page.tsx
-¦   ¦           
 ¦   +---embed
 ¦   ¦   +---[username]
 ¦   ¦           route.tsx
 ¦   ¦           
-¦   +---maintenance
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---offline
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---pricing
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---privacy
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---sentry-example-page
-¦   ¦       page.tsx
-¦   ¦       
-¦   +---terms
-¦   ¦       page.tsx
-¦   ¦       
 ¦   +---[username]
 ¦           error.tsx
-¦           loading.tsx
 ¦           not-found.tsx
-¦           opengraph-image.tsx
-¦           page.tsx
 ¦           
 +---components
-¦   +---admin
-¦   ¦       PlatformManager.tsx
-¦   ¦       SyncMonitor.tsx
-¦   ¦       SystemStats.tsx
-¦   ¦       UserTable.tsx
-¦   ¦       
-¦   +---analytics
-¦   ¦       ActivityHeatmap.tsx
-¦   ¦       AnalyticsDashboard.tsx
-¦   ¦       CategoryPieChart.tsx
-¦   ¦       ComparisonChart.tsx
-¦   ¦       DateRangeSelector.tsx
-¦   ¦       ExportChart.tsx
-¦   ¦       GoalAnalytics.tsx
-¦   ¦       InsightsPanel.tsx
-¦   ¦       Leaderboard.tsx
-¦   ¦       MetricCard.tsx
-¦   ¦       MonthlyComparison.tsx
-¦   ¦       PeriodSelector.tsx
-¦   ¦       PlatformBarChart.tsx
-¦   ¦       PlatformComparison.tsx
-¦   ¦       ProgressChart.tsx
-¦   ¦       ReportGenerator.tsx
-¦   ¦       SkillRadar.tsx
-¦   ¦       StreakCalendar.tsx
-¦   ¦       TimeDistribution.tsx
-¦   ¦       TrendIndicator.tsx
-¦   ¦       WeeklyReport.tsx
-¦   ¦       
-¦   +---auth
-¦   ¦       AuthProvider.tsx
-¦   ¦       AutoLogout.tsx
-¦   ¦       ForgotPasswordForm.tsx
-¦   ¦       LoginForm.tsx
-¦   ¦       PasswordStrengthMeter.tsx
-¦   ¦       RegisterForm.tsx
-¦   ¦       ResetPasswordForm.tsx
-¦   ¦       SocialAuthButtons.tsx
-¦   ¦       TwoFactorForm.tsx
-¦   ¦       VerifyEmailStatus.tsx
-¦   ¦       
-¦   +---billing
-¦   ¦       CancelModal.tsx
-¦   ¦       InvoiceHistory.tsx
-¦   ¦       PaymentMethod.tsx
-¦   ¦       PricingCard.tsx
-¦   ¦       PricingTable.tsx
-¦   ¦       SubscriptionStatus.tsx
-¦   ¦       UpgradeModal.tsx
-¦   ¦       UsageStats.tsx
-¦   ¦       
-¦   +---connections
-¦   ¦       AddCustomPlatform.tsx
-¦   ¦       CategoryFilter.tsx
-¦   ¦       ConnectionStatus.tsx
-¦   ¦       ConnectModal.tsx
-¦   ¦       ConnectPlatformModal.tsx
-¦   ¦       ConnectPlatformModal_Beautiful.tsx
-¦   ¦       PlatformCard.tsx
-¦   ¦       PlatformGrid.tsx
-¦   ¦       SearchBar.tsx
-¦   ¦       SyncButton.tsx
-¦   ¦       SyncHistory.tsx
-¦   ¦       SyncLogs.tsx
-¦   ¦       SyncProgress.tsx
-¦   ¦       SyncStatus.tsx
-¦   ¦       
-¦   +---dashboard
-¦   ¦       ActivityHeatmap.tsx
-¦   ¦       GoalWidget.tsx
-¦   ¦       PlatformBreakdown.tsx
-¦   ¦       ProgressOverview.tsx
-¦   ¦       QuickActions.tsx
-¦   ¦       RecentActivity.tsx
-¦   ¦       StatsCards.tsx
-¦   ¦       TrendChart.tsx
-¦   ¦       WelcomeBanner.tsx
-¦   ¦       
-¦   +---errors
-¦   ¦       ErrorCard.tsx
-¦   ¦       ErrorMessage.tsx
-¦   ¦       RetryButton.tsx
-¦   ¦       
-¦   +---export
-¦   ¦       DateRangeExport.tsx
-¦   ¦       ExportHistory.tsx
-¦   ¦       ExportModal.tsx
-¦   ¦       ExportProgress.tsx
-¦   ¦       ExportSettings.tsx
-¦   ¦       FormatSelector.tsx
-¦   ¦       PlatformSelector.tsx
-¦   ¦       PreviewExport.tsx
-¦   ¦       ScheduleExport.tsx
-¦   ¦       TemplateSelector.tsx
-¦   ¦       
-¦   +---goals
-¦   ¦       ArchivedGoals.tsx
-¦   ¦       CreateGoalModal.tsx
-¦   ¦       GoalAchievements.tsx
-¦   ¦       GoalCard.tsx
-¦   ¦       GoalDetail.tsx
-¦   ¦       GoalHistory.tsx
-¦   ¦       GoalMilestones.tsx
-¦   ¦       GoalProgress.tsx
-¦   ¦       GoalReminders.tsx
-¦   ¦       GoalShare.tsx
-¦   ¦       GoalStats.tsx
-¦   ¦       GoalTemplates.tsx
-¦   ¦       GoalTimeline.tsx
-¦   ¦       
-¦   +---landing
-¦   ¦       BlogPreview.tsx
-¦   ¦       Comparison.tsx
-¦   ¦       CTA.tsx
-¦   ¦       FAQ.tsx
-¦   ¦       Features.tsx
-¦   ¦       Hero.tsx
-¦   ¦       HowItWorks.tsx
-¦   ¦       IntegrationLogos.tsx
-¦   ¦       Newsletter.tsx
-¦   ¦       PlatformTable.tsx
-¦   ¦       Pricing.tsx
-¦   ¦       Stats.tsx
-¦   ¦       Testimonials.tsx
-¦   ¦       TrustBadges.tsx
-¦   ¦       VideoDemo.tsx
-¦   ¦       
-¦   +---layout
-¦   ¦       Breadcrumbs.tsx
-¦   ¦       Footer.tsx
-¦   ¦       MobileMenu.tsx
-¦   ¦       Navbar.tsx
-¦   ¦       Sidebar.tsx
-¦   ¦       
-¦   +---monitoring
-¦   ¦       PerformanceWidget.tsx
-¦   ¦       
-¦   +---notifications
-¦   ¦       NotificationBell.tsx
-¦   ¦       NotificationCenter.tsx
-¦   ¦       NotificationEmpty.tsx
-¦   ¦       NotificationFilter.tsx
-¦   ¦       NotificationItem.tsx
-¦   ¦       NotificationList.tsx
-¦   ¦       
-¦   +---profile
-¦   ¦       EmbedCode.tsx
-¦   ¦       ProfileActivity.tsx
-¦   ¦       ProfileBadges.tsx
-¦   ¦       ProfileGoals.tsx
-¦   ¦       ProfileHeader.tsx
-¦   ¦       ProfileHeatmap.tsx
-¦   ¦       ProfilePlatforms.tsx
-¦   ¦       ProfileStats.tsx
-¦   ¦       PublicProfile.tsx
-¦   ¦       ShareButton.tsx
-¦   ¦       
-¦   +---pwa
-¦   ¦       InstallPrompt.tsx
-¦   ¦       OfflineBanner.tsx
-¦   ¦       UpdatePrompt.tsx
-¦   ¦       
-¦   +---settings
-¦   ¦       AccountSettings.tsx
-¦   ¦       ApiKeys.tsx
-¦   ¦       AppearanceSettings.tsx
-¦   ¦       ConnectedAccounts.tsx
-¦   ¦       DangerZone.tsx
-¦   ¦       DataSettings.tsx
-¦   ¦       ExportData.tsx
-¦   ¦       ImportData.tsx
-¦   ¦       NotificationSettings.tsx
-¦   ¦       PrivacySettings.tsx
-¦   ¦       ProfileSettings.tsx
-¦   ¦       SecuritySettings.tsx
-¦   ¦       SessionsList.tsx
-¦   ¦       SettingsTabs.tsx
-¦   ¦       SyncSettings.tsx
-¦   ¦       ThemePreview.tsx
-¦   ¦       
-¦   +---shared
-¦   ¦       ConfirmDialog.tsx
-¦   ¦       EmptyState.tsx
-¦   ¦       ErrorBoundary.tsx
-¦   ¦       LoadingScreen.tsx
-¦   ¦       SearchBar.tsx
-¦   ¦       
-¦   +---sync
-¦   ¦       SyncErrorDetails.tsx
-¦   ¦       SyncQueueViewer.tsx
-¦   ¦       SyncSettings.tsx
-¦   ¦       
-¦   +---tracker
-¦   ¦       AddEntryModal.tsx
-¦   ¦       BulkActions.tsx
-¦   ¦       DailyWorkFields.tsx
-¦   ¦       DatePicker.tsx
-¦   ¦       EditEntryModal.tsx
-¦   ¦       ExportButton.tsx
-¦   ¦       ImportModal.tsx
-¦   ¦       ImportPreview.tsx
-¦   ¦       NotesCell.tsx
-¦   ¦       PlatformColumn.tsx
-¦   ¦       QuickAdd.tsx
-¦   ¦       TrackerCalendar.tsx
-¦   ¦       TrackerFilters.tsx
-¦   ¦       TrackerRow.tsx
-¦   ¦       TrackerStats.tsx
-¦   ¦       TrackerTable.tsx
-¦   ¦       
-¦   +---ui
-¦           Alert.tsx
-¦           Avatar.tsx
-¦           Badge.tsx
-¦           Button.tsx
-¦           Card.tsx
-¦           Checkbox.tsx
-¦           Dialog.tsx
-¦           Dropdown.tsx
-¦           Input.tsx
-¦           Label.tsx
-¦           Modal.tsx
-¦           Pagination.tsx
-¦           Progress.tsx
-¦           RadioGroup.tsx
-¦           Select.tsx
-¦           Skeleton.tsx
-¦           Slider.tsx
-¦           Spinner.tsx
-¦           Switch.tsx
-¦           Table.tsx
-¦           Tabs.tsx
-¦           Textarea.tsx
-¦           Toast.tsx
-¦           Tooltip.tsx
-¦           
 +---config
 ¦       achievements.ts
 ¦       categories.ts
 ¦       database.ts
+¦       maintenance.ts
 ¦       navigation.ts
+¦       newsletter.ts
 ¦       oauth.ts
 ¦       phases.ts
 ¦       platforms.ts
+¦       reports.ts
+¦       support.ts
 ¦       sync.ts
 ¦       
 +---context
@@ -902,38 +599,35 @@ D:.
 ¦       UserContext.tsx
 ¦       
 +---emails
-¦   ¦   account-deleted.tsx
-¦   ¦   achievement-unlocked.tsx
-¦   ¦   goal-reminder.tsx
-¦   ¦   layout.tsx
-¦   ¦   login-alert.tsx
-¦   ¦   monthly-report.tsx
-¦   ¦   password-changed.tsx
-¦   ¦   reset-password.tsx
-¦   ¦   streak-reminder.tsx
-¦   ¦   subscription-cancelled.tsx
-¦   ¦   subscription-confirmed.tsx
-¦   ¦   sync-failed.tsx
-¦   ¦   verify-email.tsx
-¦   ¦   weekly-digest.tsx
-¦   ¦   welcome.tsx
-¦   ¦   
-¦   +---components
-¦           Button.tsx
-¦           Footer.tsx
-¦           Header.tsx
-¦           
+¦       backup-codes-generated.tsx
+¦       maintenance-notification.tsx
+¦       newsletter.tsx
+¦       report-generated.tsx
+¦       support-ticket-created.tsx
+¦       support-ticket-reply.tsx
+¦       waitlist-welcome.tsx
+¦       
 +---hooks
 ¦       useAchievements.ts
 ¦       useAnalytics.ts
+¦       useAuditLogs.ts
 ¦       useAuth.ts
+¦       useBackupCodes.ts
+¦       useBlog.ts
+¦       useChangelog.ts
+¦       useCustomPlatforms.ts
 ¦       useDebounce.ts
 ¦       useFeatureFlag.ts
+¦       useFeatureFlags.ts
+¦       useFeedback.ts
 ¦       useFilter.ts
 ¦       useGoals.ts
 ¦       useKeyPress.ts
 ¦       useLocalStorage.ts
+¦       useLoginHistory.ts
+¦       useMaintenance.ts
 ¦       useMediaQuery.ts
+¦       useNewsletter.ts
 ¦       useNotifications.ts
 ¦       useOffline.ts
 ¦       useOnClickOutside.ts
@@ -941,16 +635,20 @@ D:.
 ¦       usePlatforms.ts
 ¦       usePWA.ts
 ¦       useRealTimeSync.ts
+¦       useReports.ts
 ¦       useSettings.ts
 ¦       useSort.ts
 ¦       useSSE.ts
 ¦       useStats.ts
+¦       useStreakHistory.ts
 ¦       useSubscription.ts
+¦       useSupport.ts
 ¦       useSync.ts
 ¦       useTheme.ts
 ¦       useToast.ts
 ¦       useTracker.ts
 ¦       useUser.ts
+¦       useWaitlist.ts
 ¦       useWebSocket.ts
 ¦       
 +---lib
@@ -997,22 +695,35 @@ D:.
 +---services
 ¦   ¦   achievementService.ts
 ¦   ¦   adminService.ts
+¦   ¦   auditLogService.ts
 ¦   ¦   authService.ts
+¦   ¦   backupCodeService.ts
+¦   ¦   blogService.ts
 ¦   ¦   cacheService.ts
+¦   ¦   changelogService.ts
+¦   ¦   customPlatformService.ts
 ¦   ¦   exportService.ts
+¦   ¦   featureFlagService.ts
 ¦   ¦   goalReminderService.ts
 ¦   ¦   goalService.ts
+¦   ¦   loginHistoryService.ts
+¦   ¦   maintenanceService.ts
+¦   ¦   newsletterService.ts
 ¦   ¦   notificationService.ts
 ¦   ¦   platformService.ts
 ¦   ¦   pushService.ts
+¦   ¦   reportService.ts
 ¦   ¦   sessionService.ts
 ¦   ¦   statsService.ts
+¦   ¦   streakHistoryService.ts
 ¦   ¦   stripeService.ts
+¦   ¦   supportService.ts
 ¦   ¦   syncService.ts
 ¦   ¦   trackerImportService.ts
 ¦   ¦   trackerService.ts
 ¦   ¦   twoFactorService.ts
 ¦   ¦   userService.ts
+¦   ¦   waitlistService.ts
 ¦   ¦   
 ¦   +---analytics
 ¦   ¦       insightsService.ts
@@ -1127,19 +838,28 @@ D:.
         admin.ts
         analytics.ts
         api.ts
+        audit.ts
         billing.ts
+        content.ts
         database.ts
         export.ts
+        feedback.ts
         goal.ts
-        hello.tsx
         index.ts
+        maintenance.ts
+        newsletter.ts
         next-auth.d.ts
         notification.ts
         oauth.ts
         platform.ts
+        report.ts
         scraper.ts
+        security.ts
         settings.ts
+        support.ts
         sync.ts
+        system.ts
         tracker.ts
         user.ts
+        waitlist.ts
         

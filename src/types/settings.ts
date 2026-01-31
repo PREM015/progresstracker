@@ -1,3 +1,4 @@
+// src/types/settings.ts
 // ===== FILE: src/types/settings.ts =====
 // Complete settings types matching Prisma schema
 
@@ -101,8 +102,7 @@ export interface NotificationPreferences {
   smsEnabled: boolean;
 
   // Email Preferences
-emailAddress?: string
-
+  emailAddress?: string;
   emailVerified: boolean;
 
   // Notification Types
@@ -170,14 +170,14 @@ export interface DashboardWidgetConfig {
 // =============================================================================
 
 /**
- * Update profile request - matches User model fields
+ * Update profile request - matches User model fields - FIXED: avatar -> image
  */
 export interface UpdateProfileRequest {
   name?: string;
   email?: string;
   username?: string;
   bio?: string;
-  avatar?: string; // Maps to 'image' in database
+  image?: string; // ✅ FIXED: Changed from avatar to image
   location?: string;
   website?: string;
   company?: string;
@@ -221,7 +221,7 @@ export interface UpdateSettingsRequest {
   allowCookies?: boolean;
 
   // Dashboard
-  dashboardLayout?: DashboardLayoutConfig|null;
+  dashboardLayout?: DashboardLayoutConfig | null;
   defaultDateRange?: string;
   showWelcomeBanner?: boolean;
 
@@ -248,8 +248,7 @@ export interface UpdateNotificationsRequest {
   smsEnabled?: boolean;
 
   // Email Preferences
- emailAddress?: string
-
+  emailAddress?: string;
 
   // Notification Types
   achievementAlerts?: boolean;
@@ -299,6 +298,20 @@ export interface ChangePasswordRequest {
 export interface DeleteAccountRequest {
   password: string;
   confirmation?: string;
+}
+
+/**
+ * Update user profile input - FIXED: avatar -> image
+ */
+export interface UpdateProfileInput {
+  name?: string;
+  username?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
+  company?: string;
+  jobTitle?: string;
+  image?: string; // ✅ FIXED: Changed from avatar to image
 }
 
 // =============================================================================
