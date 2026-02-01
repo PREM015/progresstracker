@@ -1,5 +1,6 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export default withAuth(
   function middleware(req) {

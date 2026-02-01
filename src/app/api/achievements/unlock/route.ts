@@ -1,46 +1,49 @@
 // src/app/api/achievements/unlock/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
+import apiResponse from '@/lib/apiResponse';
+import { apiRateLimiter } from '@/lib/rateLimit';
+
 
 // =============================================================================
-// VALIDATION SCHEMA
+// VALIDATION SCHEMAS
 // =============================================================================
 
 const unlockSchema = z.object({
-  achievementId: z.string().min(1, 'Achievement ID required'),
-  // For admin manual unlocks
-  targetUserId: z.string().optional(),
+  achievementId: z.string().cuid('Invalid achievement ID'),
+  targetUserId: z.string().cuid('Invalid user ID').optional(),
+  reason: z.string().max(500).optional(),
 });
 
 // =============================================================================
-// POST - Manually unlock an achievement (admin or special cases)
+// POST - Manual Achievement Unlock (Admin or Special Cases)
 // =============================================================================
 
 export async function POST(req: NextRequest) {
+  const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    // ✅ Authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      logger.warn('Unauthorized achievement unlock attempt');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+      logger.warn('Unauthorized achievement unlock attempt', { requestId });
+      return apiResponse.unauthorized('Authentication required', requestId);
     }
 
+    // ✅ Parse and Validate Body
     const body = await req.json();
     const validated = unlockSchema.parse(body);
 
-    // Determine target user
+    // ✅ Determine Target User
     let targetUserId = session.user.id;
+    let isAdminUnlock = false;
 
-    // If targetUserId is specified, check if current user is admin
+    // If unlocking for another user, verify admin permissions
     if (validated.targetUserId && validated.targetUserId !== session.user.id) {
       const currentUser = await prisma.user.findUnique({
         where: { id: session.user.id },
@@ -49,25 +52,44 @@ export async function POST(req: NextRequest) {
 
       if (!currentUser?.isAdmin && currentUser?.role !== 'admin') {
         logger.warn('Non-admin attempted to unlock achievement for another user', {
-          userId: session.user.id,
+          requesterId: session.user.id,
           targetUserId: validated.targetUserId,
+          requestId,
         });
-        return NextResponse.json(
-          { success: false, error: 'Admin access required to unlock for other users' },
-          { status: 403 }
+        return apiResponse.forbidden(
+          'Admin access required to unlock achievements for other users',
+          requestId
         );
       }
 
       targetUserId = validated.targetUserId;
+      isAdminUnlock = true;
+    }
+
+    // ✅ Rate Limiting (stricter for manual unlocks)
+    const rateLimitKey = isAdminUnlock
+      ? `achievements:unlock:admin:${session.user.id}`
+      : `achievements:unlock:${session.user.id}`;
+    
+    const rateLimitResult = await apiRateLimiter.check(5, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      logger.warn('Rate limit exceeded for achievement unlock', {
+        userId: session.user.id,
+        requestId,
+      });
+      return apiResponse.rateLimited(300, requestId); // 5 min cooldown
     }
 
     logger.info('Attempting to unlock achievement', {
       requestedBy: session.user.id,
       targetUserId,
       achievementId: validated.achievementId,
+      isAdminUnlock,
+      requestId,
     });
 
-    // Get the achievement
+    // ✅ Check if Achievement Exists and is Active
     const achievement = await prisma.achievement.findUnique({
       where: { id: validated.achievementId },
       select: {
@@ -84,21 +106,26 @@ export async function POST(req: NextRequest) {
     });
 
     if (!achievement) {
-      logger.warn('Achievement not found', { achievementId: validated.achievementId });
-      return NextResponse.json(
-        { success: false, error: 'Achievement not found' },
-        { status: 404 }
-      );
+      logger.warn('Achievement not found', {
+        achievementId: validated.achievementId,
+        requestId,
+      });
+      return apiResponse.notFound('Achievement', requestId);
     }
 
     if (!achievement.isActive) {
-      return NextResponse.json(
-        { success: false, error: 'Achievement is not active' },
-        { status: 400 }
+      logger.warn('Attempted to unlock inactive achievement', {
+        achievementId: validated.achievementId,
+        requestId,
+      });
+      return apiResponse.validationError(
+        'This achievement is not currently active',
+        undefined,
+        requestId
       );
     }
 
-    // Check if already unlocked
+    // ✅ Check if Already Unlocked (Idempotency)
     const existing = await prisma.userAchievement.findUnique({
       where: {
         userId_achievementId: {
@@ -112,14 +139,27 @@ export async function POST(req: NextRequest) {
       logger.info('Achievement already unlocked', {
         userId: targetUserId,
         achievementId: validated.achievementId,
+        requestId,
       });
-      return NextResponse.json(
-        { success: false, error: 'Achievement already unlocked' },
-        { status: 400 }
+      
+      return apiResponse.success(
+        {
+          achievement: {
+            id: achievement.id,
+            title: achievement.title,
+            alreadyUnlocked: true,
+            unlockedAt: existing.unlockedAt,
+          },
+        },
+        {
+          status: 200,
+          meta: { requestId },
+          message: 'Achievement already unlocked',
+        }
       );
     }
 
-    // Unlock the achievement in a transaction
+    // ✅ Unlock Achievement in Transaction
     const [userAchievement] = await prisma.$transaction([
       // Create user achievement
       prisma.userAchievement.create({
@@ -130,9 +170,7 @@ export async function POST(req: NextRequest) {
           progressPercentage: 100,
           unlockedAt: new Date(),
         },
-        include: {
-          achievement: true,
-        },
+        include: { achievement: true },
       }),
 
       // Update achievement unlock count
@@ -163,39 +201,45 @@ export async function POST(req: NextRequest) {
           imageUrl: achievement.badgeImage,
         },
       }),
-
-      // Audit log if admin action
-      ...(targetUserId !== session.user.id ? [
-        prisma.auditLog.create({
-          data: {
-            userId: session.user.id,
-            action: 'ADMIN_ACTION',
-            category: 'achievement',
-            entityType: 'user_achievement',
-            entityId: validated.achievementId,
-            description: `Admin unlocked achievement "${achievement.title}" for user`,
-            performedBy: session.user.id,
-            newValue: {
-              targetUserId,
-              achievementId: validated.achievementId,
-              achievementTitle: achievement.title,
-            },
-          },
-        }),
-      ] : []),
     ]);
+
+    // ✅ Audit Log for Admin Actions
+    if (isAdminUnlock) {
+      await prisma.auditLog.create({
+        data: {
+          userId: session.user.id,
+          action: 'ADMIN_ACTION',
+          category: 'achievement',
+          entityType: 'user_achievement',
+          entityId: validated.achievementId,
+          description: `Admin unlocked achievement "${achievement.title}" for user`,
+          performedBy: session.user.id,
+          newValue: {
+            targetUserId,
+            achievementId: validated.achievementId,
+            achievementTitle: achievement.title,
+            reason: validated.reason,
+          },
+          ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+          userAgent: req.headers.get('user-agent'),
+        },
+      });
+    }
+
+    const duration = Date.now() - startTime;
 
     logger.info('Achievement unlocked successfully', {
       userId: targetUserId,
       achievementId: validated.achievementId,
       achievementTitle: achievement.title,
       points: achievement.points,
-      duration: Date.now() - startTime,
+      isAdminUnlock,
+      duration,
+      requestId,
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
+    return apiResponse.created(
+      {
         achievement: {
           id: achievement.id,
           title: achievement.title,
@@ -208,24 +252,41 @@ export async function POST(req: NextRequest) {
         },
         unlockedAt: userAchievement.unlockedAt,
       },
-      message: `Achievement "${achievement.title}" unlocked!`,
-    });
+      {
+        requestId,
+        duration,
+        message: `Achievement "${achievement.title}" unlocked!`,
+      }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      logger.warn('Invalid unlock request', { errors: error.errors });
-      return NextResponse.json(
-        { success: false, error: 'Validation error', details: error.errors },
-        { status: 400 }
+      logger.warn('Invalid unlock request', { errors: error.errors, requestId });
+      return apiResponse.validationError(
+        'Invalid request data',
+        error.errors.map((e) => ({
+          field: e.path.join('.'),
+          message: e.message,
+        })),
+        requestId
       );
     }
 
-    logger.error('Unlock achievement error', {}, error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to unlock achievement' 
-      },
-      { status: 500 }
-    );
+    logger.error('Failed to unlock achievement', { requestId }, error);
+    return apiResponse.error(error, requestId);
   }
+}
+
+// =============================================================================
+// OPTIONS - CORS Preflight
+// =============================================================================
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
 }

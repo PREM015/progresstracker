@@ -1,6 +1,6 @@
+// src/services/analytics/reportService.ts
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/services/analytics/reportService.ts
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, format } from 'date-fns';
@@ -24,6 +24,10 @@ export interface ReportData {
   sentTo: string | null;
   pdfUrl: string | null;
   createdAt: Date;
+  // Add optional metadata fields
+  notes?: string | null;
+  tags?: string[];
+  isPublic?: boolean;
 }
 
 export interface ReportDataContent {
@@ -75,24 +79,70 @@ export interface ReportCreateInput {
   sendEmail?: boolean;
 }
 
+export interface ReportUpdateInput {
+  title?: string;
+  notes?: string;
+  tags?: string[];
+  isPublic?: boolean;
+}
+
 class ReportService {
   /**
-   * Get all reports for a user
+   * Get all reports for a user with pagination
    */
-  async getAll(userId: string, limit: number = 10): Promise<ReportData[]> {
+  async getAll(userId: string, limit: number = 10, skip: number = 0): Promise<ReportData[]> {
     try {
-      log.info('Fetching reports', { userId, limit });
+      log.info('Fetching reports', { userId, limit, skip });
 
       const reports = await prisma.report.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         take: limit,
+        skip: skip,
       });
 
       return reports.map(report => this.mapToReportData(report));
 
     } catch (error) {
       log.error('Failed to fetch reports', { userId }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get total count of reports for a user
+   */
+  async getCount(userId: string, type?: string): Promise<number> {
+    try {
+      const count = await prisma.report.count({
+        where: {
+          userId,
+          ...(type && { type }),
+        },
+      });
+
+      return count;
+    } catch (error) {
+      log.error('Failed to get report count', { userId, type }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get count of reports created since a specific date
+   */
+  async getCountSince(userId: string, since: Date): Promise<number> {
+    try {
+      const count = await prisma.report.count({
+        where: {
+          userId,
+          createdAt: { gte: since },
+        },
+      });
+
+      return count;
+    } catch (error) {
+      log.error('Failed to get report count since date', { userId, since }, error);
       throw error;
     }
   }
@@ -170,6 +220,88 @@ class ReportService {
     } catch (error) {
       const duration = Date.now() - startTime;
       log.error('Failed to generate report', { userId, duration }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update report metadata
+   */
+  async update(id: string, userId: string, data: ReportUpdateInput): Promise<ReportData> {
+    try {
+      log.info('Updating report', { id, userId, data });
+
+      const report = await prisma.report.update({
+        where: { id },
+        data: {
+          ...(data.title !== undefined && { title: data.title }),
+          ...(data.notes !== undefined && { notes: data.notes }),
+          ...(data.tags !== undefined && { tags: data.tags }),
+          ...(data.isPublic !== undefined && { isPublic: data.isPublic }),
+        },
+      });
+
+      log.info('Report updated successfully', { id, userId });
+
+      return this.mapToReportData(report);
+
+    } catch (error) {
+      log.error('Failed to update report', { id, userId }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Regenerate an existing report with fresh data
+   */
+  async regenerate(id: string, userId: string): Promise<ReportData> {
+    const startTime = Date.now();
+
+    try {
+      log.info('Regenerating report', { id, userId });
+
+      // Get existing report
+      const existingReport = await prisma.report.findFirst({
+        where: { id, userId },
+      });
+
+      if (!existingReport) {
+        throw new Error('Report not found');
+      }
+
+      // Regenerate data using the same period
+      const reportData = await this.generateReportData(
+        userId,
+        existingReport.periodStart,
+        existingReport.periodEnd
+      );
+
+      // Generate fresh insights and recommendations
+      const insights = this.generateInsights(reportData);
+      const recommendations = this.generateRecommendations(reportData);
+      const highlights = this.generateHighlights(reportData);
+
+      // Update the report
+      const updatedReport = await prisma.report.update({
+        where: { id },
+        data: {
+          data: reportData as never,
+          highlights: highlights as never,
+          insights: insights as never,
+          recommendations: recommendations as never,
+          summary: this.generateSummary(reportData),
+          status: 'regenerated',
+        },
+      });
+
+      const duration = Date.now() - startTime;
+      log.info('Report regenerated successfully', { id, duration });
+
+      return this.mapToReportData(updatedReport);
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Failed to regenerate report', { id, userId, duration }, error);
       throw error;
     }
   }
@@ -422,7 +554,7 @@ class ReportService {
     }
 
     // Progress insight
-    if (data.comparisons?.previousPeriod.problemsChange > 50) {
+    if (data.comparisons?.previousPeriod && data.comparisons.previousPeriod.problemsChange > 20) {
       insights.push({
         type: 'achievement',
         message: `Wow! You solved ${data.comparisons.previousPeriod.problemsChange}% more problems than last period!`,
@@ -529,6 +661,9 @@ class ReportService {
       sentTo: report.sentTo,
       pdfUrl: report.pdfUrl,
       createdAt: report.createdAt,
+      notes: report.notes,
+      tags: report.tags,
+      isPublic: report.isPublic,
     };
   }
 }

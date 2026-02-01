@@ -1,8 +1,7 @@
 // src/services/export/pdfExport.ts
 import { logger } from '@/lib/logger';
 import type { ExportData, ExportResult } from '@/types/export';
-// Note: You'll need to install jspdf and jspdf-autotable
-// npm install jspdf jspdf-autotable
+
 
 const log = logger.child({ service: 'PDFExport' });
 
@@ -36,7 +35,8 @@ export async function generatePDF(data: ExportData): Promise<ExportResult> {
       let yPos = 58;
       doc.text(`Total Entries: ${data.stats.totalEntries}`, 14, yPos);
       doc.text(`Total Problems Solved: ${data.stats.totalProblemsSolved}`, 14, (yPos += 7));
-      doc.text(`Total Time Spent: ${Math.round(data.stats.totalTimeSpent / 60)} hours`, 14, (yPos += 7));
+   doc.text(`Total Time Spent: ${Math.round((data.stats.totalTimeSpent ?? 0) / 60)} hours`, 14, (yPos += 7));
+
       doc.text(`Current Streak: ${data.stats.currentStreak} days`, 14, (yPos += 7));
       doc.text(`Active Goals: ${data.stats.totalGoals}`, 14, (yPos += 7));
       doc.text(`Achievements Unlocked: ${data.stats.achievements}`, 14, (yPos += 7));

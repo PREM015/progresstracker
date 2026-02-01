@@ -1,4 +1,5 @@
 // ===== FILE: src/config/oauth.ts =====
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Validate OAuth environment variables at startup

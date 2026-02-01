@@ -1,4 +1,5 @@
 // src/context/UserContext.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 'use client';
 

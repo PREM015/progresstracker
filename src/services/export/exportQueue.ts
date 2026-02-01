@@ -1,7 +1,10 @@
 // src/services/export/exportQueue.ts
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { ExportFormat } from '@prisma/client';
+import { ExportFormat, PlatformCategory } from '@prisma/client';
+
+
+
 
 const log = logger.child({ service: 'ExportQueue' });
 
@@ -12,7 +15,8 @@ export interface QueueExportJobInput {
   dateFrom?: Date;
   dateTo?: Date;
   platforms?: string[];
-  categories?: string[];
+  categories?: PlatformCategory[];
+
   includeNotes?: boolean;
   includeStats?: boolean;
 }
@@ -31,7 +35,7 @@ export class ExportQueue {
           dateFrom: data.dateFrom,
           dateTo: data.dateTo,
           platforms: data.platforms || [],
-          categories: data.categories || [],
+          categories:  data.categories || [],
           includeNotes: data.includeNotes ?? true,
           includeStats: data.includeStats ?? true,
           status: 'QUEUED',

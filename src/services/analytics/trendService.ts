@@ -422,7 +422,7 @@ class ReportService {
     }
 
     // Progress insight
-    if (data.comparisons?.previousPeriod.problemsChange > 50) {
+    if (data.comparisons?.previousPeriod && data.comparisons.previousPeriod.problemsChange > 20) {
       insights.push({
         type: 'achievement',
         message: `Wow! You solved ${data.comparisons.previousPeriod.problemsChange}% more problems than last period!`,

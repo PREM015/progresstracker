@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
             results.push({
               userId,
               success: true,
-              platforms: job.totalPlatforms,
+              platforms: job.successCount + job.failCount,
             });
           } catch (error: any) {
             console.error(`Daily sync failed for user ${userId}:`, error);

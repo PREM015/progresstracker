@@ -372,6 +372,9 @@ export interface ExportResult {
   duration?: number;
   expiresAt?: Date;
   error?: string;
+   content?: string;
+   size?: number;
+
 }
 
 /** Export progress update */

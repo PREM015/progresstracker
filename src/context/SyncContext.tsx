@@ -1,252 +1,252 @@
-'use client';
+// 'use client';
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  ReactNode,
-} from 'react';
-import { SyncState, SyncJob, SyncTriggerResponse } from '@/types/sync';
-import { useToast } from '@/hooks/useToast';
+// import React, {
+//   createContext,
+//   useContext,
+//   useState,
+//   useCallback,
+//   useEffect,
+//   ReactNode,
+// } from 'react';
+// import { SyncState, SyncJob, SyncTriggerResponse } from '@/types/sync';
 
-interface SyncContextType {
-  syncState: SyncState | null;
-  isLoading: boolean;
-  isSyncing: boolean;
-  currentJob: SyncJob | null;
-  triggerSync: (platforms?: string[]) => Promise<SyncTriggerResponse>;
-  triggerPlatformSync: (platformId: string) => Promise<void>;
-  cancelSync: (jobId: string) => Promise<void>;
-  refreshStatus: () => Promise<void>;
-}
 
-const SyncContext = createContext<SyncContextType | undefined>(undefined);
+// interface SyncContextType {
+//   syncState: SyncState | null;
+//   isLoading: boolean;
+//   isSyncing: boolean;
+//   currentJob: SyncJob | null;
+//   triggerSync: (platforms?: string[]) => Promise<SyncTriggerResponse>;
+//   triggerPlatformSync: (platformId: string) => Promise<void>;
+//   cancelSync: (jobId: string) => Promise<void>;
+//   refreshStatus: () => Promise<void>;
+// }
 
-export function SyncProvider({ children }: { children: ReactNode }) {
-  const [syncState, setSyncState] = useState<SyncState | null>(null);
-  const [currentJob, setCurrentJob] = useState<SyncJob | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+// const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
-  /**
-   * SAFE STATUS FETCH
-   * - no throw
-   * - no SSR
-   * - correct endpoint
-   */
-  const refreshStatus = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+// export function SyncProvider({ children }: { children: ReactNode }) {
+//   const [syncState, setSyncState] = useState<SyncState | null>(null);
+//   const [currentJob, setCurrentJob] = useState<SyncJob | null>(null);
+//   const [isLoading, setIsLoading] = useState(false);
+ 
 
-    try {
-      const res = await fetch('/api/sync/status', {
-        method: 'GET',
-        cache: 'no-store',
-      });
+//   /**
+//    * SAFE STATUS FETCH
+//    * - no throw
+//    * - no SSR
+//    * - correct endpoint
+//    */
+//   const refreshStatus = useCallback(async () => {
+//     if (typeof window === 'undefined') return;
 
-      if (!res.ok) {
-        setSyncState(null);
-        setCurrentJob(null);
-        return;
-      }
+//     try {
+//       const res = await fetch('/api/sync/status', {
+//         method: 'GET',
+//         cache: 'no-store',
+//       });
 
-      const data = await res.json();
-      setSyncState(data ?? null);
-      setCurrentJob(data?.currentJob ?? null);
-    } catch {
-      setSyncState(null);
-      setCurrentJob(null);
-    }
-  }, []);
+//       if (!res.ok) {
+//         setSyncState(null);
+//         setCurrentJob(null);
+//         return;
+//       }
 
-  /**
-   * INITIAL LOAD
-   */
-  useEffect(() => {
-    refreshStatus();
-  }, [refreshStatus]);
+//       const data = await res.json();
+//       setSyncState(data ?? null);
+//       setCurrentJob(data?.currentJob ?? null);
+//     } catch {
+//       setSyncState(null);
+//       setCurrentJob(null);
+//     }
+//   }, []);
 
-  /**
-   * JOB POLLING (ONLY WHEN RUNNING)
-   */
-  useEffect(() => {
-    if (!currentJob || currentJob.status !== 'running') return;
+//   /**
+//    * INITIAL LOAD
+//    */
+//   useEffect(() => {
+//     refreshStatus();
+//   }, [refreshStatus]);
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/sync/status?jobId=${currentJob.id}`, {
-          cache: 'no-store',
-        });
+//   /**
+//    * JOB POLLING (ONLY WHEN RUNNING)
+//    */
+//   useEffect(() => {
+//     if (!currentJob || currentJob.status !== 'running') return;
 
-        if (!res.ok) return;
+//     const interval = setInterval(async () => {
+//       try {
+//         const res = await fetch(`/api/sync/status?jobId=${currentJob.id}`, {
+//           cache: 'no-store',
+//         });
 
-        const data = await res.json();
-        const job = data.job ?? data;
+//         if (!res.ok) return;
 
-        setCurrentJob(job);
+//         const data = await res.json();
+//         const job = data.job ?? data;
 
-        if (job.status !== 'running') {
-          clearInterval(interval);
-          await refreshStatus();
+//         setCurrentJob(job);
 
-          if (job.status === 'success') {
-            toast({
-              title: 'Sync Complete',
-              description: 'All platforms synced successfully',
-              variant: 'success',
-            });
-          } else if (job.status === 'partial') {
-            toast({
-              title: 'Partial Sync',
-              description: 'Some platforms failed to sync',
-              variant: 'warning',
-            });
-          } else {
-            toast({
-              title: 'Sync Failed',
-              description: job.error || 'Sync failed',
-              variant: 'error',
-            });
-          }
-        }
-      } catch {
-        // silent
-      }
-    }, 2000);
+//         if (job.status !== 'running') {
+//           clearInterval(interval);
+//           await refreshStatus();
 
-    return () => clearInterval(interval);
-  }, [currentJob, refreshStatus, toast]);
+//           if (job.status === 'success') {
+//             toast({
+//               title: 'Sync Complete',
+//               description: 'All platforms synced successfully',
+//               variant: 'success',
+//             });
+//           } else if (job.status === 'partial') {
+//             toast({
+//               title: 'Partial Sync',
+//               description: 'Some platforms failed to sync',
+//               variant: 'warning',
+//             });
+//           } else {
+//             toast({
+//               title: 'Sync Failed',
+//               description: job.error || 'Sync failed',
+//               variant: 'error',
+//             });
+//           }
+//         }
+//       } catch {
+//         // silent
+//       }
+//     }, 2000);
 
-  /**
-   * TRIGGER FULL SYNC
-   */
-  const triggerSync = useCallback(
-    async (platforms?: string[]): Promise<SyncTriggerResponse> => {
-      setIsLoading(true);
-      try {
-        const res = await fetch('/api/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ platforms }),
-        });
+//     return () => clearInterval(interval);
+//   }, [currentJob, refreshStatus, toast]);
 
-        const data = await res.json();
+//   /**
+//    * TRIGGER FULL SYNC
+//    */
+//   const triggerSync = useCallback(
+//     async (platforms?: string[]): Promise<SyncTriggerResponse> => {
+//       setIsLoading(true);
+//       try {
+//         const res = await fetch('/api/sync', {
+//           method: 'POST',
+//           headers: { 'Content-Type': 'application/json' },
+//           body: JSON.stringify({ platforms }),
+//         });
 
-        if (!res.ok) {
-          throw new Error(data?.error || 'Failed to start sync');
-        }
+//         const data = await res.json();
 
-        if (data.jobId) {
-          setCurrentJob({
-            id: data.jobId,
-            userId: '',
-            status: 'running',
-            progress: 0,
-            totalPlatforms: data.platformCount ?? 0,
-            completedPlatforms: 0,
-            failedPlatforms: 0,
-            startedAt: new Date(),
-          });
-        }
+//         if (!res.ok) {
+//           throw new Error(data?.error || 'Failed to start sync');
+//         }
 
-        toast({
-          title: 'Sync Started',
-          description: data.message || 'Sync started',
-          variant: 'default',
-        });
+//         if (data.jobId) {
+//           setCurrentJob({
+//             id: data.jobId,
+//             userId: '',
+//             status: 'running',
+//             progress: 0,
+//             totalPlatforms: data.platformCount ?? 0,
+//             completedPlatforms: 0,
+//             failedPlatforms: 0,
+//             startedAt: new Date(),
+//           });
+//         }
 
-        return data;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [toast]
-  );
+//         toast({
+//           title: 'Sync Started',
+//           description: data.message || 'Sync started',
+//           variant: 'default',
+//         });
 
-  /**
-   * TRIGGER SINGLE PLATFORM SYNC
-   */
-  const triggerPlatformSync = useCallback(
-    async (platformId: string) => {
-      setIsLoading(true);
-      try {
-        const res = await fetch(`/api/sync/${platformId}`, {
-          method: 'POST',
-        });
+//         return data;
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     },
+//     [toast]
+//   );
 
-        const data = await res.json();
+//   /**
+//    * TRIGGER SINGLE PLATFORM SYNC
+//    */
+//   const triggerPlatformSync = useCallback(
+//     async (platformId: string) => {
+//       setIsLoading(true);
+//       try {
+//         const res = await fetch(`/api/sync/${platformId}`, {
+//           method: 'POST',
+//         });
 
-        if (!res.ok) {
-          throw new Error(data?.error || 'Platform sync failed');
-        }
+//         const data = await res.json();
 
-        toast({
-          title: 'Sync Complete',
-          description: `${data.platform || 'Platform'} synced`,
-          variant: 'success',
-        });
+//         if (!res.ok) {
+//           throw new Error(data?.error || 'Platform sync failed');
+//         }
 
-        await refreshStatus();
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [toast, refreshStatus]
-  );
+//         toast({
+//           title: 'Sync Complete',
+//           description: `${data.platform || 'Platform'} synced`,
+//           variant: 'success',
+//         });
 
-  /**
-   * CANCEL SYNC
-   */
-  const cancelSync = useCallback(
-    async (jobId: string) => {
-      try {
-        const res = await fetch(`/api/sync?jobId=${jobId}`, {
-          method: 'DELETE',
-        });
+//         await refreshStatus();
+//       } finally {
+//         setIsLoading(false);
+//       }
+//     },
+//     [toast, refreshStatus]
+//   );
 
-        if (!res.ok) return;
+//   /**
+//    * CANCEL SYNC
+//    */
+//   const cancelSync = useCallback(
+//     async (jobId: string) => {
+//       try {
+//         const res = await fetch(`/api/sync?jobId=${jobId}`, {
+//           method: 'DELETE',
+//         });
 
-        setCurrentJob(null);
-        await refreshStatus();
+//         if (!res.ok) return;
 
-        toast({
-          title: 'Sync Cancelled',
-          description: 'Sync job cancelled',
-          variant: 'default',
-        });
-      } catch {
-        // silent
-      }
-    },
-    [toast, refreshStatus]
-  );
+//         setCurrentJob(null);
+//         await refreshStatus();
 
-  const isSyncing =
-    currentJob?.status === 'running' || syncState?.isRunning || false;
+//         // toast({
+//         //   title: 'Sync Cancelled',
+//         //   description: 'Sync job cancelled',
+//         //   variant: 'default',
+//         // });
+//       } catch {
+//         // silent
+//       }
+//     },
+//     // [toast, refreshStatus]
+//   );
 
-  return (
-    <SyncContext.Provider
-      value={{
-        syncState,
-        isLoading,
-        isSyncing,
-        currentJob,
-        triggerSync,
-        triggerPlatformSync,
-        cancelSync,
-        refreshStatus,
-      }}
-    >
-      {children}
-    </SyncContext.Provider>
-  );
-}
+//   const isSyncing =
+//     currentJob?.status === 'running' || syncState?.isRunning || false;
 
-export function useSync() {
-  const ctx = useContext(SyncContext);
-  if (!ctx) {
-    throw new Error('useSync must be used within SyncProvider');
-  }
-  return ctx;
-}
+//   return (
+//     <SyncContext.Provider
+//       value={{
+//         syncState,
+//         isLoading,
+//         isSyncing,
+//         currentJob,
+//         triggerSync,
+//         triggerPlatformSync,
+//         cancelSync,
+//         refreshStatus,
+//       }}
+//     >
+//       {children}
+//     </SyncContext.Provider>
+//   );
+// }
+
+// export function useSync() {
+//   const ctx = useContext(SyncContext);
+//   if (!ctx) {
+//     throw new Error('useSync must be used within SyncProvider');
+//   }
+//   return ctx;
+// }

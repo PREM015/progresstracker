@@ -1,5 +1,7 @@
 // ===== FILE: src/config/sync.ts =====
 // Sync configuration - synced with Prisma SyncLog and UserPlatform models
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 
 import type { SyncStatus } from '@prisma/client';
 import { logger } from '@/lib/logger';

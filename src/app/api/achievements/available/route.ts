@@ -1,199 +1,202 @@
 // src/app/api/achievements/available/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
-import { prisma } from '@/lib/prisma';
+import apiResponse from '@/lib/apiResponse';
+import { apiRateLimiter } from '@/lib/rateLimit';
+import { AchievementService } from '@/services/achievementService';
 import { PlatformCategory } from '@prisma/client';
+import type { AchievementProgress, Achievement } from '@/services/achievementService';
 
 // =============================================================================
-// GET - Get available (not yet unlocked) achievements
+// TYPES
+// =============================================================================
+
+// Union type for available achievements
+type AvailableAchievementResponse = AchievementProgress | Achievement;
+
+// Helper type for filtering
+interface FilterableAchievement {
+  category?: PlatformCategory;
+  tier?: string;
+  achievement?: {
+    category?: PlatformCategory;
+    tier?: string;
+  };
+}
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
+const querySchema = z.object({
+  category: z.nativeEnum(PlatformCategory).optional(),
+  tier: z.enum(['bronze', 'silver', 'gold', 'platinum', 'diamond']).optional(),
+  includeProgress: z
+    .string()
+    .transform((v) => v === 'true')
+    .optional(),
+  page: z
+    .string()
+    .transform((v) => Math.max(1, parseInt(v) || 1))
+    .optional(),
+  limit: z
+    .string()
+    .transform((v) => Math.min(50, Math.max(1, parseInt(v) || 20)))
+    .optional(),
+});
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Type-safe category extraction
+ */
+function getCategory(item: FilterableAchievement): PlatformCategory | undefined {
+  return item.achievement?.category || item.category;
+}
+
+/**
+ * Type-safe tier extraction
+ */
+function getTier(item: FilterableAchievement): string | undefined {
+  return item.achievement?.tier || item.tier;
+}
+
+// =============================================================================
+// GET - Get Available (Not Unlocked) Achievements
 // =============================================================================
 
 export async function GET(req: NextRequest) {
+  const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
+    // ✅ Authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      logger.warn('Unauthorized available achievements access');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+      logger.warn('Unauthorized available achievements access', { requestId });
+      return apiResponse.unauthorized('Authentication required', requestId);
     }
 
+    // ✅ Rate Limiting
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const rateLimitResult = await apiRateLimiter.check(100, `achievements:available:${ip}`);
+
+    if (!rateLimitResult.success) {
+      logger.warn('Rate limit exceeded', { ip, requestId });
+      return apiResponse.rateLimited(60, requestId);
+    }
+
+    // ✅ Validate Query Parameters
     const { searchParams } = new URL(req.url);
-    const category = searchParams.get('category') as PlatformCategory | null;
-    const tier = searchParams.get('tier');
-    const includeProgress = searchParams.get('progress') === 'true';
+    const params = querySchema.parse({
+      category: searchParams.get('category') || undefined,
+      tier: searchParams.get('tier') || undefined,
+      includeProgress: searchParams.get('progress') || 'false',
+      page: searchParams.get('page') || '1',
+      limit: searchParams.get('limit') || '20',
+    });
 
     logger.debug('Fetching available achievements', {
       userId: session.user.id,
-      category,
-      tier,
+      params,
+      requestId,
     });
 
-    // Get user's unlocked achievement IDs
-    const unlockedIds = await prisma.userAchievement.findMany({
-      where: { userId: session.user.id },
-      select: { achievementId: true },
-    });
+    // ✅ Get Available Achievements with explicit typing
+    let achievements: AvailableAchievementResponse[];
 
-    const unlockedIdSet = new Set(unlockedIds.map(u => u.achievementId));
-
-    // Build where clause
-    const where: {
-      isActive: boolean;
-      isHidden: boolean;
-      id: { notIn: string[] };
-      category?: PlatformCategory;
-      tier?: string;
-    } = {
-      isActive: true,
-      isHidden: false,
-      id: { notIn: Array.from(unlockedIdSet) },
-    };
-
-    if (category && Object.values(PlatformCategory).includes(category)) {
-      where.category = category;
+    if (params.includeProgress) {
+      const allProgress = await AchievementService.getAchievementProgress(session.user.id);
+      achievements = allProgress.filter((p) => !p.isUnlocked);
+    } else {
+      achievements = await AchievementService.getAvailableAchievements(session.user.id);
     }
 
-    if (tier) {
-      where.tier = tier;
-    }
+    // ✅ Apply Filters using type-safe helpers
+    let filtered = achievements;
 
-    // Get available achievements
-    const achievements = await prisma.achievement.findMany({
-      where,
-      orderBy: [
-        { sortOrder: 'asc' },
-        { points: 'desc' },
-      ],
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        description: true,
-        category: true,
-        tier: true,
-        icon: true,
-        color: true,
-        badgeImage: true,
-        points: true,
-        xpReward: true,
-        rarity: true,
-        requirementText: true,
-        requirement: true,
-        thresholds: true,
-        totalUnlocked: true,
-        unlockPercentage: true,
-      },
-    });
-
-    // Calculate progress if requested
-    let achievementsWithProgress = achievements;
-
-    if (includeProgress) {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-          totalProblems: true,
-          totalCommits: true,
-          totalProjects: true,
-          currentStreak: true,
-          longestStreak: true,
-          totalCertifications: true,
-        },
+    if (params.category) {
+      filtered = filtered.filter((item) => {
+        const category = getCategory(item as FilterableAchievement);
+        return category === params.category;
       });
-
-      if (user) {
-        achievementsWithProgress = achievements.map(achievement => {
-          const progress = calculateProgress(achievement.requirement, user);
-          return {
-            ...achievement,
-            progress,
-          };
-        });
-      }
     }
+
+    if (params.tier) {
+      filtered = filtered.filter((item) => {
+        const tier = getTier(item as FilterableAchievement);
+        return tier === params.tier;
+      });
+    }
+
+    // ✅ Pagination
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedResults = filtered.slice(startIndex, endIndex);
+
+    const duration = Date.now() - startTime;
 
     logger.info('Available achievements fetched', {
       userId: session.user.id,
-      count: achievements.length,
-      duration: Date.now() - startTime,
+      total: filtered.length,
+      returned: paginatedResults.length,
+      duration,
+      requestId,
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        achievements: achievementsWithProgress,
-        count: achievements.length,
-        totalUnlocked: unlockedIdSet.size,
+    return apiResponse.paginated(
+      paginatedResults,
+      {
+        page,
+        limit,
+        total: filtered.length,
+        totalPages: Math.ceil(filtered.length / limit),
+        hasNextPage: endIndex < filtered.length,
+        hasPreviousPage: page > 1,
       },
-    });
-  } catch (error) {
-    logger.error('Get available achievements error', {}, error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to get available achievements' 
-      },
-      { status: 500 }
+      {
+        meta: {
+          requestId,
+          duration,
+        },
+      }
     );
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.warn('Invalid query parameters', { errors: error.errors, requestId });
+      return apiResponse.validationError(
+        'Invalid query parameters',
+        error.errors.map((e) => ({
+          field: e.path.join('.'),
+          message: e.message,
+        })),
+        requestId
+      );
+    }
+
+    logger.error('Failed to fetch available achievements', { requestId }, error);
+    return apiResponse.error(error, requestId);
   }
 }
 
 // =============================================================================
-// HELPER FUNCTION
+// OPTIONS - CORS Preflight
 // =============================================================================
 
-function calculateProgress(
-  requirement: unknown,
-  userStats: {
-    totalProblems: number;
-    totalCommits: number;
-    totalProjects: number;
-    currentStreak: number;
-    longestStreak: number;
-    totalCertifications: number;
-  }
-): { current: number; target: number; percentage: number } | null {
-  if (!requirement || typeof requirement !== 'object') return null;
-
-  const req = requirement as { type?: string; value?: number };
-  if (!req.type || !req.value) return null;
-
-  let current = 0;
-  const target = req.value;
-
-  switch (req.type) {
-    case 'problems_solved':
-      current = userStats.totalProblems;
-      break;
-    case 'commits':
-      current = userStats.totalCommits;
-      break;
-    case 'projects_completed':
-      current = userStats.totalProjects;
-      break;
-    case 'streak_days':
-      current = userStats.longestStreak;
-      break;
-    case 'current_streak':
-      current = userStats.currentStreak;
-      break;
-    case 'certifications':
-      current = userStats.totalCertifications;
-      break;
-    default:
-      return null;
-  }
-
-  return {
-    current,
-    target,
-    percentage: Math.min(100, Math.round((current / target) * 100)),
-  };
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
 }

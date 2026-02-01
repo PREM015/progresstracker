@@ -4,7 +4,7 @@
  * Consistent response format across all API routes
  */
 
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { ApiError, isApiError, toApiError } from './apiError';
 import { logger } from './logger';
 
@@ -59,9 +59,10 @@ export function success<T>(
     status?: number;
     meta?: ResponseMeta;
     headers?: Record<string, string>;
+    message?: string; // ✅ allow message
   } = {}
 ): NextResponse<ApiSuccessResponse<T>> {
-  const { status = 200, meta, headers = {} } = options;
+  const { status = 200, meta, headers = {}, message } = options;
 
   const response: ApiSuccessResponse<T> = {
     success: true,
@@ -69,6 +70,7 @@ export function success<T>(
     meta: {
       ...meta,
       timestamp: new Date().toISOString(),
+      ...(message ? { message } : {}), 
     },
   };
 
@@ -187,7 +189,7 @@ export function validationError(
  * Create unauthorized error response
  */
 export function unauthorized(
-  message: string = 'Unauthorized',
+  message = 'Unauthorized',
   requestId?: string
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = {
@@ -209,7 +211,7 @@ export function unauthorized(
  * Create forbidden error response
  */
 export function forbidden(
-  message: string = 'Forbidden',
+  message = 'Forbidden',
   requestId?: string
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = {
@@ -231,7 +233,7 @@ export function forbidden(
  * Create not found error response
  */
 export function notFound(
-  resource: string = 'Resource',
+  resource = 'Resource',
   requestId?: string
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = {
@@ -253,7 +255,7 @@ export function notFound(
  * Create rate limit error response
  */
 export function rateLimited(
-  retryAfter: number = 60,
+  retryAfter = 60,
   requestId?: string
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = {
@@ -280,7 +282,7 @@ export function rateLimited(
  * Create internal server error response
  */
 export function internalError(
-  message: string = 'Internal server error',
+  message = 'Internal server error',
   requestId?: string
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = {
@@ -298,17 +300,15 @@ export function internalError(
   return NextResponse.json(response, { status: 500 });
 }
 
-// =============================================================================
-// HANDLER WRAPPER
-// =============================================================================
+
 
 /**
  * Wrap API handler with error handling
  */
-export function withErrorHandler<T>(
-  handler: (req: Request) => Promise<NextResponse<T>>
-): (req: Request) => Promise<NextResponse<T | ApiErrorResponse>> {
-  return async (req: Request) => {
+export function withErrorHandler<T = unknown>(
+  handler: (req: NextRequest) => Promise<NextResponse<ApiSuccessResponse<T>>>
+): (req: NextRequest) => Promise<NextResponse<ApiSuccessResponse<T> | ApiErrorResponse>> {
+  return async (req: NextRequest) => {
     const requestId = crypto.randomUUID();
 
     try {
@@ -320,7 +320,6 @@ export function withErrorHandler<T>(
     }
   };
 }
-
 // =============================================================================
 // EXPORT DEFAULT OBJECT
 // =============================================================================
@@ -339,4 +338,5 @@ const apiResponse = {
   internalError,
   withErrorHandler,
 };
+
 export default apiResponse;
