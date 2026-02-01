@@ -1,65 +1,31 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/appleScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * appleScraper
- * 
- * @description Service for handling applescraper operations
- * @created 2026-01-26
- */
+export class AppleScraper extends BaseScraper {
+  platformName = 'Apple Careers';
+  platformSlug = 'applecareers';
+  protected baseUrl = 'https://www.apple.com/careers';
 
-export interface ApplescraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Apple Careers requires a username for tracking.');
+    }
 
-export interface ApplescraperCreateInput {
-  // TODO: Define create input
-}
 
-export interface ApplescraperUpdateInput {
-  // TODO: Define update input
-}
+    try {
+      // Apple Careers doesn't have a public API for application tracking
+      // Users need to track their progress manually
 
-class ApplescraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<ApplescraperData[]> {
-    // TODO: Implement
-    return [];
-  }
+      return this.notSupported(
+        'Apple Careers does not provide public API access. Please track your applications and interview progress manually.'
+      );
 
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<ApplescraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: ApplescraperCreateInput, userId: string): Promise<ApplescraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: ApplescraperUpdateInput, userId: string): Promise<ApplescraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    } catch (error) {
+      return this.handleError(error);
+      
+    }
   }
 }
 
-export const applescraperService = new ApplescraperService();
-export default applescraperService;
+export default AppleScraper;

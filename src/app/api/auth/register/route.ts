@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { nanoid } from 'nanoid';
 
+
 // =============================================================================
 // VALIDATION SCHEMA
 // =============================================================================
@@ -175,6 +176,7 @@ export async function POST(request: NextRequest) {
         });
       }
     }
+
 
     // Hash password
     const hashedPassword = await bcrypt.hash(validatedData.password, 12);

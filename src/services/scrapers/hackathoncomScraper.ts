@@ -1,65 +1,39 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/hackathonScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 /**
- * hackathoncomScraper
- * 
- * @description Service for handling hackathoncomscraper operations
- * @created 2026-01-26
+ * Generic hackathon tracking scraper
+ * Used as a base/fallback for hackathon platforms
  */
+export class HackathonScraper extends BaseScraper {
+  platformName = 'Hackathon';
+  platformSlug = 'hackathon';
+  protected baseUrl = '';
 
-export interface HackathoncomscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Hackathon requires a username for tracking.');
+    }else if (!credentials.password) {
+      return this.failure('Hackathon requires a password for tracking.');
+    }
 
-export interface HackathoncomscraperCreateInput {
-  // TODO: Define create input
-}
 
-export interface HackathoncomscraperUpdateInput {
-  // TODO: Define update input
-}
+    try {
+      
+      return this.notSupported(
 
-class HackathoncomscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<HackathoncomscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
+        'Generic hackathon tracking is not available for auto-sync. Please use specific platform integrations (Devpost, Devfolio, MLH) or track hackathon participation manually.'
 
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<HackathoncomscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
+      );
 
-  /**
-   * Create new item
-   */
-  async create(data: HackathoncomscraperCreateInput, userId: string): Promise<HackathoncomscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
 
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: HackathoncomscraperUpdateInput, userId: string): Promise<HackathoncomscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+       
+      
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const hackathoncomscraperService = new HackathoncomscraperService();
-export default hackathoncomscraperService;
+export default HackathonScraper;

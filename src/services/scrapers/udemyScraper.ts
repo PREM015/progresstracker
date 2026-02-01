@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/udemyScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * udemyScraper
- * 
- * @description Service for handling udemyscraper operations
- * @created 2026-01-26
- */
+export class UdemyScraper extends BaseScraper {
+  platformName = 'Udemy';
+  platformSlug = 'udemy';
+  protected baseUrl = 'https://www.udemy.com';
 
-export interface UdemyscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Udemy requires a username for tracking.');
+    }
 
-export interface UdemyscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface UdemyscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class UdemyscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<UdemyscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<UdemyscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: UdemyscraperCreateInput, userId: string): Promise<UdemyscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: UdemyscraperUpdateInput, userId: string): Promise<UdemyscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Udemy doesn't provide public API for course progress tracking
+      return this.notSupported(
+        'Udemy does not provide public API access for learning progress. Please track your enrolled courses, completed courses, certificates earned, and hours spent manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const udemyscraperService = new UdemyscraperService();
-export default udemyscraperService;
+export default UdemyScraper;

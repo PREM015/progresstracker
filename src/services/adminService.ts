@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/adminService.ts
-
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import type {
-
   PlatformCategory,
   SyncStatus,
   SubscriptionTier,
@@ -38,7 +36,7 @@ export interface AdminStats {
     pro: number;
     team: number;
     enterprise: number;
-    mrr: number; // Monthly Recurring Revenue in cents
+    mrr: number;
   };
   activity: {
     trackerEntriesToday: number;
@@ -106,13 +104,12 @@ export interface SyncQueueItem {
 // ============================================================================
 
 class AdminService {
+  private readonly log = logger.child({ service: 'AdminService' });
+
   // ==========================================================================
   // DASHBOARD STATS
   // ==========================================================================
 
-  /**
-   * Get admin dashboard statistics
-   */
   async getStats(): Promise<AdminStats> {
     try {
       const now = new Date();
@@ -122,7 +119,6 @@ class AdminService {
       const startOfMonth = new Date(now);
       startOfMonth.setDate(1);
 
-      // User stats
       const [
         totalUsers,
         activeUsers,
@@ -139,7 +135,6 @@ class AdminService {
         prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
       ]);
 
-      // Platform stats
       const [
         totalPlatforms,
         activePlatforms,
@@ -154,7 +149,6 @@ class AdminService {
         prisma.syncLog.count({ where: { startedAt: { gte: startOfDay } } }),
       ]);
 
-      // Subscription stats
       const subscriptionCounts = await prisma.subscription.groupBy({
         by: ['tier'],
         _count: { tier: true },
@@ -172,7 +166,6 @@ class AdminService {
         subscriptionMap[s.tier] = s._count.tier;
       });
 
-      // Calculate MRR (simplified)
       const paidSubscriptions = await prisma.subscription.findMany({
         where: {
           status: 'ACTIVE',
@@ -184,7 +177,6 @@ class AdminService {
       let mrr = 0;
       paidSubscriptions.forEach((sub) => {
         if (sub.priceAmount) {
-          // Convert yearly to monthly
           if (sub.billingInterval === 'YEARLY') {
             mrr += Math.round(sub.priceAmount / 12);
           } else {
@@ -193,13 +185,14 @@ class AdminService {
         }
       });
 
-      // Activity stats
       const [trackerEntriesToday, goalsCreatedToday, achievementsUnlockedToday] =
         await Promise.all([
           prisma.trackerEntry.count({ where: { createdAt: { gte: startOfDay } } }),
           prisma.goal.count({ where: { createdAt: { gte: startOfDay } } }),
           prisma.userAchievement.count({ where: { unlockedAt: { gte: startOfDay } } }),
         ]);
+
+      this.log.info('Admin stats fetched successfully');
 
       return {
         users: {
@@ -232,7 +225,7 @@ class AdminService {
         },
       };
     } catch (error) {
-      logger.error('Error getting admin stats:', error as Error);
+      this.log.error('Error getting admin stats', {}, error);
       throw error;
     }
   }
@@ -241,9 +234,6 @@ class AdminService {
   // USER MANAGEMENT
   // ==========================================================================
 
-  /**
-   * Get paginated user list with filters
-   */
   async getUsers(filters: UserListFilters = {}): Promise<{
     users: UserListItem[];
     total: number;
@@ -265,7 +255,6 @@ class AdminService {
 
       const where: any = {};
 
-      // Search filter
       if (search) {
         where.OR = [
           { name: { contains: search, mode: 'insensitive' } },
@@ -274,12 +263,10 @@ class AdminService {
         ];
       }
 
-      // Role filter
       if (role) {
         where.role = role;
       }
 
-      // Status filters
       if (isActive !== undefined) {
         where.isActive = isActive;
       }
@@ -287,7 +274,6 @@ class AdminService {
         where.isBanned = isBanned;
       }
 
-      // Tier filter (requires join)
       if (tier) {
         where.subscription = { tier };
       }
@@ -320,6 +306,8 @@ class AdminService {
         prisma.user.count({ where }),
       ]);
 
+      this.log.info('Users fetched', { total, page });
+
       return {
         users: users.map((u) => ({
           ...u,
@@ -331,14 +319,11 @@ class AdminService {
         totalPages: Math.ceil(total / limit),
       };
     } catch (error) {
-      logger.error('Error getting users:', error as Error);
+      this.log.error('Error getting users', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Get user details for admin view
-   */
   async getUserDetails(userId: string): Promise<any> {
     try {
       const user = await prisma.user.findUnique({
@@ -376,31 +361,25 @@ class AdminService {
         throw new Error('User not found');
       }
 
-      // Get recent activity
       const recentActivity = await prisma.auditLog.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         take: 10,
       });
 
+      this.log.info('User details fetched', { userId });
+
       return {
         ...user,
         recentActivity,
       };
     } catch (error) {
-      logger.error('Error getting user details:', error as Error);
+      this.log.error('Error getting user details', { userId }, error);
       throw error;
     }
   }
 
-  /**
-   * Ban user
-   */
-  async banUser(
-    userId: string,
-    reason: string,
-    adminId: string
-  ): Promise<void> {
+  async banUser(userId: string, reason: string, adminId: string): Promise<void> {
     try {
       await prisma.user.update({
         where: { id: userId },
@@ -413,13 +392,11 @@ class AdminService {
         },
       });
 
-      // Invalidate all sessions
       await prisma.activeSession.updateMany({
         where: { userId },
         data: { isValid: false, revokedAt: new Date(), revokedReason: 'User banned' },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           userId,
@@ -430,16 +407,13 @@ class AdminService {
         },
       });
 
-      logger.info(`User ${userId} banned by admin ${adminId}`);
+      this.log.info('User banned', { userId, adminId, reason });
     } catch (error) {
-      logger.error('Error banning user:', error as Error);
+      this.log.error('Error banning user', { userId }, error);
       throw error;
     }
   }
 
-  /**
-   * Unban user
-   */
   async unbanUser(userId: string, adminId: string): Promise<void> {
     try {
       await prisma.user.update({
@@ -453,7 +427,6 @@ class AdminService {
         },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           userId,
@@ -464,16 +437,13 @@ class AdminService {
         },
       });
 
-      logger.info(`User ${userId} unbanned by admin ${adminId}`);
+      this.log.info('User unbanned', { userId, adminId });
     } catch (error) {
-      logger.error('Error unbanning user:', error as Error);
+      this.log.error('Error unbanning user', { userId }, error);
       throw error;
     }
   }
 
-  /**
-   * Update user role
-   */
   async updateUserRole(
     userId: string,
     role: string,
@@ -489,12 +459,11 @@ class AdminService {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          role: role as Role
-          , isAdmin
+          role: role as Role,
+          isAdmin,
         },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           userId,
@@ -507,16 +476,13 @@ class AdminService {
         },
       });
 
-      logger.info(`User ${userId} role updated to ${role} by admin ${adminId}`);
+      this.log.info('User role updated', { userId, role, adminId });
     } catch (error) {
-      logger.error('Error updating user role:', error as Error);
+      this.log.error('Error updating user role', { userId }, error);
       throw error;
     }
   }
 
-  /**
-   * Delete user (soft delete)
-   */
   async deleteUser(userId: string, adminId: string): Promise<void> {
     try {
       await prisma.user.update({
@@ -524,12 +490,11 @@ class AdminService {
         data: {
           deletedAt: new Date(),
           isActive: false,
-          email: null, // GDPR compliance
+          email: null,
           name: 'Deleted User',
         },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           userId,
@@ -540,9 +505,9 @@ class AdminService {
         },
       });
 
-      logger.info(`User ${userId} deleted by admin ${adminId}`);
+      this.log.info('User deleted', { userId, adminId });
     } catch (error) {
-      logger.error('Error deleting user:', error as Error);
+      this.log.error('Error deleting user', { userId }, error);
       throw error;
     }
   }
@@ -551,9 +516,6 @@ class AdminService {
   // PLATFORM MANAGEMENT
   // ==========================================================================
 
-  /**
-   * Get all platforms with stats
-   */
   async getPlatforms(): Promise<PlatformStats[]> {
     try {
       const platforms = await prisma.platform.findMany({
@@ -564,6 +526,8 @@ class AdminService {
         },
         orderBy: { totalUsers: 'desc' },
       });
+
+      this.log.info('Platforms fetched', { count: platforms.length });
 
       return platforms.map((p) => ({
         id: p.id,
@@ -579,14 +543,11 @@ class AdminService {
         isActive: p.isActive,
       }));
     } catch (error) {
-      logger.error('Error getting platforms:', error as Error);
+      this.log.error('Error getting platforms', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Update platform status
-   */
   async updatePlatformStatus(
     platformId: string,
     isActive: boolean,
@@ -598,7 +559,6 @@ class AdminService {
         data: { isActive },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           action: 'ADMIN_ACTION',
@@ -610,16 +570,13 @@ class AdminService {
         },
       });
 
-      logger.info(`Platform ${platformId} ${isActive ? 'enabled' : 'disabled'} by admin ${adminId}`);
+      this.log.info('Platform status updated', { platformId, isActive, adminId });
     } catch (error) {
-      logger.error('Error updating platform status:', error as Error);
+      this.log.error('Error updating platform status', { platformId }, error);
       throw error;
     }
   }
 
-  /**
-   * Set platform maintenance mode
-   */
   async setPlatformMaintenance(
     platformId: string,
     maintenanceMode: boolean,
@@ -648,9 +605,9 @@ class AdminService {
         });
       }
 
-      logger.info(`Platform ${platformId} maintenance mode: ${maintenanceMode}`);
+      this.log.info('Platform maintenance mode set', { platformId, maintenanceMode });
     } catch (error) {
-      logger.error('Error setting platform maintenance:', error as Error);
+      this.log.error('Error setting platform maintenance', { platformId }, error);
       throw error;
     }
   }
@@ -659,9 +616,6 @@ class AdminService {
   // SYNC MANAGEMENT
   // ==========================================================================
 
-  /**
-   * Get sync queue status
-   */
   async getSyncQueue(limit: number = 50): Promise<SyncQueueItem[]> {
     try {
       const syncs = await prisma.syncLog.findMany({
@@ -676,6 +630,8 @@ class AdminService {
         take: limit,
       });
 
+      this.log.info('Sync queue fetched', { count: syncs.length });
+
       return syncs.map((s) => ({
         id: s.id,
         userId: s.userId,
@@ -687,14 +643,11 @@ class AdminService {
         errorMessage: s.errorMessage,
       }));
     } catch (error) {
-      logger.error('Error getting sync queue:', error as Error);
+      this.log.error('Error getting sync queue', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Get recent sync logs
-   */
   async getRecentSyncs(limit: number = 100): Promise<any[]> {
     try {
       const syncs = await prisma.syncLog.findMany({
@@ -706,16 +659,15 @@ class AdminService {
         take: limit,
       });
 
+      this.log.info('Recent syncs fetched', { count: syncs.length });
+
       return syncs;
     } catch (error) {
-      logger.error('Error getting recent syncs:', error as Error);
+      this.log.error('Error getting recent syncs', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Trigger sync for all users of a platform
-   */
   async triggerPlatformSync(platformId: string, adminId: string): Promise<number> {
     try {
       const connections = await prisma.userPlatform.findMany({
@@ -726,7 +678,6 @@ class AdminService {
         select: { id: true },
       });
 
-      // Update all to pending
       await prisma.userPlatform.updateMany({
         where: {
           platformId,
@@ -738,7 +689,6 @@ class AdminService {
         },
       });
 
-      // Create audit log
       await prisma.auditLog.create({
         data: {
           action: 'ADMIN_ACTION',
@@ -750,10 +700,10 @@ class AdminService {
         },
       });
 
-      logger.info(`Triggered sync for ${connections.length} connections on platform ${platformId}`);
+      this.log.info('Platform sync triggered', { platformId, count: connections.length });
       return connections.length;
     } catch (error) {
-      logger.error('Error triggering platform sync:', error as Error);
+      this.log.error('Error triggering platform sync', { platformId }, error);
       throw error;
     }
   }
@@ -762,9 +712,6 @@ class AdminService {
   // AUDIT LOGS
   // ==========================================================================
 
-  /**
-   * Get audit logs
-   */
   async getAuditLogs(filters: {
     userId?: string;
     action?: AuditAction;
@@ -814,6 +761,8 @@ class AdminService {
         prisma.auditLog.count({ where }),
       ]);
 
+      this.log.info('Audit logs fetched', { total, page });
+
       return {
         logs,
         total,
@@ -821,7 +770,7 @@ class AdminService {
         totalPages: Math.ceil(total / limit),
       };
     } catch (error) {
-      logger.error('Error getting audit logs:', error as Error);
+      this.log.error('Error getting audit logs', {}, error);
       throw error;
     }
   }
@@ -830,9 +779,6 @@ class AdminService {
   // SYSTEM SETTINGS
   // ==========================================================================
 
-  /**
-   * Get system settings
-   */
   async getSystemSettings(): Promise<Record<string, any>> {
     try {
       const settings = await prisma.systemSettings.findMany();
@@ -842,16 +788,15 @@ class AdminService {
         result[s.key] = s.value;
       });
 
+      this.log.info('System settings fetched', { count: settings.length });
+
       return result;
     } catch (error) {
-      logger.error('Error getting system settings:', error as Error);
+      this.log.error('Error getting system settings', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Update system setting
-   */
   async updateSystemSetting(
     key: string,
     value: any,
@@ -864,9 +809,9 @@ class AdminService {
         create: { key, value, updatedBy: adminId },
       });
 
-      logger.info(`System setting ${key} updated by admin ${adminId}`);
+      this.log.info('System setting updated', { key, adminId });
     } catch (error) {
-      logger.error('Error updating system setting:', error as Error);
+      this.log.error('Error updating system setting', { key }, error);
       throw error;
     }
   }
@@ -875,23 +820,21 @@ class AdminService {
   // FEATURE FLAGS
   // ==========================================================================
 
-  /**
-   * Get all feature flags
-   */
   async getFeatureFlags(): Promise<any[]> {
     try {
-      return await prisma.featureFlag.findMany({
+      const flags = await prisma.featureFlag.findMany({
         orderBy: { key: 'asc' },
       });
+
+      this.log.info('Feature flags fetched', { count: flags.length });
+
+      return flags;
     } catch (error) {
-      logger.error('Error getting feature flags:', error as Error);
+      this.log.error('Error getting feature flags', {}, error);
       throw error;
     }
   }
 
-  /**
-   * Update feature flag
-   */
   async updateFeatureFlag(
     key: string,
     data: {
@@ -921,9 +864,9 @@ class AdminService {
         },
       });
 
-      logger.info(`Feature flag ${key} updated by admin ${adminId}`);
+      this.log.info('Feature flag updated', { key, adminId });
     } catch (error) {
-      logger.error('Error updating feature flag:', error as Error);
+      this.log.error('Error updating feature flag', { key }, error);
       throw error;
     }
   }

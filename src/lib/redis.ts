@@ -52,6 +52,16 @@ export const cache = {
   },
 
   /**
+   * Clear all keys in Redis
+   */
+  async flushAll(): Promise<void> {
+    try {
+      await redis.flushall();
+    } catch (error) {
+      console.error('Redis flushAll error:', error);
+    }
+  },
+  /**
    * Check if key exists
    */
   async exists(key: string): Promise<boolean> {

@@ -233,6 +233,9 @@ D:.
 ¦   ¦   ¦       
 ¦   ¦   +---cron
 ¦   ¦   ¦   +---daily-sync
+¦   ¦   ¦   ¦       route.ts
+¦   ¦   ¦   ¦       
+¦   ¦   ¦   +---streak-check
 ¦   ¦   ¦           route.ts
 ¦   ¦   ¦           
 ¦   ¦   +---custom-platforms
@@ -244,6 +247,10 @@ D:.
 ¦   ¦   +---docs
 ¦   ¦   ¦       route.ts
 ¦   ¦   ¦       
+¦   ¦   +---email
+¦   ¦   ¦   +---test
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
 ¦   ¦   +---export
 ¦   ¦   ¦   ¦   route.ts
 ¦   ¦   ¦   ¦   
@@ -570,9 +577,6 @@ D:.
 ¦   ¦           route.tsx
 ¦   ¦           
 ¦   +---[username]
-¦           error.tsx
-¦           not-found.tsx
-¦           
 +---components
 +---config
 ¦       achievements.ts
@@ -599,14 +603,43 @@ D:.
 ¦       UserContext.tsx
 ¦       
 +---emails
-¦       backup-codes-generated.tsx
-¦       maintenance-notification.tsx
-¦       newsletter.tsx
-¦       report-generated.tsx
-¦       support-ticket-created.tsx
-¦       support-ticket-reply.tsx
-¦       waitlist-welcome.tsx
-¦       
+¦   ¦   account-deleted.tsx
+¦   ¦   achievement-unlocked.tsx
+¦   ¦   backup-codes-generated.tsx
+¦   ¦   email-change-request.tsx
+¦   ¦   email-changed.tsx
+¦   ¦   goal-completed.tsx
+¦   ¦   goal-reminder.tsx
+¦   ¦   index.ts
+¦   ¦   invoice-paid.tsx
+¦   ¦   login-alert.tsx
+¦   ¦   maintenance-notification.tsx
+¦   ¦   monthly-report.tsx
+¦   ¦   newsletter.tsx
+¦   ¦   password-changed.tsx
+¦   ¦   password-reset.tsx
+¦   ¦   payment-failed.tsx
+¦   ¦   report-generated.tsx
+¦   ¦   streak-at-risk.tsx
+¦   ¦   streak-broken.tsx
+¦   ¦   streak-milestone.tsx
+¦   ¦   subscription-cancelled.tsx
+¦   ¦   subscription-created.tsx
+¦   ¦   support-ticket-created.tsx
+¦   ¦   support-ticket-reply.tsx
+¦   ¦   sync-failed.tsx
+¦   ¦   two-factor-disabled.tsx
+¦   ¦   two-factor-enabled.tsx
+¦   ¦   verify-email.tsx
+¦   ¦   waitlist-welcome.tsx
+¦   ¦   weekly-report.tsx
+¦   ¦   welcome.tsx
+¦   ¦   
+¦   +---components
+¦           Button.tsx
+¦           Card.tsx
+¦           EmailLayout.tsx
+¦           
 +---hooks
 ¦       useAchievements.ts
 ¦       useAnalytics.ts
@@ -652,40 +685,45 @@ D:.
 ¦       useWebSocket.ts
 ¦       
 +---lib
-¦       analytics.ts
-¦       api.ts
-¦       apiClient.ts
-¦       apiError.ts
-¦       apiHandler.ts
-¦       apiMiddleware.ts
-¦       apiResponse.ts
-¦       auth.ts
-¦       constants.ts
-¦       crypto.ts
-¦       database.ts
-¦       date.ts
-¦       email.ts
-¦       encryption.ts
-¦       errorTracking.ts
-¦       featureFlags.ts
-¦       jwt.ts
-¦       logger.ts
-¦       monitoring.ts
-¦       offlineStorage.ts
-¦       performanceTracking.ts
-¦       prisma.ts
-¦       push.ts
-¦       rateLimit.ts
-¦       rateLimiter.ts
-¦       redis.ts
-¦       serviceWorker.ts
-¦       sse.ts
-¦       storage.ts
-¦       stripe.ts
-¦       utils.ts
-¦       validators.ts
-¦       websocket.ts
-¦       
+¦   ¦   analytics.ts
+¦   ¦   api.ts
+¦   ¦   apiClient.ts
+¦   ¦   apiError.ts
+¦   ¦   apiHandler.ts
+¦   ¦   apiMiddleware.ts
+¦   ¦   apiResponse.ts
+¦   ¦   auth.ts
+¦   ¦   constants.ts
+¦   ¦   crypto.ts
+¦   ¦   database.ts
+¦   ¦   date.ts
+¦   ¦   email.ts
+¦   ¦   encryption.ts
+¦   ¦   errorTracking.ts
+¦   ¦   featureFlags.ts
+¦   ¦   jwt.ts
+¦   ¦   logger.ts
+¦   ¦   monitoring.ts
+¦   ¦   offlineStorage.ts
+¦   ¦   performanceTracking.ts
+¦   ¦   prisma.ts
+¦   ¦   push.ts
+¦   ¦   rateLimit.ts
+¦   ¦   rateLimiter.ts
+¦   ¦   redis.ts
+¦   ¦   serviceWorker.ts
+¦   ¦   sse.ts
+¦   ¦   storage.ts
+¦   ¦   stripe.ts
+¦   ¦   utils.ts
+¦   ¦   validators.ts
+¦   ¦   websocket.ts
+¦   ¦   
+¦   +---email
+¦           email-config.ts
+¦           email-service.tsx
+¦           index.ts
+¦           
 +---middleware
 ¦       adminAuth.ts
 ¦       
@@ -702,6 +740,7 @@ D:.
 ¦   ¦   cacheService.ts
 ¦   ¦   changelogService.ts
 ¦   ¦   customPlatformService.ts
+¦   ¦   emailNotificationService.ts
 ¦   ¦   exportService.ts
 ¦   ¦   featureFlagService.ts
 ¦   ¦   goalReminderService.ts
@@ -716,6 +755,7 @@ D:.
 ¦   ¦   sessionService.ts
 ¦   ¦   statsService.ts
 ¦   ¦   streakHistoryService.ts
+¦   ¦   streakService.ts
 ¦   ¦   stripeService.ts
 ¦   ¦   supportService.ts
 ¦   ¦   syncService.ts
@@ -749,11 +789,13 @@ D:.
 ¦   ¦       binarysearchScraper.ts
 ¦   ¦       bitbucketScraper.ts
 ¦   ¦       captchaHandler.ts
+¦   ¦       codebergScraper.ts
 ¦   ¦       codecademyScraper.ts
 ¦   ¦       codechefScraper.ts
 ¦   ¦       codeforcesScraper.ts
 ¦   ¦       codewarsScraper.ts
 ¦   ¦       codinGameScraper.ts
+¦   ¦       constants.ts
 ¦   ¦       courseraScaper.ts
 ¦   ¦       datacampScraper.ts
 ¦   ¦       devfolioScraper.ts
@@ -806,6 +848,7 @@ D:.
 ¦   ¦       skillshareScraper.ts
 ¦   ¦       sourceforgeScraper.ts
 ¦   ¦       spojScraper.ts
+¦   ¦       stubScraper.ts
 ¦   ¦       swocScraper.ts
 ¦   ¦       topcoderScraper.ts
 ¦   ¦       types.ts
@@ -825,9 +868,11 @@ D:.
 ¦           webhookHandler.ts
 ¦           
 +---trigger
+¦       achievement-check.ts
 ¦       daily-sync-task.ts
 ¦       example.ts
 ¦       github-sync.ts
+¦       index.ts
 ¦       leetcode-sync.ts
 ¦       scheduled-tasks.ts
 ¦       sync-all-platforms.ts
@@ -842,6 +887,7 @@ D:.
         billing.ts
         content.ts
         database.ts
+        email.ts
         export.ts
         feedback.ts
         goal.ts

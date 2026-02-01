@@ -1,65 +1,143 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/types.ts
+import type { PlatformCategory } from '@prisma/client';
 
 /**
- * types
- * 
- * @description Service for handling types operations
- * @created 2026-01-26
+ * Scraper credentials interface
  */
-
-export interface TypesData {
-  // TODO: Define interface
-  id: string;
+export interface ScraperCredentials {
+  username?: string;
+  email?: string;
+  password?: string;
+  token?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  apiKey?: string;
+  cookies?: string;
+  sessionId?: string;
+  userId?: string;
+  profileUrl?: string;
 }
 
-export interface TypesCreateInput {
-  // TODO: Define create input
+/**
+ * Single scraper entry (one day of activity)
+ */
+export interface ScraperEntry {
+  date: Date;
+  problems?: number;
+  commits?: number;
+  pullRequests?: number;
+  issues?: number;
+  timeSpent?: number; // minutes
+  xp?: number;
+  points?: number;
+  rating?: number;
+  ratingChange?: number;
+  rank?: number;
+  rankChange?: number;
+  streak?: number;
+  notes?: string;
+  category?: PlatformCategory;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
 }
 
-export interface TypesUpdateInput {
-  // TODO: Define update input
+/**
+ * Scraper result
+ */
+export interface ScraperResult {
+  success: boolean;
+  entries: ScraperEntry[];
+  error?: string;
+  errorCode?: string;
+  metadata?: ScraperMetadata;
+  rawData?: unknown;
 }
 
-class TypesService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<TypesData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<TypesData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: TypesCreateInput, userId: string): Promise<TypesData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: TypesUpdateInput, userId: string): Promise<TypesData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
-  }
+/**
+ * Scraper metadata
+ */
+export interface ScraperMetadata {
+  username?: string;
+  displayName?: string;
+  profileUrl?: string;
+  avatarUrl?: string;
+  lastFetched?: Date;
+  totalProblems?: number;
+  totalCommits?: number;
+  totalProjects?: number;
+  rating?: number;
+  maxRating?: number;
+  rank?: string;
+  level?: number;
+  xp?: number;
+  points?: number;
+  streak?: number;
+  longestStreak?: number;
+  badges?: number;
+  certificates?: number;
+  followers?: number;
+  following?: number;
+  reputation?: number;
+  contributions?: number;
+  [key: string]: unknown;
 }
 
-export const typesService = new TypesService();
-export default typesService;
+/**
+ * Rate limit configuration
+ */
+export interface RateLimitConfig {
+  requests: number;
+  windowMs: number;
+  retryAfter?: number;
+}
+
+/**
+ * Proxy configuration
+ */
+export interface ProxyConfig {
+  host: string;
+  port: number;
+  protocol: 'http' | 'https' | 'socks4' | 'socks5';
+  username?: string;
+  password?: string;
+  country?: string;
+}
+
+/**
+ * Scraper configuration
+ */
+export interface ScraperConfig {
+  timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
+  rateLimit?: RateLimitConfig;
+  proxy?: ProxyConfig;
+  userAgent?: string;
+  headers?: Record<string, string>;
+}
+
+/**
+ * Health check result
+ */
+export interface HealthCheckResult {
+  platform: string;
+  healthy: boolean;
+  responseTime: number;
+  statusCode?: number;
+  error?: string;
+  lastChecked: Date;
+}
+
+/**
+ * Scraper capability flags
+ */
+export interface ScraperCapabilities {
+  supportsDateRange: boolean;
+  supportsIncremental: boolean;
+  requiresAuth: boolean;
+  requiresOAuth: boolean;
+  requiresApiKey: boolean;
+  supportsPagination: boolean;
+  hasRateLimit: boolean;
+  needsScraping: boolean;
+}

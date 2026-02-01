@@ -4,6 +4,7 @@ import { prisma, paginationArgs, buildPaginationResponse, withTransaction } from
 import { hash, compare } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { logger } from "@trigger.dev/sdk/v3";
+import { Role } from '@prisma/client';
 
 // =============================================================================
 // TYPES
@@ -1408,7 +1409,7 @@ export class UserService {
     }
 
     if (role) {
-      where.role = role;
+      where.role = role as Role;
     }
 
     if (isActive !== undefined) {
@@ -1543,7 +1544,7 @@ export class UserService {
       await tx.user.update({
         where: { id: userId },
         data: {
-          role,
+         role: Role.user,
           isAdmin: role === "admin",
           updatedAt: new Date(),
         },

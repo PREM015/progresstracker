@@ -1,6 +1,6 @@
 // src/services/scrapers/edxScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class EdxScraper extends BaseScraper {
   platformName = 'edX';
@@ -10,7 +10,22 @@ export class EdxScraper extends BaseScraper {
     if (!credentials.accessToken) {
       return this.failure('edX requires OAuth authentication.');
     }
-    return this.notSupported('edX API requires special access.');
+    if (!credentials.userId) {
+      return this.failure('edX requires user ID in credentials.');
+    }
+    // edX API is very restrictive
+    // Most useful data requires special permissions
+    try {
+     
+      return this.notSupported(
+        'edX API requires special permissions. Please track course progress manually.'
+      );
+
+    } catch (error) {
+      return this.handleError(error);
+
+    }
+  
   }
 }
 

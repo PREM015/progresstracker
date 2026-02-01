@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/indeedScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * indeedScraper
- * 
- * @description Service for handling indeedscraper operations
- * @created 2026-01-26
- */
+export class IndeedScraper extends BaseScraper {
+  platformName = 'Indeed';
+  platformSlug = 'indeed';
+  protected baseUrl = 'https://www.indeed.com';
 
-export interface IndeedscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Indeed requires a username for tracking.');
+    }
 
-export interface IndeedscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface IndeedscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class IndeedscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<IndeedscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<IndeedscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: IndeedscraperCreateInput, userId: string): Promise<IndeedscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: IndeedscraperUpdateInput, userId: string): Promise<IndeedscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Indeed doesn't provide public API for job application tracking
+      return this.notSupported(
+        'Indeed does not provide public API access for application tracking. Please track your job applications, responses, and interviews manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const indeedscraperService = new IndeedscraperService();
-export default indeedscraperService;
+export default IndeedScraper;

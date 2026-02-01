@@ -1,6 +1,6 @@
 // src/services/scrapers/devpostScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class DevpostScraper extends BaseScraper {
   platformName = 'Devpost';
@@ -12,24 +12,29 @@ export class DevpostScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // Devpost has a public portfolio page
-      // Need to scrape HTML or use unofficial API
+      // Try unofficial API
       try {
-        const response = await this.get<any>(
-          `https://devpost-api.vercel.app/user/${username}`
-        );
+        const response = await this.get<{
+          projects?: Array<{
+            name: string;
+            submittedAt?: string;
+            createdAt?: string;
+            hackathon?: string;
+          }>;
+          error?: string;
+        }>(`https://devpost-api.vercel.app/user/${username}`);
 
-        if (response && !response.error) {
-          const entries = response.projects?.map((project: any) => ({
-            date: this.parseDate(project.submittedAt || project.createdAt),
+        if (response && !response.error && response.projects) {
+          const entries = response.projects.map((project) => ({
+            date: this.parseDate(project.submittedAt || project.createdAt || new Date()),
             problems: 1,
             notes: `Submitted project: ${project.name} to ${project.hackathon || 'Devpost'}`,
-          })) || [];
+          }));
 
           return this.success(entries, {
             username,
             profileUrl: `${this.baseUrl}/${username}`,
-            totalProblems: response.projects?.length || 0,
+            totalProblems: response.projects.length,
           });
         }
       } catch {
@@ -39,7 +44,7 @@ export class DevpostScraper extends BaseScraper {
       return this.notSupported(
         'Devpost requires web scraping. Please track hackathon projects manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

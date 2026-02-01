@@ -1,6 +1,6 @@
 // src/services/scrapers/hackerearthScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class HackerEarthScraper extends BaseScraper {
   platformName = 'HackerEarth';
@@ -12,22 +12,27 @@ export class HackerEarthScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // Try to fetch profile data
-      // HackerEarth doesn't have a public API, requires scraping
       const profileUrl = `${this.baseUrl}/@${username}`;
 
-      // Attempt to get public profile data
+      // Try unofficial API
       try {
-        const response = await this.get<any>(
-          `https://hackerearth-api.vercel.app/user/${username}`
-        );
+        const response = await this.get<{
+          solved?: number;
+          rating?: number;
+          error?: string;
+        }>(`https://hackerearth-api.vercel.app/user/${username}`);
 
         if (response && !response.error) {
-          const entries = [{
-            date: new Date(),
-            problems: response.solved || 0,
-            notes: `Profile synced from HackerEarth`,
-          }];
+          const entries =
+            response.solved && response.solved > 0
+              ? [
+                  {
+                    date: new Date(),
+                    problems: response.solved,
+                    notes: `Profile synced from HackerEarth`,
+                  },
+                ]
+              : [];
 
           return this.success(entries, {
             username,
@@ -43,7 +48,7 @@ export class HackerEarthScraper extends BaseScraper {
       return this.notSupported(
         'HackerEarth requires web scraping for full data access. Please use manual tracking.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

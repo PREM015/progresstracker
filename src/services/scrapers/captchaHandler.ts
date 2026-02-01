@@ -1,65 +1,147 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/captchaHandler.ts
+import { logger } from '@/lib/logger';
 
-/**
- * captchaHandler
- * 
- * @description Service for handling captchahandler operations
- * @created 2026-01-26
- */
-
-export interface CaptchahandlerData {
-  // TODO: Define interface
-  id: string;
+export interface CaptchaChallenge {
+  type: 'recaptcha' | 'hcaptcha' | 'cloudflare' | 'funcaptcha' | 'unknown';
+  siteKey?: string;
+  pageUrl?: string;
+  data?: Record<string, unknown>;
 }
 
-export interface CaptchahandlerCreateInput {
-  // TODO: Define create input
+export interface CaptchaSolution {
+  token: string;
+  type: string;
+  expiresAt?: Date;
 }
 
-export interface CaptchahandlerUpdateInput {
-  // TODO: Define update input
-}
+class CaptchaHandler {
+  private readonly apiKey: string | undefined;
+  private readonly service: string;
+  private readonly enabled: boolean;
 
-class CaptchahandlerService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<CaptchahandlerData[]> {
-    // TODO: Implement
-    return [];
+  constructor() {
+    this.apiKey = process.env.CAPTCHA_API_KEY;
+    this.service = process.env.CAPTCHA_SERVICE || '2captcha';
+    this.enabled = !!this.apiKey;
   }
 
   /**
-   * Get single item by ID
+   * Check if captcha solving is available
    */
-  async getById(id: string, userId: string): Promise<CaptchahandlerData | null> {
-    // TODO: Implement
+  isAvailable(): boolean {
+    return this.enabled;
+  }
+
+  /**
+   * Detect captcha type from page content
+   */
+  detect(html: string): CaptchaChallenge | null {
+    // reCAPTCHA v2
+    if (html.includes('g-recaptcha') || html.includes('recaptcha/api.js')) {
+      const siteKeyMatch = html.match(/data-sitekey="([^"]+)"/);
+      return {
+        type: 'recaptcha',
+        siteKey: siteKeyMatch?.[1],
+      };
+    }
+
+    // hCaptcha
+    if (html.includes('hcaptcha.com') || html.includes('h-captcha')) {
+      const siteKeyMatch = html.match(/data-sitekey="([^"]+)"/);
+      return {
+        type: 'hcaptcha',
+        siteKey: siteKeyMatch?.[1],
+      };
+    }
+
+    // Cloudflare challenge
+    if (html.includes('cf-browser-verification') || html.includes('__cf_chl')) {
+      return {
+        type: 'cloudflare',
+      };
+    }
+
+    // FunCaptcha
+    if (html.includes('funcaptcha') || html.includes('arkoselabs')) {
+      return {
+        type: 'funcaptcha',
+      };
+    }
+
     return null;
   }
 
   /**
-   * Create new item
+   * Solve captcha challenge
    */
-  async create(data: CaptchahandlerCreateInput, userId: string): Promise<CaptchahandlerData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+  async solve(challenge: CaptchaChallenge): Promise<CaptchaSolution | null> {
+    if (!this.enabled) {
+      logger.warn('Captcha solving not available - no API key configured');
+      return null;
+    }
+
+    if (challenge.type === 'cloudflare') {
+      logger.warn('Cloudflare challenges require browser automation');
+      return null;
+    }
+
+    try {
+      switch (this.service) {
+        case '2captcha':
+          return await this.solve2Captcha(challenge);
+        case 'anticaptcha':
+          return await this.solveAntiCaptcha(challenge);
+        case 'capsolver':
+          return await this.solveCapsolver(challenge);
+        default:
+          logger.error(`Unknown captcha service: ${this.service}`);
+          return null;
+      }
+    } catch (error) {
+      logger.error('Captcha solving failed', {}, error);
+      return null;
+    }
   }
 
   /**
-   * Update existing item
+   * Solve using 2Captcha service
    */
-  async update(id: string, data: CaptchahandlerUpdateInput, userId: string): Promise<CaptchahandlerData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+  private async solve2Captcha(challenge: CaptchaChallenge): Promise<CaptchaSolution | null> {
+    // This is a placeholder - actual implementation would call 2Captcha API
+    logger.info('2Captcha solving requested', { type: challenge.type });
+    
+    // In production, you would:
+    // 1. Submit captcha to 2captcha.com/in.php
+    // 2. Poll 2captcha.com/res.php for solution
+    // 3. Return the token
+
+    return null;
   }
 
   /**
-   * Delete item
+   * Solve using Anti-Captcha service
    */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+  private async solveAntiCaptcha(challenge: CaptchaChallenge): Promise<CaptchaSolution | null> {
+    logger.info('Anti-Captcha solving requested', { type: challenge.type });
+    return null;
+  }
+
+  /**
+   * Solve using Capsolver service
+   */
+  private async solveCapsolver(challenge: CaptchaChallenge): Promise<CaptchaSolution | null> {
+    logger.info('Capsolver solving requested', { type: challenge.type });
+    return null;
+  }
+
+  /**
+   * Report incorrect solution (for refund)
+   */
+  async reportBad(taskId: string): Promise<void> {
+    logger.info('Reporting bad captcha solution', { taskId });
+    // Implementation would report to captcha service
   }
 }
 
-export const captchahandlerService = new CaptchahandlerService();
-export default captchahandlerService;
+export const captchaHandler = new CaptchaHandler();
+export default captchaHandler;

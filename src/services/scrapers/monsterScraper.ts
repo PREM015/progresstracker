@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/monsterScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * monsterScraper
- * 
- * @description Service for handling monsterscraper operations
- * @created 2026-01-26
- */
+export class MonsterScraper extends BaseScraper {
+  platformName = 'Monster';
+  platformSlug = 'monster';
+  protected baseUrl = 'https://www.monster.com';
 
-export interface MonsterscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Monster requires a username for tracking.');
+    }
 
-export interface MonsterscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface MonsterscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class MonsterscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<MonsterscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<MonsterscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: MonsterscraperCreateInput, userId: string): Promise<MonsterscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: MonsterscraperUpdateInput, userId: string): Promise<MonsterscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Monster doesn't provide public API for job application tracking
+      return this.notSupported(
+        'Monster does not provide public API access for application tracking. Please track your job applications and profile views manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const monsterscraperService = new MonsterscraperService();
-export default monsterscraperService;
+export default MonsterScraper;

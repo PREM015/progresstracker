@@ -1,13 +1,14 @@
 // src/services/notificationService.ts
-// Fixed to match Prisma schema with proper enums
-
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { 
   NotificationType, 
   NotificationChannel, 
   NotificationPriority,
   Prisma 
 } from '@prisma/client';
+
+const log = logger.child({ service: 'NotificationService' });
 
 // =============================================================================
 // TYPES
@@ -50,7 +51,6 @@ export interface NotificationWithMeta {
   isArchived: boolean;
   isDismissed: boolean;
   createdAt: Date;
-  // Frontend-friendly alias
   read: boolean;
 }
 
@@ -78,46 +78,51 @@ export class NotificationService {
   // CREATE NOTIFICATION
   // ===========================================================================
 
-  /**
-   * Create a new notification
-   */
   static async createNotification(
     userId: string,
     data: CreateNotificationInput
   ): Promise<NotificationWithMeta> {
-    const notification = await prisma.notification.create({
-      data: {
-        userId,
-        type: data.type,
-        channel: data.channel ?? NotificationChannel.IN_APP,
-        priority: data.priority ?? NotificationPriority.NORMAL,
-        title: data.title,
-        message: data.message,
-        shortMessage: data.shortMessage,
-        actionUrl: data.actionUrl,
-        actionLabel: data.actionLabel,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        imageUrl: data.imageUrl,
-        metadata: data.metadata 
-          ? (data.metadata as Prisma.InputJsonValue)
-          : Prisma.JsonNull,
-        scheduledFor: data.scheduledFor,
-        expiresAt: data.expiresAt,
-        isRead: false,
-        isArchived: false,
-        isDismissed: false,
-        isDelivered: data.channel === NotificationChannel.IN_APP,
-        deliveredAt: data.channel === NotificationChannel.IN_APP ? new Date() : null,
-      },
-    });
+    try {
+      const notification = await prisma.notification.create({
+        data: {
+          userId,
+          type: data.type,
+          channel: data.channel ?? NotificationChannel.IN_APP,
+          priority: data.priority ?? NotificationPriority.NORMAL,
+          title: data.title,
+          message: data.message,
+          shortMessage: data.shortMessage,
+          actionUrl: data.actionUrl,
+          actionLabel: data.actionLabel,
+          entityType: data.entityType,
+          entityId: data.entityId,
+          imageUrl: data.imageUrl,
+          metadata: data.metadata 
+            ? (data.metadata as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+          scheduledFor: data.scheduledFor,
+          expiresAt: data.expiresAt,
+          isRead: false,
+          isArchived: false,
+          isDismissed: false,
+          isDelivered: data.channel === NotificationChannel.IN_APP,
+          deliveredAt: data.channel === NotificationChannel.IN_APP ? new Date() : null,
+        },
+      });
 
-    return this.formatNotification(notification);
+      log.info('Notification created', { 
+        id: notification.id, 
+        userId, 
+        type: data.type 
+      });
+
+      return this.formatNotification(notification);
+    } catch (error) {
+      log.error('Error creating notification', { userId, type: data.type }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Create notification with simplified type (for internal use)
-   */
   static async createSimpleNotification(
     userId: string,
     data: {
@@ -128,39 +133,40 @@ export class NotificationService {
       actionText?: string;
     }
   ): Promise<NotificationWithMeta> {
-    // Map simple types to NotificationType enum
-    const typeMapping: Record<string, NotificationType> = {
-      info: NotificationType.SYSTEM,
-      success: NotificationType.ACHIEVEMENT_UNLOCKED,
-      warning: NotificationType.STREAK_AT_RISK,
-      error: NotificationType.SECURITY_ALERT,
-    };
+    try {
+      const typeMapping: Record<string, NotificationType> = {
+        info: NotificationType.SYSTEM,
+        success: NotificationType.ACHIEVEMENT_UNLOCKED,
+        warning: NotificationType.STREAK_AT_RISK,
+        error: NotificationType.SECURITY_ALERT,
+      };
 
-    const priorityMapping: Record<string, NotificationPriority> = {
-      info: NotificationPriority.LOW,
-      success: NotificationPriority.NORMAL,
-      warning: NotificationPriority.HIGH,
-      error: NotificationPriority.URGENT,
-    };
+      const priorityMapping: Record<string, NotificationPriority> = {
+        info: NotificationPriority.LOW,
+        success: NotificationPriority.NORMAL,
+        warning: NotificationPriority.HIGH,
+        error: NotificationPriority.URGENT,
+      };
 
-    return this.createNotification(userId, {
-      type: typeMapping[data.type] || NotificationType.CUSTOM,
-      priority: priorityMapping[data.type] || NotificationPriority.NORMAL,
-      title: data.title,
-      message: data.message,
-      actionUrl: data.actionUrl,
-      actionLabel: data.actionText,
-      metadata: { severity: data.type },
-    });
+      return this.createNotification(userId, {
+        type: typeMapping[data.type] || NotificationType.CUSTOM,
+        priority: priorityMapping[data.type] || NotificationPriority.NORMAL,
+        title: data.title,
+        message: data.message,
+        actionUrl: data.actionUrl,
+        actionLabel: data.actionText,
+        metadata: { severity: data.type },
+      });
+    } catch (error) {
+      log.error('Error creating simple notification', { userId, type: data.type }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // GET NOTIFICATIONS
   // ===========================================================================
 
-  /**
-   * Get user notifications with filtering
-   */
   static async getUserNotifications(
     userId: string,
     options: {
@@ -170,411 +176,468 @@ export class NotificationService {
       includeArchived?: boolean;
     } = {}
   ): Promise<{ notifications: NotificationWithMeta[]; total: number }> {
-    const {
-      filter,
-      limit = 50,
-      offset = 0,
-      includeArchived = false,
-    } = options;
+    try {
+      const {
+        filter,
+        limit = 50,
+        offset = 0,
+        includeArchived = false,
+      } = options;
 
-    const where: Prisma.NotificationWhereInput = {
-      userId,
-      ...(includeArchived ? {} : { isArchived: false }),
-    };
+      const where: Prisma.NotificationWhereInput = {
+        userId,
+        ...(includeArchived ? {} : { isArchived: false }),
+      };
 
-    if (filter) {
-      if (filter.type) {
-        where.type = Array.isArray(filter.type) 
-          ? { in: filter.type } 
-          : filter.type;
+      if (filter) {
+        if (filter.type) {
+          where.type = Array.isArray(filter.type) 
+            ? { in: filter.type } 
+            : filter.type;
+        }
+        if (filter.channel) {
+          where.channel = filter.channel;
+        }
+        if (filter.isRead !== undefined) {
+          where.isRead = filter.isRead;
+        }
+        if (filter.priority) {
+          where.priority = filter.priority;
+        }
       }
-      if (filter.channel) {
-        where.channel = filter.channel;
-      }
-      if (filter.isRead !== undefined) {
-        where.isRead = filter.isRead;
-      }
-      if (filter.priority) {
-        where.priority = filter.priority;
-      }
+
+      const [notifications, total] = await Promise.all([
+        prisma.notification.findMany({
+          where,
+          orderBy: [
+            { priority: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: limit,
+          skip: offset,
+        }),
+        prisma.notification.count({ where }),
+      ]);
+
+      log.info('User notifications fetched', { userId, total });
+
+      return {
+        notifications: notifications.map((n) => this.formatNotification(n)),
+        total,
+      };
+    } catch (error) {
+      log.error('Error fetching user notifications', { userId }, error);
+      throw error;
     }
-
-    const [notifications, total] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'desc' },
-        ],
-        take: limit,
-        skip: offset,
-      }),
-      prisma.notification.count({ where }),
-    ]);
-
-    return {
-      notifications: notifications.map((n) => this.formatNotification(n)),
-      total,
-    };
   }
 
-  /**
-   * Get unread notifications only
-   */
   static async getUnreadNotifications(
     userId: string,
     limit: number = 20
   ): Promise<NotificationWithMeta[]> {
-    const result = await this.getUserNotifications(userId, {
-      filter: { isRead: false },
-      limit,
-    });
+    try {
+      const result = await this.getUserNotifications(userId, {
+        filter: { isRead: false },
+        limit,
+      });
 
-    return result.notifications;
+      return result.notifications;
+    } catch (error) {
+      log.error('Error fetching unread notifications', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Get notification by ID
-   */
   static async getNotificationById(
     id: string,
     userId: string
   ): Promise<NotificationWithMeta | null> {
-    const notification = await prisma.notification.findFirst({
-      where: { id, userId },
-    });
+    try {
+      const notification = await prisma.notification.findFirst({
+        where: { id, userId },
+      });
 
-    return notification ? this.formatNotification(notification) : null;
+      return notification ? this.formatNotification(notification) : null;
+    } catch (error) {
+      log.error('Error fetching notification by ID', { id, userId }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // UNREAD COUNT
   // ===========================================================================
 
-  /**
-   * Get unread notification count
-   */
   static async getUnreadCount(userId: string): Promise<number> {
-    return prisma.notification.count({
-      where: {
-        userId,
-        isRead: false,
-        isArchived: false,
-        isDismissed: false,
-      },
-    });
+    try {
+      const count = await prisma.notification.count({
+        where: {
+          userId,
+          isRead: false,
+          isArchived: false,
+          isDismissed: false,
+        },
+      });
+
+      log.info('Unread count fetched', { userId, count });
+
+      return count;
+    } catch (error) {
+      log.error('Error fetching unread count', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Get notification stats
-   */
   static async getNotificationStats(userId: string): Promise<NotificationStats> {
-    const [total, unread, byType, byPriority] = await Promise.all([
-      prisma.notification.count({ where: { userId } }),
-      prisma.notification.count({
-        where: { userId, isRead: false, isArchived: false },
-      }),
-      prisma.notification.groupBy({
-        by: ['type'],
-        where: { userId, isArchived: false },
-        _count: true,
-      }),
-      prisma.notification.groupBy({
-        by: ['priority'],
-        where: { userId, isRead: false, isArchived: false },
-        _count: true,
-      }),
-    ]);
+    try {
+      const [total, unread, byType, byPriority] = await Promise.all([
+        prisma.notification.count({ where: { userId } }),
+        prisma.notification.count({
+          where: { userId, isRead: false, isArchived: false },
+        }),
+        prisma.notification.groupBy({
+          by: ['type'],
+          where: { userId, isArchived: false },
+          _count: true,
+        }),
+        prisma.notification.groupBy({
+          by: ['priority'],
+          where: { userId, isRead: false, isArchived: false },
+          _count: true,
+        }),
+      ]);
 
-    const byTypeMap: Record<string, number> = {};
-    byType.forEach((item) => {
-      byTypeMap[item.type] = item._count;
-    });
+      const byTypeMap: Record<string, number> = {};
+      byType.forEach((item) => {
+        byTypeMap[item.type] = item._count;
+      });
 
-    const byPriorityMap: Record<string, number> = {};
-    byPriority.forEach((item) => {
-      byPriorityMap[item.priority] = item._count;
-    });
+      const byPriorityMap: Record<string, number> = {};
+      byPriority.forEach((item) => {
+        byPriorityMap[item.priority] = item._count;
+      });
 
-    return {
-      total,
-      unread,
-      byType: byTypeMap,
-      byPriority: byPriorityMap,
-    };
+      log.info('Notification stats fetched', { userId });
+
+      return {
+        total,
+        unread,
+        byType: byTypeMap,
+        byPriority: byPriorityMap,
+      };
+    } catch (error) {
+      log.error('Error fetching notification stats', { userId }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // MARK AS READ
   // ===========================================================================
 
-  /**
-   * Mark specific notifications as read
-   */
   static async markAsRead(
     notificationIds: string[],
     userId: string
   ): Promise<{ count: number }> {
-    const result = await prisma.notification.updateMany({
-      where: {
-        id: { in: notificationIds },
-        userId,
-      },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
-    });
+    try {
+      const result = await prisma.notification.updateMany({
+        where: {
+          id: { in: notificationIds },
+          userId,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
 
-    return { count: result.count };
+      log.info('Notifications marked as read', { userId, count: result.count });
+
+      return { count: result.count };
+    } catch (error) {
+      log.error('Error marking notifications as read', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Mark single notification as read
-   */
   static async markOneAsRead(
     id: string,
     userId: string
   ): Promise<NotificationWithMeta | null> {
-    const notification = await prisma.notification.updateMany({
-      where: { id, userId },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
-    });
+    try {
+      const notification = await prisma.notification.updateMany({
+        where: { id, userId },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
 
-    if (notification.count === 0) return null;
+      if (notification.count === 0) return null;
 
-    return this.getNotificationById(id, userId);
+      log.info('Notification marked as read', { id, userId });
+
+      return this.getNotificationById(id, userId);
+    } catch (error) {
+      log.error('Error marking notification as read', { id, userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Mark all notifications as read
-   */
   static async markAllAsRead(userId: string): Promise<{ count: number }> {
-    const result = await prisma.notification.updateMany({
-      where: {
-        userId,
-        isRead: false,
-      },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
-    });
+    try {
+      const result = await prisma.notification.updateMany({
+        where: {
+          userId,
+          isRead: false,
+        },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
 
-    return { count: result.count };
+      log.info('All notifications marked as read', { userId, count: result.count });
+
+      return { count: result.count };
+    } catch (error) {
+      log.error('Error marking all notifications as read', { userId }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // ARCHIVE & DISMISS
   // ===========================================================================
 
-  /**
-   * Archive a notification
-   */
   static async archiveNotification(
     id: string,
     userId: string
   ): Promise<boolean> {
-    const result = await prisma.notification.updateMany({
-      where: { id, userId },
-      data: {
-        isArchived: true,
-        archivedAt: new Date(),
-      },
-    });
+    try {
+      const result = await prisma.notification.updateMany({
+        where: { id, userId },
+        data: {
+          isArchived: true,
+          archivedAt: new Date(),
+        },
+      });
 
-    return result.count > 0;
+      log.info('Notification archived', { id, userId });
+
+      return result.count > 0;
+    } catch (error) {
+      log.error('Error archiving notification', { id, userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Dismiss a notification
-   */
   static async dismissNotification(
     id: string,
     userId: string
   ): Promise<boolean> {
-    const result = await prisma.notification.updateMany({
-      where: { id, userId },
-      data: {
-        isDismissed: true,
-        dismissedAt: new Date(),
-      },
-    });
+    try {
+      const result = await prisma.notification.updateMany({
+        where: { id, userId },
+        data: {
+          isDismissed: true,
+          dismissedAt: new Date(),
+        },
+      });
 
-    return result.count > 0;
+      log.info('Notification dismissed', { id, userId });
+
+      return result.count > 0;
+    } catch (error) {
+      log.error('Error dismissing notification', { id, userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Archive all read notifications
-   */
   static async archiveAllRead(userId: string): Promise<{ count: number }> {
-    const result = await prisma.notification.updateMany({
-      where: {
-        userId,
-        isRead: true,
-        isArchived: false,
-      },
-      data: {
-        isArchived: true,
-        archivedAt: new Date(),
-      },
-    });
+    try {
+      const result = await prisma.notification.updateMany({
+        where: {
+          userId,
+          isRead: true,
+          isArchived: false,
+        },
+        data: {
+          isArchived: true,
+          archivedAt: new Date(),
+        },
+      });
 
-    return { count: result.count };
+      log.info('All read notifications archived', { userId, count: result.count });
+
+      return { count: result.count };
+    } catch (error) {
+      log.error('Error archiving all read notifications', { userId }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // DELETE
   // ===========================================================================
 
-  /**
-   * Delete a notification
-   */
   static async deleteNotification(
     id: string,
     userId: string
   ): Promise<boolean> {
     try {
-      await prisma.notification.delete({
-        
+      // ✅ FIXED: Use deleteMany instead of delete for composite conditions
+      const result = await prisma.notification.deleteMany({
         where: { id, userId },
       });
-      return true;
-    } catch {
+
+      log.info('Notification deleted', { id, userId });
+
+      return result.count > 0;
+    } catch (error) {
+      log.error('Error deleting notification', { id, userId }, error);
       return false;
     }
   }
 
-  /**
-   * Delete old notifications (cleanup)
-   */
   static async deleteOldNotifications(
     userId: string,
     daysOld: number = 30
   ): Promise<{ count: number }> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-    const result = await prisma.notification.deleteMany({
-      where: {
-        userId,
-        createdAt: { lt: cutoffDate },
-        isRead: true,
-      },
-    });
+      const result = await prisma.notification.deleteMany({
+        where: {
+          userId,
+          createdAt: { lt: cutoffDate },
+          isRead: true,
+        },
+      });
 
-    return { count: result.count };
+      log.info('Old notifications deleted', { userId, count: result.count, daysOld });
+
+      return { count: result.count };
+    } catch (error) {
+      log.error('Error deleting old notifications', { userId, daysOld }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // NOTIFICATION BUILDERS
   // ===========================================================================
 
-  /**
-   * Create achievement unlocked notification
-   */
   static async notifyAchievementUnlocked(
     userId: string,
     achievement: { title: string; icon: string; points: number }
   ): Promise<NotificationWithMeta> {
-    return this.createNotification(userId, {
-      type: NotificationType.ACHIEVEMENT_UNLOCKED,
-      priority: NotificationPriority.NORMAL,
-      title: '🏆 Achievement Unlocked!',
-      message: `You've earned "${achievement.title}" and received ${achievement.points} points!`,
-      shortMessage: `Unlocked: ${achievement.title}`,
-      actionUrl: '/dashboard/achievements',
-      actionLabel: 'View Achievement',
-      metadata: { achievement },
-    });
+    try {
+      return this.createNotification(userId, {
+        type: NotificationType.ACHIEVEMENT_UNLOCKED,
+        priority: NotificationPriority.NORMAL,
+        title: '🏆 Achievement Unlocked!',
+        message: `You've earned "${achievement.title}" and received ${achievement.points} points!`,
+        shortMessage: `Unlocked: ${achievement.title}`,
+        actionUrl: '/dashboard/achievements',
+        actionLabel: 'View Achievement',
+        metadata: { achievement },
+      });
+    } catch (error) {
+      log.error('Error creating achievement notification', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Create goal completed notification
-   */
   static async notifyGoalCompleted(
     userId: string,
     goal: { title: string; id: string }
   ): Promise<NotificationWithMeta> {
-    return this.createNotification(userId, {
-      type: NotificationType.GOAL_COMPLETED,
-      priority: NotificationPriority.NORMAL,
-      title: '🎯 Goal Completed!',
-      message: `Congratulations! You've completed your goal: "${goal.title}"`,
-      shortMessage: `Completed: ${goal.title}`,
-      actionUrl: `/goals/${goal.id}`,
-      actionLabel: 'View Goal',
-      entityType: 'goal',
-      entityId: goal.id,
-    });
+    try {
+      return this.createNotification(userId, {
+        type: NotificationType.GOAL_COMPLETED,
+        priority: NotificationPriority.NORMAL,
+        title: '🎯 Goal Completed!',
+        message: `Congratulations! You've completed your goal: "${goal.title}"`,
+        shortMessage: `Completed: ${goal.title}`,
+        actionUrl: `/goals/${goal.id}`,
+        actionLabel: 'View Goal',
+        entityType: 'goal',
+        entityId: goal.id,
+      });
+    } catch (error) {
+      log.error('Error creating goal completed notification', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Create streak at risk notification
-   */
   static async notifyStreakAtRisk(
     userId: string,
     currentStreak: number
   ): Promise<NotificationWithMeta> {
-    return this.createNotification(userId, {
-      type: NotificationType.STREAK_AT_RISK,
-      priority: NotificationPriority.HIGH,
-      title: '🔥 Streak at Risk!',
-      message: `Your ${currentStreak}-day streak is about to end! Complete some activity today to keep it going.`,
-      shortMessage: `${currentStreak}-day streak at risk`,
-      actionUrl: '/tracker',
-      actionLabel: 'Log Activity',
-    });
+    try {
+      return this.createNotification(userId, {
+        type: NotificationType.STREAK_AT_RISK,
+        priority: NotificationPriority.HIGH,
+        title: '🔥 Streak at Risk!',
+        message: `Your ${currentStreak}-day streak is about to end! Complete some activity today to keep it going.`,
+        shortMessage: `${currentStreak}-day streak at risk`,
+        actionUrl: '/tracker',
+        actionLabel: 'Log Activity',
+      });
+    } catch (error) {
+      log.error('Error creating streak at risk notification', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Create sync failed notification
-   */
   static async notifySyncFailed(
     userId: string,
     platform: { name: string; id: string },
     error: string
   ): Promise<NotificationWithMeta> {
-    return this.createNotification(userId, {
-      type: NotificationType.SYNC_FAILED,
-      priority: NotificationPriority.HIGH,
-      title: `❌ Sync Failed: ${platform.name}`,
-      message: `Failed to sync data from ${platform.name}. ${error}`,
-      shortMessage: `${platform.name} sync failed`,
-      actionUrl: '/connections',
-      actionLabel: 'Retry Sync',
-      entityType: 'platform',
-      entityId: platform.id,
-      metadata: { error },
-    });
+    try {
+      return this.createNotification(userId, {
+        type: NotificationType.SYNC_FAILED,
+        priority: NotificationPriority.HIGH,
+        title: `❌ Sync Failed: ${platform.name}`,
+        message: `Failed to sync data from ${platform.name}. ${error}`,
+        shortMessage: `${platform.name} sync failed`,
+        actionUrl: '/connections',
+        actionLabel: 'Retry Sync',
+        entityType: 'platform',
+        entityId: platform.id,
+        metadata: { error },
+      });
+    } catch (error) {
+      log.error('Error creating sync failed notification', { userId }, error);
+      throw error;
+    }
   }
 
-  /**
-   * Create welcome notification
-   */
   static async notifyWelcome(userId: string): Promise<NotificationWithMeta> {
-    return this.createNotification(userId, {
-      type: NotificationType.WELCOME,
-      priority: NotificationPriority.NORMAL,
-      title: '👋 Welcome to Progress Tracker!',
-      message: 'Get started by connecting your first platform and setting up your goals.',
-      actionUrl: '/connections',
-      actionLabel: 'Connect Platforms',
-    });
+    try {
+      return this.createNotification(userId, {
+        type: NotificationType.WELCOME,
+        priority: NotificationPriority.NORMAL,
+        title: '👋 Welcome to Progress Tracker!',
+        message: 'Get started by connecting your first platform and setting up your goals.',
+        actionUrl: '/connections',
+        actionLabel: 'Connect Platforms',
+      });
+    } catch (error) {
+      log.error('Error creating welcome notification', { userId }, error);
+      throw error;
+    }
   }
 
   // ===========================================================================
   // HELPER METHODS
   // ===========================================================================
 
-  /**
-   * Format notification for API response
-   */
   private static formatNotification(
-    notification: Prisma.NotificationGetPayload<object>
+    notification: Prisma.NotificationGetPayload<Record<string, never>>
   ): NotificationWithMeta {
     return {
       id: notification.id,
@@ -596,7 +659,6 @@ export class NotificationService {
       isArchived: notification.isArchived,
       isDismissed: notification.isDismissed,
       createdAt: notification.createdAt,
-      // Frontend-friendly alias
       read: notification.isRead,
     };
   }

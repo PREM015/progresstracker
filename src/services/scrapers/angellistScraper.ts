@@ -1,65 +1,30 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/angellistScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * angellistScraper
- * 
- * @description Service for handling angellistscraper operations
- * @created 2026-01-26
- */
+export class AngelListScraper extends BaseScraper {
+  platformName = 'AngelList';
+  platformSlug = 'angellist';
+  protected baseUrl = 'https://angel.co';
 
-export interface AngellistscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('AngelList requires username and password for login.');
+    }
 
-export interface AngellistscraperCreateInput {
-  // TODO: Define create input
-}
+    try {
+      // AngelList (now Wellfound) requires OAuth for data access
+      if (!credentials.accessToken) {
+        return this.failure('AngelList requires OAuth authentication.');
+      }
 
-export interface AngellistscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class AngellistscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<AngellistscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<AngellistscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: AngellistscraperCreateInput, userId: string): Promise<AngellistscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: AngellistscraperUpdateInput, userId: string): Promise<AngellistscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      return this.notSupported(
+        'AngelList has been rebranded to Wellfound. Please use the Wellfound integration or track startup applications manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const angellistscraperService = new AngellistscraperService();
-export default angellistscraperService;
+export default AngelListScraper;

@@ -1,65 +1,55 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/swocScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * swocScraper
- * 
- * @description Service for handling swocscraper operations
- * @created 2026-01-26
- */
+export class SWoCScraper extends BaseScraper {
+  platformName = 'Social Winter of Code';
+  platformSlug = 'swoc';
+  protected baseUrl = 'https://swoc.scriptindia.org';
 
-export interface SwocscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    try {
+      this.validateCredentials(credentials, ['username']);
+      const username = credentials.username!;
 
-export interface SwocscraperCreateInput {
-  // TODO: Define create input
-}
+      // Try to fetch from SWoC API/leaderboard if available
+      try {
+        const response = await this.get<{
+          contributions?: number;
+          prs_merged?: number;
+          points?: number;
+          rank?: number;
+        }>(`${this.baseUrl}/api/participant/${username}`);
 
-export interface SwocscraperUpdateInput {
-  // TODO: Define update input
-}
+        if (response) {
+          const entries = [
+            {
+              date: new Date(),
+              problems: response.contributions || response.prs_merged || 0,
+              points: response.points,
+              notes: `SWoC: ${response.prs_merged || 0} PRs merged, ${response.points || 0} points`,
+            },
+          ];
 
-class SwocscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<SwocscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
+          return this.success(entries, {
+            username,
+            profileUrl: `https://github.com/${username}`,
+            totalProblems: response.contributions || response.prs_merged,
+            points: response.points,
+            rank: response.rank?.toString(),
+          });
+        }
+      } catch {
+        // Fall through
+      }
 
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<SwocscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: SwocscraperCreateInput, userId: string): Promise<SwocscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: SwocscraperUpdateInput, userId: string): Promise<SwocscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      return this.notSupported(
+        'Social Winter of Code participant data not found. Please track your contributions, PRs merged, and points manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const swocscraperService = new SwocscraperService();
-export default swocscraperService;
+export default SWoCScraper;

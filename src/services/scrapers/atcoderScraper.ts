@@ -1,6 +1,6 @@
 // src/services/scrapers/atcoderScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 interface AtCoderSubmission {
   id: number;
@@ -35,7 +35,7 @@ export class AtCoderScraper extends BaseScraper {
 
       // Filter accepted submissions and count by date
       const accepted = submissions.filter((s) => s.result === 'AC');
-      
+
       const counts = this.countByDate(
         accepted,
         (s) => this.parseDate(s.epoch_second),
@@ -52,7 +52,7 @@ export class AtCoderScraper extends BaseScraper {
         profileUrl: `https://atcoder.jp/users/${username}`,
         totalProblems: accepted.length,
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

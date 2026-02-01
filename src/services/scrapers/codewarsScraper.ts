@@ -1,6 +1,6 @@
 // src/services/scrapers/codewarsScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 interface CodewarsUser {
   username: string;
@@ -12,6 +12,7 @@ interface CodewarsUser {
   codeChallenges: {
     totalCompleted: number;
   };
+  leaderboardPosition?: number;
 }
 
 interface CodewarsChallenge {
@@ -19,6 +20,12 @@ interface CodewarsChallenge {
   name: string;
   slug: string;
   completedAt: string;
+}
+
+interface CodewarsCompletedResponse {
+  data: CodewarsChallenge[];
+  totalPages: number;
+  totalItems: number;
 }
 
 export class CodewarsScraper extends BaseScraper {
@@ -32,12 +39,14 @@ export class CodewarsScraper extends BaseScraper {
       const username = credentials.username!;
 
       // Get user info
-      const user = await this.get<CodewarsUser>(
-        `${this.baseUrl}/users/${username}`
-      );
+      const user = await this.get<CodewarsUser>(`${this.baseUrl}/users/${username}`);
+
+      if (!user || !user.username) {
+        return this.failure(`Codewars user "${username}" not found`);
+      }
 
       // Get completed challenges
-      const completedResponse = await this.get<{ data: CodewarsChallenge[] }>(
+      const completedResponse = await this.get<CodewarsCompletedResponse>(
         `${this.baseUrl}/users/${username}/code-challenges/completed`,
         { page: 0 }
       );
@@ -61,8 +70,9 @@ export class CodewarsScraper extends BaseScraper {
         profileUrl: `https://www.codewars.com/users/${username}`,
         totalProblems: user.codeChallenges?.totalCompleted || 0,
         rank: user.ranks?.overall?.name,
+        reputation: user.honor,
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

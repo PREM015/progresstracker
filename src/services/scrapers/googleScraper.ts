@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/googleScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * googleScraper
- * 
- * @description Service for handling googlescraper operations
- * @created 2026-01-26
- */
+export class GoogleScraper extends BaseScraper {
+  platformName = 'Google Careers';
+  platformSlug = 'googlecareers';
+  protected baseUrl = 'https://careers.google.com';
 
-export interface GooglescraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Google Careers requires a username for tracking.');
+    }
 
-export interface GooglescraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface GooglescraperUpdateInput {
-  // TODO: Define update input
-}
-
-class GooglescraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<GooglescraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<GooglescraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: GooglescraperCreateInput, userId: string): Promise<GooglescraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: GooglescraperUpdateInput, userId: string): Promise<GooglescraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Google Careers doesn't have a public API for application tracking
+      return this.notSupported(
+        'Google Careers does not provide public API access. Please track your applications, phone screens, and onsite interviews manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const googlescraperService = new GooglescraperService();
-export default googlescraperService;
+export default GoogleScraper;

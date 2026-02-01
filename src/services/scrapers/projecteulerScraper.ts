@@ -1,65 +1,42 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/projecteulerScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * projecteulerScraper
- * 
- * @description Service for handling projecteulerscraper operations
- * @created 2026-01-26
- */
+export class ProjectEulerScraper extends BaseScraper {
+  platformName = 'Project Euler';
+  platformSlug = 'projecteuler';
+  protected baseUrl = 'https://projecteuler.net';
 
-export interface ProjecteulerscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    try {
+      this.validateCredentials(credentials, ['username']);
+      const username = credentials.username!;
 
-export interface ProjecteulerscraperCreateInput {
-  // TODO: Define create input
-}
+      // Project Euler has a simple public badge/image API
+      // But no comprehensive stats API
+      try {
+        // Check if user exists by trying to load their badge
 
-export interface ProjecteulerscraperUpdateInput {
-  // TODO: Define update input
-}
+        const badgeUrl = `${this.baseUrl}/profile/${username}.png`;
+        await this.get(badgeUrl);
 
-class ProjecteulerscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<ProjecteulerscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
 
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<ProjecteulerscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
+        // We can only verify existence, not get detailed stats
+        return this.notSupported(
+          'Project Euler provides limited public data (badge only). Please track your solved problems, level, and awards manually. You can verify your account at: ' +
+            badgeUrl
+        );
 
-  /**
-   * Create new item
-   */
-  async create(data: ProjecteulerscraperCreateInput, userId: string): Promise<ProjecteulerscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
+         
+      } catch {
+        return this.failure(`Project Euler user "${username}" not found`);
 
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: ProjecteulerscraperUpdateInput, userId: string): Promise<ProjecteulerscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      }
+    } catch (error) {
+      return this.handleError(error);
+      
+    }
   }
 }
 
-export const projecteulerscraperService = new ProjecteulerscraperService();
-export default projecteulerscraperService;
+export default ProjectEulerScraper;

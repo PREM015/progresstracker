@@ -1,6 +1,6 @@
 // src/services/scrapers/spojScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class SPOJScraper extends BaseScraper {
   platformName = 'SPOJ';
@@ -12,19 +12,25 @@ export class SPOJScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // SPOJ doesn't have a public API, need to scrape
-      // Try unofficial API first
+      // Try unofficial API
       try {
-        const response = await this.get<any>(
-          `https://spoj-api.vercel.app/user/${username}`
-        );
+        const response = await this.get<{
+          solved?: number;
+          rank?: number;
+          error?: string;
+        }>(`https://spoj-api.vercel.app/user/${username}`);
 
         if (response && !response.error) {
-          const entries = [{
-            date: new Date(),
-            problems: response.solved || 0,
-            notes: `Total problems solved on SPOJ: ${response.solved || 0}`,
-          }];
+          const entries =
+            response.solved && response.solved > 0
+              ? [
+                  {
+                    date: new Date(),
+                    problems: response.solved,
+                    notes: `Total problems solved on SPOJ: ${response.solved}`,
+                  },
+                ]
+              : [];
 
           return this.success(entries, {
             username,
@@ -37,10 +43,8 @@ export class SPOJScraper extends BaseScraper {
         // Fall through
       }
 
-      return this.notSupported(
-        'SPOJ requires web scraping. Please use manual tracking.'
-      );
-    } catch (error: any) {
+      return this.notSupported('SPOJ requires web scraping. Please use manual tracking.');
+    } catch (error) {
       return this.handleError(error);
     }
   }

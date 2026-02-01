@@ -1,65 +1,35 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/projecteulerScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * simplyhiredScraper
- * 
- * @description Service for handling simplyhiredscraper operations
- * @created 2026-01-26
- */
+export class ProjectEulerScraper extends BaseScraper {
+  platformName = 'Project Euler';
+  platformSlug = 'projecteuler';
+  protected baseUrl = 'https://projecteuler.net';
 
-export interface SimplyhiredscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    try {
+      this.validateCredentials(credentials, ['username']);
+      const username = credentials.username!;
 
-export interface SimplyhiredscraperCreateInput {
-  // TODO: Define create input
-}
+      // Project Euler has a simple public badge/image API
+      // But no comprehensive stats API
+      try {
+        // Check if user exists by trying to load their badge
+        const badgeUrl = `${this.baseUrl}/profile/${username}.png`;
 
-export interface SimplyhiredscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class SimplyhiredscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<SimplyhiredscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<SimplyhiredscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: SimplyhiredscraperCreateInput, userId: string): Promise<SimplyhiredscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: SimplyhiredscraperUpdateInput, userId: string): Promise<SimplyhiredscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+        // We can only verify existence, not get detailed stats
+        return this.notSupported(
+          'Project Euler provides limited public data (badge only). Please track your solved problems, level, and awards manually. You can verify your account at: ' +
+            badgeUrl
+        );
+      } catch {
+        return this.failure(`Project Euler user "${username}" not found`);
+      }
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const simplyhiredscraperService = new SimplyhiredscraperService();
-export default simplyhiredscraperService;
+export default ProjectEulerScraper;

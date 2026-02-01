@@ -1,65 +1,27 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/amazonScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * amazonScraper
- * 
- * @description Service for handling amazonscraper operations
- * @created 2026-01-26
- */
+export class AmazonScraper extends BaseScraper {
+  platformName = 'Amazon Jobs';
+  platformSlug = 'amazonjobs';
+  protected baseUrl = 'https://www.amazon.jobs';
 
-export interface AmazonscraperData {
-  // TODO: Define interface
-  id: string;
-}
 
-export interface AmazonscraperCreateInput {
-  // TODO: Define create input
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Amazon Jobs requires a username for tracking.');
+    }
 
-export interface AmazonscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class AmazonscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<AmazonscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<AmazonscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: AmazonscraperCreateInput, userId: string): Promise<AmazonscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: AmazonscraperUpdateInput, userId: string): Promise<AmazonscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Amazon Jobs doesn't have a public API for application tracking
+      return this.notSupported(
+        'Amazon Jobs does not provide public API access. Please track your applications, interviews, and OA completions manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const amazonscraperService = new AmazonscraperService();
-export default amazonscraperService;
+export default AmazonScraper;

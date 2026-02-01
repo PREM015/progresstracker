@@ -1,6 +1,20 @@
 // src/services/scrapers/geeksforgeeksScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+interface GFGStats {
+  userName: string;
+  solvedStats?: {
+    easy?: { count: number };
+    medium?: { count: number };
+    hard?: { count: number };
+  };
+  currentStreak?: number;
+  maxStreak?: number;
+  institutionRank?: number;
+  languagesUsed?: string[];
+  error?: string;
+}
 
 export class GeeksforGeeksScraper extends BaseScraper {
   platformName = 'GeeksforGeeks';
@@ -13,7 +27,7 @@ export class GeeksforGeeksScraper extends BaseScraper {
       const username = credentials.username!;
 
       // Use unofficial API
-      const response = await this.get<any>(
+      const response = await this.get<GFGStats>(
         `https://geeks-for-geeks-stats-api.vercel.app/?userName=${username}`
       );
 
@@ -21,19 +35,22 @@ export class GeeksforGeeksScraper extends BaseScraper {
         return this.failure(response?.error || `GFG user "${username}" not found`);
       }
 
-      const totalSolved =
-        (response.solvedStats?.easy?.count || 0) +
-        (response.solvedStats?.medium?.count || 0) +
-        (response.solvedStats?.hard?.count || 0);
+      const easy = response.solvedStats?.easy?.count || 0;
+      const medium = response.solvedStats?.medium?.count || 0;
+      const hard = response.solvedStats?.hard?.count || 0;
+      const totalSolved = easy + medium + hard;
 
       // GFG API doesn't provide date-wise data
-      const entries = totalSolved > 0
-        ? [{
-            date: new Date(),
-            problems: totalSolved,
-            notes: `Total solved on GFG: ${totalSolved} (Easy: ${response.solvedStats?.easy?.count || 0}, Medium: ${response.solvedStats?.medium?.count || 0}, Hard: ${response.solvedStats?.hard?.count || 0})`,
-          }]
-        : [];
+      const entries =
+        totalSolved > 0
+          ? [
+              {
+                date: new Date(),
+                problems: totalSolved,
+                notes: `Total solved on GFG: ${totalSolved} (Easy: ${easy}, Medium: ${medium}, Hard: ${hard})`,
+              },
+            ]
+          : [];
 
       return this.success(entries, {
         username,
@@ -41,8 +58,9 @@ export class GeeksforGeeksScraper extends BaseScraper {
         totalProblems: totalSolved,
         rank: response.institutionRank?.toString(),
         streak: response.currentStreak,
+        longestStreak: response.maxStreak,
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

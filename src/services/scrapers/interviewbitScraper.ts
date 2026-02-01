@@ -1,6 +1,6 @@
 // src/services/scrapers/interviewbitScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class InterviewBitScraper extends BaseScraper {
   platformName = 'InterviewBit';
@@ -12,19 +12,27 @@ export class InterviewBitScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // InterviewBit doesn't have a public API
-      // Try to get public profile data
+      // Try unofficial API
       try {
-        const response = await this.get<any>(
-          `https://interviewbit-api.vercel.app/user/${username}`
-        );
+        const response = await this.get<{
+          problemsSolved?: number;
+          score?: number;
+          rank?: number;
+          streak?: number;
+          error?: string;
+        }>(`https://interviewbit-api.vercel.app/user/${username}`);
 
         if (response && !response.error) {
-          const entries = [{
-            date: new Date(),
-            problems: response.problemsSolved || 0,
-            notes: `InterviewBit: ${response.problemsSolved || 0} problems solved, Score: ${response.score || 0}`,
-          }];
+          const entries =
+            response.problemsSolved && response.problemsSolved > 0
+              ? [
+                  {
+                    date: new Date(),
+                    problems: response.problemsSolved,
+                    notes: `InterviewBit: ${response.problemsSolved} problems solved, Score: ${response.score || 0}`,
+                  },
+                ]
+              : [];
 
           return this.success(entries, {
             username,
@@ -38,10 +46,8 @@ export class InterviewBitScraper extends BaseScraper {
         // Fall through
       }
 
-      return this.notSupported(
-        'InterviewBit requires web scraping. Please use manual tracking.'
-      );
-    } catch (error: any) {
+      return this.notSupported('InterviewBit requires web scraping. Please use manual tracking.');
+    } catch (error) {
       return this.handleError(error);
     }
   }

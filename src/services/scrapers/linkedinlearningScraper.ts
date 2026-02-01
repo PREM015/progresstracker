@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/linkedinlearningScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * linkedinlearningScraper
- * 
- * @description Service for handling linkedinlearningscraper operations
- * @created 2026-01-26
- */
+export class LinkedInLearningScraper extends BaseScraper {
+  platformName = 'LinkedIn Learning';
+  platformSlug = 'linkedinlearning';
+  protected baseUrl = 'https://www.linkedin.com/learning';
 
-export interface LinkedinlearningscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    try {
+      if (!credentials.accessToken) {
+        return this.failure('LinkedIn Learning requires OAuth authentication through LinkedIn.');
+      }
 
-export interface LinkedinlearningscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface LinkedinlearningscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class LinkedinlearningscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<LinkedinlearningscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<LinkedinlearningscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: LinkedinlearningscraperCreateInput, userId: string): Promise<LinkedinlearningscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: LinkedinlearningscraperUpdateInput, userId: string): Promise<LinkedinlearningscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      // LinkedIn Learning API is part of LinkedIn's restricted API
+      return this.notSupported(
+        'LinkedIn Learning API requires special permissions through LinkedIn. Please track your completed courses, certificates, and learning hours manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const linkedinlearningscraperService = new LinkedinlearningscraperService();
-export default linkedinlearningscraperService;
+export default LinkedInLearningScraper;

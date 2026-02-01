@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/glassdoorScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * glassdoorScraper
- * 
- * @description Service for handling glassdoorscraper operations
- * @created 2026-01-26
- */
+export class GlassdoorScraper extends BaseScraper {
+  platformName = 'Glassdoor';
+  platformSlug = 'glassdoor';
+  protected baseUrl = 'https://www.glassdoor.com';
 
-export interface GlassdoorscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Glassdoor requires a username for tracking.');
+    }
 
-export interface GlassdoorscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface GlassdoorscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class GlassdoorscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<GlassdoorscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<GlassdoorscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: GlassdoorscraperCreateInput, userId: string): Promise<GlassdoorscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: GlassdoorscraperUpdateInput, userId: string): Promise<GlassdoorscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Glassdoor doesn't provide public API for job application tracking
+      return this.notSupported(
+        'Glassdoor does not provide public API access for application tracking. Please track your applications, company research, and interview preparations manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const glassdoorscraperService = new GlassdoorscraperService();
-export default glassdoorscraperService;
+export default GlassdoorScraper;

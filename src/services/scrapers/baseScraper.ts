@@ -1,119 +1,167 @@
 // src/services/scrapers/baseScraper.ts
-
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { logger } from '@/lib/logger';
-
-export interface ScraperCredentials {
-  username?: string;
-  token?: string;
-  email?: string;
-  password?: string;
-  apiKey?: string;
-  cookies?: string;
-  accessToken?: string;
-  refreshToken?: string;
-}
-
-export interface ScraperEntry {
-  date: Date;
-  problems?: number;
-  timeSpent?: number;
-  notes?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface ScraperResult {
-  success: boolean;
-  entries: ScraperEntry[];
-  error?: string;
-  metadata?: {
-    username?: string;
-    profileUrl?: string;
-    lastFetched?: Date;
-    totalProblems?: number;
-    rating?: number;
-    rank?: string;
-    streak?: number;
-    [key: string]: any;
-  };
-}
-
-export interface RateLimitConfig {
-  requests: number;
-  windowMs: number;
-}
+import { userAgentManager } from './userAgentManager';
+import { rateLimitManager } from './rateLimitManager';
+import { proxyManager } from './proxyManager';
+import { ScraperErrorCode } from './constants';
+import { dateUtils, sleep, retryWithBackoff } from './utils';
+import type {
+  ScraperCredentials,
+  ScraperEntry,
+  ScraperResult,
+  ScraperMetadata,
+  ScraperConfig,
+  ScraperCapabilities,
+  RateLimitConfig,
+} from './types';
 
 export abstract class BaseScraper {
   abstract platformName: string;
   abstract platformSlug: string;
-  
+
   protected baseUrl: string = '';
   protected timeout: number = 30000;
   protected maxRetries: number = 3;
   protected retryDelay: number = 1000;
   protected rateLimit: RateLimitConfig = { requests: 60, windowMs: 60000 };
+  protected useProxy: boolean = false;
+  protected requiresAuth: boolean = false;
 
   // Abstract method - must be implemented by each scraper
   abstract fetchData(credentials: ScraperCredentials): Promise<ScraperResult>;
 
-  // HTTP request with retry logic
-  protected async request<T = any>(
-    url: string,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> {
-    return this.retryRequest(() =>
-      axios({
-        url,
-        timeout: this.timeout,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          ...config?.headers,
-        },
-        ...config,
-      })
-    );
+  /**
+   * Get scraper capabilities
+   */
+  getCapabilities(): ScraperCapabilities {
+    return {
+      supportsDateRange: true,
+      supportsIncremental: false,
+      requiresAuth: this.requiresAuth,
+      requiresOAuth: false,
+      requiresApiKey: false,
+      supportsPagination: false,
+      hasRateLimit: true,
+      needsScraping: true,
+    };
   }
 
-  // GET request helper
-  protected async get<T = any>(
-    url: string,
-    params?: Record<string, any>,
-    headers?: Record<string, string>
-  ): Promise<T> {
-    const response = await this.request<T>(url, { method: 'GET', params, headers });
-    return response.data;
-  }
-
-  // POST request helper
-  protected async post<T = any>(
-    url: string,
-    data?: any,
-    headers?: Record<string, string>
-  ): Promise<T> {
-    const response = await this.request<T>(url, { method: 'POST', data, headers });
-    return response.data;
-  }
-
-  // Retry wrapper with exponential backoff
-  protected async retryRequest<T>(
-    fn: () => Promise<T>,
-    retries: number = this.maxRetries,
-    delay: number = this.retryDelay
-  ): Promise<T> {
-    try {
-      return await fn();
-    } catch (error: any) {
-      if (retries > 0 && this.isRetryableError(error)) {
-        logger.info(`[${this.platformName}] Retrying in ${delay}ms... (${retries} attempts left)`);
-        await this.sleep(delay);
-        return this.retryRequest(fn, retries - 1, Math.min(delay * 2, 30000));
-      }
-      throw error;
+  /**
+   * Configure scraper
+   */
+  configure(config: ScraperConfig): void {
+    if (config.timeout) this.timeout = config.timeout;
+    if (config.maxRetries) this.maxRetries = config.maxRetries;
+    if (config.retryDelay) this.retryDelay = config.retryDelay;
+    if (config.rateLimit) {
+      this.rateLimit = config.rateLimit;
+      rateLimitManager.configure(this.platformSlug, config.rateLimit);
     }
   }
 
-  // Check if error is retryable
-  protected isRetryableError(error: any): boolean {
+  /**
+   * HTTP request with retry logic and rate limiting
+   */
+  protected async request<T = unknown>(
+    url: string,
+    config?: AxiosRequestConfig
+  ): Promise<AxiosResponse<T>> {
+    // Wait for rate limit
+    await rateLimitManager.acquire(this.platformSlug);
+
+    const requestConfig: AxiosRequestConfig = {
+      url,
+      timeout: this.timeout,
+      headers: {
+        'User-Agent': userAgentManager.getForPlatform(this.platformSlug),
+        Accept: 'application/json, text/html, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        ...config?.headers,
+      },
+      ...config,
+    };
+
+    // Add proxy if enabled
+    if (this.useProxy && proxyManager.isEnabled()) {
+      const proxy = proxyManager.getNext();
+      if (proxy) {
+        requestConfig.proxy = {
+          host: proxy.host,
+          port: proxy.port,
+          protocol: proxy.protocol,
+          auth:
+            proxy.username && proxy.password
+              ? { username: proxy.username, password: proxy.password }
+              : undefined,
+        };
+      }
+    }
+
+    return retryWithBackoff(() => axios(requestConfig), this.maxRetries, this.retryDelay);
+  }
+
+  /**
+   * GET request helper
+   */
+  protected async get<T = unknown>(
+    url: string,
+    params?: Record<string, unknown>,
+    headers?: Record<string, string>
+  ): Promise<T> {
+    const response = await this.request<T>(url, {
+      method: 'GET',
+      params,
+      headers,
+    });
+    return response.data;
+  }
+
+  /**
+   * POST request helper
+   */
+  protected async post<T = unknown>(
+    url: string,
+    data?: unknown,
+    headers?: Record<string, string>
+  ): Promise<T> {
+    const response = await this.request<T>(url, {
+      method: 'POST',
+      data,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+    });
+    return response.data;
+  }
+
+  /**
+   * GraphQL request helper
+   */
+  protected async graphql<T = unknown>(
+    url: string,
+    query: string,
+    variables?: Record<string, unknown>,
+    headers?: Record<string, string>
+  ): Promise<T> {
+    const response = await this.post<{ data: T; errors?: Array<{ message: string }> }>(
+      url,
+      { query, variables },
+      headers
+    );
+
+    if (response.errors?.length) {
+      throw new Error(response.errors[0].message);
+    }
+
+    return response.data;
+  }
+
+  /**
+   * Check if error is retryable
+   */
+  protected isRetryableError(error: unknown): boolean {
     if (error instanceof AxiosError) {
       const status = error.response?.status;
       return (
@@ -123,40 +171,69 @@ export abstract class BaseScraper {
         status === 408 ||
         error.code === 'ECONNABORTED' ||
         error.code === 'ECONNRESET' ||
-        error.code === 'ETIMEDOUT'
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ENOTFOUND'
       );
     }
     return false;
   }
 
-  // Error handler - returns standardized error result
-  protected handleError(error: any): ScraperResult {
-    logger.error(`[${this.platformName}] Scraper error:`, error instanceof Error ? error : new Error(String(error)));
+  /**
+   * Handle errors and return standardized result
+   */
+  protected handleError(error: unknown): ScraperResult {
+    const logContext = { platform: this.platformName };
+
+    if (error instanceof Error) {
+      logger.error(`[${this.platformName}] Scraper error`, logContext, error);
+    } else {
+      logger.error(
+        `[${this.platformName}] Scraper error`,
+        logContext,
+        new Error(String(error))
+      );
+    }
 
     let errorMessage = 'An unknown error occurred';
+    let errorCode: string = ScraperErrorCode.UNKNOWN;
 
     if (error instanceof AxiosError) {
       const status = error.response?.status;
+
       switch (status) {
         case 401:
           errorMessage = 'Authentication failed. Please reconnect your account.';
+          errorCode = ScraperErrorCode.AUTH_FAILED;
           break;
         case 403:
           errorMessage = 'Access forbidden. Your account may not have required permissions.';
+          errorCode = ScraperErrorCode.BLOCKED;
           break;
         case 404:
           errorMessage = `User not found on ${this.platformName}. Please check your username.`;
+          errorCode = ScraperErrorCode.USER_NOT_FOUND;
           break;
         case 429:
           errorMessage = 'Rate limited. Please try again in a few minutes.';
+          errorCode = ScraperErrorCode.RATE_LIMITED;
           break;
         case 500:
         case 502:
         case 503:
+        case 504:
           errorMessage = `${this.platformName} is temporarily unavailable. Please try again later.`;
+          errorCode = ScraperErrorCode.PLATFORM_DOWN;
           break;
         default:
-          errorMessage = error.message || `Failed to fetch data from ${this.platformName}`;
+          if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            errorMessage = `Request to ${this.platformName} timed out. Please try again.`;
+            errorCode = ScraperErrorCode.TIMEOUT;
+          } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+            errorMessage = `Unable to connect to ${this.platformName}. Please check your network.`;
+            errorCode = ScraperErrorCode.NETWORK_ERROR;
+          } else {
+            errorMessage = error.message || `Failed to fetch data from ${this.platformName}`;
+          }
       }
     } else if (error instanceof Error) {
       errorMessage = error.message;
@@ -166,57 +243,50 @@ export abstract class BaseScraper {
       success: false,
       entries: [],
       error: errorMessage,
+      errorCode,
     };
   }
 
-  // Sleep utility
-  protected sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  // Parse date from various formats
+  /**
+   * Parse date from various formats
+   */
   protected parseDate(input: string | number | Date): Date {
-    if (input instanceof Date) return input;
-    
-    if (typeof input === 'number') {
-      // Unix timestamp (seconds or milliseconds)
-      return new Date(input < 10000000000 ? input * 1000 : input);
-    }
-    
-    return new Date(input);
+    return dateUtils.parse(input);
   }
 
-  // Get date string in YYYY-MM-DD format
+  /**
+   * Get date string in YYYY-MM-DD format
+   */
   protected toDateString(date: Date): string {
-    return date.toISOString().split('T')[0];
+    return dateUtils.toDateString(date);
   }
 
-  // Get dates from last N days
+  /**
+   * Get date range for last N days
+   */
   protected getDateRange(days: number): { start: Date; end: Date } {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - days);
-    return { start, end };
+    return dateUtils.getRange(days);
   }
 
-  // Group items by date
-  protected groupByDate<T>(
-    items: T[],
-    getDate: (item: T) => Date
-  ): Map<string, T[]> {
+  /**
+   * Group items by date
+   */
+  protected groupByDate<T>(items: T[], getDate: (item: T) => Date): Map<string, T[]> {
     const groups = new Map<string, T[]>();
-    
+
     for (const item of items) {
       const dateStr = this.toDateString(getDate(item));
       const existing = groups.get(dateStr) || [];
       existing.push(item);
       groups.set(dateStr, existing);
     }
-    
+
     return groups;
   }
 
-  // Count unique items by date
+  /**
+   * Count unique items by date
+   */
   protected countByDate<T>(
     items: T[],
     getDate: (item: T) => Date,
@@ -224,10 +294,10 @@ export abstract class BaseScraper {
   ): Map<string, number> {
     const counts = new Map<string, number>();
     const seen = new Map<string, Set<string>>();
-    
+
     for (const item of items) {
       const dateStr = this.toDateString(getDate(item));
-      
+
       if (getId) {
         const id = getId(item);
         const seenIds = seen.get(dateStr) || new Set();
@@ -235,14 +305,16 @@ export abstract class BaseScraper {
         seenIds.add(id);
         seen.set(dateStr, seenIds);
       }
-      
+
       counts.set(dateStr, (counts.get(dateStr) || 0) + 1);
     }
-    
+
     return counts;
   }
 
-  // Convert count map to entries
+  /**
+   * Convert count map to entries
+   */
   protected countsToEntries(
     counts: Map<string, number>,
     noteTemplate: (count: number) => string
@@ -254,23 +326,24 @@ export abstract class BaseScraper {
     }));
   }
 
-  // Validate required credentials
+  /**
+   * Validate required credentials
+   */
   protected validateCredentials(
     credentials: ScraperCredentials,
     required: (keyof ScraperCredentials)[]
   ): void {
     for (const field of required) {
       if (!credentials[field]) {
-        throw new Error(`${this.platformName} requires ${field}`);
+        throw new Error(`${this.platformName} requires ${String(field)}`);
       }
     }
   }
 
-  // Create success result
-  protected success(
-    entries: ScraperEntry[],
-    metadata?: ScraperResult['metadata']
-  ): ScraperResult {
+  /**
+   * Create success result
+   */
+  protected success(entries: ScraperEntry[], metadata?: ScraperMetadata): ScraperResult {
     return {
       success: true,
       entries,
@@ -281,23 +354,41 @@ export abstract class BaseScraper {
     };
   }
 
-  // Create failure result
-  protected failure(error: string): ScraperResult {
+  /**
+   * Create failure result
+   */
+  protected failure(error: string, errorCode: string = ScraperErrorCode.UNKNOWN): ScraperResult {
     return {
       success: false,
       entries: [],
       error,
+      errorCode,
     };
   }
 
-  // Create placeholder result for unsupported platforms
+  /**
+   * Create not supported result
+   */
   protected notSupported(reason?: string): ScraperResult {
     return {
       success: false,
       entries: [],
-      error: reason || `Auto-sync for ${this.platformName} is not yet available. Please use manual tracking.`,
+      error:
+        reason ||
+        `Auto-sync for ${this.platformName} is not yet available. Please use manual tracking.`,
+      errorCode: ScraperErrorCode.NOT_SUPPORTED,
     };
+  }
+
+  /**
+   * Sleep utility
+   */
+  protected sleep(ms: number): Promise<void> {
+    return sleep(ms);
   }
 }
 
 export default BaseScraper;
+
+// Re-export types for convenience
+export type { ScraperCredentials, ScraperEntry, ScraperResult, ScraperMetadata };

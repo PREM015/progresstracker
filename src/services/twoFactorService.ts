@@ -1,5 +1,5 @@
 // src/services/twoFactorService.ts
-// Complete 2FA service with TOTP and backup codes
+
 
 import { prisma } from '@/lib/prisma';
 import { authenticator } from 'otplib';

@@ -1,15 +1,14 @@
 // src/services/export/csvExport.ts
-
-import Papa from 'papaparse';
-import type { ExportData, ExportResult } from '@/types/export';
-import { format } from 'date-fns';
 import { logger } from '@/lib/logger';
+import type { ExportData, ExportResult } from '@/types/export';
+import Papa from 'papaparse';
+
+const log = logger.child({ service: 'CSVExport' });
 
 export async function generateCSV(data: ExportData): Promise<ExportResult> {
   try {
-    // Prepare tracker entries for CSV
-    const csvData = data.trackerEntries?.map((entry) => ({
-      Date: format(new Date(entry.date), 'yyyy-MM-dd'),
+    const csvData = data.trackerEntries.map((entry) => ({
+      Date: entry.date,
       Platform: entry.platform,
       Category: entry.category,
       'Problems Solved': entry.problemsSolved || 0,
@@ -19,25 +18,22 @@ export async function generateCSV(data: ExportData): Promise<ExportResult> {
       'Time Spent (min)': entry.timeSpent || 0,
       Mood: entry.mood || '',
       Notes: entry.notes || '',
-    })) || [];
+    }));
 
-    // Generate CSV string
-    const csv = Papa.unparse(csvData, {
-      quotes: true,
-      header: true,
-    });
+    const csv = Papa.unparse(csvData);
+    const fileName = `progress-tracker-${new Date().toISOString().split('T')[0]}.csv`;
 
-    // Generate filename
-    const fileName = `codesync-export-${format(data.exportDate, 'yyyy-MM-dd')}.csv`;
+    log.info('CSV export generated', { fileName, rows: csvData.length });
 
     return {
       success: true,
       format: 'csv',
       fileName,
       data: csv,
+  
     };
   } catch (error) {
-    logger.error('CSV generation error:', error as Error);
+    log.error('Error generating CSV export', {}, error);
     return {
       success: false,
       format: 'csv',
@@ -46,3 +42,5 @@ export async function generateCSV(data: ExportData): Promise<ExportResult> {
     };
   }
 }
+
+export default generateCSV;

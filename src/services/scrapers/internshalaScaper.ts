@@ -1,6 +1,6 @@
 // src/services/scrapers/internshalaScaper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class InternshalaScaper extends BaseScraper {
   platformName = 'Internshala';
@@ -8,12 +8,15 @@ export class InternshalaScaper extends BaseScraper {
   protected baseUrl = 'https://internshala.com';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('Internshala requires username and password for login.');
+    }
+
     try {
-      // Internshala requires authentication for application data
       return this.notSupported(
         'Internshala requires login credentials. Please track internship applications manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

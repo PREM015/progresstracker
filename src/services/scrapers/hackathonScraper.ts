@@ -1,65 +1,34 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/hackathoncomScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * hackathonScraper
- * 
- * @description Service for handling hackathonscraper operations
- * @created 2026-01-26
- */
+export class HackathonComScraper extends BaseScraper {
+  platformName = 'Hackathon.com';
+  platformSlug = 'hackathoncom';
+  protected baseUrl = 'https://www.hackathon.com';
 
-export interface HackathonscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Hackathon.com requires a username for tracking.');
+    }else if (!credentials.password) {
+      return this.failure('Hackathon.com requires a password for tracking.');
+    }
 
-export interface HackathonscraperCreateInput {
-  // TODO: Define create input
-}
+    try {
+      this.validateCredentials(credentials, ['username']);
+      const username = credentials.username!;
+      if (!username) {
+        return this.failure('Hackathon.com requires a valid username for tracking.');
+      }
 
-export interface HackathonscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class HackathonscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<HackathonscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<HackathonscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: HackathonscraperCreateInput, userId: string): Promise<HackathonscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: HackathonscraperUpdateInput, userId: string): Promise<HackathonscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      // Hackathon.com has limited public API
+      return this.notSupported(
+        'Hackathon.com requires web scraping for participation data. Please track your hackathon submissions and awards manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const hackathonscraperService = new HackathonscraperService();
-export default hackathonscraperService;
+export default HackathonComScraper;

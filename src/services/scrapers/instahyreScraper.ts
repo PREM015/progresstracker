@@ -1,6 +1,6 @@
 // src/services/scrapers/instahyreScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class InstahyreScraper extends BaseScraper {
   platformName = 'Instahyre';
@@ -8,12 +8,15 @@ export class InstahyreScraper extends BaseScraper {
   protected baseUrl = 'https://www.instahyre.com';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('Instahyre requires username and password for login.');
+    }
+
     try {
-      // Instahyre requires login
       return this.notSupported(
         'Instahyre requires login credentials. Please track job matches manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

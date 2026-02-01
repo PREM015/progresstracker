@@ -1,6 +1,27 @@
 // src/services/scrapers/exercismScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+interface ExercismProfile {
+  profile: {
+    user: {
+      handle: string;
+      reputation: number;
+      avatar_url: string;
+    };
+  };
+}
+
+interface ExercismSolution {
+  uuid: string;
+  exercise: { slug: string; title: string };
+  published_at?: string;
+  completed_at?: string;
+}
+
+interface ExercismSolutionsResponse {
+  results: ExercismSolution[];
+}
 
 export class ExercismScraper extends BaseScraper {
   platformName = 'Exercism';
@@ -13,14 +34,18 @@ export class ExercismScraper extends BaseScraper {
       const username = credentials.username!;
 
       // Get profile
-      const profileResponse = await this.get<any>(
+      const profileResponse = await this.get<ExercismProfile>(
         `${this.baseUrl}/profiles/${username}`
       );
+
+      if (!profileResponse?.profile?.user) {
+        return this.failure(`Exercism user "${username}" not found`);
+      }
 
       const profile = profileResponse.profile;
 
       // Get solutions
-      const solutionsResponse = await this.get<any>(
+      const solutionsResponse = await this.get<ExercismSolutionsResponse>(
         `${this.baseUrl}/profiles/${username}/solutions`
       );
 
@@ -28,9 +53,9 @@ export class ExercismScraper extends BaseScraper {
 
       // Group by date
       const counts = this.countByDate(
-        solutions.filter((s: any) => s.published_at || s.completed_at),
-        (s: any) => this.parseDate(s.published_at || s.completed_at),
-        (s: any) => s.uuid
+        solutions.filter((s) => s.published_at || s.completed_at),
+        (s) => this.parseDate(s.published_at || s.completed_at!),
+        (s) => s.uuid
       );
 
       const entries = this.countsToEntries(
@@ -41,9 +66,11 @@ export class ExercismScraper extends BaseScraper {
       return this.success(entries, {
         username,
         profileUrl: `https://exercism.org/profiles/${username}`,
+        avatarUrl: profile.user.avatar_url,
         totalProblems: solutions.length,
+        reputation: profile.user.reputation,
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

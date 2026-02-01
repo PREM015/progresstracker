@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/email.ts
 
 import nodemailer from 'nodemailer';
@@ -20,28 +22,33 @@ interface SendEmailOptions {
   text?: string;
   from?: string;
 }
+// src/lib/email.ts
+// Re-export everything from the email module
+export * from './email/index';
 
-/**
- * Send email
- */
-export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const { to, subject, html, text, from } = options;
+// Backward compatibility: simple sendEmail function
+import { emailService } from './email/index';
 
-  try {
-    await transporter.sendMail({
-      from: from || process.env.SMTP_FROM || 'CodeSync <noreply@codesync.pro>',
-      to: Array.isArray(to) ? to.join(', ') : to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]*>/g, ''),
-    });
+export async function sendEmail(options: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+  from?: string;
+}): Promise<void> {
+  const result = await emailService.send({
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    text: options.text,
+    from: options.from,
+  });
 
-    console.log(`Email sent to ${to}`);
-  } catch (error) {
-    console.error('Email send error:', error);
-    throw new Error('Failed to send email');
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to send email');
   }
 }
+
 
 /**
  * Email templates
@@ -52,10 +59,13 @@ export const emailTemplates = {
    */
   welcome: (name: string, username: string) => ({
     subject: 'Welcome to CodeSync Pro! 🚀',
+
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #3b82f6;">Welcome to CodeSync Pro!</h1>
-        <p>Hi ${name},</p>
+        <p>Hi ${name},
+          
+        </p>
         <p>Thank you for joining CodeSync Pro. We're excited to help you track your coding progress across multiple platforms.</p>
         <p>Your username: <strong>@${username}</strong></p>
         <p>Get started by:</p>

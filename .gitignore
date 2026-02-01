@@ -55,3 +55,4 @@ phase.md
 
 # Sentry Config File
 .env.sentry-build-plugin
+src/full.txt

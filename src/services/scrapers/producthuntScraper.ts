@@ -1,6 +1,6 @@
 // src/services/scrapers/producthuntScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class ProductHuntScraper extends BaseScraper {
   platformName = 'Product Hunt';
@@ -8,6 +8,10 @@ export class ProductHuntScraper extends BaseScraper {
   protected baseUrl = 'https://api.producthunt.com/v2';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('Product Hunt requires username and password for login.');
+    }
+
     try {
       if (!credentials.accessToken) {
         return this.failure('Product Hunt requires OAuth authentication.');
@@ -16,7 +20,7 @@ export class ProductHuntScraper extends BaseScraper {
       return this.notSupported(
         'Product Hunt API access is limited. Please track launches manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

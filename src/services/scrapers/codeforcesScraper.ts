@@ -1,6 +1,6 @@
 // src/services/scrapers/codeforcesScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 interface CodeforcesSubmission {
   id: number;
@@ -9,6 +9,7 @@ interface CodeforcesSubmission {
     contestId: number;
     index: string;
     name: string;
+    rating?: number;
   };
   verdict: string;
 }
@@ -18,6 +19,17 @@ interface CodeforcesUser {
   rating?: number;
   maxRating?: number;
   rank?: string;
+  maxRank?: string;
+  contribution?: number;
+  friendOfCount?: number;
+  avatar?: string;
+  titlePhoto?: string;
+}
+
+interface CodeforcesResponse<T> {
+  status: string;
+  result: T;
+  comment?: string;
 }
 
 export class CodeforcesScraper extends BaseScraper {
@@ -31,36 +43,32 @@ export class CodeforcesScraper extends BaseScraper {
       const handle = credentials.username!;
 
       // Fetch user info
-      const userResponse = await this.get<{
-        status: string;
-        result: CodeforcesUser[];
-      }>(`${this.baseUrl}/user.info`, { handles: handle });
+      const userResponse = await this.get<CodeforcesResponse<CodeforcesUser[]>>(
+        `${this.baseUrl}/user.info`,
+        { handles: handle }
+      );
 
-      if (userResponse.status !== 'OK') {
-        return this.failure('Failed to fetch user info from Codeforces');
+      if (userResponse.status !== 'OK' || !userResponse.result?.[0]) {
+        return this.failure(`Codeforces user "${handle}" not found`);
       }
 
       const user = userResponse.result[0];
 
       // Fetch submissions
-      const submissionsResponse = await this.get<{
-        status: string;
-        result: CodeforcesSubmission[];
-      }>(`${this.baseUrl}/user.status`, {
-        handle,
-        from: 1,
-        count: 1000,
-      });
+      const { start } = this.getDateRange(90);
+      const submissionsResponse = await this.get<CodeforcesResponse<CodeforcesSubmission[]>>(
+        `${this.baseUrl}/user.status`,
+        { handle, from: 1, count: 1000 }
+      );
 
       if (submissionsResponse.status !== 'OK') {
         return this.failure('Failed to fetch submissions from Codeforces');
       }
 
-      const submissions = submissionsResponse.result;
-      const { start } = this.getDateRange(90);
+      const submissions = submissionsResponse.result || [];
       const sinceTimestamp = start.getTime() / 1000;
 
-      // Filter accepted submissions from last 90 days
+      // Filter accepted submissions from date range
       const acceptedSubmissions = submissions.filter(
         (sub) => sub.verdict === 'OK' && sub.creationTimeSeconds >= sinceTimestamp
       );
@@ -80,10 +88,14 @@ export class CodeforcesScraper extends BaseScraper {
       return this.success(entries, {
         username: handle,
         profileUrl: `https://codeforces.com/profile/${handle}`,
+        avatarUrl: user.titlePhoto || user.avatar,
         rating: user.rating,
+        maxRating: user.maxRating,
         rank: user.rank,
+        contributions: user.contribution,
+        followers: user.friendOfCount,
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

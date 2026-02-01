@@ -1,6 +1,18 @@
 // src/services/scrapers/hackerrankScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+interface HackerRankSubmission {
+  slug: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface HackerRankResponse {
+  models: HackerRankSubmission[];
+  total: number;
+}
 
 export class HackerRankScraper extends BaseScraper {
   platformName = 'HackerRank';
@@ -12,40 +24,48 @@ export class HackerRankScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // HackerRank has some public API endpoints
-      const profileResponse = await this.get<any>(
-        `${this.baseUrl}/hackers/${username}/scores_elo`
-      );
+      // Try to fetch recent challenges
+      try {
+        const response = await this.get<HackerRankResponse>(
+          `${this.baseUrl}/hackers/${username}/recent_challenges`,
+          { limit: 100 }
+        );
 
-      const submissionsResponse = await this.get<any>(
-        `${this.baseUrl}/hackers/${username}/recent_challenges`,
-        { limit: 100 }
-      );
+        const submissions = response?.models || [];
 
-      const submissions = submissionsResponse?.models || [];
+        if (submissions.length === 0) {
+          return this.success([], {
+            username,
+            profileUrl: `https://www.hackerrank.com/profile/${username}`,
+            totalProblems: 0,
+          });
+        }
 
-      // Group by date
-      const counts = this.countByDate(
-        submissions,
-        (s: any) => this.parseDate(s.created_at || s.updated_at),
-        (s: any) => s.slug
-      );
+        // Group by date
+        const counts = this.countByDate(
+          submissions,
+          (s) => this.parseDate(s.created_at || s.updated_at),
+          (s) => s.slug
+        );
 
-      const entries = this.countsToEntries(
-        counts,
-        (count) => `Completed ${count} challenge${count > 1 ? 's' : ''} on HackerRank`
-      );
+        const entries = this.countsToEntries(
+          counts,
+          (count) => `Completed ${count} challenge${count > 1 ? 's' : ''} on HackerRank`
+        );
 
-      return this.success(entries, {
-        username,
-        profileUrl: `https://www.hackerrank.com/profile/${username}`,
-        totalProblems: submissions.length,
-      });
-    } catch (error: any) {
-      // HackerRank might block API requests
-      return this.notSupported(
-        'HackerRank requires authentication for full data access. Please use manual tracking.'
-      );
+        return this.success(entries, {
+          username,
+          profileUrl: `https://www.hackerrank.com/profile/${username}`,
+          totalProblems: submissions.length,
+        });
+      } catch {
+        // HackerRank might block API requests without auth
+        return this.notSupported(
+          'HackerRank requires authentication for full data access. Please use manual tracking.'
+        );
+      }
+    } catch (error) {
+      return this.handleError(error);
     }
   }
 }

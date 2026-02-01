@@ -1,6 +1,6 @@
 // src/services/scrapers/hiredScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class HiredScraper extends BaseScraper {
   platformName = 'Hired';
@@ -16,7 +16,7 @@ export class HiredScraper extends BaseScraper {
       return this.notSupported(
         'Hired API requires special access. Please track interview requests manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

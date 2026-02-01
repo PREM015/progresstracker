@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/algoexpertScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * algoexpertScraper
- * 
- * @description Service for handling algoexpertscraper operations
- * @created 2026-01-26
- */
+export class AlgoExpertScraper extends BaseScraper {
+  platformName = 'AlgoExpert';
+  platformSlug = 'algoexpert';
+  protected baseUrl = 'https://www.algoexpert.io';
 
-export interface AlgoexpertscraperData {
-  // TODO: Define interface
-  id: string;
-}
-
-export interface AlgoexpertscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface AlgoexpertscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class AlgoexpertscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<AlgoexpertscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<AlgoexpertscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: AlgoexpertscraperCreateInput, userId: string): Promise<AlgoexpertscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: AlgoexpertscraperUpdateInput, userId: string): Promise<AlgoexpertscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('AlgoExpert requires a username for tracking.');
+    }
+    try {
+      // AlgoExpert is a paid platform without public API
+      // Users need to track their progress manually
+      return this.notSupported(
+        'AlgoExpert is a premium platform without public API. Please track your completed questions manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const algoexpertscraperService = new AlgoexpertscraperService();
-export default algoexpertscraperService;
+export default AlgoExpertScraper;

@@ -1,65 +1,28 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/outreachyScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * outreachyScraper
- * 
- * @description Service for handling outreachyscraper operations
- * @created 2026-01-26
- */
+export class OutreachyScraper extends BaseScraper {
+  platformName = 'Outreachy';
+  platformSlug = 'outreachy';
+  protected baseUrl = 'https://www.outreachy.org';
 
-export interface OutreachyscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Outreachy requires a username for tracking.');
+    }
 
-export interface OutreachyscraperCreateInput {
-  // TODO: Define create input
-}
+    try {
+      this.validateCredentials(credentials, ['username']);
 
-export interface OutreachyscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class OutreachyscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<OutreachyscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<OutreachyscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: OutreachyscraperCreateInput, userId: string): Promise<OutreachyscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: OutreachyscraperUpdateInput, userId: string): Promise<OutreachyscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+      // Outreachy doesn't have a public API
+      return this.notSupported(
+        'Outreachy does not provide public API access. Please track your initial applications, contributions, and internship status manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const outreachyscraperService = new OutreachyscraperService();
-export default outreachyscraperService;
+export default OutreachyScraper;

@@ -1,12 +1,32 @@
 // src/services/scrapers/leetcodeScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult, ScraperEntry } from './types';
 
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+interface LeetCodeUserStats {
+  matchedUser: {
+    username: string;
+    profile: {
+      ranking: number;
+      userAvatar: string;
+      realName: string;
+    };
+    submitStats: {
+      acSubmissionNum: Array<{
+        difficulty: string;
+        count: number;
+      }>;
+    };
+    submissionCalendar: string;
+  } | null;
+}
 
-interface LeetCodeSubmission {
-  id: string;
-  title: string;
-  titleSlug: string;
-  timestamp: string;
+interface LeetCodeRecentSubmissions {
+  recentAcSubmissionList: Array<{
+    id: string;
+    title: string;
+    titleSlug: string;
+    timestamp: string;
+  }>;
 }
 
 export class LeetCodeScraper extends BaseScraper {
@@ -19,93 +39,104 @@ export class LeetCodeScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // GraphQL query for recent submissions
-      const query = `
-        query recentAcSubmissions($username: String!, $limit: Int!) {
-          recentAcSubmissionList(username: $username, limit: $limit) {
-            id
-            title
-            titleSlug
-            timestamp
-          }
-        }
-      `;
-
-      const response = await this.post<any>(
-        `${this.baseUrl}/graphql`,
-        {
-          query,
-          variables: { username, limit: 100 },
-        },
-        {
-          'Content-Type': 'application/json',
-          'Referer': this.baseUrl,
-        }
-      );
-
-      const submissions: LeetCodeSubmission[] = 
-        response.data?.recentAcSubmissionList || [];
-
-      if (!Array.isArray(submissions)) {
-        return this.failure('Invalid response from LeetCode');
-      }
-
-      // Get user stats
+      // Fetch user profile and stats
       const statsQuery = `
-        query userPublicProfile($username: String!) {
+        query getUserProfile($username: String!) {
           matchedUser(username: $username) {
+            username
+            profile {
+              ranking
+              userAvatar
+              realName
+            }
             submitStats {
               acSubmissionNum {
                 difficulty
                 count
               }
             }
-            profile {
-              ranking
-            }
+            submissionCalendar
           }
         }
       `;
 
-      const statsResponse = await this.post<any>(
+      const statsData = await this.graphql<LeetCodeUserStats>(
         `${this.baseUrl}/graphql`,
-        {
-          query: statsQuery,
-          variables: { username },
-        },
-        {
-          'Content-Type': 'application/json',
-          'Referer': this.baseUrl,
+        statsQuery,
+        { username },
+        { Referer: this.baseUrl, Origin: this.baseUrl }
+      );
+
+      if (!statsData.matchedUser) {
+        return this.failure(`LeetCode user "${username}" not found`);
+      }
+
+      const user = statsData.matchedUser;
+
+      // Parse submission calendar
+      let entries: ScraperEntry[] = [];
+      try {
+        const calendar = JSON.parse(user.submissionCalendar || '{}') as Record<string, number>;
+        entries = Object.entries(calendar)
+          .filter(([, count]) => count > 0)
+          .map(([timestamp, count]) => ({
+            date: this.parseDate(parseInt(timestamp)),
+            problems: count,
+            notes: `Solved ${count} problem${count > 1 ? 's' : ''} on LeetCode`,
+          }));
+      } catch {
+        // If calendar parsing fails, try to fetch recent submissions
+        try {
+          const recentQuery = `
+            query recentAcSubmissions($username: String!, $limit: Int!) {
+              recentAcSubmissionList(username: $username, limit: $limit) {
+                id
+                title
+                titleSlug
+                timestamp
+              }
+            }
+          `;
+
+          const recentData = await this.graphql<LeetCodeRecentSubmissions>(
+            `${this.baseUrl}/graphql`,
+            recentQuery,
+            { username, limit: 100 },
+            { Referer: this.baseUrl, Origin: this.baseUrl }
+          );
+
+          const submissions = recentData.recentAcSubmissionList || [];
+          const counts = this.countByDate(
+            submissions,
+            (s) => this.parseDate(parseInt(s.timestamp)),
+            (s) => s.titleSlug
+          );
+
+          entries = this.countsToEntries(
+            counts,
+            (count) => `Solved ${count} problem${count > 1 ? 's' : ''} on LeetCode`
+          );
+        } catch {
+          // Silent fail for recent submissions
         }
-      );
+      }
 
-      const userStats = statsResponse.data?.matchedUser;
-
-      // Group by date (unique problems only)
-      const counts = this.countByDate(
-        submissions,
-        (s) => this.parseDate(parseInt(s.timestamp)),
-        (s) => s.titleSlug
-      );
-
-      const entries = this.countsToEntries(
-        counts,
-        (count) => `Solved ${count} problem${count > 1 ? 's' : ''} on LeetCode`
-      );
-
-      // Calculate total
-      const totalSolved = userStats?.submitStats?.acSubmissionNum?.reduce(
-        (sum: number, item: any) => sum + (item.count || 0),
-        0
-      ) || submissions.length;
+      // Calculate totals
+      const stats = user.submitStats.acSubmissionNum;
+      const easy = stats.find((s) => s.difficulty === 'Easy')?.count || 0;
+      const medium = stats.find((s) => s.difficulty === 'Medium')?.count || 0;
+      const hard = stats.find((s) => s.difficulty === 'Hard')?.count || 0;
+      const total = easy + medium + hard;
 
       return this.success(entries, {
         username,
+        displayName: user.profile.realName || username,
         profileUrl: `${this.baseUrl}/u/${username}`,
-        totalProblems: totalSolved,
-        rank: userStats?.profile?.ranking?.toString(),
+        avatarUrl: user.profile.userAvatar,
+        totalProblems: total,
+        rank: user.profile.ranking?.toString(),
       });
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

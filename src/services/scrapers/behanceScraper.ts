@@ -1,6 +1,6 @@
 // src/services/scrapers/behanceScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class BehanceScraper extends BaseScraper {
   platformName = 'Behance';
@@ -8,6 +8,11 @@ export class BehanceScraper extends BaseScraper {
   protected baseUrl = 'https://www.behance.net/v2';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('Behance requires username and password for login.');
+    }
+
+    
     try {
       if (!credentials.accessToken) {
         return this.failure('Behance requires OAuth authentication.');
@@ -16,7 +21,7 @@ export class BehanceScraper extends BaseScraper {
       return this.notSupported(
         'Behance API requires special access. Please track projects manually.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

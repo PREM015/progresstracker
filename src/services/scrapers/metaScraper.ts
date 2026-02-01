@@ -1,65 +1,25 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/metaScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * metaScraper
- * 
- * @description Service for handling metascraper operations
- * @created 2026-01-26
- */
+export class MetaScraper extends BaseScraper {
+  platformName = 'Meta Careers';
+  platformSlug = 'metacareers';
+  protected baseUrl = 'https://www.metacareers.com';
 
-export interface MetascraperData {
-  // TODO: Define interface
-  id: string;
-}
-
-export interface MetascraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface MetascraperUpdateInput {
-  // TODO: Define update input
-}
-
-class MetascraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<MetascraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<MetascraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: MetascraperCreateInput, userId: string): Promise<MetascraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: MetascraperUpdateInput, userId: string): Promise<MetascraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if( !credentials.username) {
+      return this.failure('Meta Careers requires a username for tracking.');
+    }
+    try {
+      // Meta Careers doesn't have a public API for application tracking
+      return this.notSupported(
+        'Meta Careers does not provide public API access. Please track your applications, recruiter calls, and interview progress manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const metascraperService = new MetascraperService();
-export default metascraperService;
+export default MetaScraper;

@@ -1,6 +1,6 @@
 // src/services/scrapers/hacktoberfestScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class HacktoberfestScraper extends BaseScraper {
   platformName = 'Hacktoberfest';
@@ -8,19 +8,23 @@ export class HacktoberfestScraper extends BaseScraper {
   protected baseUrl = 'https://hacktoberfest.com';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username || !credentials.password) {
+      return this.failure('Hacktoberfest requires username and password for login.');
+    }
+
+    else if (!credentials.accessToken && !credentials.token) {
+      return this.failure('Hacktoberfest requires GitHub OAuth connection.');
+    }
+
     try {
-      // Hacktoberfest uses GitHub OAuth
       if (!credentials.accessToken && !credentials.token) {
         return this.failure('Hacktoberfest requires GitHub OAuth connection.');
       }
 
-      // Hacktoberfest data comes from GitHub PRs during October
-      // This would need to query GitHub for PRs with hacktoberfest labels
-      
       return this.notSupported(
         'Hacktoberfest tracking via GitHub PRs. Please track manually or sync via GitHub.'
       );
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

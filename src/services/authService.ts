@@ -1,7 +1,9 @@
-// ===== FILE: src/services/authService.ts (REPLACE FULL) =====
-
+// src/services/authService.ts
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ service: 'AuthService' });
 
 /**
  * Helper: Normalize email
@@ -10,211 +12,214 @@ function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
+/**
+ * Generate referral code
+ */
+function generateReferralCode(): string {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
 export const authService = {
   /**
    * Create a new user with hashed password
-   * - Checks existing user
-   * - Normalizes email
-   * - Validates password strength
-   * - Creates user + settings + notificationPreferences in transaction
    */
   async createUser(email: string, password: string, name?: string) {
-    // ✅ Normalize email
-    const normalizedEmail = normalizeEmail(email);
+    try {
+      const normalizedEmail = normalizeEmail(email);
 
-    // ✅ Validate password strength
-    if (!password || password.length < 8) {
-      throw new Error("Password must be at least 8 characters");
+      if (!password || password.length < 8) {
+        throw new Error("Password must be at least 8 characters");
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (existingUser) {
+        throw new Error("User already exists with this email");
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 12);
+
+      const user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            password: hashedPassword,
+            name: name || normalizedEmail.split("@")[0],
+            referralCode: generateReferralCode(),
+          },
+        });
+
+        await tx.userSettings.create({
+          data: {
+            userId: newUser.id,
+            theme: "system",
+            autoSync: true,
+            syncFrequency: "daily",
+          },
+        });
+
+        await tx.notificationPreferences.create({
+          data: {
+            userId: newUser.id,
+            enabled: true,
+            emailEnabled: true,
+            pushEnabled: true,
+            inAppEnabled: true,
+            weeklyReport: true,
+            achievementAlerts: true,
+          },
+        });
+
+        return newUser;
+      });
+
+      log.info('User created', { userId: user.id, email: normalizedEmail });
+
+      return user;
+    } catch (error) {
+      log.error('Error creating user', { email }, error);
+      throw error;
     }
-
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (existingUser) {
-      throw new Error("User already exists with this email");
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user with settings in transaction
-    const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          email: normalizedEmail,
-          password: hashedPassword,
-          name: name || normalizedEmail.split("@")[0],
-
-          /**
-           * ✅ Added from FIXED version
-           * NOTE: If Prisma User model doesn't have referralCode -> remove/comment this line
-           */
-          // referralCode: generateReferralCode(),
-        },
-      });
-
-      // Create default settings
-      await tx.userSettings.create({
-        data: {
-          userId: newUser.id,
-          theme: "system",
-          autoSync: true,
-          syncFrequency: "daily",
-        },
-      });
-
-      // Create notification preferences (MERGED + FIXED)
-      await tx.notificationPreferences.create({
-        data: {
-          userId: newUser.id,
-
-          // ✅ Preferences
-          enabled: true,
-          emailEnabled: true,
-          pushEnabled: true, // (your first code had true)
-          inAppEnabled: true,
-
-          // ✅ Alerts
-          weeklyReport: true,
-          achievementAlerts: true,
-        },
-      });
-
-      return newUser;
-    });
-
-    return user;
   },
 
   /**
    * Verify user credentials
-   * - Normalizes email
-   * - Checks password
-   * - Checks isActive + isBanned
-   * - Updates lastLoginAt
    */
   async verifyCredentials(email: string, password: string) {
-    const normalizedEmail = normalizeEmail(email);
+    try {
+      const normalizedEmail = normalizeEmail(email);
 
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail }, // ✅ Normalize email
-      select: {
-        // identity
-        id: true,
-        email: true,
-        password: true,
-        name: true,
-        image: true,
+      const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: {
+          id: true,
+          email: true,
+          password: true,
+          name: true,
+          image: true,
+          isActive: true,
+          isBanned: true,
+          banReason: true,
+          role: true,
+          isAdmin: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLoginAt: true,
+          referralCode: true,
+        },
+      });
 
-        // status
-        isActive: true,
-        isBanned: true,
-        banReason: true,
+      if (!user || !user.password) {
+        log.warn('User not found or no password', { email: normalizedEmail });
+        return null;
+      }
 
-        // role/admin
-        role: true,
-        isAdmin: true,
+      if (!user.isActive) {
+        log.warn('Account deactivated', { userId: user.id });
+        throw new Error("Account is deactivated");
+      }
 
-        // timestamps
-        createdAt: true,
-        updatedAt: true,
+      if (user.isBanned) {
+        log.warn('Account banned', { userId: user.id });
+        throw new Error(
+          `Account is banned: ${user.banReason || "Policy violation"}`
+        );
+      }
 
-        
-        
-         lastLoginAt: true,
-         referralCode: true,
-         
-      },
-    });
+      const isValid = await bcrypt.compare(password, user.password);
+      if (!isValid) {
+        log.warn('Invalid password', { email: normalizedEmail });
+        return null;
+      }
 
-    // ✅ If user doesn't exist OR password missing (OAuth only)
-    if (!user || !user.password) {
-      return null;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+        },
+      });
+
+      log.info('User verified successfully', { userId: user.id });
+
+      return user;
+    } catch (error) {
+      log.error('Error verifying credentials', { email }, error);
+      throw error;
     }
-
-    // ✅ Check account status (from FIXED code)
-    if (!user.isActive) {
-      throw new Error("Account is deactivated");
-    }
-
-    if (user.isBanned) {
-      throw new Error(
-        `Account is banned: ${user.banReason || "Policy violation"}`
-      );
-    }
-
-    // Verify password
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
-      return null;
-    }
-
-    /**
-     * ✅ Update last login (from FIXED code)
-     * NOTE: requires `lastLoginAt` field in Prisma schema.
-     * If it doesn't exist -> remove/comment this block.
-     */
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
-      },
-    });
-
-    return user;
   },
 
   /**
    * Get user by ID
    */
   async getUserById(userId: string) {
-    return prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        image: true,
-        createdAt: true,
-      },
-    });
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          createdAt: true,
+        },
+      });
+
+      if (user) {
+        log.info('User fetched by ID', { userId });
+      }
+
+      return user;
+    } catch (error) {
+      log.error('Error fetching user by ID', { userId }, error);
+      throw error;
+    }
   },
 
   /**
    * Change password
-   * - Works only for password users (not OAuth-only)
    */
   async changePassword(
     userId: string,
     currentPassword: string,
     newPassword: string
   ) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, password: true },
-    });
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, password: true },
+      });
 
-    if (!user?.password) {
-      throw new Error("Cannot change password for OAuth-only users");
+      if (!user?.password) {
+        throw new Error("Cannot change password for OAuth-only users");
+      }
+
+      if (!newPassword || newPassword.length < 8) {
+        throw new Error("New password must be at least 8 characters");
+      }
+
+      const isValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isValid) {
+        throw new Error("Current password is incorrect");
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { 
+          password: hashedPassword,
+          passwordChangedAt: new Date(),
+        },
+      });
+
+      log.info('Password changed', { userId });
+    } catch (error) {
+      log.error('Error changing password', { userId }, error);
+      throw error;
     }
-
-    // Validate new password
-    if (!newPassword || newPassword.length < 8) {
-      throw new Error("New password must be at least 8 characters");
-    }
-
-    const isValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isValid) {
-      throw new Error("Current password is incorrect");
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
   },
 };
+
+export default authService;

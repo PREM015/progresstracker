@@ -1,6 +1,6 @@
 // src/services/scrapers/udacityScraper.ts
-
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
 export class UdacityScraper extends BaseScraper {
   platformName = 'Udacity';
@@ -10,6 +10,11 @@ export class UdacityScraper extends BaseScraper {
     if (!credentials.accessToken) {
       return this.failure('Udacity requires OAuth authentication.');
     }
+    if (!credentials.userId) {
+      return this.failure('Udacity requires user ID in credentials.');
+    }
+    // Udacity API is very restrictive
+    // Most useful data requires special permissions
     return this.notSupported('Udacity API requires special access.');
   }
 }

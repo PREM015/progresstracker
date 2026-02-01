@@ -1,6 +1,16 @@
 // src/services/scrapers/codinGameScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-import { BaseScraper, ScraperCredentials, ScraperResult } from './baseScraper';
+interface CodinGamerResponse {
+  codingamer?: {
+    level?: number;
+    xp?: number;
+    achievementCount?: number;
+    publicHandle?: string;
+    rank?: number;
+  };
+}
 
 export class CodinGameScraper extends BaseScraper {
   platformName = 'CodinGame';
@@ -13,30 +23,35 @@ export class CodinGameScraper extends BaseScraper {
       const username = credentials.username!;
 
       // CodinGame public API
-      const response = await this.post<any>(
+      const response = await this.post<CodinGamerResponse>(
         `${this.baseUrl}/services/CodinGamer/findCodinGamerPublicInformations`,
         [username]
       );
 
-      if (response && response.codingamer) {
+      if (response?.codingamer) {
         const codingamer = response.codingamer;
 
-        const entries = [{
-          date: new Date(),
-          problems: codingamer.achievementCount || 0,
-          notes: `CodinGame: Level ${codingamer.level || 0}, XP: ${codingamer.xp || 0}`,
-        }];
+        const entries = [
+          {
+            date: new Date(),
+            problems: codingamer.achievementCount || 0,
+            xp: codingamer.xp,
+            notes: `CodinGame: Level ${codingamer.level || 0}, XP: ${codingamer.xp || 0}`,
+          },
+        ];
 
         return this.success(entries, {
           username,
           profileUrl: `${this.baseUrl}/profile/${codingamer.publicHandle}`,
           totalProblems: codingamer.achievementCount,
+          level: codingamer.level,
+          xp: codingamer.xp,
           rank: codingamer.rank?.toString(),
         });
       }
 
       return this.failure(`CodinGame user "${username}" not found`);
-    } catch (error: any) {
+    } catch (error) {
       return this.handleError(error);
     }
   }

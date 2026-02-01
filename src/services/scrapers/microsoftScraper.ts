@@ -1,65 +1,26 @@
-import { prisma } from '@/lib/prisma';
+// src/services/scrapers/microsoftScraper.ts
+import { BaseScraper } from './baseScraper';
+import type { ScraperCredentials, ScraperResult } from './types';
 
-/**
- * microsoftScraper
- * 
- * @description Service for handling microsoftscraper operations
- * @created 2026-01-26
- */
+export class MicrosoftScraper extends BaseScraper {
+  platformName = 'Microsoft Careers';
+  platformSlug = 'microsoftcareers';
+  protected baseUrl = 'https://careers.microsoft.com';
 
-export interface MicrosoftscraperData {
-  // TODO: Define interface
-  id: string;
-}
+  async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
+    if (!credentials.username) {
+      return this.failure('Microsoft Careers requires a username for tracking.');
+    }
 
-export interface MicrosoftscraperCreateInput {
-  // TODO: Define create input
-}
-
-export interface MicrosoftscraperUpdateInput {
-  // TODO: Define update input
-}
-
-class MicrosoftscraperService {
-  /**
-   * Get all items
-   */
-  async getAll(userId: string): Promise<MicrosoftscraperData[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  /**
-   * Get single item by ID
-   */
-  async getById(id: string, userId: string): Promise<MicrosoftscraperData | null> {
-    // TODO: Implement
-    return null;
-  }
-
-  /**
-   * Create new item
-   */
-  async create(data: MicrosoftscraperCreateInput, userId: string): Promise<MicrosoftscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Update existing item
-   */
-  async update(id: string, data: MicrosoftscraperUpdateInput, userId: string): Promise<MicrosoftscraperData> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  /**
-   * Delete item
-   */
-  async delete(id: string, userId: string): Promise<void> {
-    // TODO: Implement
+    try {
+      // Microsoft Careers doesn't have a public API for application tracking
+      return this.notSupported(
+        'Microsoft Careers does not provide public API access. Please track your applications, interviews, and referrals manually.'
+      );
+    } catch (error) {
+      return this.handleError(error);
+    }
   }
 }
 
-export const microsoftscraperService = new MicrosoftscraperService();
-export default microsoftscraperService;
+export default MicrosoftScraper;
