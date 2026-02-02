@@ -1,4 +1,5 @@
 // src/services/sync/syncOrchestrator.ts
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { SyncQueue } from './syncQueue';
@@ -75,7 +76,8 @@ export class SyncOrchestrator {
 
       log.info('Processing sync queue', { count: jobs.length });
 
-      await Promise.allSettled(
+      await Promise.allSettled()=>this.processJob(job.id, job.userId, job.platformId)
+      await Promise.all(  
         jobs.map((job) => this.processJob(job.id, job.userId, job.platformId))
       );
     } catch (error) {

@@ -3,7 +3,7 @@
 /**
  * API client utilities
  */
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean>;
 }

@@ -1,366 +1,481 @@
 // src/app/api/analytics/export/route.ts
+// =============================================================================
+// Analytics Export
+// =============================================================================
+// Methods: GET, POST, DELETE, OPTIONS, HEAD
+// Auth Required: Yes
+// Rate Limit: 20 requests/minute
+// =============================================================================
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import apiResponse, { withErrorHandler } from '@/lib/apiResponse';
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { ExportService } from '@/services/exportService';
-import { prisma } from '@/lib/prisma';
-import { ExportStatus, PlatformCategory } from '@prisma/client';
-import {
-  fromPrismaExportFormat,
-  fromPrismaExportStatus,
-  toPrismaExportFormat,
-} from '@/types/export';
+import { PlatformCategory, ExportFormat, ExportStatus } from '@prisma/client';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
+import { subDays, format } from 'date-fns';
 
-const log = logger.child({ module: 'api.analytics.export' });
+// =============================================================================
+// CONSTANTS
+// =============================================================================
 
-// Validation schemas
-const exportSchema = z.object({
-  format: z.enum(['csv', 'json', 'pdf', 'excel', 'xml']).default('csv'),
+const RATE_LIMIT = 20;
+const DAILY_EXPORT_LIMIT = 10;
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Cache-Control': 'no-store',
+};
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
+const getQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  status: z.enum(['QUEUED', 'PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED', 'CANCELLED']).optional(),
+});
+
+const postBodySchema = z.object({
+  format: z.enum(['CSV', 'JSON', 'PDF', 'EXCEL', 'XML']).default('CSV'),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
+  days: z.number().int().min(1).max(365).optional().default(30),
   platforms: z.array(z.string()).optional(),
-
-  // IMPORTANT: Prisma expects enum values, not plain string[]
   categories: z.array(z.nativeEnum(PlatformCategory)).optional(),
-
   includeNotes: z.boolean().optional().default(true),
   includeStats: z.boolean().optional().default(true),
   includeGoals: z.boolean().optional().default(false),
   includeAchievements: z.boolean().optional().default(false),
-  includePlatforms: z.boolean().optional().default(false),
 });
 
-type ExportParams = z.infer<typeof exportSchema>;
+const deleteQuerySchema = z.object({
+  id: z.string().cuid(),
+});
 
-/**
- * GET /api/analytics/export
- * Get user's export history
- */
-export const GET = withErrorHandler(async (req: NextRequest) => {
-  const startTime = Date.now();
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
-  // Authentication check
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
+}
+
+async function validateSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitKey = `analytics-export:${ip}`;
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+  if (!rateLimitResult.success) {
+    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
+  }
+
   const session = await getServerSession(authOptions);
+
   if (!session?.user?.id) {
-    log.warn('Unauthorized export history request');
-    // IMPORTANT: must return SUCCESS type because withErrorHandler expects success
-    return apiResponse.success([], { 
-      status: 401, 
-      message: 'Authentication required' 
-    });
+    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
   }
 
-  const userId = session.user.id;
-  const { searchParams } = new URL(req.url);
+  return { error: null, session, rateLimitResult };
+}
 
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
-  const limit = Math.min(50, parseInt(searchParams.get('limit') || '10'));
-  const statusParam = searchParams.get('status');
+// =============================================================================
+// HTTP METHOD HANDLERS
+// =============================================================================
 
-  const status = statusParam ? (statusParam as ExportStatus) : null;
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+}
 
-  log.info('Fetching export history', { userId, page, limit, status });
-
-  // Build where clause
-  const where: { userId: string; status?: ExportStatus } = { userId };
-  if (status) where.status = status;
-
-  // Fetch export jobs
-  const [exportJobs, total] = await Promise.all([
-    prisma.exportJob.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.exportJob.count({ where }),
-  ]);
-
-  // Transform to response format
-  const exports = exportJobs.map((job) => ({
-    id: job.id,
-    name: job.name,
-    format: fromPrismaExportFormat(job.format),
-    status: fromPrismaExportStatus(job.status),
-    progress: job.progress,
-    dateFrom: job.dateFrom?.toISOString(),
-    dateTo: job.dateTo?.toISOString(),
-    fileUrl: job.fileUrl,
-    fileName: job.fileName,
-    fileSize: job.fileSize,
-    totalRecords: job.totalRecords,
-    exportedRecords: job.exportedRecords,
-    hasError: job.hasError,
-    errorMessage: job.errorMessage,
-    expiresAt: job.expiresAt?.toISOString(),
-    createdAt: job.createdAt.toISOString(),
-    completedAt: job.completedAt?.toISOString(),
-  }));
-
-  const duration = Date.now() - startTime;
-  log.info('Export history fetched successfully', {
-    userId,
-    count: exports.length,
-    duration,
-  });
-
-  return apiResponse.paginated(exports, {
-    page,
-    limit,
-    total,
-    totalPages: Math.ceil(total / limit),
-    hasNextPage: page * limit < total,
-    hasPreviousPage: page > 1,
-  });
-});
-
-/**
- * POST /api/analytics/export
- * Create new export job
- */
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const startTime = Date.now();
-
-  // Authentication check
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    log.warn('Unauthorized export request');
-    // IMPORTANT: must return SUCCESS type because withErrorHandler expects success
-    return apiResponse.success(
-      { id: '', status: 'unauthorized', message: 'Authentication required' },
-      { status: 401 }
-    );
-  }
-
-  const userId = session.user.id;
-  const body = await req.json();
-
-  // Validate request body
-  const validationResult = exportSchema.safeParse(body);
-  if (!validationResult.success) {
-    log.warn('Invalid export parameters', {
-      userId,
-      errors: validationResult.error.flatten(),
-    });
-
-    // IMPORTANT: withErrorHandler expects success type
-    // So return "success" but with 400 status and include errors
-    return apiResponse.success(
-      {
-        id: '',
-        status: 'validation_error',
-        message: 'Invalid export parameters',
-        errors: validationResult.error.issues,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any,
-      { status: 400, message: 'Invalid export parameters' }
-    );
-  }
-
-  const params = validationResult.data;
-
-  // Check subscription limits
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
-
-  const currentMonth = new Date();
-  currentMonth.setDate(1);
-  currentMonth.setHours(0, 0, 0, 0);
-
-  const monthlyExports = await prisma.exportJob.count({
-    where: {
-      userId,
-      createdAt: { gte: currentMonth },
-    },
-  });
-
-  const exportLimit = user?.subscription?.exportLimitMonthly || 3;
-
-  if (monthlyExports >= exportLimit) {
-    log.warn('Export limit exceeded', {
-      userId,
-      limit: exportLimit,
-      current: monthlyExports,
-    });
-
-    // IMPORTANT: return success type with 403 status
-    return apiResponse.success(
-      {
-        id: '',
-        status: 'limit_exceeded',
-        message: `Monthly export limit (${exportLimit}) reached. Upgrade your plan for more exports.`,
-      },
-      { status: 403 }
-    );
-  }
-
-  log.info('Creating export job', {
-    userId,
-    format: params.format,
-    dateRange: { from: params.dateFrom, to: params.dateTo },
-  });
-
-  // Create export job
-  const exportJob = await prisma.exportJob.create({
-    data: {
-      userId,
-      name: `${params.format.toUpperCase()} Export - ${new Date().toLocaleDateString()}`,
-      format: toPrismaExportFormat(params.format),
-      dateFrom: params.dateFrom ? new Date(params.dateFrom) : null,
-      dateTo: params.dateTo ? new Date(params.dateTo) : null,
-      platforms: params.platforms || [],
-      categories: params.categories || [],
-      includeNotes: params.includeNotes,
-      includeStats: params.includeStats,
-      includeGoals: params.includeGoals,
-      includeAchievements: params.includeAchievements,
-      includePlatforms: params.includePlatforms,
-      status: 'PENDING',
-      progress: 0,
-      hasError: false,
-      totalRecords: 0,
-      exportedRecords: 0,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-    },
-  });
-
-  // Start export process asynchronously
-  processExportJob(exportJob.id, userId, params).catch((error) => {
-    log.error('Export processing failed', { jobId: exportJob.id, userId }, error);
-  });
-
-  const duration = Date.now() - startTime;
-  log.info('Export job created successfully', {
-    jobId: exportJob.id,
-    userId,
-    duration,
-  });
-
-  return apiResponse.created(
-    {
-      id: exportJob.id,
-      status: 'pending',
-      message: 'Export job created. Processing will begin shortly.',
-    },
-    {
-      meta: {
-        format: params.format,
-        executionTime: duration,
-      },
-    }
-  );
-});
-
-/**
- * Process export job asynchronously
- */
-async function processExportJob(
-  jobId: string,
-  userId: string,
-  params: ExportParams
-): Promise<void> {
-  const processingLog = logger.child({
-    module: 'export.processing',
-    jobId,
-    userId,
-  });
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
 
   try {
-    processingLog.info('Starting export processing');
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
 
-    // Update status to processing
-    await prisma.exportJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'PROCESSING',
-        startedAt: new Date(),
-        progress: 10,
-      },
-    });
-
-    // Prepare export options
-    // NOTE: ExportService might only support csv/json/pdf
-    // If excel/xml are selected, fallback to csv safely.
-    const normalizedFormat =
-      params.format === 'excel' || params.format === 'xml' ? 'csv' : params.format;
-
-    const exportOptions = {
-      format: normalizedFormat as 'csv' | 'json' | 'pdf',
-      type: 'full' as const,
-      dateRange:
-        params.dateFrom && params.dateTo
-          ? ('custom' as const)
-          : ('all_time' as const),
-      startDate: params.dateFrom ? new Date(params.dateFrom) : undefined,
-      endDate: params.dateTo ? new Date(params.dateTo) : undefined,
-      includeTracker: true,
-      includeGoals: params.includeGoals,
-      includeAchievements: params.includeAchievements,
-      includePlatforms: params.includePlatforms,
-      includeStats: params.includeStats,
-      includeNotes: params.includeNotes,
-      platforms: params.platforms,
-      categories: params.categories,
-    };
-
-    // Update progress
-    await prisma.exportJob.update({
-      where: { id: jobId },
-      data: { progress: 30 },
-    });
-
-    // Generate export
-    const result = await ExportService.exportData(userId, exportOptions);
-
-    if (!result.success) {
-      throw new Error(result.error || 'Export failed');
+    if (error) {
+      return addHeaders(new NextResponse(null, { status: 401 }), requestId, rateLimitResult);
     }
 
-    // Update progress
-    await prisma.exportJob.update({
-      where: { id: jobId },
-      data: { progress: 80 },
-    });
+    const userId = session!.user.id;
 
-    // Store file (in production, upload to cloud storage)
-    const fileUrl = `/api/analytics/export/download/${jobId}`;
-    const fileData = result.data as string;
-    const fileSize = Buffer.byteLength(fileData, 'utf8');
+    const [totalExports, pendingExports] = await Promise.all([
+      prisma.exportJob.count({ where: { userId } }),
+      prisma.exportJob.count({ where: { userId, status: { in: ['QUEUED', 'PENDING', 'PROCESSING'] } } }),
+    ]);
 
-    // Complete export job
-    await prisma.exportJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'COMPLETED',
-        progress: 100,
-        completedAt: new Date(),
-        fileUrl,
-        fileName: result.fileName,
-        fileSize,
-        fileMimeType: result.mimeType,
-        totalRecords: result.recordCount || 0,
-        exportedRecords: result.recordCount || 0,
-      },
-    });
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Total-Exports', String(totalExports));
+    response.headers.set('X-Pending-Exports', String(pendingExports));
 
-    processingLog.info('Export processing completed successfully');
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    processingLog.error('Export processing failed', { error });
-
-    await prisma.exportJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'FAILED',
-        hasError: true,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        completedAt: new Date(),
-      },
-    });
+    logger.error('HEAD analytics/export failed', { requestId }, error);
+    return new NextResponse(null, { status: 500 });
   }
 }
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
+
+    // Check for specific export ID
+    const exportId = searchParams.get('id');
+    if (exportId) {
+      const exportJob = await prisma.exportJob.findFirst({
+        where: { id: exportId, userId },
+      });
+
+      if (!exportJob) {
+        return addHeaders(apiResponse.notFound('Export job', requestId), requestId, rateLimitResult);
+      }
+
+      return addHeaders(
+        apiResponse.success({
+          id: exportJob.id,
+          name: exportJob.name,
+          format: exportJob.format,
+          status: exportJob.status,
+          progress: exportJob.progress,
+          fileUrl: exportJob.fileUrl,
+          fileName: exportJob.fileName,
+          fileSize: exportJob.fileSize,
+          totalRecords: exportJob.totalRecords,
+          exportedRecords: exportJob.exportedRecords,
+          hasError: exportJob.hasError,
+          errorMessage: exportJob.errorMessage,
+          expiresAt: exportJob.expiresAt?.toISOString(),
+          createdAt: exportJob.createdAt.toISOString(),
+          completedAt: exportJob.completedAt?.toISOString(),
+        }, { meta: { requestId } }),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Parse query parameters
+    const queryValidation = getQuerySchema.safeParse({
+      page: searchParams.get('page') || '1',
+      limit: searchParams.get('limit') || '10',
+      status: searchParams.get('status'),
+    });
+
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const params = queryValidation.data;
+
+    // Build where clause
+    const where: { userId: string; status?: ExportStatus } = { userId };
+    if (params.status) {
+      where.status = params.status as ExportStatus;
+    }
+
+    // Fetch exports
+    const [exports, total] = await Promise.all([
+      prisma.exportJob.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (params.page - 1) * params.limit,
+        take: params.limit,
+      }),
+      prisma.exportJob.count({ where }),
+    ]);
+
+    const exportList = exports.map(job => ({
+      id: job.id,
+      name: job.name,
+      format: job.format,
+      status: job.status,
+      progress: job.progress,
+      fileUrl: job.fileUrl,
+      fileName: job.fileName,
+      fileSize: job.fileSize,
+      totalRecords: job.totalRecords,
+      hasError: job.hasError,
+      expiresAt: job.expiresAt?.toISOString(),
+      createdAt: job.createdAt.toISOString(),
+      completedAt: job.completedAt?.toISOString(),
+    }));
+
+    logger.info('Export list fetched', {
+      userId,
+      count: exports.length,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    return addHeaders(
+      apiResponse.paginated(exportList, {
+        page: params.page,
+        limit: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+        hasNextPage: params.page * params.limit < total,
+        hasPreviousPage: params.page > 1,
+      }, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
+  } catch (error) {
+    logger.error('GET analytics/export failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch exports', requestId), requestId);
+  }
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const validation = postBodySchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const params = validation.data;
+
+    // Check daily limit
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayExports = await prisma.exportJob.count({
+      where: {
+        userId,
+        createdAt: { gte: todayStart },
+      },
+    });
+
+    if (todayExports >= DAILY_EXPORT_LIMIT) {
+      return addHeaders(
+        apiResponse.rateLimited(86400, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Check subscription limits
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId },
+      select: { exportLimitMonthly: true, currentExportCount: true },
+    });
+
+    const monthlyLimit = subscription?.exportLimitMonthly || 3;
+    const currentCount = subscription?.currentExportCount || 0;
+
+    if (currentCount >= monthlyLimit) {
+      return addHeaders(
+        apiResponse.forbidden(`Monthly export limit (${monthlyLimit}) reached. Upgrade to export more.`, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Calculate date range
+    const dateTo = params.dateTo ? new Date(params.dateTo) : new Date();
+    const dateFrom = params.dateFrom ? new Date(params.dateFrom) : subDays(dateTo, params.days || 30);
+
+    // Create export job
+    const exportJob = await prisma.exportJob.create({
+      data: {
+        userId,
+        name: `${params.format} Export - ${format(new Date(), 'yyyy-MM-dd HH:mm')}`,
+        format: params.format as ExportFormat,
+        dateFrom,
+        dateTo,
+        platforms: params.platforms || [],
+        categories: params.categories || [],
+        includeNotes: params.includeNotes ?? true,
+        includeStats: params.includeStats ?? true,
+        status: 'QUEUED' as ExportStatus,
+        progress: 0,
+        hasError: false,
+        totalRecords: 0,
+        exportedRecords: 0,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+    });
+
+    // Update subscription export count
+    if (subscription) {
+      await prisma.subscription.update({
+        where: { userId },
+        data: { currentExportCount: { increment: 1 } },
+      });
+    }
+
+    // TODO: Queue export job for background processing
+    // In production, this would trigger a background job
+    // For now, we'll process it inline (simplified)
+
+    logger.info('Export job created', {
+      userId,
+      exportId: exportJob.id,
+      format: params.format,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    return addHeaders(
+      apiResponse.created({
+        id: exportJob.id,
+        status: 'QUEUED',
+        message: 'Export job created. Processing will begin shortly.',
+        format: params.format,
+        estimatedTime: '1-5 minutes',
+      }, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
+  } catch (error) {
+    logger.error('POST analytics/export failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to create export', requestId), requestId);
+  }
+}
+
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
+
+    const queryValidation = deleteQuerySchema.safeParse({
+      id: searchParams.get('id'),
+    });
+
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Export ID is required', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const { id } = queryValidation.data;
+
+    // Check ownership
+    const exportJob = await prisma.exportJob.findFirst({
+      where: { id, userId },
+    });
+
+    if (!exportJob) {
+      return addHeaders(apiResponse.notFound('Export job', requestId), requestId, rateLimitResult);
+    }
+
+    // Cancel if in progress
+    if (['QUEUED', 'PENDING', 'PROCESSING'].includes(exportJob.status)) {
+      await prisma.exportJob.update({
+        where: { id },
+        data: { status: 'CANCELLED' as ExportStatus },
+      });
+    } else {
+      await prisma.exportJob.delete({ where: { id } });
+    }
+
+    logger.info('Export job deleted/cancelled', {
+      userId,
+      exportId: id,
+      previousStatus: exportJob.status,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    return addHeaders(
+      apiResponse.success({ message: 'Export deleted successfully', id }, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
+  } catch (error) {
+    logger.error('DELETE analytics/export failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to delete export', requestId), requestId);
+  }
+}
+
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

@@ -1,89 +1,228 @@
 // src/app/api/user/export-data/route.ts
+// =============================================================================
+// USER DATA EXPORT ROUTES
+// =============================================================================
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
 import { ExportFormat, ExportStatus } from '@prisma/client';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
 
-// GET - List export jobs
-export async function GET(request: NextRequest) {
+// =============================================================================
+// SCHEMAS
+// =============================================================================
+
+const exportSchema = z.object({
+  format: z.enum(['JSON', 'CSV', 'PDF', 'EXCEL', 'XML']).default('JSON'),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  platforms: z.array(z.string()).default([]),
+  categories: z.array(z.string()).default([]),
+  includeNotes: z.boolean().default(true),
+  includeStats: z.boolean().default(true),
+});
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 10;
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store',
+};
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(response: NextResponse, requestId: string): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+  return response;
+}
+
+async function validateSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, ip);
+
+  if (!rateLimitResult.success) {
+    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
+  }
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
+  }
+
+  return { error: null, session, rateLimitResult };
+}
+
+// =============================================================================
+// OPTIONS
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// =============================================================================
+// HEAD
+// =============================================================================
+
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      logger.info('request is ', { request })
+      return addHeaders(new NextResponse(null, { status: 401 }), requestId);
     }
 
+    const count = await prisma.exportJob.count({
+      where: { userId: session.user.id },
+    });
+
+    const response = new NextResponse(null, {
+      status: 200,
+      headers: {
+        'X-Export-Count': String(count),
+      },
+    });
+
+    return addHeaders(response, requestId);
+  } catch (error) {
+    logger.error('HEAD export-data failed', { requestId }, error);
+    return addHeaders(new NextResponse(null, { status: 500 }), requestId);
+  }
+}
+
+// =============================================================================
+// GET - List export jobs
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId);
+
+    const userId = session!.user.id;
+
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50);
+    const page = Math.max(parseInt(searchParams.get('page') || '1'), 1);
 
     const [exports, total] = await Promise.all([
       prisma.exportJob.findMany({
-        where: { userId: session.user.id },
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
-      prisma.exportJob.count({ where: { userId: session.user.id } }),
+      prisma.exportJob.count({ where: { userId } }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: exports,
-      pagination: {
+    logger.info('Export jobs fetched', {
+      userId,
+      count: exports.length,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    const response = apiResponse.paginated(
+      exports,
+      {
         page,
         limit,
+
+
         total,
+
         totalPages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPreviousPage: page > 1,
+
+
       },
-    });
-  } catch (error) {
-    console.error('Error fetching exports:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch exports' },
-      { status: 500 }
+      {
+        meta: { requestId },
+        headers: {
+          'X-RateLimit-Limit': String(rateLimitResult.limit),
+          'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+        },
+      }
     );
+
+    return addHeaders(response, requestId);
+  } catch (error) {
+    logger.error('GET export-data failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch exports', requestId), requestId);
   }
 }
 
+// =============================================================================
 // POST - Create new export job
-export async function POST(request: NextRequest) {
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const session = await getServerSession(authOptions);
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId);
 
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(apiResponse.validationError('Invalid JSON', undefined, requestId), requestId);
+    }
+
+    const validation = exportSchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId
       );
     }
 
-    const body = await request.json();
-    const {
-      format = 'JSON',
-      dateFrom,
-      dateTo,
-      platforms = [],
-      categories = [],
-      includeNotes = true,
-      includeStats = true,
-    } = body;
-
-    // Validate format
-    if (!Object.values(ExportFormat).includes(format)) {
-      return NextResponse.json(
-        { error: 'Invalid export format' },
-        { status: 400 }
-      );
-    }
+    const { format, dateFrom, dateTo, platforms, categories, includeNotes, includeStats } = validation.data;
 
     // Check subscription limits
     const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     const monthStart = new Date();
@@ -92,28 +231,31 @@ export async function POST(request: NextRequest) {
 
     const exportsThisMonth = await prisma.exportJob.count({
       where: {
-        userId: session.user.id,
+        userId,
         createdAt: { gte: monthStart },
       },
     });
 
     const exportLimit = subscription?.exportLimitMonthly || 3;
     if (exportsThisMonth >= exportLimit) {
-      return NextResponse.json(
-        { error: `Export limit reached. You can export ${exportLimit} times per month.` },
-        { status: 429 }
+      return addHeaders(
+        apiResponse.rateLimited(
+          30 * 24 * 60 * 60, // 30 days
+          requestId
+        ),
+        requestId
       );
     }
 
     // Create export job
     const exportJob = await prisma.exportJob.create({
       data: {
-        userId: session.user.id,
+        userId,
         format: format as ExportFormat,
         dateFrom: dateFrom ? new Date(dateFrom) : undefined,
         dateTo: dateTo ? new Date(dateTo) : undefined,
         platforms,
-        categories,
+        categories: categories as any[],
         includeNotes,
         includeStats,
         status: ExportStatus.QUEUED,
@@ -121,30 +263,49 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // In production, you'd queue this job for async processing
-    // For now, we'll process it synchronously
-    await processExportJob(exportJob.id, session.user.id);
-
-    // Fetch updated job
-    const updatedJob = await prisma.exportJob.findUnique({
-      where: { id: exportJob.id },
+    // Process export job asynchronously
+    processExportJob(exportJob.id, userId).catch((err) => {
+      logger.error('Export job processing failed', { jobId: exportJob.id, userId }, err);
     });
 
-    return NextResponse.json({
-      success: true,
-      data: updatedJob,
-      message: 'Export job created successfully',
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'EXPORT_DATA',
+        category: 'export',
+        entityType: 'exportJob',
+        entityId: exportJob.id,
+        description: `Export job created: ${format}`,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent'),
+      },
     });
+
+    logger.info('Export job created', {
+      userId,
+      jobId: exportJob.id,
+      format,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    const response = apiResponse.created(exportJob, { requestId });
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+
+    return addHeaders(response, requestId);
   } catch (error) {
-    console.error('Error creating export:', error);
-    return NextResponse.json(
-      { error: 'Failed to create export' },
-      { status: 500 }
-    );
+    logger.error('POST export-data failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to create export', requestId), requestId);
   }
 }
 
-async function processExportJob(jobId: string, userId: string) {
+// =============================================================================
+// EXPORT PROCESSING FUNCTION
+// =============================================================================
+
+async function processExportJob(jobId: string, userId: string): Promise<void> {
   try {
     // Update status to processing
     await prisma.exportJob.update({
@@ -159,11 +320,11 @@ async function processExportJob(jobId: string, userId: string) {
     if (!job) return;
 
     // Build query conditions
-    const whereClause: any = { userId };
+    const whereClause: Record<string, unknown> = { userId };
     if (job.dateFrom || job.dateTo) {
       whereClause.date = {};
-      if (job.dateFrom) whereClause.date.gte = job.dateFrom;
-      if (job.dateTo) whereClause.date.lte = job.dateTo;
+      if (job.dateFrom) (whereClause.date as Record<string, unknown>).gte = job.dateFrom;
+      if (job.dateTo) (whereClause.date as Record<string, unknown>).lte = job.dateTo;
     }
     if (job.platforms.length > 0) {
       whereClause.platformId = { in: job.platforms };
@@ -183,25 +344,25 @@ async function processExportJob(jobId: string, userId: string) {
       }),
       job.includeStats
         ? prisma.goal.findMany({
-            where: { userId },
-            select: {
-              title: true,
-              description: true,
-              target: true,
-              progress: true,
-              status: true,
-              startDate: true,
-              endDate: true,
-            },
-          })
+          where: { userId },
+          select: {
+            title: true,
+            description: true,
+            target: true,
+            progress: true,
+            status: true,
+            startDate: true,
+            endDate: true,
+          },
+        })
         : [],
       job.includeStats
         ? prisma.userAchievement.findMany({
-            where: { userId },
-            include: {
-              achievement: { select: { title: true, description: true, tier: true } },
-            },
-          })
+          where: { userId },
+          include: {
+            achievement: { select: { title: true, description: true, tier: true } },
+          },
+        })
         : [],
       prisma.userPlatform.findMany({
         where: { userId, isActive: true },
@@ -249,9 +410,8 @@ async function processExportJob(jobId: string, userId: string) {
         extension = 'json';
     }
 
-    // In production, save to cloud storage
     const fileName = `export-${userId}-${Date.now()}.${extension}`;
-    const fileUrl = `/api/exports/${jobId}/download`; // Placeholder
+    const fileUrl = `/api/export/download/${jobId}`;
 
     await prisma.exportJob.update({
       where: { id: jobId },
@@ -278,19 +438,21 @@ async function processExportJob(jobId: string, userId: string) {
   }
 }
 
-function convertToCSV(entries: any[]): string {
+function convertToCSV(entries: unknown[]): string {
   if (entries.length === 0) return '';
-  
-  const headers = [
-    'date',
-    'platform',
-    'problemsSolved',
-    'commits',
-    'timeSpent',
-    'notes',
-  ];
-  
-  const rows = entries.map((e) => [
+
+  const typedEntries = entries as Array<{
+    date: Date;
+    platform?: { name: string };
+    problemsSolved: number;
+    commits: number;
+    timeSpent: number;
+    notes?: string;
+  }>;
+
+  const headers = ['date', 'platform', 'problemsSolved', 'commits', 'timeSpent', 'notes'];
+
+  const rows = typedEntries.map((e) => [
     e.date.toISOString().split('T')[0],
     e.platform?.name || '',
     e.problemsSolved,
@@ -298,6 +460,9 @@ function convertToCSV(entries: any[]): string {
     e.timeSpent,
     `"${(e.notes || '').replace(/"/g, '""')}"`,
   ]);
-  
+
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

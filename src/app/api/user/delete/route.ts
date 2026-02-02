@@ -1,306 +1,185 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// src/app/api/user/delete/route.ts
+// src/app/api/user/2fa/verify/route.ts
+// =============================================================================
+// 2FA VERIFICATION ROUTE
+// =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { compare } from 'bcryptjs';
+import { authenticator } from 'otplib';
+import { decrypt } from '@/lib/encryption';
 import { z } from 'zod';
-
-
+import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
 
 // =============================================================================
-// VALIDATION SCHEMA
+// SCHEMAS
 // =============================================================================
 
-const deleteAccountSchema = z.object({
-  password: z.string().min(1, 'Password is required'),
-  confirmation: z.literal('DELETE', {
-    errorMap: () => ({ message: 'Please type DELETE to confirm' }),
-  }),
-  reason: z.string().optional(),
-  feedback: z.string().optional(),
+const verifySchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be numeric'),
 });
 
 // =============================================================================
-// GET - Get account deletion info
+// CONSTANTS
 // =============================================================================
 
-export async function GET(request: NextRequest) {
-  const startTime = Date.now();
+const RATE_LIMIT = 5;
 
-  try {
-    const session = await getServerSession(authOptions);
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store',
+};
 
-    if (!session?.user?.id) {
-      logger.warn('Unauthorized deletion info access');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+const CORS_HEADERS = {
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
-    logger.debug('Fetching deletion info', { userId: session.user.id });
+// =============================================================================
+// HELPERS
+// =============================================================================
 
-    // Get counts of all user data that will be deleted
-    const [
-      entriesCount,
-      goalsCount,
-      achievementsCount,
-      platformsCount,
-      notificationsCount,
-      syncLogsCount,
-      dailyStatsCount,
-      streakHistoryCount,
-      exportJobsCount,
-      apiKeysCount,
-    ] = await Promise.all([
-      prisma.trackerEntry.count({ where: { userId: session.user.id } }),
-      prisma.goal.count({ where: { userId: session.user.id } }),
-      prisma.userAchievement.count({ where: { userId: session.user.id } }),
-      prisma.userPlatform.count({ where: { userId: session.user.id } }),
-      prisma.notification.count({ where: { userId: session.user.id } }),
-      prisma.syncLog.count({ where: { userId: session.user.id } }),
-      prisma.dailyStats.count({ where: { userId: session.user.id } }),
-      prisma.streakHistory.count({ where: { userId: session.user.id } }),
-      prisma.exportJob.count({ where: { userId: session.user.id } }),
-      prisma.apiKey.count({ where: { userId: session.user.id } }),
-    ]);
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
-    // Check for active subscription
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-      select: {
-        status: true,
-        tier: true,
-        currentPeriodEnd: true,
-      },
-    });
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
 
-    const hasActiveSubscription = subscription?.status === 'ACTIVE' && 
-      subscription.tier !== 'FREE';
-
-    logger.info('Deletion info fetched', {
-      userId: session.user.id,
-      duration: Date.now() - startTime,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        dataToBeDeleted: {
-          trackerEntries: entriesCount,
-          goals: goalsCount,
-          achievements: achievementsCount,
-          connectedPlatforms: platformsCount,
-          notifications: notificationsCount,
-          syncLogs: syncLogsCount,
-          dailyStats: dailyStatsCount,
-          streakHistory: streakHistoryCount,
-          exportJobs: exportJobsCount,
-          apiKeys: apiKeysCount,
-        },
-        subscription: hasActiveSubscription ? {
-          status: subscription?.status,
-          tier: subscription?.tier,
-          currentPeriodEnd: subscription?.currentPeriodEnd,
-          warning: 'Your active subscription will be cancelled immediately.',
-        } : null,
-        warnings: [
-          'This action cannot be undone.',
-          'All your data will be permanently deleted.',
-          'Your username will become available for others.',
-          hasActiveSubscription ? 'Your active subscription will be cancelled.' : null,
-          'You will lose all achievements and streaks.',
-          'Connected platforms will be disconnected.',
-        ].filter(Boolean),
-        confirmationRequired: 'DELETE',
-      },
-    });
-  } catch (error) {
-    logger.error('Error fetching deletion info', {}, error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch account info' },
-      { status: 500 }
-    );
-  }
+function addHeaders(response: NextResponse, requestId: string): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+  return response;
 }
 
 // =============================================================================
-// POST - Delete account (soft delete first, then hard delete)
+// OPTIONS
 // =============================================================================
 
-export async function POST(request: NextRequest) {
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// =============================================================================
+// POST - Verify 2FA code
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(authRateLimiter, RATE_LIMIT, ip);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(300, requestId), requestId);
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      logger.warn('Unauthorized account deletion attempt');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+      return addHeaders(apiResponse.unauthorized('Authentication required', requestId), requestId);
+    }
+
+    const userId = session.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(apiResponse.validationError('Invalid JSON', undefined, requestId), requestId);
+    }
+
+    const validation = verifySchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid code format', validation.error.errors, requestId),
+        requestId
       );
     }
 
-    const body = await request.json();
-    const validated = deleteAccountSchema.parse(body);
+    const { code } = validation.data;
 
-    logger.warn('Account deletion initiated', { userId: session.user.id });
+    const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
+      where: { userId },
+    });
 
-    // Get user with password
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { 
-        id: true,
-        email: true,
-        password: true,
-        username: true,
+    if (!twoFactorAuth) {
+      return addHeaders(
+        apiResponse.validationError('2FA not set up', undefined, requestId),
+        requestId
+      );
+    }
+
+    if (twoFactorAuth.isEnabled && !twoFactorAuth.isPending) {
+      return addHeaders(
+        apiResponse.validationError('2FA is already verified and enabled', undefined, requestId),
+        requestId
+      );
+    }
+
+    // Decrypt and verify
+    const decryptedSecret = decrypt(twoFactorAuth.secret);
+    const isValid = authenticator.verify({
+      token: code,
+      secret: decryptedSecret,
+    });
+
+    if (!isValid) {
+      logger.warn('Invalid 2FA verification code', { userId, requestId });
+      return addHeaders(
+        apiResponse.validationError('Invalid verification code', undefined, requestId),
+        requestId
+      );
+    }
+
+    // Enable 2FA
+    await prisma.twoFactorAuth.update({
+      where: { userId },
+      data: {
+        isEnabled: true,
+        isPending: false,
+        verifiedAt: new Date(),
       },
     });
 
-    if (!user) {
-      return NextResponse.json(
-        { success: false, error: 'User not found' },
-        { status: 404 }
-      );
-    }
-
-    // Verify password (if user has one)
-    if (user.password) {
-      const isValidPassword = await compare(validated.password, user.password);
-      if (!isValidPassword) {
-        logger.warn('Invalid password for account deletion', { userId: session.user.id });
-        return NextResponse.json(
-          { success: false, error: 'Invalid password' },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Store deletion feedback if provided
-    if (validated.reason || validated.feedback) {
-      await prisma.feedback.create({
-        data: {
-          userId: session.user.id,
-          type: 'other',
-          title: 'Account Deletion Feedback',
-          message: `Reason: ${validated.reason || 'Not provided'}\n\nFeedback: ${validated.feedback || 'Not provided'}`,
-          status: 'new',
-        },
-      });
-    }
-
-    // Log the action before deletion
+    // Audit log
     await prisma.auditLog.create({
       data: {
-        userId: session.user.id,
-        action: 'ACCOUNT_DELETE',
-        category: 'user',
-        description: 'User initiated account deletion',
-        metadata: {
-          email: user.email,
-          username: user.username,
-          reason: validated.reason,
-        },
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+        userId,
+        action: 'TWO_FACTOR_ENABLE',
+        category: 'auth',
+        description: '2FA enabled and verified',
+        ipAddress: ip,
         userAgent: request.headers.get('user-agent'),
       },
     });
 
-    // Cancel Stripe subscription if exists
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-      select: { stripeSubscriptionId: true },
-    });
-
-    if (subscription?.stripeSubscriptionId) {
-      try {
-        // Import stripe service dynamically to avoid issues if not configured
-        const { stripeService } = await import('@/services/stripeService');
-        await stripeService.cancelSubscription(subscription.stripeSubscriptionId);
-        logger.info('Subscription cancelled during deletion', { userId: session.user.id });
-      } catch (stripeError) {
-        logger.error('Failed to cancel Stripe subscription', {}, stripeError);
-        // Continue with deletion even if Stripe fails
-      }
-    }
-
-    // Perform soft delete first (set deletedAt, isActive = false)
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: {
-        isActive: false,
-        deletedAt: new Date(),
-        email: `deleted_${session.user.id}@deleted.local`, // Free up email
-        username: `deleted_${session.user.id}`, // Free up username
-      },
-    });
-
-    // Delete user data in transaction
-    await prisma.$transaction(async (tx) => {
-      // Delete in order of dependencies
-      await tx.goalReminder.deleteMany({ where: { userId: session.user.id } });
-      await tx.goal.deleteMany({ where: { userId: session.user.id } });
-      await tx.userAchievement.deleteMany({ where: { userId: session.user.id } });
-      await tx.notification.deleteMany({ where: { userId: session.user.id } });
-      await tx.pushSubscription.deleteMany({ where: { userId: session.user.id } });
-      await tx.trackerEntry.deleteMany({ where: { userId: session.user.id } });
-      await tx.dailyStats.deleteMany({ where: { userId: session.user.id } });
-      await tx.streakHistory.deleteMany({ where: { userId: session.user.id } });
-      await tx.syncLog.deleteMany({ where: { userId: session.user.id } });
-      await tx.userPlatform.deleteMany({ where: { userId: session.user.id } });
-      await tx.customPlatform.deleteMany({ where: { userId: session.user.id } });
-      await tx.exportJob.deleteMany({ where: { userId: session.user.id } });
-      await tx.scheduledExport.deleteMany({ where: { userId: session.user.id } });
-      await tx.apiKey.deleteMany({ where: { userId: session.user.id } });
-      await tx.activeSession.deleteMany({ where: { userId: session.user.id } });
-      await tx.refreshToken.deleteMany({ where: { userId: session.user.id } });
-      await tx.twoFactorAuth.deleteMany({ where: { userId: session.user.id } });
-      await tx.backupCode.deleteMany({ where: { userId: session.user.id } });
-      await tx.passwordReset.deleteMany({ where: { userId: session.user.id } });
-      await tx.emailVerification.deleteMany({ where: { userId: session.user.id } });
-      await tx.emailChangeRequest.deleteMany({ where: { userId: session.user.id } });
-      await tx.loginAttempt.deleteMany({ where: { userId: session.user.id } });
-      await tx.userSettings.deleteMany({ where: { userId: session.user.id } });
-      await tx.notificationPreferences.deleteMany({ where: { userId: session.user.id } });
-      await tx.subscription.deleteMany({ where: { userId: session.user.id } });
-      await tx.invoice.deleteMany({ where: { userId: session.user.id } });
-      await tx.paymentMethod.deleteMany({ where: { userId: session.user.id } });
-      await tx.report.deleteMany({ where: { userId: session.user.id } });
-      await tx.supportTicket.deleteMany({ where: { userId: session.user.id } });
-      await tx.account.deleteMany({ where: { userId: session.user.id } });
-      await tx.session.deleteMany({ where: { userId: session.user.id } });
-      
-      // Finally delete the user
-      await tx.user.delete({ where: { id: session.user.id } });
-    });
-
-    logger.info('Account deleted successfully', {
-      userId: session.user.id,
+    logger.info('2FA verified and enabled', {
+      userId,
+      requestId,
       duration: Date.now() - startTime,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Account deleted successfully. You will be logged out.',
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      logger.warn('Deletion validation error', { errors: error.errors });
-      return NextResponse.json(
-        { success: false, error: 'Validation error', details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    logger.error('Error deleting account', {}, error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to delete account' },
-      { status: 500 }
+    const response = apiResponse.success(
+      { message: '2FA has been successfully enabled' },
+      { meta: { requestId } }
     );
+
+    return addHeaders(response, requestId);
+  } catch (error) {
+    logger.error('POST 2FA verify failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to verify 2FA', requestId), requestId);
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

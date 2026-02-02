@@ -1,178 +1,325 @@
 // src/app/api/admin/changelog/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { Prisma, AuditAction } from '@prisma/client';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
 
-async function checkAdminAuth(req: NextRequest) {
-  const session = req.headers.get("x-admin-session");
-  if (!session) {
-    return null;
-  }
-  
-  const user = await prisma.user.findFirst({
-    where: { isAdmin: true },
-    select: { id: true, email: true, isAdmin: true }
-  });
-  
-  return user;
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 100;
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Cache-Control': 'no-store',
+};
+
+// =============================================================================
+// VALIDATION
+// =============================================================================
+
+const querySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().max(200).optional(),
+  type: z.enum(['feature', 'improvement', 'bugfix', 'security']).optional(),
+  isPublished: z.coerce.boolean().optional(),
+  sortBy: z.enum(['createdAt', 'publishedAt', 'version']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+});
+
+const createSchema = z.object({
+  version: z.string().min(1).max(50).regex(/^\d+\.\d+\.\d+$/),
+  title: z.string().min(5).max(300),
+  description: z.string().min(10).max(2000),
+  type: z.enum(['feature', 'improvement', 'bugfix', 'security']),
+  changes: z.array(z.object({
+    type: z.enum(['added', 'changed', 'deprecated', 'removed', 'fixed', 'security']),
+    description: z.string().min(10).max(500),
+  })).min(1),
+  isPublished: z.boolean().default(false),
+});
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-// GET /api/admin/changelog - List all changelog entries
-export async function GET(req: NextRequest) {
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: { limit: number; remaining: number }): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+  return response;
+}
+
+async function validateAdminSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `admin-changelog:${ip}`);
+
+  if (!rateLimitResult.success) {
+    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
+  }
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
+  }
+
+  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
+
+  if (!isAdmin) {
+    return { error: apiResponse.forbidden('Admin access required', requestId), session: null, rateLimitResult };
+  }
+
+  return { error: null, session, rateLimitResult };
+}
+
+// =============================================================================
+// OPTIONS
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+}
+
+// =============================================================================
+// HEAD
+// =============================================================================
+
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+
   try {
-    const admin = await checkAdminAuth(req);
-    if (!admin) {
-      logger.warn("Unauthorized changelog access attempt");
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+    const { error, rateLimitResult } = await validateAdminSession(request, requestId);
+
+    if (error) {
+      return new NextResponse(null, { status: 403 });
+    }
+
+    const [total, published, unpublished] = await Promise.all([
+      prisma.changelogEntry.count(),
+      prisma.changelogEntry.count({ where: { isPublished: true } }),
+      prisma.changelogEntry.count({ where: { isPublished: false } }),
+    ]);
+
+    const response = new NextResponse(null, {
+      status: 200,
+      headers: {
+        'X-Total-Count': String(total),
+        'X-Published-Count': String(published),
+        'X-Unpublished-Count': String(unpublished),
+      },
+    });
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('HEAD admin changelog failed', { requestId }, error);
+    return new NextResponse(null, { status: 500 });
+  }
+}
+
+// =============================================================================
+// GET - List changelog entries
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, rateLimitResult } = await validateAdminSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const { searchParams } = new URL(request.url);
+    const queryValidation = querySchema.safeParse({
+      page: searchParams.get('page'),
+      limit: searchParams.get('limit'),
+      search: searchParams.get('search') || undefined,
+      type: searchParams.get('type') || undefined,
+      isPublished: searchParams.get('isPublished') !== null ? searchParams.get('isPublished') : undefined,
+      sortBy: searchParams.get('sortBy') || 'createdAt',
+      sortOrder: searchParams.get('sortOrder') || 'desc',
+    });
+
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const search = searchParams.get("search") || "";
-    const type = searchParams.get("type");
-    const isPublished = searchParams.get("isPublished");
+    const { page, limit, search, type, isPublished, sortBy, sortOrder } = queryValidation.data;
 
-    const skip = (page - 1) * limit;
+    const where: Prisma.ChangelogEntryWhereInput = {};
 
-    const where = {
-      ...(search && {
-        OR: [
-          { version: { contains: search, mode: "insensitive" as const } },
-          { title: { contains: search, mode: "insensitive" as const } },
-          { description: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
-      ...(type && { type }),
-      ...(isPublished !== null && isPublished !== undefined && {
-        isPublished: isPublished === "true",
-      }),
-    };
+    if (search) {
+      where.OR = [
+        { version: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (type) where.type = type;
+    if (isPublished !== undefined) where.isPublished = isPublished;
 
     const [entries, total] = await Promise.all([
       prisma.changelogEntry.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortBy]: sortOrder },
       }),
       prisma.changelogEntry.count({ where }),
     ]);
 
-    logger.info("Changelog entries fetched", {
-      admin: admin.email,
+    logger.info('Changelog entries fetched', {
       total,
       page,
       filters: { type, isPublished },
+      requestId,
+      duration: Date.now() - startTime,
     });
 
-    return NextResponse.json({
+    const response = apiResponse.paginated(
       entries,
-      pagination: {
+      {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        hasNextPage: page < Math.ceil(total / limit),
+        hasPreviousPage: page > 1,
       },
-    });
-  } catch (error) {
-    logger.error("Error fetching changelog entries", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { meta: { requestId } }
     );
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('GET admin changelog failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch changelog entries', requestId), requestId);
   }
 }
 
-// POST /api/admin/changelog - Create new changelog entry
-export async function POST(req: NextRequest) {
+// =============================================================================
+// POST - Create changelog entry
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const admin = await checkAdminAuth(req);
-    if (!admin) {
-      logger.warn("Unauthorized changelog creation attempt");
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const body = await req.json();
-    const {
-      version,
-      title,
-      description,
-      type,
-      changes,
-      isPublished = false,
-    } = body;
+    const validation = createSchema.safeParse(body);
 
-    // Validation
-    if (!version || !title || !description || !type || !changes) {
-      return NextResponse.json(
-        { error: "Version, title, description, type, and changes are required" },
-        { status: 400 }
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    // Validate type
-    const validTypes = ["feature", "improvement", "bugfix", "security"];
-    if (!validTypes.includes(type)) {
-      return NextResponse.json(
-        { error: `Type must be one of: ${validTypes.join(", ")}` },
-        { status: 400 }
-      );
-    }
+    const data = validation.data;
 
-    // Validate changes structure
-    if (!Array.isArray(changes)) {
-      return NextResponse.json(
-        { error: "Changes must be an array" },
-        { status: 400 }
-      );
-    }
-
-    // Check if version already exists
-    const existing = await prisma.changelogEntry.findFirst({
-      where: { version },
-    });
+    // Check if version exists
+    const existing = await prisma.changelogEntry.findFirst({ where: { version: data.version } });
 
     if (existing) {
-      return NextResponse.json(
-        { error: "Changelog entry with this version already exists" },
-        { status: 409 }
+      return addHeaders(
+        apiResponse.validationError('Changelog entry with this version already exists', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
     const entry = await prisma.changelogEntry.create({
       data: {
-        version,
-        title,
-        description,
-        type,
-        changes,
-        isPublished,
-        ...(isPublished && {
-          publishedAt: new Date(),
-        }),
+        ...data,
+        publishedAt: data.isPublished ? new Date() : null,
       },
     });
 
-    logger.info("Changelog entry created", {
-      admin: admin.email,
-      version,
-      entryId: entry.id,
-      isPublished,
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'CREATE' as AuditAction,
+        category: 'admin',
+        entityType: 'changelogEntry',
+        entityId: entry.id,
+        description: `Created changelog entry: ${entry.version}`,
+        newValue: entry as unknown as Prisma.InputJsonValue,
+        ipAddress: getClientIp(request),
+        performedBy: userId,
+      },
     });
 
-    return NextResponse.json(entry, { status: 201 });
+    logger.info('Changelog entry created', {
+      entryId: entry.id,
+      version: entry.version,
+      adminId: userId,
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    const response = apiResponse.created(entry, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error("Error creating changelog entry", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    logger.error('POST admin changelog failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to create changelog entry', requestId), requestId);
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

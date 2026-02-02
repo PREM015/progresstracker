@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
     const access = await checkAdminAccess(session);
 
     if (!access.authorized) {
+      
+  logger.info('request is ', { request })
+
       logger.warn('Unauthorized admin sync access');
       return NextResponse.json(
         { success: false, error: access.error },

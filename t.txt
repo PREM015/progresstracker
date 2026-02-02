@@ -1,0 +1,626 @@
+
+## 📁 **components/ui/** (Shared Base UI Elements)
+These are atomic/base components used everywhere:
+
+```
+components/ui/
+├── Button.tsx
+├── Input.tsx
+├── Select.tsx
+├── Checkbox.tsx
+├── Radio.tsx
+├── Switch.tsx
+├── Textarea.tsx
+├── Card.tsx
+├── Modal.tsx
+├── Dropdown.tsx
+├── Table.tsx
+├── Pagination.tsx
+├── Tabs.tsx
+├── Avatar.tsx
+├── Badge.tsx
+├── Tooltip.tsx
+├── Alert.tsx
+├── Toast.tsx
+├── Spinner.tsx
+├── Skeleton.tsx
+├── Progress.tsx
+├── EmptyState.tsx
+├── ConfirmDialog.tsx
+├── DatePicker.tsx
+├── TimePicker.tsx
+├── FileUpload.tsx
+├── SearchInput.tsx
+├── Label.tsx
+├── FormError.tsx
+└── index.ts
+```
+**Total: 28 files**
+
+---
+
+## 📁 **components/layouts/** (Layout Components)
+
+```
+components/layouts/
+├── RootLayout.tsx          # Main app wrapper (header, footer, providers)
+├── AuthLayout.tsx          # Auth pages layout (login/register wrapper)
+├── DashboardLayout.tsx     # Dashboard layout with sidebar
+├── AdminLayout.tsx         # Admin section layout
+├── PublicLayout.tsx        # Public pages layout (blog, changelog)
+├── MinimalLayout.tsx       # Minimal layout (embed, error pages)
+└── index.ts
+```
+**Total: 7 files**
+
+---
+
+## 📁 **components/navigation/** (Navigation Components)
+
+```
+components/navigation/
+├── Navbar.tsx              # Main navbar with: logo, links, user menu, notifications bell, mobile toggle
+├── Sidebar.tsx             # Dashboard sidebar with: nav items, user info, collapse toggle
+├── AdminSidebar.tsx        # Admin sidebar with: all admin nav items, stats preview
+├── Footer.tsx              # Footer with: links, social, copyright
+├── Breadcrumbs.tsx         # Breadcrumb navigation
+├── MobileMenu.tsx          # Mobile navigation drawer
+├── UserMenu.tsx            # User dropdown menu (profile, settings, logout)
+├── NotificationBell.tsx    # Notification indicator + dropdown
+└── index.ts
+```
+**Total: 9 files**
+
+---
+
+## 📁 **components/auth/** (Authentication Components)
+
+```
+components/auth/
+├── LoginForm.tsx           # Email, password, remember me, forgot link, social buttons
+├── RegisterForm.tsx        # Name, email, username, password, terms checkbox
+├── ForgotPasswordForm.tsx  # Email input, submit button, back to login
+├── ResetPasswordForm.tsx   # New password, confirm password, strength indicator
+├── VerifyEmailForm.tsx     # OTP/code input, resend button, timer
+├── TwoFactorSetup.tsx      # QR code display, verification input, backup codes
+├── TwoFactorVerify.tsx     # 2FA code input during login
+├── BackupCodesDisplay.tsx  # Show/download backup codes
+├── SocialAuthButtons.tsx   # Google, GitHub, other OAuth buttons
+├── ChangePasswordForm.tsx  # Current password, new password, confirm
+├── ChangeEmailForm.tsx     # New email, password confirmation
+├── SessionsList.tsx        # Active sessions with revoke option
+├── AccountDeletion.tsx     # Delete account confirmation flow
+└── index.ts
+```
+**Total: 14 files**
+
+---
+
+## 📁 **components/dashboard/** (Main Dashboard)
+
+```
+components/dashboard/
+├── DashboardOverview.tsx   # Main dashboard page content (stats grid, charts, activity)
+├── StatsCards.tsx          # Stat cards (problems, commits, streak, points)
+├── StreakDisplay.tsx       # Current streak, best streak, freeze info
+├── ActivityChart.tsx       # Line/bar charts for activity over time
+├── HeatmapCalendar.tsx     # GitHub-style contribution heatmap
+├── RecentActivity.tsx      # Recent activity feed/timeline
+├── PlatformSummary.tsx     # Connected platforms mini cards
+├── GoalsSummary.tsx        # Active goals progress mini cards
+├── AchievementsSummary.tsx # Recent achievements mini display
+├── QuickActions.tsx        # Quick action buttons (sync, add entry, etc.)
+├── WelcomeBanner.tsx       # Welcome message, onboarding progress
+└── index.ts
+```
+**Total: 12 files**
+
+---
+
+## 📁 **components/platforms/** (Platform Management)
+
+```
+components/platforms/
+├── PlatformList.tsx        # Grid/list of all platforms with filters
+├── PlatformCard.tsx        # Individual platform card (status, stats, actions)
+├── PlatformConnect.tsx     # Connect platform modal/page (OAuth, username input)
+├── PlatformDetails.tsx     # Platform detail view (stats, history, settings)
+├── PlatformSettings.tsx    # Platform-specific settings (sync freq, notifications)
+├── PlatformDisconnect.tsx  # Disconnect confirmation modal
+├── SyncStatusBadge.tsx     # Sync status indicator (syncing, success, failed)
+├── SyncHistoryList.tsx     # List of sync logs for platform
+├── CustomPlatformForm.tsx  # Create/edit custom platform
+├── CustomPlatformList.tsx  # List of user's custom platforms
+├── PlatformCategories.tsx  # Platform category tabs/filters
+├── PlatformSearch.tsx      # Search platforms
+└── index.ts
+```
+**Total: 13 files**
+
+---
+
+## 📁 **components/tracker/** (Activity Tracker)
+
+```
+components/tracker/
+├── TrackerDashboard.tsx    # Main tracker view with calendar and entries
+├── TrackerEntryForm.tsx    # Add/edit tracker entry form (all fields)
+├── TrackerEntryList.tsx    # List view of entries with filters
+├── TrackerEntryCard.tsx    # Individual entry display card
+├── TrackerCalendar.tsx     # Calendar view for selecting dates
+├── TrackerHeatmap.tsx      # Heatmap view of activity
+├── TrackerFilters.tsx      # Date range, platform, category filters
+├── TrackerStats.tsx        # Stats summary for selected period
+├── TrackerBulkActions.tsx  # Bulk edit/delete actions
+├── TrackerImport.tsx       # Import entries from file
+├── TrackerExport.tsx       # Export entries modal
+├── QuickEntry.tsx          # Quick add entry widget
+└── index.ts
+```
+**Total: 13 files**
+
+---
+
+## 📁 **components/goals/** (Goals Management)
+
+```
+components/goals/
+├── GoalsList.tsx           # All goals list with filters (active, completed, etc.)
+├── GoalCard.tsx            # Goal card with progress, actions
+├── GoalForm.tsx            # Create/edit goal form (all fields, milestones)
+├── GoalDetails.tsx         # Goal detail page (full stats, history, progress chart)
+├── GoalProgress.tsx        # Progress bar/ring with milestones
+├── GoalReminders.tsx       # Reminder settings for a goal
+├── GoalTemplates.tsx       # Browse/select goal templates
+├── GoalShare.tsx           # Share goal modal with link generation
+├── GoalMilestones.tsx      # Milestone management UI
+├── GoalFilters.tsx         # Filter goals by status, category, date
+├── GoalStats.tsx           # Goal statistics and analytics
+├── GoalArchive.tsx         # Archived goals list
+└── index.ts
+```
+**Total: 13 files**
+
+---
+
+## 📁 **components/achievements/** (Achievements System)
+
+```
+components/achievements/
+├── AchievementsList.tsx    # All achievements grid (earned, available, locked)
+├── AchievementCard.tsx     # Achievement card with badge, progress, rarity
+├── AchievementDetails.tsx  # Achievement detail modal (requirements, stats)
+├── AchievementBadge.tsx    # Badge display component (tier-based styling)
+├── AchievementProgress.tsx # Progress towards achievement
+├── AchievementUnlock.tsx   # Unlock animation/celebration modal
+├── AchievementFilters.tsx  # Filter by category, tier, status
+├── AchievementLeaderboard.tsx  # Top achievers list
+├── PinnedAchievements.tsx  # User's pinned achievements display
+├── AchievementCategories.tsx # Category navigation
+└── index.ts
+```
+**Total: 11 files**
+
+---
+
+## 📁 **components/analytics/** (Analytics & Reports)
+
+```
+components/analytics/
+├── AnalyticsDashboard.tsx  # Main analytics page layout
+├── OverviewStats.tsx       # Key metrics cards
+├── TrendCharts.tsx         # Line charts for trends over time
+├── CategoryBreakdown.tsx   # Pie/donut chart by category
+├── PlatformComparison.tsx  # Compare stats across platforms
+├── TimeSpentAnalysis.tsx   # Time spent breakdown
+├── ProductivityScore.tsx   # Productivity metrics display
+├── InsightsCard.tsx        # AI-generated insights display
+├── PredictionsCard.tsx     # Predictions and projections
+├── ComparisonTools.tsx     # Compare periods/platforms
+├── AnalyticsFilters.tsx    # Date range, platform, category filters
+├── ExportAnalytics.tsx     # Export analytics data
+└── index.ts
+```
+**Total: 13 files**
+
+---
+
+## 📁 **components/reports/** (Reports & Export)
+
+```
+components/reports/
+├── ReportsList.tsx         # List of generated reports
+├── ReportCard.tsx          # Report preview card
+├── ReportViewer.tsx        # View full report
+├── ReportGenerator.tsx     # Generate new report (options)
+├── WeeklyReport.tsx        # Weekly report template
+├── MonthlyReport.tsx       # Monthly report template
+├── CustomReport.tsx        # Custom report builder
+├── ScheduledReports.tsx    # Manage scheduled reports
+├── ExportModal.tsx         # Export data modal (CSV, JSON, PDF, Excel)
+├── ExportHistory.tsx       # Export history list
+└── index.ts
+```
+**Total: 11 files**
+
+---
+
+## 📁 **components/leaderboard/** (Leaderboard)
+
+```
+components/leaderboard/
+├── LeaderboardPage.tsx     # Main leaderboard page
+├── LeaderboardTable.tsx    # Rankings table with user info
+├── LeaderboardFilters.tsx  # Filter by period, category, friends
+├── LeaderboardCard.tsx     # User rank card
+├── TopPerformers.tsx       # Top 3 showcase
+├── UserRankBadge.tsx       # User's current rank display
+└── index.ts
+```
+**Total: 7 files**
+
+---
+
+## 📁 **components/notifications/** (Notifications)
+
+```
+components/notifications/
+├── NotificationCenter.tsx  # Full notifications page
+├── NotificationList.tsx    # List of all notifications
+├── NotificationItem.tsx    # Single notification item
+├── NotificationDropdown.tsx # Navbar notification dropdown
+├── NotificationFilters.tsx # Filter by type, read status
+├── NotificationSettings.tsx # Notification preferences (inline)
+├── PushNotificationPrompt.tsx # Enable push notifications prompt
+└── index.ts
+```
+**Total: 8 files**
+
+---
+
+## 📁 **components/settings/** (User Settings)
+
+```
+components/settings/
+├── SettingsPage.tsx        # Main settings page with tabs
+├── ProfileSettings.tsx     # Profile info, avatar, bio
+├── AccountSettings.tsx     # Email, username, password
+├── AppearanceSettings.tsx  # Theme, language, display
+├── NotificationSettings.tsx # All notification preferences
+├── PrivacySettings.tsx     # Profile visibility, data sharing
+├── SecuritySettings.tsx    # 2FA, sessions, login history
+├── BillingSettings.tsx     # Subscription, payment methods
+├── ExportSettings.tsx      # Data export options
+├── DangerZone.tsx          # Account deletion, deactivation
+├── ApiKeyManager.tsx       # API keys list, create, delete
+├── ConnectedAccounts.tsx   # OAuth connections management
+├── LoginHistory.tsx        # Login history table
+└── index.ts
+```
+**Total: 14 files**
+
+---
+
+## 📁 **components/billing/** (Subscription & Billing)
+
+```
+components/billing/
+├── PricingPage.tsx         # Public pricing page
+├── PricingCard.tsx         # Pricing tier card
+├── SubscriptionStatus.tsx  # Current subscription info
+├── UpgradeModal.tsx        # Upgrade plan modal
+├── PaymentMethodsList.tsx  # Saved payment methods
+├── AddPaymentMethod.tsx    # Add new payment method form
+├── InvoicesList.tsx        # Billing history/invoices
+├── InvoiceDetail.tsx       # Single invoice view
+├── CancelSubscription.tsx  # Cancel flow/modal
+├── UsageMeter.tsx          # Usage limits display
+├── BillingAlerts.tsx       # Payment failed, expiring card alerts
+└── index.ts
+```
+**Total: 12 files**
+
+---
+
+## 📁 **components/support/** (Support & Help)
+
+```
+components/support/
+├── SupportPage.tsx         # Main support page
+├── TicketsList.tsx         # User's support tickets
+├── TicketDetail.tsx        # Ticket conversation view
+├── TicketForm.tsx          # Create new ticket form
+├── TicketReply.tsx         # Reply to ticket form
+├── FeedbackForm.tsx        # Quick feedback form
+├── HelpSearch.tsx          # Search help articles
+├── FAQAccordion.tsx        # FAQ list with accordion
+├── ContactForm.tsx         # Contact us form
+└── index.ts
+```
+**Total: 10 files**
+
+---
+
+## 📁 **components/profile/** (User Profile)
+
+```
+components/profile/
+├── ProfilePage.tsx         # User's own profile page
+├── ProfileHeader.tsx       # Avatar, name, bio, stats
+├── ProfileStats.tsx        # Detailed stats display
+├── ProfilePlatforms.tsx    # Connected platforms showcase
+├── ProfileAchievements.tsx # Achievements showcase
+├── ProfileGoals.tsx        # Public goals display
+├── ProfileActivity.tsx     # Activity heatmap/timeline
+├── EditProfileModal.tsx    # Edit profile modal
+├── PublicProfilePage.tsx   # Public profile view ([username])
+├── ShareProfile.tsx        # Share profile modal
+├── ProfileEmbed.tsx        # Embeddable profile widget
+└── index.ts
+```
+**Total: 12 files**
+
+---
+
+## 📁 **components/admin/** (Admin Panel)
+
+```
+components/admin/
+├── AdminDashboard.tsx      # Admin overview with stats
+├── AdminStats.tsx          # System-wide statistics
+├── UserManagement.tsx      # Users table, search, actions
+├── UserDetail.tsx          # User detail view (admin)
+├── UserActions.tsx         # Ban, verify, impersonate actions
+├── AchievementManager.tsx  # CRUD achievements
+├── AchievementForm.tsx     # Create/edit achievement form
+├── BlogManager.tsx         # Blog posts list, CRUD
+├── BlogEditor.tsx          # Blog post editor
+├── ChangelogManager.tsx    # Changelog entries CRUD
+├── ChangelogEditor.tsx     # Changelog editor
+├── FeatureFlagManager.tsx  # Feature flags list, toggle
+├── FeatureFlagForm.tsx     # Create/edit feature flag
+├── MaintenanceManager.tsx  # Maintenance windows CRUD
+├── NewsletterManager.tsx   # Newsletter subscribers, send
+├── WaitlistManager.tsx     # Waitlist management
+├── SystemSettings.tsx      # System-wide settings
+├── LogViewer.tsx           # System logs viewer
+├── MetricsDashboard.tsx    # System metrics/monitoring
+├── AuditLogViewer.tsx      # Audit logs table
+├── CacheManager.tsx        # Cache management
+├── SyncManager.tsx         # Global sync management
+├── ReportManager.tsx       # User reports review
+├── FeedbackManager.tsx     # User feedback review
+├── SupportManager.tsx      # Support tickets (admin view)
+└── index.ts
+```
+**Total: 26 files**
+
+---
+
+## 📁 **components/landing/** (Landing/Marketing Pages)
+
+```
+components/landing/
+├── LandingPage.tsx         # Main landing page
+├── Hero.tsx                # Hero section
+├── Features.tsx            # Features grid
+├── HowItWorks.tsx          # How it works section
+├── Platforms.tsx           # Supported platforms showcase
+├── Testimonials.tsx        # User testimonials
+├── PricingSection.tsx      # Pricing on landing
+├── FAQ.tsx                 # FAQ section
+├── CTASection.tsx          # Call to action
+├── Stats.tsx               # Platform stats (users, syncs)
+├── Newsletter.tsx          # Newsletter signup
+└── index.ts
+```
+**Total: 12 files**
+
+---
+
+## 📁 **components/public/** (Public Pages)
+
+```
+components/public/
+├── BlogList.tsx            # Blog listing page
+├── BlogPost.tsx            # Single blog post view
+├── BlogSidebar.tsx         # Blog categories, recent posts
+├── ChangelogPage.tsx       # Public changelog
+├── ChangelogEntry.tsx      # Single changelog entry
+├── WaitlistPage.tsx        # Waitlist signup page
+├── TermsPage.tsx           # Terms of service
+├── PrivacyPage.tsx         # Privacy policy
+├── AboutPage.tsx           # About us page
+└── index.ts
+```
+**Total: 10 files**
+
+---
+
+## 📁 **components/onboarding/** (User Onboarding)
+
+```
+components/onboarding/
+├── OnboardingFlow.tsx      # Multi-step onboarding wizard
+├── WelcomeStep.tsx         # Welcome step
+├── ProfileSetupStep.tsx    # Basic profile setup
+├── PlatformConnectStep.tsx # Connect first platforms
+├── GoalSetupStep.tsx       # Set first goals
+├── PreferencesStep.tsx     # Set preferences
+├── CompletionStep.tsx      # Onboarding complete
+├── OnboardingProgress.tsx  # Progress indicator
+└── index.ts
+```
+**Total: 9 files**
+
+---
+
+## 📁 **components/sync/** (Sync Related)
+
+```
+components/sync/
+├── SyncDashboard.tsx       # Sync overview page
+├── SyncStatus.tsx          # Current sync status
+├── SyncHistory.tsx         # Sync logs history
+├── SyncLogDetail.tsx       # Detailed sync log view
+├── SyncControls.tsx        # Manual sync triggers
+├── SyncSchedule.tsx        # Sync schedule settings
+├── SyncConflicts.tsx       # Conflict resolution UI
+└── index.ts
+```
+**Total: 8 files**
+
+---
+
+## 📁 **components/share/** (Sharing Features)
+
+```
+components/share/
+├── ShareModal.tsx          # Share modal (goals, stats, achievements)
+├── ShareCard.tsx           # Shareable card preview
+├── ShareButtons.tsx        # Social share buttons
+├── ShareLink.tsx           # Copy share link
+├── EmbedCode.tsx           # Get embed code
+└── index.ts
+```
+**Total: 6 files**
+
+---
+
+## 📁 **components/referral/** (Referral System)
+
+```
+components/referral/
+├── ReferralDashboard.tsx   # Referral overview
+├── ReferralLink.tsx        # Get referral link
+├── ReferralStats.tsx       # Referral statistics
+├── ReferralRewards.tsx     # Rewards earned/available
+├── ReferralList.tsx        # List of referrals
+└── index.ts
+```
+**Total: 6 files**
+
+---
+
+## 📁 **components/errors/** (Error States)
+
+```
+components/errors/
+├── ErrorBoundary.tsx       # React error boundary
+├── ErrorPage.tsx           # Generic error page
+├── NotFoundPage.tsx        # 404 page
+├── ServerError.tsx         # 500 error page
+├── MaintenancePage.tsx     # Maintenance mode page
+├── OfflinePage.tsx         # Offline state
+└── index.ts
+```
+**Total: 7 files**
+
+---
+
+## 📁 **components/charts/** (Chart Components)
+
+```
+components/charts/
+├── LineChart.tsx           # Reusable line chart
+├── BarChart.tsx            # Reusable bar chart
+├── PieChart.tsx            # Reusable pie/donut chart
+├── AreaChart.tsx           # Area chart
+├── RadarChart.tsx          # Radar/spider chart
+├── HeatmapChart.tsx        # Heatmap component
+├── ChartTooltip.tsx        # Custom chart tooltip
+├── ChartLegend.tsx         # Custom chart legend
+└── index.ts
+```
+**Total: 9 files**
+
+---
+
+## 📁 **components/widgets/** (Reusable Widgets)
+
+```
+components/widgets/
+├── StatWidget.tsx          # Stat display widget
+├── ProgressWidget.tsx      # Progress display widget
+├── ListWidget.tsx          # List display widget
+├── ChartWidget.tsx         # Chart wrapper widget
+├── CountdownWidget.tsx     # Countdown timer
+├── TimeAgo.tsx             # Relative time display
+├── CopyButton.tsx          # Copy to clipboard button
+├── ThemeToggle.tsx         # Theme switcher
+├── LanguageSelect.tsx      # Language selector
+└── index.ts
+```
+**Total: 10 files**
+
+---
+
+# 📊 **Summary Table**
+
+| Folder | Files Count | Description |
+|--------|-------------|-------------|
+| `components/ui/` | 28 | Base UI components |
+| `components/layouts/` | 7 | Layout wrappers |
+| `components/navigation/` | 9 | Navigation components |
+| `components/auth/` | 14 | Authentication flows |
+| `components/dashboard/` | 12 | Dashboard components |
+| `components/platforms/` | 13 | Platform management |
+| `components/tracker/` | 13 | Activity tracking |
+| `components/goals/` | 13 | Goal management |
+| `components/achievements/` | 11 | Achievements system |
+| `components/analytics/` | 13 | Analytics & insights |
+| `components/reports/` | 11 | Reports & exports |
+| `components/leaderboard/` | 7 | Leaderboard |
+| `components/notifications/` | 8 | Notifications |
+| `components/settings/` | 14 | User settings |
+| `components/billing/` | 12 | Billing & subscription |
+| `components/support/` | 10 | Support & help |
+| `components/profile/` | 12 | Profile pages |
+| `components/admin/` | 26 | Admin panel |
+| `components/landing/` | 12 | Landing page |
+| `components/public/` | 10 | Public pages |
+| `components/onboarding/` | 9 | Onboarding flow |
+| `components/sync/` | 8 | Sync management |
+| `components/share/` | 6 | Sharing features |
+| `components/referral/` | 6 | Referral system |
+| `components/errors/` | 7 | Error states |
+| `components/charts/` | 9 | Chart components |
+| `components/widgets/` | 10 | Reusable widgets |
+
+---
+
+## **Total UI Files Needed: ~300 files**
+
+---
+
+## 📂 **Folder Structure Overview**
+
+```
+components/
+├── ui/                 # 28 files - Atomic/base components
+├── layouts/            # 7 files  - Page layouts
+├── navigation/         # 9 files  - Nav components
+├── auth/               # 14 files - Auth components
+├── dashboard/          # 12 files - Dashboard
+├── platforms/          # 13 files - Platforms
+├── tracker/            # 13 files - Tracker
+├── goals/              # 13 files - Goals
+├── achievements/       # 11 files - Achievements
+├── analytics/          # 13 files - Analytics
+├── reports/            # 11 files - Reports
+├── leaderboard/        # 7 files  - Leaderboard
+├── notifications/      # 8 files  - Notifications
+├── settings/           # 14 files - Settings
+├── billing/            # 12 files - Billing
+├── support/            # 10 files - Support
+├── profile/            # 12 files - Profile
+├── admin/              # 26 files - Admin
+├── landing/            # 12 files - Landing
+├── public/             # 10 files - Public pages
+├── onboarding/         # 9 files  - Onboarding
+├── sync/               # 8 files  - Sync
+├── share/              # 6 files  - Sharing
+├── referral/           # 6 files  - Referral
+├── errors/             # 7 files  - Errors
+├── charts/             # 9 files  - Charts
+└── widgets/            # 10 files - Widgets

@@ -16,6 +16,17 @@ export const registerSchema = z.object({
     .max(100, "Password must be less than 100 characters"),
 })
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  username: z.string().optional(),
+  bio: z.string().optional(),
+  image: z.string().url().optional(),
+});
+
+// Type ke liye export
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+
 export type RegisterInput = z.infer<typeof registerSchema>
 
 /**

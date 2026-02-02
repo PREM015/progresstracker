@@ -1,48 +1,128 @@
 // src/app/api/user/2fa/verify/route.ts
+// =============================================================================
+// 2FA VERIFICATION ROUTE
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { authenticator } from 'otplib';
 import { decrypt } from '@/lib/encryption';
+import { z } from 'zod';
+import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
 
-// POST - Verify 2FA code (completes setup)
-export async function POST(request: NextRequest) {
+// =============================================================================
+// SCHEMAS
+// =============================================================================
+
+const verifySchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be numeric'),
+});
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 5;
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store',
+};
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(response: NextResponse, requestId: string): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+  return response;
+}
+
+// =============================================================================
+// OPTIONS
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
+// =============================================================================
+// POST - Verify 2FA code
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(authRateLimiter, RATE_LIMIT, ip);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(300, requestId), requestId);
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+      return addHeaders(apiResponse.unauthorized('Authentication required', requestId), requestId);
+    }
+
+    const userId = session.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(apiResponse.validationError('Invalid JSON', undefined, requestId), requestId);
+    }
+
+    const validation = verifySchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid code format', validation.error.errors, requestId),
+        requestId
       );
     }
 
-    const body = await request.json();
-    const { code } = body;
-
-    if (!code || typeof code !== 'string' || code.length !== 6) {
-      return NextResponse.json(
-        { error: 'Invalid code format. Must be 6 digits.' },
-        { status: 400 }
-      );
-    }
+    const { code } = validation.data;
 
     const twoFactorAuth = await prisma.twoFactorAuth.findUnique({
-      where: { userId: session.user.id },
+      where: { userId },
     });
 
     if (!twoFactorAuth) {
-      return NextResponse.json(
-        { error: '2FA not set up. Please initiate setup first.' },
-        { status: 400 }
+      return addHeaders(
+        apiResponse.validationError('2FA not set up', undefined, requestId),
+        requestId
       );
     }
 
     if (twoFactorAuth.isEnabled && !twoFactorAuth.isPending) {
-      return NextResponse.json(
-        { error: '2FA is already verified and enabled' },
-        { status: 400 }
+      return addHeaders(
+        apiResponse.validationError('2FA is already verified and enabled', undefined, requestId),
+        requestId
       );
     }
 
@@ -54,15 +134,16 @@ export async function POST(request: NextRequest) {
     });
 
     if (!isValid) {
-      return NextResponse.json(
-        { error: 'Invalid verification code' },
-        { status: 400 }
+      logger.warn('Invalid 2FA verification code', { userId, requestId });
+      return addHeaders(
+        apiResponse.validationError('Invalid verification code', undefined, requestId),
+        requestId
       );
     }
 
     // Enable 2FA
     await prisma.twoFactorAuth.update({
-      where: { userId: session.user.id },
+      where: { userId },
       data: {
         isEnabled: true,
         isPending: false,
@@ -70,27 +151,35 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Log the action
+    // Audit log
     await prisma.auditLog.create({
       data: {
-        userId: session.user.id,
+        userId,
         action: 'TWO_FACTOR_ENABLE',
         category: 'auth',
         description: '2FA enabled and verified',
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
+        ipAddress: ip,
         userAgent: request.headers.get('user-agent'),
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: '2FA has been successfully enabled',
+    logger.info('2FA verified and enabled', {
+      userId,
+      requestId,
+      duration: Date.now() - startTime,
     });
-  } catch (error) {
-    console.error('Error verifying 2FA:', error);
-    return NextResponse.json(
-      { error: 'Failed to verify 2FA code' },
-      { status: 500 }
+
+    const response = apiResponse.success(
+      { message: '2FA has been successfully enabled' },
+      { meta: { requestId } }
     );
+
+    return addHeaders(response, requestId);
+  } catch (error) {
+    logger.error('POST 2FA verify failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to verify 2FA', requestId), requestId);
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

@@ -1,414 +1,493 @@
 // src/app/api/analytics/report/route.ts
+// =============================================================================
+// Analytics Reports
+// =============================================================================
+// Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD
+// Auth Required: Yes
+// Rate Limit: 30 requests/minute
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import apiResponse from '@/lib/apiResponse';
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
+
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
 import { reportService } from '@/services/analytics/reportService';
 
-const log = logger.child({ module: 'api.analytics.report' });
 
-// Validation schemas
-const createReportSchema = z.object({
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 30;
+const DAILY_REPORT_LIMIT = 10;
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Cache-Control': 'no-store',
+};
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
+const getQuerySchema = z.object({
+  id: z.string().cuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+  page: z.coerce.number().int().min(1).default(1),
+  type: z.enum(['weekly', 'monthly', 'yearly', 'custom']).optional(),
+});
+
+const createBodySchema = z.object({
   type: z.enum(['weekly', 'monthly', 'yearly', 'custom']),
   periodStart: z.string().datetime().optional(),
   periodEnd: z.string().datetime().optional(),
   sendEmail: z.boolean().optional().default(false),
+  title: z.string().max(200).optional(),
 });
 
-const updateReportSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  notes: z.string().max(1000).optional(),
-  tags: z.array(z.string()).optional(),
+const updateBodySchema = z.object({
+  title: z.string().max(200).optional(),
+  notes: z.string().max(2000).optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
   isPublic: z.boolean().optional(),
 });
 
-const getReportsSchema = z.object({
-  limit: z.coerce.number().min(1).max(50).optional().default(10),
-  type: z.enum(['weekly', 'monthly', 'yearly', 'custom']).optional(),
-  page: z.coerce.number().min(1).optional().default(1),
-});
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
-/**
- * GET /api/analytics/report
- * Get user's reports or specific report by ID
- */
-export async function GET(req: NextRequest): Promise<NextResponse> {
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
+}
+
+async function validateSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitKey = `analytics-report:${ip}`;
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+  if (!rateLimitResult.success) {
+    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
+  }
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
+  }
+
+  return { error: null, session, rateLimitResult };
+}
+
+// =============================================================================
+// HTTP METHOD HANDLERS
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+}
+
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(new NextResponse(null, { status: 401 }), requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+    const reportCount = await prisma.report.count({ where: { userId } });
+
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Total-Reports', String(reportCount));
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('HEAD analytics/report failed', { requestId }, error);
+    return new NextResponse(null, { status: 500 });
+  }
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      log.warn('Unauthorized report request');
-      return apiResponse.unauthorized('Authentication required');
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    const userId = session.user.id;
-    const { searchParams } = new URL(req.url);
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
 
-    // Check for specific report ID
-    const reportId = searchParams.get('id');
-    if (reportId) {
-      log.info('Fetching specific report', { userId, reportId });
-
-      const report = await reportService.getById(reportId, userId);
-      if (!report) {
-        log.warn('Report not found', { userId, reportId });
-        return apiResponse.notFound('Report');
-      }
-
-      const duration = Date.now() - startTime;
-      log.info('Report fetched successfully', { userId, reportId, duration });
-
-      return apiResponse.success(report, {
-        meta: { executionTime: duration },
-      });
-    }
-
-    // Extract params for list
-    const limit = searchParams.get('limit');
-    const type = searchParams.get('type');
-    const page = searchParams.get('page');
-
-    // Parse and validate query params for list
-    const validationResult = getReportsSchema.safeParse({
-      limit: limit ?? undefined,
-      type: type ?? undefined,
-      page: page ?? undefined,
+    // Parse query parameters
+    const queryValidation = getQuerySchema.safeParse({
+      id: searchParams.get('id'),
+      limit: searchParams.get('limit') || '10',
+      page: searchParams.get('page') || '1',
+      type: searchParams.get('type'),
     });
 
-    if (!validationResult.success) {
-      log.warn('Invalid report list parameters', {
-        userId,
-        errors: validationResult.error.flatten(),
-      });
-      return apiResponse.validationError(
-        'Invalid parameters',
-        validationResult.error.issues
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const params = validationResult.data;
+    const params = queryValidation.data;
 
-    log.info('Fetching reports list', {
-      userId,
-      limit: params.limit,
-      type: params.type,
-      page: params.page,
-    });
+    // Get single report by ID
+    if (params.id) {
+      const report = await reportService.getById(params.id, userId);
 
-    // Fetch reports with pagination
+      if (!report) {
+        return addHeaders(apiResponse.notFound('Report', requestId), requestId, rateLimitResult);
+      }
+
+      return addHeaders(
+        apiResponse.success(report, { meta: { requestId } }),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Get reports list
     const skip = (params.page - 1) * params.limit;
     const reports = await reportService.getAll(userId, params.limit, skip);
+    const total = await reportService.getCount(userId, params.type);
 
     // Filter by type if specified
     const filteredReports = params.type
-      ? reports.filter((r) => r.type === params.type)
+      ? reports.filter(r => r.type === params.type)
       : reports;
 
-    // Get total count for pagination
-    const totalCount = await reportService.getCount(userId, params.type);
-
-    const duration = Date.now() - startTime;
-    log.info('Reports fetched successfully', {
+    logger.info('Reports fetched', {
       userId,
       count: filteredReports.length,
-      duration,
+      requestId,
+      duration: Date.now() - startTime,
     });
 
-    return apiResponse.success(
-      {
-        reports: filteredReports,
-        pagination: {
-          total: totalCount,
-          page: params.page,
-          limit: params.limit,
-          totalPages: Math.ceil(totalCount / params.limit),
-          hasNext: params.page * params.limit < totalCount,
-          hasPrev: params.page > 1,
-        },
-      },
-      {
-        meta: {
-          limit: params.limit,
-          type: params.type,
-          executionTime: duration,
-        },
-      }
+    return addHeaders(
+      apiResponse.paginated(filteredReports, {
+        page: params.page,
+        limit: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+        hasNextPage: params.page * params.limit < total,
+        hasPreviousPage: params.page > 1,
+      }, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
     );
   } catch (error) {
-    const duration = Date.now() - startTime;
-    log.error('Error fetching reports', { duration }, error);
-    return apiResponse.error(error);
+    logger.error('GET analytics/report failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch reports', requestId), requestId);
   }
 }
 
-/**
- * POST /api/analytics/report
- * Generate a new report
- */
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      log.warn('Unauthorized report generation request');
-      return apiResponse.unauthorized('Authentication required');
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    const userId = session.user.id;
-    const body = await req.json();
+    const userId = session!.user.id;
 
-    // Validate request body
-    const validationResult = createReportSchema.safeParse(body);
-    if (!validationResult.success) {
-      log.warn('Invalid report creation parameters', {
-        userId,
-        errors: validationResult.error.flatten(),
-      });
-      return apiResponse.validationError(
-        'Invalid report parameters',
-        validationResult.error.issues
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const params = validationResult.data;
+    const validation = createBodySchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const params = validation.data;
+
+    // Check daily limit
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayReports = await reportService.getCountSince(userId, todayStart);
+
+    if (todayReports >= DAILY_REPORT_LIMIT) {
+      return addHeaders(
+        apiResponse.rateLimited(86400, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
 
     // Validate custom period dates
     if (params.type === 'custom' && (!params.periodStart || !params.periodEnd)) {
-      log.warn('Custom report missing period dates', { userId });
-      return apiResponse.validationError(
-        'Custom reports require periodStart and periodEnd dates'
+      return addHeaders(
+        apiResponse.validationError('Custom reports require periodStart and periodEnd', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
-
-    // Check rate limiting (max 10 reports per day)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const reportsToday = await reportService.getCountSince(userId, todayStart);
-    
-    if (reportsToday >= 10) {
-      log.warn('Report generation rate limit exceeded', { userId, reportsToday });
-      return apiResponse.rateLimited(86400); // 24 hours
-    }
-
-    log.info('Generating report', {
-      userId,
-      type: params.type,
-      periodStart: params.periodStart,
-      periodEnd: params.periodEnd,
-      sendEmail: params.sendEmail,
-    });
 
     // Generate report
-    const report = await reportService.create(
-      {
-        type: params.type,
-        periodStart: params.periodStart ? new Date(params.periodStart) : undefined,
-        periodEnd: params.periodEnd ? new Date(params.periodEnd) : undefined,
-        sendEmail: params.sendEmail,
-      },
-      userId
-    );
+    const report = await reportService.create({
+      type: params.type,
+      periodStart: params.periodStart ? new Date(params.periodStart) : undefined,
+      periodEnd: params.periodEnd ? new Date(params.periodEnd) : undefined,
+      sendEmail: params.sendEmail,
+    }, userId);
 
-    const duration = Date.now() - startTime;
-    log.info('Report generated successfully', {
+    logger.info('Report created', {
       userId,
       reportId: report.id,
-      type: report.type,
-      duration,
+      type: params.type,
+      requestId,
+      duration: Date.now() - startTime,
     });
 
-    return apiResponse.created(report, {
-      meta: {
-        type: params.type,
-        executionTime: duration,
-      },
-    });
+    return addHeaders(
+      apiResponse.created(report, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
   } catch (error) {
-    const duration = Date.now() - startTime;
-    log.error('Error generating report', { duration }, error);
-    return apiResponse.error(error);
+    logger.error('POST analytics/report failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to create report', requestId), requestId);
   }
 }
 
-/**
- * PATCH /api/analytics/report
- * Update a report (metadata only, not regenerate)
- */
-export async function PATCH(req: NextRequest): Promise<NextResponse> {
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      log.warn('Unauthorized report update request');
-      return apiResponse.unauthorized('Authentication required');
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    const userId = session.user.id;
-    const { searchParams } = new URL(req.url);
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
     const reportId = searchParams.get('id');
 
     if (!reportId) {
-      log.warn('Report ID missing for update', { userId });
-      return apiResponse.validationError('Report ID is required');
-    }
-
-    // Check if report exists and belongs to user
-    const existingReport = await reportService.getById(reportId, userId);
-    if (!existingReport) {
-      log.warn('Report not found for update', { userId, reportId });
-      return apiResponse.notFound('Report');
-    }
-
-    const body = await req.json();
-
-    // Validate request body
-    const validationResult = updateReportSchema.safeParse(body);
-    if (!validationResult.success) {
-      log.warn('Invalid report update parameters', {
-        userId,
-        reportId,
-        errors: validationResult.error.flatten(),
-      });
-      return apiResponse.validationError(
-        'Invalid update parameters',
-        validationResult.error.issues
+      return addHeaders(
+        apiResponse.validationError('Report ID is required', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const params = validationResult.data;
+    // Regenerate report
+    const existingReport = await reportService.getById(reportId, userId);
 
-    log.info('Updating report', { userId, reportId, updates: params });
+    if (!existingReport) {
+      return addHeaders(apiResponse.notFound('Report', requestId), requestId, rateLimitResult);
+    }
 
-    // Update report
-    const updatedReport = await reportService.update(reportId, userId, params);
+    const regeneratedReport = await reportService.regenerate(reportId, userId);
 
-    const duration = Date.now() - startTime;
-    log.info('Report updated successfully', { userId, reportId, duration });
-
-    return apiResponse.success(updatedReport, {
-      meta: { executionTime: duration },
+    logger.info('Report regenerated', {
+      userId,
+      reportId,
+      requestId,
+      duration: Date.now() - startTime,
     });
+
+    return addHeaders(
+      apiResponse.success(regeneratedReport, { meta: { requestId, regenerated: true } }),
+      requestId,
+      rateLimitResult
+    );
   } catch (error) {
-    const duration = Date.now() - startTime;
-    log.error('Error updating report', { duration }, error);
-    return apiResponse.error(error);
+    logger.error('PUT analytics/report failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to regenerate report', requestId), requestId);
   }
 }
 
-/**
- * DELETE /api/analytics/report
- * Delete a report
- */
-export async function DELETE(req: NextRequest): Promise<NextResponse> {
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      log.warn('Unauthorized report deletion request');
-      return apiResponse.unauthorized('Authentication required');
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    const userId = session.user.id;
-    const { searchParams } = new URL(req.url);
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
     const reportId = searchParams.get('id');
 
     if (!reportId) {
-      log.warn('Report ID missing for deletion', { userId });
-      return apiResponse.validationError('Report ID is required');
+      return addHeaders(
+        apiResponse.validationError('Report ID is required', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
     }
 
-    // Check if report exists and belongs to user
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const validation = updateBodySchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Check ownership
     const existingReport = await reportService.getById(reportId, userId);
+
     if (!existingReport) {
-      log.warn('Report not found for deletion', { userId, reportId });
-      return apiResponse.notFound('Report');
+      return addHeaders(apiResponse.notFound('Report', requestId), requestId, rateLimitResult);
     }
 
-    log.info('Deleting report', { userId, reportId });
+    const updatedReport = await reportService.update(reportId, userId, validation.data);
+
+    logger.info('Report updated', {
+      userId,
+      reportId,
+      updates: Object.keys(validation.data),
+      requestId,
+      duration: Date.now() - startTime,
+    });
+
+    return addHeaders(
+      apiResponse.success(updatedReport, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
+  } catch (error) {
+    logger.error('PATCH analytics/report failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to update report', requestId), requestId);
+  }
+}
+
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+    const { searchParams } = new URL(request.url);
+    const reportId = searchParams.get('id');
+
+    if (!reportId) {
+      return addHeaders(
+        apiResponse.validationError('Report ID is required', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Check ownership
+    const existingReport = await reportService.getById(reportId, userId);
+
+    if (!existingReport) {
+      return addHeaders(apiResponse.notFound('Report', requestId), requestId, rateLimitResult);
+    }
 
     await reportService.delete(reportId, userId);
 
-    const duration = Date.now() - startTime;
-    log.info('Report deleted successfully', { userId, reportId, duration });
-
-    return apiResponse.success(
-      {
-        message: 'Report deleted successfully',
-        id: reportId,
-      },
-      {
-        meta: { executionTime: duration },
-      }
-    );
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    log.error('Error deleting report', { duration }, error);
-    return apiResponse.error(error);
-  }
-}
-
-/**
- * PUT /api/analytics/report/regenerate
- * Regenerate an existing report with latest data
- */
-export async function PUT(req: NextRequest): Promise<NextResponse> {
-  const startTime = Date.now();
-
-  try {
-    // Authentication check
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      log.warn('Unauthorized report regeneration request');
-      return apiResponse.unauthorized('Authentication required');
-    }
-
-    const userId = session.user.id;
-    const { searchParams } = new URL(req.url);
-    const reportId = searchParams.get('id');
-
-    if (!reportId) {
-      log.warn('Report ID missing for regeneration', { userId });
-      return apiResponse.validationError('Report ID is required');
-    }
-
-    // Check if report exists and belongs to user
-    const existingReport = await reportService.getById(reportId, userId);
-    if (!existingReport) {
-      log.warn('Report not found for regeneration', { userId, reportId });
-      return apiResponse.notFound('Report');
-    }
-
-    log.info('Regenerating report', { userId, reportId });
-
-    // Regenerate report
-    const regeneratedReport = await reportService.regenerate(reportId, userId);
-
-    const duration = Date.now() - startTime;
-    log.info('Report regenerated successfully', {
+    logger.info('Report deleted', {
       userId,
       reportId,
-      duration,
+      requestId,
+      duration: Date.now() - startTime,
     });
 
-    return apiResponse.success(regeneratedReport, {
-      meta: {
-        executionTime: duration,
-        regenerated: true,
-      },
-    });
+    return addHeaders(
+      apiResponse.success({ message: 'Report deleted successfully', id: reportId }, { meta: { requestId } }),
+      requestId,
+      rateLimitResult
+    );
   } catch (error) {
-    const duration = Date.now() - startTime;
-    log.error('Error regenerating report', { duration }, error);
-    return apiResponse.error(error);
+    logger.error('DELETE analytics/report failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to delete report', requestId), requestId);
   }
 }
+
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
