@@ -1,134 +1,140 @@
-/**
- * Component: ForgotPasswordForm
- * Location: components/auth/ForgotPasswordForm.tsx
- * 
- * Description: Password reset request form
- */
-
+// components/auth/ForgotPasswordForm.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { z } from 'zod';
+import apiClient from '@/lib/apiClient';
+import Link from 'next/link';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/auth/forgot-password
+const emailSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
 
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-// - PasswordReset
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for PasswordReset model
-interface IPasswordReset {
-  id: string;
-  // Add fields from your Prisma PasswordReset model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/auth/forgot-password
-const fetchForgotPasswordFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/auth/forgot-password');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface ForgotPasswordFormProps {
-  className?: string;
-  // Add component-specific props here
-}
-
-// ===== COMPONENT =====
-export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
-  className,
-}) => {
-  // Component state
+export default function ForgotPasswordForm() {
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-  // Component logic
-  
-  // Render
+    // Validate
+    const validation = emailSchema.safeParse({ email });
+    if (!validation.success) {
+      setError(validation.error.errors[0].message);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post('/auth/forgot-password', { email });
+
+      if (response.error) {
+        setError(response.error);
+      } else {
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+          Check your email
+        </h3>
+        
+        <p className="text-gray-600 dark:text-gray-400 mb-6">
+          We've sent password reset instructions to <strong>{email}</strong>
+        </p>
+
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500 dark:text-gray-500">
+            Didn't receive the email? Check your spam folder or{' '}
+            <button
+              onClick={() => setSuccess(false)}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              try again
+            </button>
+          </p>
+
+          <Link
+            href="/login"
+            className="inline-block text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+          >
+            ← Back to login
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ForgotPasswordForm</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Email Address
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError('');
+          }}
+          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all outline-none"
+          placeholder="you@example.com"
+          required
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-500/30"
+      >
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Sending...
+          </span>
+        ) : (
+          'Send Reset Link'
+        )}
+      </button>
+
+      <div className="text-center">
+        <Link
+          href="/login"
+          className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+        >
+          ← Back to login
+        </Link>
+      </div>
+    </form>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default ForgotPasswordForm;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/auth/forgot-password
- *  * - Model: User
- * - Model: PasswordReset
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}

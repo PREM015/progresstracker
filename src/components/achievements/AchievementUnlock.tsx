@@ -1,159 +1,264 @@
-/**
- * Component: AchievementUnlock
- * Location: components/achievements/AchievementUnlock.tsx
- * 
- * Description: Premium celebration overlay for newly unlocked achievements
- */
-
+// src/components/achievements/AchievementUnlock.tsx
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Star, Sparkles, X } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { cn } from '@/lib/utils';
-import { AchievementBadge } from './AchievementBadge';
-import { Achievement, RARITY_CONFIG } from '@/types/achievement';
-import { Button } from '@/components/ui/Button';
+import { memo, useState, useEffect, useCallback } from 'react';
+import type { Achievement, AchievementNotification } from '@/types/achievement';
+import { RARITY_CONFIG, TIER_CONFIG } from '@/types/achievement';
 
-export interface AchievementUnlockProps {
-  achievement: Achievement;
-  onClose: () => void;
-  className?: string;
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface AchievementUnlockProps {
+  notification: AchievementNotification | null;
+  onDismiss: () => void;
+  onView?: (achievement: Achievement) => void;
+  onShare?: (achievement: Achievement) => void;
+  autoHideDelay?: number;
 }
 
-export const AchievementUnlock: React.FC<AchievementUnlockProps> = ({
-  achievement,
-  onClose,
-  className,
-}) => {
-  const rarityConfig = RARITY_CONFIG[achievement.rarity as keyof typeof RARITY_CONFIG] || RARITY_CONFIG.common;
+// =============================================================================
+// COMPONENT
+// =============================================================================
+
+export const AchievementUnlock = memo(function AchievementUnlock({
+  notification,
+  onDismiss,
+  onView,
+  onShare,
+  autoHideDelay = 8000,
+}: AchievementUnlockProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
-    // Trigger confetti on mount
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+    if (notification) {
+      // Small delay for animation
+      const showTimer = setTimeout(() => setIsVisible(true), 50);
 
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+      // Auto hide
+      const hideTimer = setTimeout(() => {
+        handleDismiss();
+      }, autoHideDelay);
 
-    const interval: any = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
+    } else {
+      setIsVisible(false);
+      setIsExiting(false);
+    }
+  }, [notification, autoHideDelay]);
 
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
+  const handleDismiss = useCallback(() => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      setIsExiting(false);
+      onDismiss();
+    }, 300);
+  }, [onDismiss]);
 
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-    }, 250);
+  const handleView = useCallback(() => {
+    if (notification) {
+      onView?.(notification.achievement);
+      handleDismiss();
+    }
+  }, [notification, onView, handleDismiss]);
 
-    return () => clearInterval(interval);
-  }, []);
+  const handleShare = useCallback(() => {
+    if (notification) {
+      onShare?.(notification.achievement);
+    }
+  }, [notification, onShare]);
+
+  if (!notification || !isVisible) return null;
+
+  const { achievement, pointsEarned, xpEarned } = notification;
+  const rarityConfig = RARITY_CONFIG[achievement.rarity];
+  const tierConfig = TIER_CONFIG[achievement.tier];
 
   return (
-    <div className={cn('fixed inset-0 z-[9999] flex items-center justify-center p-4', className)}>
-      {/* Immersive backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-zinc-950/80 backdrop-blur-xl"
-      />
-
-      {/* Main Container */}
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0, y: 50 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.8, opacity: 0, y: 50 }}
-        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-        className="relative w-full max-w-lg bg-[var(--card-bg)] border border-white/10 rounded-[2.5rem] shadow-2xl overflow-hidden"
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 px-4 pointer-events-none">
+      <div
+        className={`
+          relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden pointer-events-auto
+          transform transition-all duration-300 ease-out
+          ${isExiting ? 'opacity-0 -translate-y-4 scale-95' : 'opacity-100 translate-y-0 scale-100'}
+        `}
       >
-        {/* Animated Background Rays */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-t from-[var(--primary)] to-transparent animate-pulse" />
+        {/* Confetti Background */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -inset-1/2 bg-gradient-to-r from-yellow-400 via-pink-500 to-purple-600 opacity-10 animate-spin-slow" />
         </div>
 
-        <div className="relative z-10 p-10 flex flex-col items-center text-center">
+        {/* Top Gradient Bar */}
+        <div
+          className="h-2"
+          style={{
+            background: `linear-gradient(90deg, ${rarityConfig.color}, ${tierConfig.color})`,
+          }}
+        />
+
+        {/* Content */}
+        <div className="relative p-6">
+          {/* Close Button */}
           <button
-            onClick={onClose}
-            className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white"
+            onClick={handleDismiss}
+            className="absolute top-2 right-2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <XIcon className="w-5 h-5" />
           </button>
 
-          <motion.div
-            initial={{ rotate: -20, scale: 0 }}
-            animate={{ rotate: 0, scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring' }}
-            className="mb-8"
-          >
-            <AchievementBadge achievement={achievement} size="xl" showTooltip={false} animate={true} />
-          </motion.div>
-
-          <div className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="flex items-center gap-2 text-amber-400">
-                <Sparkles className="w-5 h-5 fill-amber-400" />
-                <span className="text-xs font-black uppercase tracking-[0.4em]">Achievement Unlocked</span>
-                <Sparkles className="w-5 h-5 fill-amber-400" />
-              </div>
-              <h2 className="text-4xl font-black text-white tracking-tight leading-tight">
-                {achievement.title}
-              </h2>
-            </motion.div>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="text-zinc-400 font-medium text-lg leading-relaxed max-w-xs mx-auto"
-            >
-              {achievement.description}
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.8 }}
-              className="flex items-center justify-center gap-4 pt-4"
-            >
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-black text-white">{achievement.points}</span>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Points</span>
-              </div>
-              <div className="h-8 w-px bg-white/10 mx-2" />
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-black text-emerald-400">+{achievement.xpReward}</span>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">XP Reward</span>
-              </div>
-            </motion.div>
+          {/* Header */}
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center justify-center px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium mb-3">
+              🎉 Achievement Unlocked!
+            </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1 }}
-            className="mt-10 w-full"
-          >
-            <Button
-              onClick={onClose}
-              className="w-full h-14 rounded-2xl bg-white text-black hover:bg-zinc-200 font-black uppercase tracking-widest text-sm shadow-xl"
+          {/* Achievement Icon - Animated */}
+          <div className="flex justify-center mb-4">
+            <div
+              className={`
+                relative w-24 h-24 flex items-center justify-center rounded-2xl
+                ${rarityConfig.bgClass} border-4 ${rarityConfig.borderClass}
+                shadow-lg animate-bounce-slow
+              `}
             >
-              Continue Your Journey
-            </Button>
-          </motion.div>
+              <span className="text-5xl">{achievement.icon}</span>
+              <div className="absolute -top-2 -right-2 text-2xl animate-pulse">
+                ✨
+              </div>
+            </div>
+          </div>
+
+          {/* Achievement Info */}
+          <div className="text-center mb-6">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+              {achievement.title}
+            </h3>
+            <p className="text-gray-600">
+              {achievement.description}
+            </p>
+          </div>
+
+          {/* Rewards */}
+          <div className="flex items-center justify-center gap-6 mb-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-indigo-600">+{pointsEarned}</div>
+              <div className="text-xs text-gray-500">Points</div>
+            </div>
+            {xpEarned > 0 && (
+              <>
+                <div className="w-px h-8 bg-gray-200" />
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">+{xpEarned}</div>
+                  <div className="text-xs text-gray-500">XP</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Badges */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <span className={`px-3 py-1 text-sm font-medium rounded-full ${rarityConfig.bgClass} ${rarityConfig.textClass}`}>
+              {rarityConfig.emoji} {rarityConfig.label}
+            </span>
+            <span className="px-3 py-1 text-sm font-medium rounded-full bg-gray-100 text-gray-700">
+              {tierConfig.icon} {tierConfig.label}
+            </span>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            {onView && (
+              <button
+                onClick={handleView}
+                className="flex-1 py-3 px-4 rounded-xl font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                View Details
+              </button>
+            )}
+            {onShare && (
+              <button
+                onClick={handleShare}
+                className="flex-1 py-3 px-4 rounded-xl font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <ShareIcon className="w-5 h-5" />
+                Share
+              </button>
+            )}
+          </div>
         </div>
-      </motion.div>
+
+        {/* Animated particles */}
+        <Particles />
+      </div>
     </div>
   );
-};
+});
+
+// =============================================================================
+// PARTICLES ANIMATION
+// =============================================================================
+
+function Particles() {
+  const particles = Array.from({ length: 20 }).map((_, i) => ({
+    id: i,
+    left: `${Math.random() * 100}%`,
+    delay: `${Math.random() * 2}s`,
+    duration: `${2 + Math.random() * 2}s`,
+    size: `${4 + Math.random() * 4}px`,
+    color: ['#FFD700', '#FF69B4', '#7B68EE', '#00CED1'][Math.floor(Math.random() * 4)],
+  }));
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute bottom-0 animate-float-up"
+          style={{
+            left: p.left,
+            animationDelay: p.delay,
+            animationDuration: p.duration,
+          }}
+        >
+          <div
+            className="rounded-full"
+            style={{
+              width: p.size,
+              height: p.size,
+              backgroundColor: p.color,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =============================================================================
+// ICONS
+// =============================================================================
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
+}
+
+function ShareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+    </svg>
+  );
+}
+
 
 export default AchievementUnlock;

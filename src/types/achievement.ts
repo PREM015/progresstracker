@@ -266,6 +266,7 @@ export const RARITY_CONFIG: Record<AchievementRarity, {
 
 /** Tier display configuration */
 export const TIER_CONFIG: Record<AchievementTier, {
+  icon: ReactNode;
   label: string;
   color: string;
   emoji: string;

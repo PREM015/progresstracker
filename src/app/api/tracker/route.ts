@@ -1,773 +1,622 @@
 // src/app/api/tracker/route.ts
-// Complete tracker API with all fields and proper validation
+// =============================================================================
+// Main Tracker Entry CRUD API
+// Methods: GET (list), POST (create), PUT (bulk update), PATCH (bulk partial), DELETE (bulk delete)
+// =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { PlatformCategory, Prisma } from '@prisma/client';
+import { PlatformCategory } from '@prisma/client';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
+import { TrackerService } from '@/services/trackerService';
+import { AchievementService } from '@/services/achievementService';
+import { GoalService } from '@/services/goalService';
+import { auditLogService } from '@/services/auditLogService';
+import { getClientIp, generateRequestId } from '@/lib/utils';
+
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 100; // requests per minute
 
 // =============================================================================
 // VALIDATION SCHEMAS
 // =============================================================================
 
 const createEntrySchema = z.object({
-  date: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: 'Invalid date format',
-  }),
-  platformId: z.string().optional().nullable(),
-  customPlatformId: z.string().optional().nullable(),
-  category: z.nativeEnum(PlatformCategory).optional().nullable(),
-  subcategory: z.string().optional().nullable(),
+  date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  platformId: z.string().optional(),
+  customPlatformId: z.string().optional(),
+  category: z.nativeEnum(PlatformCategory).optional(),
+  subcategory: z.string().optional(),
 
   // Primary Metrics
-  problemsSolved: z.number().int().min(0).default(0),
-  problemsAttempted: z.number().int().min(0).default(0),
-  easyProblems: z.number().int().min(0).default(0),
-  mediumProblems: z.number().int().min(0).default(0),
-  hardProblems: z.number().int().min(0).default(0),
+  problemsSolved: z.number().int().min(0).optional().default(0),
+  problemsAttempted: z.number().int().min(0).optional().default(0),
+  easyProblems: z.number().int().min(0).optional().default(0),
+  mediumProblems: z.number().int().min(0).optional().default(0),
+  hardProblems: z.number().int().min(0).optional().default(0),
 
   // Code & Development
-  commits: z.number().int().min(0).default(0),
-  pullRequests: z.number().int().min(0).default(0),
-  pullRequestsMerged: z.number().int().min(0).default(0),
-  issuesOpened: z.number().int().min(0).default(0),
-  issuesClosed: z.number().int().min(0).default(0),
-  codeReviews: z.number().int().min(0).default(0),
-  linesOfCode: z.number().int().min(0).default(0),
+  commits: z.number().int().min(0).optional().default(0),
+  pullRequests: z.number().int().min(0).optional().default(0),
+  pullRequestsMerged: z.number().int().min(0).optional().default(0),
+  issuesOpened: z.number().int().min(0).optional().default(0),
+  issuesClosed: z.number().int().min(0).optional().default(0),
+  codeReviews: z.number().int().min(0).optional().default(0),
+  linesOfCode: z.number().int().min(0).optional().default(0),
 
   // Projects
-  projectsStarted: z.number().int().min(0).default(0),
-  projectsCompleted: z.number().int().min(0).default(0),
+  projectsStarted: z.number().int().min(0).optional().default(0),
+  projectsCompleted: z.number().int().min(0).optional().default(0),
 
   // Learning
-  coursesStarted: z.number().int().min(0).default(0),
-  coursesCompleted: z.number().int().min(0).default(0),
-  lessonsCompleted: z.number().int().min(0).default(0),
-  modulesCompleted: z.number().int().min(0).default(0),
-  certificationsEarned: z.number().int().min(0).default(0),
-  quizzesTaken: z.number().int().min(0).default(0),
-  quizzesPassed: z.number().int().min(0).default(0),
+  coursesStarted: z.number().int().min(0).optional().default(0),
+  coursesCompleted: z.number().int().min(0).optional().default(0),
+  lessonsCompleted: z.number().int().min(0).optional().default(0),
+  modulesCompleted: z.number().int().min(0).optional().default(0),
+  certificationsEarned: z.number().int().min(0).optional().default(0),
+  quizzesTaken: z.number().int().min(0).optional().default(0),
+  quizzesPassed: z.number().int().min(0).optional().default(0),
 
-  // Reading & Research
-  articlesRead: z.number().int().min(0).default(0),
-  tutorialsCompleted: z.number().int().min(0).default(0),
-  documentationPages: z.number().int().min(0).default(0),
-
-  // Jobs & Applications
-  applicationsSubmitted: z.number().int().min(0).default(0),
-  applicationsViewed: z.number().int().min(0).default(0),
-  interviewsScheduled: z.number().int().min(0).default(0),
-  interviewsCompleted: z.number().int().min(0).default(0),
-  offersReceived: z.number().int().min(0).default(0),
-
-  // Competitions
-  contestsParticipated: z.number().int().min(0).default(0),
-  contestsCompleted: z.number().int().min(0).default(0),
-  hackathonsJoined: z.number().int().min(0).default(0),
-  hackathonsCompleted: z.number().int().min(0).default(0),
-
-  // Community
-  mentoringSessions: z.number().int().min(0).default(0),
-  helpGiven: z.number().int().min(0).default(0),
-  helpReceived: z.number().int().min(0).default(0),
-  postsWritten: z.number().int().min(0).default(0),
-  commentsWritten: z.number().int().min(0).default(0),
-
-  // Time Tracking
-  timeSpent: z.number().int().min(0).default(0),
-  focusTime: z.number().int().min(0).default(0),
-
-  // Quality Metrics
-  averageDifficulty: z.number().min(0).max(10).optional().nullable(),
-  accuracyRate: z.number().min(0).max(100).optional().nullable(),
-  completionRate: z.number().min(0).max(100).optional().nullable(),
+  // Time
+  timeSpent: z.number().int().min(0).optional().default(0),
+  focusTime: z.number().int().min(0).optional().default(0),
 
   // Platform-specific
-  rating: z.number().int().optional().nullable(),
-  ratingChange: z.number().int().optional().nullable(),
-  rank: z.number().int().optional().nullable(),
-  rankChange: z.number().int().optional().nullable(),
-  points: z.number().int().optional().nullable(),
-  pointsEarned: z.number().int().optional().nullable(),
-  streak: z.number().int().optional().nullable(),
-  xpEarned: z.number().int().optional().nullable(),
+  rating: z.number().int().optional(),
+  rank: z.number().int().optional(),
+  points: z.number().int().optional(),
+  streak: z.number().int().min(0).optional(),
 
   // Mood & Notes
-  mood: z.string().optional().nullable(),
-  energyLevel: z.number().int().min(1).max(5).optional().nullable(),
-  productivityRating: z.number().int().min(1).max(5).optional().nullable(),
-  notes: z.string().max(5000).optional().nullable(),
+  mood: z.string().optional(),
+  energyLevel: z.number().int().min(1).max(5).optional(),
+  productivityRating: z.number().int().min(1).max(5).optional(),
+  notes: z.string().max(5000).optional(),
 
   // Tags
-  tags: z.array(z.string()).default([]),
-  topics: z.array(z.string()).default([]),
-  languages: z.array(z.string()).default([]),
+  tags: z.array(z.string()).optional().default([]),
+  topics: z.array(z.string()).optional().default([]),
+  languages: z.array(z.string()).optional().default([]),
 
   // Custom fields
-  customFields: z.record(z.unknown()).optional().nullable(),
+  customFields: z.record(z.unknown()).optional(),
 });
 
-const updateEntrySchema = createEntrySchema.partial().extend({
-  id: z.string(),
+const querySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  platformId: z.string().optional(),
+  customPlatformId: z.string().optional(),
+  category: z.nativeEnum(PlatformCategory).optional(),
+  source: z.string().optional(),
+  sortBy: z.string().optional().default('date'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+});
+
+const bulkUpdateSchema = z.object({
+  ids: z.array(z.string()).min(1).max(100),
+  data: createEntrySchema.partial(),
+});
+
+const bulkDeleteSchema = z.object({
+  ids: z.array(z.string()).min(1).max(100),
 });
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-async function updateUserTotals(userId: string): Promise<void> {
-  const aggregates = await prisma.trackerEntry.aggregate({
-    where: { userId },
-    _sum: {
-      problemsSolved: true,
-      commits: true,
-      projectsCompleted: true,
-      certificationsEarned: true,
-      points: true,
-      pointsEarned: true,
-    },
-  });
+async function validateSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitKey = `tracker:${ip}`;
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
-  // Calculate streak
-  const entries = await prisma.trackerEntry.findMany({
-    where: { userId },
-    orderBy: { date: 'desc' },
-    select: { date: true },
-    distinct: ['date'],
-    take: 366,
-  });
-
-  let currentStreak = 0;
-  let longestStreak = 0;
-  let lastActivityDate: Date | null = null;
-
-  if (entries.length > 0) {
-    lastActivityDate = entries[0].date;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (let i = 0; i < entries.length; i++) {
-      const entryDate = new Date(entries[i].date);
-      entryDate.setHours(0, 0, 0, 0);
-
-      const expectedDate = new Date(today);
-      expectedDate.setDate(expectedDate.getDate() - currentStreak);
-
-      const diffDays = Math.floor(
-        (expectedDate.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      if (i === 0 && diffDays > 1) {
-        break;
-      }
-
-      if (diffDays === 0 || (i === 0 && diffDays === 1)) {
-        currentStreak++;
-      } else {
-        break;
-      }
-    }
-
-    longestStreak = currentStreak;
-    let tempStreak = 1;
-    for (let i = 1; i < entries.length; i++) {
-      const prevDate = new Date(entries[i - 1].date);
-      const currDate = new Date(entries[i].date);
-      prevDate.setHours(0, 0, 0, 0);
-      currDate.setHours(0, 0, 0, 0);
-
-      const diff = (prevDate.getTime() - currDate.getTime()) / (1000 * 60 * 60 * 24);
-
-      if (diff === 1) {
-        tempStreak++;
-        longestStreak = Math.max(longestStreak, tempStreak);
-      } else {
-        tempStreak = 1;
-      }
-    }
+  if (!rateLimitResult.success) {
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult,
+    };
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      totalProblems: aggregates._sum.problemsSolved || 0,
-      totalCommits: aggregates._sum.commits || 0,
-      totalProjects: aggregates._sum.projectsCompleted || 0,
-      totalCertifications: aggregates._sum.certificationsEarned || 0,
-      totalPoints: (aggregates._sum.points || 0) + (aggregates._sum.pointsEarned || 0),
-      currentStreak,
-      longestStreak: Math.max(longestStreak, currentStreak),
-      lastActivityDate,
-      lastActiveAt: new Date(),
-    },
-  });
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult,
+    };
+  }
+
+  return { error: null, session, rateLimitResult };
 }
 
-function normalizeDate(dateString: string): Date {
-  const date = new Date(dateString);
-  date.setHours(0, 0, 0, 0);
-  return date;
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  response.headers.set('X-Request-ID', requestId);
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('Cache-Control', 'no-store');
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
 }
 
 // =============================================================================
-// GET - Fetch entries
+// HTTP METHOD HANDLERS
 // =============================================================================
 
-export async function GET(request: NextRequest) {
+/**
+ * OPTIONS - CORS preflight
+ */
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return addHeaders(response, requestId);
+}
+
+/**
+ * HEAD - Get metadata
+ */
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    // Get count without fetching data
+    const { searchParams } = new URL(request.url);
+    const queryValidation = querySchema.safeParse(Object.fromEntries(searchParams));
+
+    if (!queryValidation.success) {
+      return addHeaders(new NextResponse(null, { status: 400 }), requestId, rateLimitResult);
+    }
+
+    const { startDate, endDate, platformId, category } = queryValidation.data;
+
+    const count = await TrackerService.getEntries(
+      userId,
+      startDate ? new Date(startDate) : new Date(0),
+      endDate ? new Date(endDate) : new Date(),
+    { platformId, category: category ?? undefined },
+
+      { page: 1, limit: 1 }
+    );
+
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Total-Count', String(count.pagination?.total || 0));
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('HEAD /tracker failed', { requestId }, error);
+    return addHeaders(new NextResponse(null, { status: 500 }), requestId);
+  }
+}
+
+/**
+ * GET - List tracker entries
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    // Parse and validate query params
+    const { searchParams } = new URL(request.url);
+    const queryValidation = querySchema.safeParse(Object.fromEntries(searchParams));
+
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const platformId = searchParams.get('platformId');
-    const customPlatformId = searchParams.get('customPlatformId');
-    const category = searchParams.get('category');
-    const source = searchParams.get('source');
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+    const {
+      page,
+      limit,
+      startDate,
+      endDate,
+      platformId,
+      customPlatformId,
+      category,
+      source,
+      sortBy,
+      sortOrder,
+    } = queryValidation.data;
 
-    const where: Prisma.TrackerEntryWhereInput = {
-      userId: session.user.id,
-    };
-
-    // Date range filter
-    if (startDate && endDate) {
-      where.date = {
-        gte: normalizeDate(startDate),
-        lte: normalizeDate(endDate),
-      };
-    } else if (startDate) {
-      where.date = { gte: normalizeDate(startDate) };
-    } else if (endDate) {
-      where.date = { lte: normalizeDate(endDate) };
-    }
-
-    // Platform filter
-    if (platformId) {
-      where.platformId = platformId;
-    }
-
-    if (customPlatformId) {
-      where.customPlatformId = customPlatformId;
-    }
-
-    // Category filter
-    if (category && Object.values(PlatformCategory).includes(category as PlatformCategory)) {
-      where.category = category as PlatformCategory;
-    }
-
-    // Source filter
-    if (source) {
-      where.source = source;
-    }
-
-    const [entries, total] = await Promise.all([
-      prisma.trackerEntry.findMany({
-        where,
-        orderBy: { date: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          platform: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              icon: true,
-              color: true,
-              category: true,
-            },
-          },
-          customPlatform: {
-            select: {
-              id: true,
-              name: true,
-              icon: true,
-              color: true,
-              category: true,
-            },
-          },
-        },
-      }),
-      prisma.trackerEntry.count({ where }),
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      data: entries,
-      pagination: {
+    // Get entries
+    const result = await TrackerService.getEntries(
+      userId,
+      startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      endDate ? new Date(endDate) : new Date(),
+      {
+        platformId: platformId || undefined,
+        customPlatformId: customPlatformId || undefined,
+        categories: category ? [category] : undefined,
+        source,
+      },
+      {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page * limit < total,
-        hasPreviousPage: page > 1,
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching tracker entries:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch entries' },
-      { status: 500 }
-    );
-  }
-}
-
-// =============================================================================
-// POST - Create entry
-// =============================================================================
-
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-    const validated = createEntrySchema.parse(body);
-
-    const entryDate = normalizeDate(validated.date);
-
-    // Check for duplicate entry
-    if (validated.platformId) {
-      const existing = await prisma.trackerEntry.findFirst({
-        where: {
-          userId: session.user.id,
-          date: entryDate,
-          platformId: validated.platformId,
-        },
-      });
-
-      if (existing) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Entry already exists for this date and platform',
-            code: 'DUPLICATE_ENTRY',
-            existingId: existing.id,
-          },
-          { status: 409 }
-        );
+        sortBy,
+        sortOrder,
+        include: { platform: true, customPlatform: true },
       }
-    }
+    );
 
-    // Get category from platform if not provided
-    let category = validated.category;
-    if (!category && validated.platformId) {
-      const platform = await prisma.platform.findUnique({
-        where: { id: validated.platformId },
-        select: { category: true },
-      });
-      category = platform?.category || null;
-    }
-    if (!category && validated.customPlatformId) {
-      const customPlatform = await prisma.customPlatform.findUnique({
-        where: { id: validated.customPlatformId },
-        select: { category: true },
-      });
-      category = customPlatform?.category || null;
-    }
-
-    // Create the entry
-    const entry = await prisma.trackerEntry.create({
-      data: {
-        userId: session.user.id,
-        date: entryDate,
-        platformId: validated.platformId || null,
-        customPlatformId: validated.customPlatformId || null,
-        category,
-        subcategory: validated.subcategory || null,
-
-        // Primary Metrics
-        problemsSolved: validated.problemsSolved,
-        problemsAttempted: validated.problemsAttempted,
-        easyProblems: validated.easyProblems,
-        mediumProblems: validated.mediumProblems,
-        hardProblems: validated.hardProblems,
-
-        // Code & Development
-        commits: validated.commits,
-        pullRequests: validated.pullRequests,
-        pullRequestsMerged: validated.pullRequestsMerged,
-        issuesOpened: validated.issuesOpened,
-        issuesClosed: validated.issuesClosed,
-        codeReviews: validated.codeReviews,
-        linesOfCode: validated.linesOfCode,
-
-        // Projects
-        projectsStarted: validated.projectsStarted,
-        projectsCompleted: validated.projectsCompleted,
-
-        // Learning
-        coursesStarted: validated.coursesStarted,
-        coursesCompleted: validated.coursesCompleted,
-        lessonsCompleted: validated.lessonsCompleted,
-        modulesCompleted: validated.modulesCompleted,
-        certificationsEarned: validated.certificationsEarned,
-        quizzesTaken: validated.quizzesTaken,
-        quizzesPassed: validated.quizzesPassed,
-
-        // Reading
-        articlesRead: validated.articlesRead,
-        tutorialsCompleted: validated.tutorialsCompleted,
-        documentationPages: validated.documentationPages,
-
-        // Jobs
-        applicationsSubmitted: validated.applicationsSubmitted,
-        applicationsViewed: validated.applicationsViewed,
-        interviewsScheduled: validated.interviewsScheduled,
-        interviewsCompleted: validated.interviewsCompleted,
-        offersReceived: validated.offersReceived,
-
-        // Competitions
-        contestsParticipated: validated.contestsParticipated,
-        contestsCompleted: validated.contestsCompleted,
-        hackathonsJoined: validated.hackathonsJoined,
-        hackathonsCompleted: validated.hackathonsCompleted,
-
-        // Community
-        mentoringSessions: validated.mentoringSessions,
-        helpGiven: validated.helpGiven,
-        helpReceived: validated.helpReceived,
-        postsWritten: validated.postsWritten,
-        commentsWritten: validated.commentsWritten,
-
-        // Time
-        timeSpent: validated.timeSpent,
-        focusTime: validated.focusTime,
-
-        // Quality Metrics
-        averageDifficulty: validated.averageDifficulty ?? null,
-        accuracyRate: validated.accuracyRate ?? null,
-        completionRate: validated.completionRate ?? null,
-
-        // Platform-specific
-        rating: validated.rating ?? null,
-        ratingChange: validated.ratingChange ?? null,
-        rank: validated.rank ?? null,
-        rankChange: validated.rankChange ?? null,
-        points: validated.points ?? null,
-        pointsEarned: validated.pointsEarned ?? null,
-        streak: validated.streak ?? null,
-        xpEarned: validated.xpEarned ?? null,
-
-        // Mood & Notes
-        mood: validated.mood || null,
-        energyLevel: validated.energyLevel ?? null,
-        productivityRating: validated.productivityRating ?? null,
-        notes: validated.notes || null,
-
-        // Tags
-        tags: validated.tags,
-        topics: validated.topics,
-        languages: validated.languages,
-
-        // Source
-        source: 'manual',
-        isAutoGenerated: false,
-        isVerified: false,
-
-        // Custom fields
-        customFields: validated.customFields
-          ? (validated.customFields as Prisma.InputJsonValue)
-          : Prisma.JsonNull,
-      },
-      include: {
-        platform: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            icon: true,
-            color: true,
-          },
-        },
-        customPlatform: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            color: true,
-          },
-        },
-      },
+    logger.info('GET /tracker completed', {
+      userId,
+      page,
+      total: result.pagination?.total,
+      duration: Date.now() - startTime,
+      requestId,
     });
 
-    // Update user totals in background
-    updateUserTotals(session.user.id).catch(console.error);
-
-    return NextResponse.json(
-      { success: true, data: entry },
-      { status: 201 }
+    const response = apiResponse.paginated(
+      result.data,
+      result.pagination || { page: 1, limit: 50, total: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false },
+      { meta: { requestId } }
     );
+
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Validation error',
-          details: error.errors.map((e) => ({
-            field: e.path.join('.'),
-            message: e.message,
-          })),
-        },
-        { status: 400 }
-      );
-    }
-
-    console.error('Error creating tracker entry:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create entry' },
-      { status: 500 }
-    );
+    logger.error('GET /tracker failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch entries', requestId), requestId);
   }
 }
 
-// =============================================================================
-// PUT - Update entry
-// =============================================================================
+/**
+ * POST - Create new tracker entry
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
 
-export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    // Parse and validate body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const body = await request.json();
-    const validated = updateEntrySchema.parse(body);
+    const validation = createEntrySchema.safeParse(body);
 
-    // Verify ownership
-    const existing = await prisma.trackerEntry.findFirst({
-      where: {
-        id: validated.id,
-        userId: session.user.id,
-      },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Entry not found' },
-        { status: 404 }
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    // Build update data
-    const updateData: Prisma.TrackerEntryUpdateInput = {
-      updatedAt: new Date(),
-    };
+    const data = validation.data;
 
-    // Only include fields that were provided
-    const fields = [
-      'platformId', 'customPlatformId', 'category', 'subcategory',
-      'problemsSolved', 'problemsAttempted', 'easyProblems', 'mediumProblems', 'hardProblems',
-      'commits', 'pullRequests', 'pullRequestsMerged', 'issuesOpened', 'issuesClosed',
-      'codeReviews', 'linesOfCode', 'projectsStarted', 'projectsCompleted',
-      'coursesStarted', 'coursesCompleted', 'lessonsCompleted', 'modulesCompleted',
-      'certificationsEarned', 'quizzesTaken', 'quizzesPassed',
-      'articlesRead', 'tutorialsCompleted', 'documentationPages',
-      'applicationsSubmitted', 'applicationsViewed', 'interviewsScheduled',
-      'interviewsCompleted', 'offersReceived',
-      'contestsParticipated', 'contestsCompleted', 'hackathonsJoined', 'hackathonsCompleted',
-      'mentoringSessions', 'helpGiven', 'helpReceived', 'postsWritten', 'commentsWritten',
-      'timeSpent', 'focusTime', 'averageDifficulty', 'accuracyRate', 'completionRate',
-      'rating', 'ratingChange', 'rank', 'rankChange', 'points', 'pointsEarned',
-      'streak', 'xpEarned', 'mood', 'energyLevel', 'productivityRating', 'notes',
-      'tags', 'topics', 'languages',
-    ];
-
-    for (const field of fields) {
-      if ((validated as Record<string, unknown>)[field] !== undefined) {
-        (updateData as Record<string, unknown>)[field] = (validated as Record<string, unknown>)[field];
-      }
-    }
-
-    if (validated.date) {
-      updateData.date = normalizeDate(validated.date);
-    }
-
-    if (validated.customFields !== undefined) {
-      updateData.customFields = validated.customFields
-        ? (validated.customFields as Prisma.InputJsonValue)
-        : Prisma.JsonNull;
-    }
-
-    const entry = await prisma.trackerEntry.update({
-      where: { id: validated.id },
-      data: updateData,
-      include: {
-        platform: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            icon: true,
-            color: true,
-          },
-        },
-        customPlatform: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            color: true,
-          },
-        },
-      },
+    // Create entry
+    const entry = await TrackerService.createEntry({
+      userId,
+      date: new Date(data.date),
+      platformId: data.platformId,
+      customPlatformId: data.customPlatformId,
+      category: data.category,
+      subcategory: data.subcategory,
+      problemsSolved: data.problemsSolved,
+      problemsAttempted: data.problemsAttempted,
+      easyProblems: data.easyProblems,
+      mediumProblems: data.mediumProblems,
+      hardProblems: data.hardProblems,
+      commits: data.commits,
+      pullRequests: data.pullRequests,
+      pullRequestsMerged: data.pullRequestsMerged,
+      issuesOpened: data.issuesOpened,
+      issuesClosed: data.issuesClosed,
+      codeReviews: data.codeReviews,
+      linesOfCode: data.linesOfCode,
+      projectsStarted: data.projectsStarted,
+      projectsCompleted: data.projectsCompleted,
+      coursesStarted: data.coursesStarted,
+      coursesCompleted: data.coursesCompleted,
+      lessonsCompleted: data.lessonsCompleted,
+      modulesCompleted: data.modulesCompleted,
+      certificationsEarned: data.certificationsEarned,
+      quizzesTaken: data.quizzesTaken,
+      quizzesPassed: data.quizzesPassed,
+      timeSpent: data.timeSpent,
+      focusTime: data.focusTime,
+      rating: data.rating,
+      rank: data.rank,
+      points: data.points,
+      streak: data.streak,
+      mood: data.mood,
+      energyLevel: data.energyLevel,
+      productivityRating: data.productivityRating,
+      notes: data.notes,
+      tags: data.tags,
+      topics: data.topics,
+      languages: data.languages,
+      customFields: data.customFields,
+      source: 'manual',
+      isAutoGenerated: false,
     });
 
-    // Update user totals in background
-    updateUserTotals(session.user.id).catch(console.error);
+    // Background tasks (don't block response)
+    Promise.all([
+      AchievementService.checkAndUnlockAchievements(userId).catch(console.error),
+      GoalService.autoUpdateGoals(userId).catch(console.error),
+    ]);
 
-    return NextResponse.json({ success: true, data: entry });
+    // Audit log
+    auditLogService.create({
+      userId,
+      action: 'CREATE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      entityId: entry.id,
+      description: 'Created tracker entry',
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('POST /tracker completed', {
+      userId,
+      entryId: entry.id,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.created(entry, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Validation error',
-          details: error.errors.map((e) => ({
-            field: e.path.join('.'),
-            message: e.message,
-          })),
-        },
-        { status: 400 }
+    logger.error('POST /tracker failed', { requestId }, error);
+    
+    if (error instanceof Error && error.message.includes('already exists')) {
+      return addHeaders(
+        apiResponse.error({ message: error.message, code: 'DUPLICATE_ENTRY', statusCode: 409 }, requestId),
+        requestId
       );
     }
 
-    console.error('Error updating tracker entry:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update entry' },
-      { status: 500 }
-    );
+    return addHeaders(apiResponse.internalError('Failed to create entry', requestId), requestId);
   }
 }
 
-// =============================================================================
-// DELETE - Delete entry
-// =============================================================================
+/**
+ * PUT - Bulk update entries (full replacement)
+ */
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
 
-export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
+    const validation = bulkUpdateSchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const { ids, data } = validation.data;
+
+    // Bulk update
+    const result = await TrackerService.bulkUpdateEntries(ids, data, userId);
+
+    // Audit log
+    auditLogService.create({
+      userId,
+      action: 'UPDATE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      description: `Bulk updated ${result.updated} entries`,
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('PUT /tracker completed', {
+      userId,
+      updated: result.updated,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.success(result, {  });
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('PUT /tracker failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to update entries', requestId), requestId);
+  }
+}
+
+/**
+ * PATCH - Bulk partial update entries
+ */
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const validation = bulkUpdateSchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const { ids, data } = validation.data;
+
+    const result = await TrackerService.bulkUpdateEntries(ids, data, userId);
+
+    auditLogService.create({
+      userId,
+      action: 'UPDATE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      description: `Bulk patched ${result.updated} entries`,
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('PATCH /tracker completed', {
+      userId,
+      updated: result.updated,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.success(result, { });
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('PATCH /tracker failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to patch entries', requestId), requestId);
+  }
+}
+
+/**
+ * DELETE - Bulk delete entries
+ */
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const userId = session!.user.id;
+
+    // Try to get IDs from query params or body
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    const ids = searchParams.get('ids'); // For bulk delete
+    const idsParam = searchParams.get('ids');
 
-    if (!id && !ids) {
-      return NextResponse.json(
-        { success: false, error: 'Entry ID required' },
-        { status: 400 }
-      );
-    }
+    let ids: string[] = [];
 
-    if (ids) {
-      // Bulk delete
-      const idArray = ids.split(',').map((s) => s.trim()).filter(Boolean);
-
-      if (idArray.length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'No valid IDs provided' },
-          { status: 400 }
-        );
+    if (idsParam) {
+      ids = idsParam.split(',').map(id => id.trim());
+    } else {
+      try {
+        const body = await request.json();
+        const validation = bulkDeleteSchema.safeParse(body);
+        if (validation.success) {
+          ids = validation.data.ids;
+        }
+      } catch {
+        // Body parsing failed, continue with empty ids
       }
-
-      // Verify ownership of all entries
-      const entries = await prisma.trackerEntry.findMany({
-        where: {
-          id: { in: idArray },
-          userId: session.user.id,
-        },
-        select: { id: true },
-      });
-
-      if (entries.length === 0) {
-        return NextResponse.json(
-          { success: false, error: 'No entries found' },
-          { status: 404 }
-        );
-      }
-
-      const deleteResult = await prisma.trackerEntry.deleteMany({
-        where: {
-          id: { in: entries.map((e) => e.id) },
-          userId: session.user.id,
-        },
-      });
-
-      // Update user totals
-      updateUserTotals(session.user.id).catch(console.error);
-
-      return NextResponse.json({
-        success: true,
-        deleted: deleteResult.count,
-        message: `Deleted ${deleteResult.count} entries`,
-      });
     }
 
-    // Single delete
-    if (!id) {
-      return NextResponse.json(
-        { success: false, error: 'Entry ID required' },
-        { status: 400 }
+    if (ids.length === 0) {
+      return addHeaders(
+        apiResponse.validationError('No entry IDs provided', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const existing = await prisma.trackerEntry.findFirst({
-      where: {
-        id,
-        userId: session.user.id,
-      },
+    const result = await TrackerService.bulkDeleteEntries(ids, userId);
+
+    auditLogService.create({
+      userId,
+      action: 'DELETE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      description: `Bulk deleted ${result.deleted} entries`,
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('DELETE /tracker completed', {
+      userId,
+      deleted: result.deleted,
+      duration: Date.now() - startTime,
+      requestId,
     });
 
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Entry not found' },
-        { status: 404 }
-      );
-    }
-
-    await prisma.trackerEntry.delete({
-      where: { id },
-    });
-
-    // Update user totals
-    updateUserTotals(session.user.id).catch(console.error);
-
-    return NextResponse.json({
-      success: true,
-      deleted: 1,
-      message: 'Entry deleted successfully',
-    });
+    const response = apiResponse.success(result, {  message: `Deleted ${result.deleted} entries` });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    console.error('Error deleting tracker entry:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete entry' },
-      { status: 500 }
-    );
+    logger.error('DELETE /tracker failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to delete entries', requestId), requestId);
   }
 }
+
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

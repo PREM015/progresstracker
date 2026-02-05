@@ -1,135 +1,176 @@
-/**
- * Component: SessionsList
- * Location: components/auth/SessionsList.tsx
- * 
- * Description: Active sessions management
- */
-
+// components/auth/SessionsList.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import apiClient from '@/lib/apiClient';
+import { formatLocationLabel, formatDeviceLabel } from '@/types/security';
+import { getRelativeTime } from '@/lib/utils';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/sessions
-// - /api/user/sessions/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - ActiveSession
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for ActiveSession model
-interface IActiveSession {
+interface Session {
   id: string;
-  // Add fields from your Prisma ActiveSession model
-  // Check schema.prisma for exact field definitions
+  device?: string;
+  browser?: string;
+  os?: string;
+  ipAddress?: string;
+  country?: string;
+  city?: string;
+  isCurrent: boolean;
+  lastActiveAt: Date;
   createdAt: Date;
-  updatedAt: Date;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
+export default function SessionsList() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/sessions
-const fetchSessionsListData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/sessions');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/user/sessions/[id]
-const fetchSessionsListData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/user/sessions/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface SessionsListProps {
-  className?: string;
-  // Add component-specific props here
-}
-
-// ===== COMPONENT =====
-export const SessionsList: React.FC<SessionsListProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetchSessions();
   }, []);
 
-  // Component logic
-  
-  // Render
+  const fetchSessions = async () => {
+    try {
+      const response = await apiClient.get('/auth/sessions');
+      if (response.error) {
+        setError(response.error);
+      } else {
+        setSessions(response.data.sessions || []);
+      }
+    } catch (err) {
+      console.error('Fetch sessions error:', err);
+      setError('Failed to load sessions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRevoke = async (sessionId: string) => {
+    if (!confirm('Are you sure you want to revoke this session?')) return;
+
+    setRevokingId(sessionId);
+
+    try {
+      const response = await apiClient.delete(`/auth/sessions/${sessionId}`);
+      
+      if (response.error) {
+        setError(response.error);
+      } else {
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
+      }
+    } catch (err) {
+      console.error('Revoke session error:', err);
+      setError('Failed to revoke session');
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const getDeviceIcon = (device?: string) => {
+    if (device?.toLowerCase().includes('mobile')) {
+      return (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SessionsList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className="space-y-4">
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      )}
+
+      {sessions.length === 0 ? (
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          No active sessions found
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sessions.map(session => (
+            <div
+              key={session.id}
+              className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-400">
+                    {getDeviceIcon(session.device)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {formatDeviceLabel(session as never)}
+                      </h4>
+                      {session.isCurrent && (
+                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium rounded">
+                          Current
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                      <p className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {formatLocationLabel(session as never)}
+                      </p>
+                      <p className="flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Last active {getRelativeTime(new Date(session.lastActiveAt))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {!session.isCurrent && (
+                  <button
+                    onClick={() => handleRevoke(session.id)}
+                    disabled={revokingId === session.id}
+                    className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {revokingId === session.id ? 'Revoking...' : 'Revoke'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sessions.length > 1 && (
+        <button
+          onClick={() => {
+            if (confirm('Are you sure you want to revoke all other sessions?')) {
+              // Implement revoke all
+            }
+          }}
+          className="w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors font-medium"
+        >
+          Revoke All Other Sessions
+        </button>
+      )}
     </div>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default SessionsList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/sessions
- * - API: /api/user/sessions/[id]
- *  * - Model: ActiveSession
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}

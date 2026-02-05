@@ -1,22 +1,19 @@
+// src/app/api/tracker/[id]/notes/route.ts
 // =============================================================================
-// tracker/[id]/notes/route.ts
+// Manage Tracker Entry Notes
+// Methods: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
 // =============================================================================
-// Description: Manage tracker entry notes
-// Methods: GET, PUT, PATCH
-// Auth Required: True
-// Rate Limit: 50 requests/minute
-// Tags: tracker, notes
-// Generated: 2026-02-02T11:57:44.560899
-// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { TrackerService } from '@/services/trackerService';
+import { auditLogService } from '@/services/auditLogService';
+import { getClientIp, generateRequestId } from '@/lib/utils';
 
 // =============================================================================
 // CONSTANTS
@@ -24,106 +21,64 @@ import apiResponse from '@/lib/apiResponse';
 
 const RATE_LIMIT = 50;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, PATCH, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
 // =============================================================================
 // VALIDATION SCHEMAS
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+const notesSchema = z.object({
+  notes: z.string().max(5000),
 });
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const partialNotesSchema = z.object({
+  notes: z.string().max(5000).optional(),
 });
-
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate session and check rate limits
- */
 async function validateSession(request: NextRequest, requestId: string) {
   const ip = getClientIp(request);
-  const rateLimitKey = `tracker-[id]-notes:${ip}`;
+  const rateLimitKey = `tracker-notes:${ip}`;
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult,
     };
   }
 
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult,
     };
   }
 
   return { error: null, session, rateLimitResult };
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  response.headers.set('X-Request-ID', requestId);
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('Cache-Control', 'no-store');
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
 }
 
 // =============================================================================
@@ -135,140 +90,109 @@ async function validateSession(request: NextRequest, requestId: string) {
  */
 export async function OPTIONS(): Promise<NextResponse> {
   const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set('Access-Control-Allow-Methods', 'GET, PUT, PATCH, DELETE, HEAD, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return addHeaders(response, requestId);
 }
 
 /**
- * HEAD - Resource metadata
+ * HEAD - Get notes metadata
  */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    const entry = await TrackerService.getEntryById(id, userId);
+
+    if (!entry) {
+      return addHeaders(new NextResponse(null, { status: 404 }), requestId, rateLimitResult);
+    }
+
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Has-Notes', entry.notes ? 'true' : 'false');
+    response.headers.set('X-Notes-Length', String(entry.notes?.length || 0));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
+    logger.error('HEAD /tracker/[id]/notes failed', { requestId }, error);
+    return addHeaders(new NextResponse(null, { status: 500 }), requestId);
   }
 }
 
 /**
- * GET - Manage tracker entry notes
- * 
- * TODO Implementation Checklist:
-   * - Validate session and entry ownership
-   * - GET: Return entry notes and metadata
-   * - PUT/PATCH: Update entry notes
-   * - Support markdown formatting
-   * - Auto-save draft notes
-   * - Return updated entry
+ * GET - Get entry notes
  */
 export async function GET(
-  request: NextRequest, { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
     const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    const resolvedParams = await params;
-    const { id }} = resolvedParams;
+    const { id } = await params;
     const userId = session!.user.id;
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
+    const entry = await TrackerService.getEntryById(id, userId);
 
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
+    if (!entry) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId, rateLimitResult);
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
-
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
-
-    logger.info('GET tracker/[id]/notes completed', {
+    logger.info('GET /tracker/[id]/notes completed', {
       userId,
-      page,
-      total,
-      requestId,
+      entryId: id,
+      hasNotes: !!entry.notes,
       duration: Date.now() - startTime,
+      requestId,
     });
 
-    const response = apiResponse.paginated(
-      data,
+    const response = apiResponse.success(
       {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
+        id: entry.id,
+        notes: entry.notes || '',
+        hasNotes: !!entry.notes,
+        notesLength: entry.notes?.length || 0,
+        updatedAt: entry.updatedAt,
       },
-      { meta: { requestId } }
+      {  }
     );
-
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET tracker/[id]/notes failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('GET /tracker/[id]/notes failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch notes', requestId), requestId);
   }
 }
 
 /**
- * PUT - Manage tracker entry notes
- * 
- * TODO Implementation Checklist:
-   * - Validate session and entry ownership
-   * - GET: Return entry notes and metadata
-   * - PUT/PATCH: Update entry notes
-   * - Support markdown formatting
-   * - Auto-save draft notes
-   * - Return updated entry
+ * PUT - Replace entry notes (full update)
  */
 export async function PUT(
-  request: NextRequest, { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
     const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    const resolvedParams = await params;
-    const { id }} = resolvedParams;
+    const { id } = await params;
     const userId = session!.user.id;
 
-    // Parse request body
     let body: unknown;
     try {
       body = await request.json();
@@ -280,7 +204,7 @@ export async function PUT(
       );
     }
 
-    const validation = bodySchema.safeParse(body);
+    const validation = notesSchema.safeParse(body);
 
     if (!validation.success) {
       return addHeaders(
@@ -290,62 +214,55 @@ export async function PUT(
       );
     }
 
-    const data = validation.data;
+    const { notes } = validation.data;
 
-    // TODO: Implement update logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Validate update is allowed
-    // 4. Update database record
-    // 5. Create audit log with changes
-    // 6. Trigger side effects if needed
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual update
+    const entry = await TrackerService.updateEntry(id, { notes }, userId);
 
-    logger.info('PUT tracker/[id]/notes completed', {
+    logger.info('PUT /tracker/[id]/notes completed', {
       userId,
-      requestId,
+      entryId: id,
+      notesLength: notes.length,
       duration: Date.now() - startTime,
+      requestId,
     });
 
-    const response = apiResponse.success(result, { requestId });
+    const response = apiResponse.success(
+      {
+        id: entry.id,
+        notes: entry.notes,
+        updatedAt: entry.updatedAt,
+      },
+      {  }
+    );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('PUT tracker/[id]/notes failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('PUT /tracker/[id]/notes failed', { requestId }, error);
+
+    if (error instanceof Error && error.message.includes('not found')) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId);
+    }
+
+    return addHeaders(apiResponse.internalError('Failed to update notes', requestId), requestId);
   }
 }
 
 /**
- * PATCH - Partial update for Manage tracker entry notes
- * 
- * TODO Implementation Checklist:
-   * - Validate session and entry ownership
-   * - GET: Return entry notes and metadata
-   * - PUT/PATCH: Update entry notes
-   * - Support markdown formatting
-   * - Auto-save draft notes
-   * - Return updated entry
+ * PATCH - Update entry notes (partial/append)
  */
 export async function PATCH(
-  request: NextRequest, { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
     const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    const resolvedParams = await params;
-    const { id }} = resolvedParams;
+    const { id } = await params;
     const userId = session!.user.id;
 
-    // Parse request body (partial)
     let body: unknown;
     try {
       body = await request.json();
@@ -357,7 +274,7 @@ export async function PATCH(
       );
     }
 
-    const validation = bodySchema.partial().safeParse(body);
+    const validation = partialNotesSchema.safeParse(body);
 
     if (!validation.success) {
       return addHeaders(
@@ -367,32 +284,93 @@ export async function PATCH(
       );
     }
 
-    const data = validation.data;
+    const { notes } = validation.data;
 
-    // TODO: Implement partial update logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Apply partial updates
-    // 4. Create audit log with changes
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual update
+    const entry = await TrackerService.updateEntry(id, { notes }, userId);
 
-    logger.info('PATCH tracker/[id]/notes completed', {
+    logger.info('PATCH /tracker/[id]/notes completed', {
       userId,
-      requestId,
+      entryId: id,
       duration: Date.now() - startTime,
+      requestId,
     });
 
-    const response = apiResponse.success(result, { requestId });
+    const response = apiResponse.success(
+      {
+        id: entry.id,
+        notes: entry.notes,
+        updatedAt: entry.updatedAt,
+      },
+      {  }
+    );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('PATCH tracker/[id]/notes failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('PATCH /tracker/[id]/notes failed', { requestId }, error);
+
+    if (error instanceof Error && error.message.includes('not found')) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId);
+    }
+
+    return addHeaders(apiResponse.internalError('Failed to patch notes', requestId), requestId);
   }
 }
 
+/**
+ * DELETE - Clear entry notes
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    const entry = await TrackerService.updateEntry(id, { notes: null }, userId);
+
+    auditLogService.create({
+      userId,
+      action: 'DELETE',
+      category: 'tracker',
+      entityType: 'tracker_entry_notes',
+      entityId: id,
+      description: 'Cleared entry notes',
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('DELETE /tracker/[id]/notes completed', {
+      userId,
+      entryId: id,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.success(
+      {
+        id: entry.id,
+        notes: null,
+        cleared: true,
+      },
+      {  message: 'Notes cleared successfully' }
+    );
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('DELETE /tracker/[id]/notes failed', { requestId }, error);
+
+    if (error instanceof Error && error.message.includes('not found')) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId);
+    }
+
+    return addHeaders(apiResponse.internalError('Failed to clear notes', requestId), requestId);
+  }
+}
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -400,8 +378,3 @@ export async function PATCH(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

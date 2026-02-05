@@ -1,46 +1,28 @@
-import { ReactNode } from "react";
-import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+// app/(dashboard)/layout.tsx
+import React from 'react';
+import UserMenu from '@/components/navigation/UserMenu';
 
-import Sidebar from "@/components/layout/Sidebar";
-import Navbar from "@/components/layout/Navbar";
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import Footer from "@/components/layout/Footer";
-import { SyncProvider}  from "@/context/SyncContext";
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
-  // Authentication check
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    redirect("/login");
-  }
-
   return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="text-xl font-bold">ProgressTracker</div>
+          
+          {/* User Menu with Logout */}
+          <UserMenu />
+        </div>
+      </header>
 
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-          <SyncProvider>
-      {/* Navbar */}
-      <Navbar />
-
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <Sidebar />
-
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto lg:pl-64">
-          <div className="container mx-auto px-4 py-6">
-            <Breadcrumbs />
-            <div className="mt-6">{children}</div>
-          </div>
-        </main>
-      </div>
-       <Footer />
-       </SyncProvider>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {children}
+      </main>
     </div>
   );
 }

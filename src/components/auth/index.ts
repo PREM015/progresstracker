@@ -1,18 +1,14 @@
-/**
- * Index file for components/auth
- * Auto-generated barrel export file
- */
-
-export { LoginForm } from './LoginForm';
-export { RegisterForm } from './RegisterForm';
-export { ForgotPasswordForm } from './ForgotPasswordForm';
-export { ResetPasswordForm } from './ResetPasswordForm';
-export { VerifyEmailForm } from './VerifyEmailForm';
-export { TwoFactorSetup } from './TwoFactorSetup';
-export { TwoFactorVerify } from './TwoFactorVerify';
-export { BackupCodesDisplay } from './BackupCodesDisplay';
-export { SocialAuthButtons } from './SocialAuthButtons';
-export { ChangePasswordForm } from './ChangePasswordForm';
-export { ChangeEmailForm } from './ChangeEmailForm';
-export { SessionsList } from './SessionsList';
-export { AccountDeletion } from './AccountDeletion';
+// components/auth/index.ts
+export { default as LoginForm } from './LoginForm';
+export { default as RegisterForm } from './RegisterForm';
+export { default as ForgotPasswordForm } from './ForgotPasswordForm';
+export { default as ResetPasswordForm } from './ResetPasswordForm';
+export { default as VerifyEmailForm } from './VerifyEmailForm';
+export { default as SocialAuthButtons } from './SocialAuthButtons';
+export { default as TwoFactorSetup } from './TwoFactorSetup';
+export { default as TwoFactorVerify } from './TwoFactorVerify';
+export { default as BackupCodesDisplay } from './BackupCodesDisplay';
+export { default as ChangePasswordForm } from './ChangePasswordForm';
+export { default as ChangeEmailForm } from './ChangeEmailForm';
+export { default as SessionsList } from './SessionsList';
+export { default as AccountDeletion } from './AccountDeletion';

@@ -1,31 +1,46 @@
 // src/app/api/tracker/[id]/route.ts
+// =============================================================================
+// Single Tracker Entry CRUD API
+// Methods: GET, PUT, PATCH, DELETE, HEAD, OPTIONS
+// =============================================================================
 
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
-import { z } from "zod";
-import { PlatformCategory } from "@prisma/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { PlatformCategory } from '@prisma/client';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
+import { TrackerService } from '@/services/trackerService';
+import { AchievementService } from '@/services/achievementService';
+import { GoalService } from '@/services/goalService';
+import { auditLogService } from '@/services/auditLogService';
+import { getClientIp, generateRequestId } from '@/lib/utils';
 
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 100;
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
 
 const updateEntrySchema = z.object({
+  date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
   platformId: z.string().optional(),
   customPlatformId: z.string().optional(),
-  date: z.string().datetime().optional(),
-
-  // Classification
   category: z.nativeEnum(PlatformCategory).optional(),
   subcategory: z.string().optional(),
 
-  // Primary Metrics
+  // Metrics
   problemsSolved: z.number().int().min(0).optional(),
   problemsAttempted: z.number().int().min(0).optional(),
   easyProblems: z.number().int().min(0).optional(),
   mediumProblems: z.number().int().min(0).optional(),
   hardProblems: z.number().int().min(0).optional(),
-
-  // Code & Development
   commits: z.number().int().min(0).optional(),
   pullRequests: z.number().int().min(0).optional(),
   pullRequestsMerged: z.number().int().min(0).optional(),
@@ -33,367 +48,369 @@ const updateEntrySchema = z.object({
   issuesClosed: z.number().int().min(0).optional(),
   codeReviews: z.number().int().min(0).optional(),
   linesOfCode: z.number().int().min(0).optional(),
-
-  // Projects
   projectsStarted: z.number().int().min(0).optional(),
   projectsCompleted: z.number().int().min(0).optional(),
-
-  // Learning
   coursesStarted: z.number().int().min(0).optional(),
   coursesCompleted: z.number().int().min(0).optional(),
   lessonsCompleted: z.number().int().min(0).optional(),
   modulesCompleted: z.number().int().min(0).optional(),
   certificationsEarned: z.number().int().min(0).optional(),
-
-  // Time Tracking
   timeSpent: z.number().int().min(0).optional(),
   focusTime: z.number().int().min(0).optional(),
-
-  // Quality Metrics
-  averageDifficulty: z.number().min(0).max(10).optional(),
-  accuracyRate: z.number().min(0).max(100).optional(),
-  completionRate: z.number().min(0).max(100).optional(),
-
-  // Platform-specific
   rating: z.number().int().optional(),
-  ratingChange: z.number().int().optional(),
   rank: z.number().int().optional(),
-  rankChange: z.number().int().optional(),
   points: z.number().int().optional(),
-  pointsEarned: z.number().int().optional(),
   streak: z.number().int().min(0).optional(),
-  xpEarned: z.number().int().min(0).optional(),
-
-  // Mood & Notes
   mood: z.string().optional(),
   energyLevel: z.number().int().min(1).max(5).optional(),
   productivityRating: z.number().int().min(1).max(5).optional(),
-  notes: z.string().optional(),
-
-  // Tags & Categories
+  notes: z.string().max(5000).optional(),
   tags: z.array(z.string()).optional(),
   topics: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
-
-  // Custom Fields
   customFields: z.record(z.unknown()).optional(),
 });
 
-interface RouteContext {
-  params: Promise<{
-    id: string;
-  }>;
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+async function validateSession(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitKey = `tracker-entry:${ip}`;
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+  if (!rateLimitResult.success) {
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult,
+    };
+  }
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult,
+    };
+  }
+
+  return { error: null, session, rateLimitResult };
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  response.headers.set('X-Request-ID', requestId);
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('Cache-Control', 'no-store');
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
+}
+
+// =============================================================================
+// HTTP METHOD HANDLERS
+// =============================================================================
+
+/**
+ * OPTIONS - CORS preflight
+ */
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const response = new NextResponse(null, { status: 204 });
+  response.headers.set('Access-Control-Allow-Methods', 'GET, PUT, PATCH, DELETE, HEAD, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return addHeaders(response, requestId);
 }
 
 /**
- * Helper: build Prisma update data safely
- * - removes platformId/customPlatformId from spread
- * - updates relations using connect/disconnect
+ * HEAD - Get entry metadata
  */
-function buildTrackerEntryUpdateData<T extends { platformId?: string; customPlatformId?: string }>(
-  validated: T
-) {
-  const { platformId, customPlatformId, ...rest } = validated;
+export async function HEAD(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
 
-  const data: Record<string, unknown> = {
-    ...rest,
-    updatedAt: new Date(),
-  };
-
-  // ✅ Relation update for platform
-  if (platformId !== undefined) {
-    data.platform = platformId
-      ? { connect: { id: platformId } }
-      : { disconnect: true };
-  }
-
-  // ✅ Relation update for customPlatform
-  if (customPlatformId !== undefined) {
-    data.customPlatform = customPlatformId
-      ? { connect: { id: customPlatformId } }
-      : { disconnect: true };
-  }
-
-  return data;
-}
-
-/**
- * ✅ GET – Get single tracker entry
- */
-export async function GET(_request: NextRequest, context: RouteContext) {
   try {
-    const { id } = await context.params;
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      logger.warn("Unauthorized tracker entry access");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    const entry = await TrackerService.getEntryById(id, userId);
+
+    if (!entry) {
+      return addHeaders(new NextResponse(null, { status: 404 }), requestId, rateLimitResult);
     }
 
-    logger.debug("Fetching tracker entry", {
-      userId: session.user.id,
-      entryId: id,
-    });
-
-    const entry = await prisma.trackerEntry.findUnique({
-      where: { id },
-      include: {
-        platform: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            icon: true,
-            color: true,
-          },
-        },
-        customPlatform: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            color: true,
-          },
-        },
-      },
-    });
-
-    if (!entry || entry.userId !== session.user.id) {
-      logger.warn("Tracker entry not found", {
-        userId: session.user.id,
-        entryId: id,
-      });
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
-    }
-
-    logger.info("Tracker entry fetched", {
-      userId: session.user.id,
-      entryId: id,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: entry,
-    });
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Entry-Date', entry.date.toISOString());
+    response.headers.set('X-Entry-Status', entry.isVerified ? 'verified' : 'unverified');
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error("Error fetching tracker entry", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get entry" },
-      { status: 500 }
-    );
+    logger.error('HEAD /tracker/[id] failed', { requestId }, error);
+    return addHeaders(new NextResponse(null, { status: 500 }), requestId);
   }
 }
 
 /**
- * ✅ PUT – Update tracker entry
+ * GET - Get single tracker entry
  */
-export async function PUT(request: NextRequest, context: RouteContext) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const { id } = await context.params;
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    const entry = await TrackerService.getEntryById(id, userId);
+
+    if (!entry) {
+      logger.warn('Entry not found', { userId, entryId: id, requestId });
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId, rateLimitResult);
     }
 
-    const body = await request.json();
-    const validated = updateEntrySchema.parse(body);
-
-    logger.debug("Updating tracker entry", {
-      userId: session.user.id,
+    logger.info('GET /tracker/[id] completed', {
+      userId,
       entryId: id,
-      fields: Object.keys(validated),
+      duration: Date.now() - startTime,
+      requestId,
     });
 
-    const existing = await prisma.trackerEntry.findUnique({
-      where: { id },
-    });
-
-    if (!existing || existing.userId !== session.user.id) {
-      logger.warn("Tracker entry not found for update", {
-        userId: session.user.id,
-        entryId: id,
-      });
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
-    }
-
-    const updated = await prisma.trackerEntry.update({
-      where: { id },
-      data: buildTrackerEntryUpdateData(validated),
-      include: {
-        platform: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            icon: true,
-            color: true,
-          },
-        },
-        customPlatform: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            color: true,
-          },
-        },
-      },
-    });
-
-    logger.info("Tracker entry updated", {
-      userId: session.user.id,
-      entryId: id,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: updated,
-    });
+    const response = apiResponse.success(entry, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      logger.warn("Validation error updating tracker entry", {
-        errors: error.errors,
-      });
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+    logger.error('GET /tracker/[id] failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to fetch entry', requestId), requestId);
+  }
+}
+
+/**
+ * PUT - Full update tracker entry
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    // Parse body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    logger.error("Error updating tracker entry", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update entry" },
-      { status: 500 }
-    );
-  }
-}
+    const validation = updateEntrySchema.safeParse(body);
 
-/**
- * ✅ PATCH – Partial update tracker entry
- */
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
-
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validated = updateEntrySchema.partial().parse(body);
-
-    logger.debug("Patching tracker entry", {
-      userId: session.user.id,
-      entryId: id,
-      fields: Object.keys(validated),
-    });
-
-    const existing = await prisma.trackerEntry.findUnique({
-      where: { id },
-    });
-
-    if (!existing || existing.userId !== session.user.id) {
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
-    }
-
-    const updated = await prisma.trackerEntry.update({
-      where: { id },
-      data: buildTrackerEntryUpdateData(validated),
-      include: {
-        platform: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            icon: true,
-            color: true,
-          },
-        },
-        customPlatform: {
-          select: {
-            id: true,
-            name: true,
-            icon: true,
-            color: true,
-          },
-        },
-      },
-    });
-
-    logger.info("Tracker entry patched", {
-      userId: session.user.id,
-      entryId: id,
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: updated,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    logger.error("Error patching tracker entry", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update entry" },
-      { status: 500 }
-    );
+    const data = validation.data;
+
+    // Update entry
+    const entry = await TrackerService.updateEntry(id, data, userId);
+
+    // Audit log
+    auditLogService.create({
+      userId,
+      action: 'UPDATE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      entityId: id,
+      description: 'Updated tracker entry',
+      newValue: data,
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('PUT /tracker/[id] completed', {
+      userId,
+      entryId: id,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.success(entry, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('PUT /tracker/[id] failed', { requestId }, error);
+
+    if (error instanceof Error && error.message.includes('not found')) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId);
+    }
+
+    return addHeaders(apiResponse.internalError('Failed to update entry', requestId), requestId);
   }
 }
 
 /**
- * ✅ DELETE – Delete tracker entry
+ * PATCH - Partial update tracker entry
  */
-export async function DELETE(_request: NextRequest, context: RouteContext) {
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const { id } = await context.params;
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
     }
 
-    logger.info("Deleting tracker entry", {
-      userId: session.user.id,
-      entryId: id,
-    });
+    const validation = updateEntrySchema.partial().safeParse(body);
 
-    const existing = await prisma.trackerEntry.findUnique({
-      where: { id },
-    });
-
-    if (!existing || existing.userId !== session.user.id) {
-      logger.warn("Tracker entry not found for deletion", {
-        userId: session.user.id,
-        entryId: id,
-      });
-      return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
     }
 
-    await prisma.trackerEntry.delete({
-      where: { id },
-    });
+    const data = validation.data;
 
-    logger.info("Tracker entry deleted", {
-      userId: session.user.id,
+    const entry = await TrackerService.updateEntry(id, data, userId);
+
+    auditLogService.create({
+      userId,
+      action: 'UPDATE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      entityId: id,
+      description: 'Patched tracker entry',
+      changes: data,
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('PATCH /tracker/[id] completed', {
+      userId,
       entryId: id,
+      duration: Date.now() - startTime,
+      requestId,
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Entry deleted successfully",
-    });
+    const response = apiResponse.success(entry, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error("Error deleting tracker entry", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete entry" },
-      { status: 500 }
-    );
+    logger.error('PATCH /tracker/[id] failed', { requestId }, error);
+
+    if (error instanceof Error && error.message.includes('not found')) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId);
+    }
+
+    return addHeaders(apiResponse.internalError('Failed to patch entry', requestId), requestId);
   }
 }
+
+/**
+ * DELETE - Delete tracker entry
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const { id } = await params;
+    const userId = session!.user.id;
+
+    const result = await TrackerService.deleteEntry(id, userId);
+
+    if (!result.deleted) {
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId, rateLimitResult);
+    }
+
+    auditLogService.create({
+      userId,
+      action: 'DELETE',
+      category: 'tracker',
+      entityType: 'tracker_entry',
+      entityId: id,
+      description: 'Deleted tracker entry',
+      ipAddress: getClientIp(request),
+      requestId,
+    }).catch(console.error);
+
+    logger.info('DELETE /tracker/[id] completed', {
+      userId,
+      entryId: id,
+      duration: Date.now() - startTime,
+      requestId,
+    });
+
+    const response = apiResponse.success(
+      { deleted: true, id },
+      { requestId, message: 'Entry deleted successfully' }
+    );
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('DELETE /tracker/[id] failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to delete entry', requestId), requestId);
+  }
+}
+
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

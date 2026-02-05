@@ -1,169 +1,114 @@
-/**
- * Component: TwoFactorSetup
- * Location: components/auth/TwoFactorSetup.tsx
- * 
- * Description: 2FA setup component
- */
-
+// components/auth/TwoFactorVerify.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import apiClient from '@/lib/apiClient';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/2fa
-// - /api/user/2fa/verify
-// - /api/backup-codes/generate
+export default function TwoFactorVerify() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
 
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-// - TwoFactorAuth
-// - BackupCode
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for TwoFactorAuth model
-interface ITwoFactorAuth {
-  id: string;
-  // Add fields from your Prisma TwoFactorAuth model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for BackupCode model
-interface IBackupCode {
-  id: string;
-  // Add fields from your Prisma BackupCode model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/2fa
-const fetchTwoFactorSetupData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/2fa');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/user/2fa/verify
-const fetchTwoFactorSetupData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/2fa/verify');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/backup-codes/generate
-const fetchTwoFactorSetupData = async () => {
-  try {
-    const response = await apiClient.get('/api/backup-codes/generate');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface TwoFactorSetupProps {
-  className?: string;
-  // Add component-specific props here
-}
-
-// ===== COMPONENT =====
-export const TwoFactorSetup: React.FC<TwoFactorSetupProps> = ({
-  className,
-}) => {
-  // Component state
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [useBackupCode, setUseBackupCode] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-  // Component logic
-  
-  // Render
+    if (!code || (useBackupCode ? code.length < 8 : code.length !== 6)) {
+      setError('Please enter a valid code');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post('/auth/2fa/verify', {
+        code,
+        method: useBackupCode ? 'backup_code' : 'totp',
+      });
+
+      if (response.error) {
+        setError(response.error);
+      } else {
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error('2FA verification error:', err);
+      setError('Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TwoFactorSetup</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          {useBackupCode ? 'Backup Code' : 'Authentication Code'}
+        </label>
+        <input
+          id="code"
+          type="text"
+          value={code}
+          onChange={(e) => {
+            const value = useBackupCode 
+              ? e.target.value.toUpperCase()
+              : e.target.value.replace(/\D/g, '').slice(0, 6);
+            setCode(value);
+            setError('');
+          }}
+          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all outline-none text-center text-2xl tracking-widest font-mono"
+          placeholder={useBackupCode ? 'XXXX-XXXX-XXXX' : '000000'}
+          maxLength={useBackupCode ? 14 : 6}
+          autoComplete="off"
+          autoFocus
+        />
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+          {useBackupCode 
+            ? 'Enter one of your backup codes' 
+            : 'Enter the 6-digit code from your authenticator app'
+          }
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading || !code}
+        className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-500/30"
+      >
+        {loading ? (
+          <span className="flex items-center justify-center gap-2">
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Verifying...
+          </span>
+        ) : (
+          'Verify'
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+          setUseBackupCode(!useBackupCode);
+          setCode('');
+          setError('');
+        }}
+        className="w-full px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+      >
+        {useBackupCode ? '← Use authenticator app' : 'Use backup code instead'}
+      </button>
+    </form>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default TwoFactorSetup;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/2fa
- * - API: /api/user/2fa/verify
- * - API: /api/backup-codes/generate
- *  * - Model: User
- * - Model: TwoFactorAuth
- * - Model: BackupCode
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}

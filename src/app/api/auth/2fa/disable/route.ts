@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/auth/2fa/disable/route.ts
 // Disable Two-Factor Authentication
 
@@ -238,7 +239,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Disable 2FA
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: { twoFactorAuth: { delete: (arg0: { where: { userId: string; }; }) => any; }; backupCode: { deleteMany: (arg0: { where: { userId: string; }; }) => any; }; auditLog: { create: (arg0: { data: { userId: string; action: string; category: string; entityType: string; entityId: any; description: string; ipAddress: string; userAgent: string | undefined; status: string; }; }) => any; }; }) => {
       // Delete 2FA record
       await tx.twoFactorAuth.delete({
         where: { userId },
