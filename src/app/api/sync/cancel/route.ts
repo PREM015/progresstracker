@@ -1,32 +1,35 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // =============================================================================
-// sync/cancel/route.ts
+// src/app/api/sync/cancel/route.ts
 // =============================================================================
-// Description: Cancel ongoing sync
-// Methods: POST
-// Auth Required: True
-// Rate Limit: 20 requests/minute
-// Tags: sync, cancel
-// Generated: 2026-02-02T11:57:44.567137
+// Description: Cancel pending/running syncs
+// Methods: POST, HEAD, OPTIONS
+// Auth Required: Yes
+// Rate Limit: 20/min
 // =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { SyncService } from '@/services/syncService';
+import { SyncQueue } from '@/services/sync/syncQueue';
+import { sseSyncService } from '@/services/sseSyncService';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { SyncStatus } from '@prisma/client';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-const RATE_LIMIT = 20;
+const log = logger.child({ route: 'api/sync/cancel' });
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'POST, HEAD, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -37,146 +40,113 @@ const SECURITY_HEADERS = {
 };
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// VALIDATION
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
-
+const cancelSchema = z.object({
+  platformId: z.string().cuid().optional(),
+  syncLogIds: z.array(z.string().cuid()).optional(),
+  cancelAll: z.boolean().default(false),
+  reason: z.string().max(500).optional(),
+}).refine(
+  data => data.platformId || data.syncLogIds || data.cancelAll,
+  { message: 'Must specify platformId, syncLogIds, or cancelAll' }
+);
 
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `sync-cancel:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
 // =============================================================================
-// HTTP METHOD HANDLERS
+// OPTIONS
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
 export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+  return addHeaders(new NextResponse(null, { status: 204 }), generateRequestId());
 }
 
-/**
- * HEAD - Resource metadata
- */
+// =============================================================================
+// HEAD
+// =============================================================================
+
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
+  
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse(null, { status: 401 });
+    }
+
+    const cancellableCount = await prisma.syncLog.count({
+      where: {
+        userId: session.user.id,
+        status: { in: [SyncStatus.PENDING, SyncStatus.IN_PROGRESS] },
+      },
+    });
+
     const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Cancellable-Count', String(cancellableCount));
+    
     return addHeaders(response, requestId);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
+    log.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
   }
 }
 
-/**
- * POST - Cancel ongoing sync
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse sync job ID from request body
-   * - Verify user owns the sync job
-   * - Check if sync is cancellable (in progress)
-   * - Update SyncLog status to CANCELLED
-   * - Stop any running scraper/sync tasks
-   * - Return cancellation confirmation
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// POST - Cancel Syncs
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, 20, `sync:cancel:${ip}`);
     
-    const userId = session!.user.id;
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
 
-    // Parse request body
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return addHeaders(
+        apiResponse.unauthorized('Authentication required', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const userId = session.user.id;
     let body: unknown;
+    
     try {
       body = await request.json();
     } catch {
@@ -187,56 +157,136 @@ export async function POST(
       );
     }
 
-    const validation = bodySchema.safeParse(body);
-
+    const validation = cancelSchema.safeParse(body);
     if (!validation.success) {
       return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        apiResponse.validationError('Invalid request body', validation.error.errors, requestId),
         requestId,
         rateLimitResult
       );
     }
 
-    const data = validation.data;
+    const { platformId, syncLogIds, cancelAll, reason } = validation.data;
+    const cancelReason = reason || 'Cancelled by user';
+    const results: Array<{ id: string; cancelled: boolean; platformName?: string; error?: string }> = [];
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    if (cancelAll) {
+      // Cancel all active syncs for user
+      await SyncService.cancelSync(userId);
+      
+      const cancelled = await prisma.syncLog.findMany({
+        where: {
+          userId,
+          status: SyncStatus.CANCELLED,
+          completedAt: { gte: new Date(Date.now() - 5000) }, // Just cancelled
+        },
+        include: { platform: { select: { name: true } } },
+      });
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+      for (const sync of cancelled) {
+        results.push({
+          id: sync.id,
+          cancelled: true,
+          platformName: sync.platform?.name,
+        });
 
-    logger.info('POST sync/cancel completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
+        // Send SSE notification
+        if (sync.platformId) {
+          sseSyncService.sendSyncCancelled(
+            userId,
+            sync.id,
+            sync.platformId,
+            sync.platform?.name || 'Unknown',
+            cancelReason
+          );
+        }
+      }
+    } else if (platformId) {
+      // Cancel syncs for specific platform
+      await SyncService.cancelSync(userId, platformId);
+      
+      const platform = await prisma.platform.findUnique({
+        where: { id: platformId },
+        select: { name: true },
+      });
 
-    const response = apiResponse.created(result, { requestId });
+      results.push({
+        id: platformId,
+        cancelled: true,
+        platformName: platform?.name,
+      });
+
+      sseSyncService.sendSyncCancelled(
+        userId,
+        'platform-' + platformId,
+        platformId,
+        platform?.name || 'Unknown',
+        cancelReason
+      );
+    } else if (syncLogIds && syncLogIds.length > 0) {
+      // Cancel specific sync logs
+      for (const syncLogId of syncLogIds) {
+        try {
+          const syncLog = await prisma.syncLog.findFirst({
+            where: {
+              id: syncLogId,
+              userId,
+              status: { in: [SyncStatus.PENDING, SyncStatus.IN_PROGRESS] },
+            },
+            include: { platform: { select: { name: true, id: true } } },
+          });
+
+          if (!syncLog) {
+            results.push({ id: syncLogId, cancelled: false, error: 'Sync not found or not cancellable' });
+            continue;
+          }
+
+          await SyncQueue.cancel(syncLogId, cancelReason);
+          
+          results.push({
+            id: syncLogId,
+            cancelled: true,
+            platformName: syncLog.platform?.name,
+          });
+
+          if (syncLog.platformId) {
+            sseSyncService.sendSyncCancelled(
+              userId,
+              syncLogId,
+              syncLog.platformId,
+              syncLog.platform?.name || 'Unknown',
+              cancelReason
+            );
+          }
+        } catch (error) {
+          results.push({
+            id: syncLogId,
+            cancelled: false,
+            error: error instanceof Error ? error.message : 'Cancel failed',
+          });
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    log.info('Syncs cancelled', { userId, requestId, cancelledCount: results.filter(r => r.cancelled).length, duration });
+
+    const response = apiResponse.success(
+      {
+        cancelled: results.filter(r => r.cancelled).length,
+        failed: results.filter(r => !r.cancelled).length,
+        results,
+        message: `Cancelled ${results.filter(r => r.cancelled).length} sync(s)`,
+      },
+      { meta: { requestId, duration } }
+    );
+
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST sync/cancel failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    log.error('POST cancel failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to cancel syncs', requestId), requestId);
   }
 }
-
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -244,8 +294,3 @@ export async function POST(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

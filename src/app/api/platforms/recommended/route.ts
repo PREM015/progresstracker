@@ -1,124 +1,162 @@
-// =============================================================================
-// platforms/recommended/route.ts
-// =============================================================================
-// Description: Get recommended platforms for user
-// Methods: GET
-// Auth Required: True
-// Rate Limit: 30 requests/minute
-// Tags: platform, recommendation
-// Generated: 2026-02-02T11:57:44.509212
-// =============================================================================
+// src/app/api/platforms/recommended/route.ts
+/**
+ * Recommended Platforms API
+ *
+ * @route GET /api/platforms/recommended - Get personalized platform recommendations
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { UnauthorizedError } from '@/lib/apiError';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { cache } from '@/lib/redis';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
 const RATE_LIMIT = 30;
+const CACHE_TTL = 60 * 15; // 15 minutes
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
+  'Cache-Control': 'private, max-age=900',
 };
 
+const log = logger.child({ route: 'platforms/recommended' });
+
 // =============================================================================
-// VALIDATION SCHEMAS
+// VALIDATION SCHEMA
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+  category: z.string().optional(),
 });
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface ScoredPlatform {
+  id: string;
+  slug: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  category: string;
+  icon: string | null;
+  color: string | null;
+  tags: string[];
+  supportsAutoSync: boolean;
+  authType: string;
+  totalUsers: number;
+  website: string | null;
+  recommendationScore: number;
+  matchReasons: string[];
+}
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `platforms-recommended:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+function calculateRecommendationScore(
+  platform: {
+    category: string;
+    tags: string[];
+    supportsAutoSync: boolean;
+    totalUsers: number;
+  },
+  context: {
+    connectedCategories: string[];
+    goalCategories: string[];
+    userTags: string[];
+    userStats: { totalProblems: number; totalCommits: number; totalProjects: number } | null;
+  }
+): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
 
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
+  // Category match with connected platforms
+  if (context.connectedCategories.includes(platform.category)) {
+    score += 30;
+    reasons.push('Similar to your connected platforms');
   }
 
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
+  // Goal category match
+  if (context.goalCategories.includes(platform.category)) {
+    score += 25;
+    reasons.push('Matches your goals');
   }
 
-  return { error: null, session, rateLimitResult };
+  // Popularity score (capped at 20)
+  score += Math.min(platform.totalUsers / 100, 20);
+  if (platform.totalUsers > 1000) {
+    reasons.push('Popular platform');
+  }
+
+  // Auto-sync bonus
+  if (platform.supportsAutoSync) {
+    score += 15;
+    reasons.push('Supports automatic sync');
+  }
+
+  // DSA bonus for problem solvers
+  if (platform.category === 'DSA' && (context.userStats?.totalProblems || 0) > 0) {
+    score += 20;
+  }
+
+  // Git bonus for committers
+  if (platform.category === 'GIT' && (context.userStats?.totalCommits || 0) > 0) {
+    score += 20;
+  }
+
+  // Tag matching
+  const matchingTags = platform.tags.filter((tag) => context.userTags.includes(tag));
+  if (matchingTags.length > 0) {
+    score += matchingTags.length * 5;
+    reasons.push(`Matches interests: ${matchingTags.slice(0, 3).join(', ')}`);
+  }
+
+  return { score: Math.round(score), reasons };
 }
 
 // =============================================================================
-// HTTP METHOD HANDLERS
+// ROUTE HANDLERS
 // =============================================================================
 
 /**
@@ -130,109 +168,203 @@ export async function OPTIONS(): Promise<NextResponse> {
 }
 
 /**
- * HEAD - Resource metadata
+ * GET /api/platforms/recommended
+ *
+ * Get personalized platform recommendations
  */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * GET - Get recommended platforms for user
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Get user's currently connected platforms
-   * - Analyze user's activity and preferences
-   * - Get popular platforms user hasn't connected
-   * - Consider user's goal types for recommendations
-   * - Return personalized platform recommendations
-   * - Include recommendation reason for each
-   * - Sort by relevance score
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    // Authentication
+    const session = await getServerSession(authOptions);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (!session?.user?.id) {
+      throw new UnauthorizedError('Authentication required');
     }
-    
-    const userId = session!.user.id;
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
+    const userId = session.user.id;
+
+    // Rate limiting
+    const rateLimitKey = `platforms:recommended:${userId}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    // Parse query
+    const searchParams = Object.fromEntries(request.nextUrl.searchParams);
+    const queryValidation = QuerySchema.safeParse(searchParams);
 
     if (!queryValidation.success) {
       return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        apiResponse.validationError(
+          'Invalid query parameters',
+          queryValidation.error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+          requestId
+        ),
         requestId,
         rateLimitResult
       );
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    const { limit, category } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Check cache
+    const cacheKey = `platforms:recommended:${userId}:${limit}:${category || 'all'}`;
+    try {
+      const cached = await cache.get<{ recommendations: ScoredPlatform[] }>(cacheKey);
+      if (cached) {
+        return addHeaders(
+          apiResponse.success(cached, { meta: { requestId, cached: true } }),
+          requestId,
+          rateLimitResult
+        );
+      }
+    } catch {
+      // Continue without cache
+    }
 
-    logger.info('GET platforms/recommended completed', {
+    // Fetch user context
+    const [userPlatforms, userGoals, userStats] = await Promise.all([
+      prisma.userPlatform.findMany({
+        where: { userId },
+        include: {
+          platform: {
+            select: { category: true, tags: true },
+          },
+        },
+      }),
+      prisma.goal.findMany({
+        where: { userId, status: { in: ['ACTIVE', 'COMPLETED'] } },
+        select: { category: true, metric: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          totalProblems: true,
+          totalCommits: true,
+          totalProjects: true,
+        },
+      }),
+    ]);
+
+    const connectedPlatformIds = userPlatforms.map((up) => up.platformId);
+    const connectedCategories = userPlatforms.map((up) => up.platform.category);
+    const goalCategories = userGoals.map((g) => g.category);
+    const userTags = userPlatforms.flatMap((up) => up.platform.tags);
+
+    // Build platform filter
+    const platformWhere: Record<string, unknown> = {
+      isActive: true,
+      isBeta: false,
+      id: { notIn: connectedPlatformIds },
+    };
+
+    if (category) {
+      platformWhere.category = category.toUpperCase();
+    }
+
+    // Fetch available platforms
+    const availablePlatforms = await prisma.platform.findMany({
+      where: platformWhere,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        displayName: true,
+        description: true,
+        category: true,
+        icon: true,
+        color: true,
+        tags: true,
+        supportsAutoSync: true,
+        authType: true,
+        totalUsers: true,
+        website: true,
+      },
+    });
+
+    // Score and sort platforms
+    const scoredPlatforms: ScoredPlatform[] = availablePlatforms.map((platform) => {
+      const { score, reasons } = calculateRecommendationScore(platform, {
+        connectedCategories,
+        goalCategories,
+        userTags,
+        userStats,
+      });
+
+      return {
+        ...platform,
+        recommendationScore: score,
+        matchReasons: reasons,
+      };
+    });
+
+    scoredPlatforms.sort((a, b) => b.recommendationScore - a.recommendationScore);
+    const recommendations = scoredPlatforms.slice(0, limit);
+
+    // Get popular platforms as fallback
+    const popularPlatforms = await prisma.platform.findMany({
+      where: {
+        isActive: true,
+        isBeta: false,
+        id: { notIn: connectedPlatformIds },
+      },
+      orderBy: { totalUsers: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        displayName: true,
+        category: true,
+        icon: true,
+        color: true,
+        totalUsers: true,
+        supportsAutoSync: true,
+      },
+    });
+
+    const response = {
+      recommendations,
+      popular: popularPlatforms,
+      stats: {
+        totalAvailable: availablePlatforms.length,
+        connected: userPlatforms.length,
+        recommendationsShown: recommendations.length,
+      },
+    };
+
+    // Cache the result
+    try {
+      await cache.set(cacheKey, response, CACHE_TTL);
+    } catch {
+      // Continue without caching
+    }
+
+    log.info('Recommendations generated', {
       userId,
-      page,
-      total,
+      recommendationCount: recommendations.length,
       requestId,
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.paginated(
-      data,
-      {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      },
-      { meta: { requestId } }
+    return addHeaders(
+      apiResponse.success(response, { meta: { requestId, duration: Date.now() - startTime } }),
+      requestId,
+      rateLimitResult
     );
-
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET platforms/recommended failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    log.error('Error generating recommendations', { requestId }, error);
+    return addHeaders(apiResponse.error(error, requestId), requestId);
   }
 }
-
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -240,8 +372,3 @@ export async function GET(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

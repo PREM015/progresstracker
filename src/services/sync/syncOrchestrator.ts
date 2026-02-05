@@ -1,9 +1,7 @@
 // src/services/sync/syncOrchestrator.ts
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { SyncQueue } from './syncQueue';
-import { SyncStatus } from '@prisma/client';
 
 const log = logger.child({ service: 'SyncOrchestrator' });
 
@@ -43,14 +41,20 @@ export class SyncOrchestrator {
           queued++;
         } catch (error) {
           failed++;
-          log.error('Error queueing platform sync', {
-            userId,
-            platformId: userPlatform.platformId,
-          }, error);
+          log.error(
+            'Error queueing platform sync',
+            { userId, platformId: userPlatform.platformId },
+            error
+          );
         }
       }
 
-      log.info('All platforms sync queued', { userId, total: userPlatforms.length, queued, failed });
+      log.info('All platforms sync queued', {
+        userId,
+        total: userPlatforms.length,
+        queued,
+        failed,
+      });
 
       return {
         total: userPlatforms.length,
@@ -65,21 +69,39 @@ export class SyncOrchestrator {
 
   /**
    * Process sync queue
+   * SyncQueue.dequeue() returns: Job | null (single job)
+   * and takes: 0 args
    */
   static async processQueue(concurrency: number = 5): Promise<void> {
     try {
-      const jobs = await SyncQueue.getNextJobs(concurrency);
+      type DequeuedJob = Awaited<ReturnType<typeof SyncQueue.dequeue>>;
+      type Job = NonNullable<DequeuedJob>;
 
-      if (jobs.length === 0) {
-        return;
+      const jobs: Job[] = [];
+
+      // pull up to `concurrency` jobs
+      for (let i = 0; i < concurrency; i++) {
+        const job = await SyncQueue.dequeue(); // ✅ no args
+        if (!job) break;
+        jobs.push(job);
       }
+
+      if (jobs.length === 0) return;
 
       log.info('Processing sync queue', { count: jobs.length });
 
-      await Promise.allSettled()=>this.processJob(job.id, job.userId, job.platformId)
-      await Promise.all(  
+      // run jobs in parallel
+      const results = await Promise.allSettled(
         jobs.map((job) => this.processJob(job.id, job.userId, job.platformId))
       );
+
+      const failedCount = results.filter((r) => r.status === 'rejected').length;
+
+      log.info('Sync queue batch finished', {
+        total: jobs.length,
+        success: jobs.length - failedCount,
+        failed: failedCount,
+      });
     } catch (error) {
       log.error('Error processing sync queue', {}, error);
       throw error;
@@ -89,15 +111,33 @@ export class SyncOrchestrator {
   /**
    * Process individual sync job
    */
-  private static async processJob(jobId: string, userId: string, platformId: string): Promise<void> {
+  private static async processJob(
+    jobId: string,
+    userId: string,
+    platformId: string
+  ): Promise<void> {
     try {
       // Import sync service dynamically to avoid circular dependency
       const { SyncService } = await import('../syncService');
 
       await SyncService.syncPlatform(userId, platformId);
-      await SyncQueue.complete(jobId);
+
+      await SyncQueue.complete(jobId, {
+        itemsFound: 0,
+        itemsCreated: 0,
+        itemsUpdated: 0,
+        itemsSkipped: 0,
+      });
+
+      log.info('Sync job completed', { jobId, userId, platformId });
     } catch (error) {
-      await SyncQueue.fail(jobId, error instanceof Error ? error.message : 'Unknown error');
+      const errorDetails =
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : { message: String(error) };
+
+      await SyncQueue.fail(jobId, errorDetails);
+
       log.error('Error processing sync job', { jobId, userId, platformId }, error);
     }
   }
@@ -105,11 +145,13 @@ export class SyncOrchestrator {
   /**
    * Get platforms due for sync
    */
-  static async getPlatformsDueForSync(): Promise<Array<{
-    userId: string;
-    platformId: string;
-    userPlatformId: string;
-  }>> {
+  static async getPlatformsDueForSync(): Promise<
+    Array<{
+      userId: string;
+      platformId: string;
+      userPlatformId: string;
+    }>
+  > {
     try {
       const now = new Date();
 
@@ -118,10 +160,7 @@ export class SyncOrchestrator {
           isActive: true,
           autoSync: true,
           syncStatus: { notIn: ['IN_PROGRESS', 'PENDING'] },
-          OR: [
-            { nextSyncAt: null },
-            { nextSyncAt: { lte: now } },
-          ],
+          OR: [{ nextSyncAt: null }, { nextSyncAt: { lte: now } }],
           consecutiveFailures: { lt: 5 },
         },
         include: {
@@ -129,10 +168,7 @@ export class SyncOrchestrator {
             select: { id: true, isActive: true },
           },
         },
-        orderBy: [
-          { syncPriority: 'desc' },
-          { lastSyncedAt: 'asc' },
-        ],
+        orderBy: [{ syncPriority: 'desc' }, { lastSyncedAt: 'asc' }],
         take: 100,
       });
 

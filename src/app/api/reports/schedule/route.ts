@@ -1,40 +1,23 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // =============================================================================
-// reports/schedule/route.ts
+// api/reports/schedule/route.ts
 // =============================================================================
-// Description: Manage scheduled reports
-// Methods: GET, POST, PUT, DELETE
-// Auth Required: True
-// Rate Limit: 30 requests/minute
-// Tags: report, schedule
-// Generated: 2026-02-02T11:57:44.629370
+// Description: Manage scheduled reports (CRUD operations)
+// Methods: GET, POST, PUT, DELETE, OPTIONS
+// Auth Required: Yes
+// Rate Limit: 20 requests/minute
 // =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-const RATE_LIMIT = 30;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+import { PlatformCategory, AuditAction } from '@prisma/client';
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -42,186 +25,244 @@ const SECURITY_HEADERS = {
 
 const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  isActive: z.coerce.boolean().optional(),
+  frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  sortBy: z.enum(['createdAt', 'nextRunAt', 'name', 'frequency']).default('nextRunAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const createScheduleSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(500).optional(),
+  
+  // Schedule configuration
+  frequency: z.enum(['daily', 'weekly', 'monthly']),
+  dayOfWeek: z.number().int().min(0).max(6).optional(), // 0=Sunday, for weekly
+  dayOfMonth: z.number().int().min(1).max(31).optional(), // for monthly
+  time: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'),
+  timezone: z.string().default('UTC'),
+  
+  // Report configuration
+  reportConfig: z.object({
+    type: z.enum(['weekly', 'monthly', 'yearly', 'custom']).default('weekly'),
+    includeCharts: z.boolean().default(true),
+    includeComparisons: z.boolean().default(true),
+    includeInsights: z.boolean().default(true),
+    includePlatformBreakdown: z.boolean().default(true),
+    
+    // For custom reports
+    relativeDateRange: z.enum([
+      'last_7_days', 'last_30_days', 'last_90_days', 
+      'last_week', 'last_month', 'last_quarter'
+    ]).default('last_7_days'),
+    
+    // Filters
+    platforms: z.array(z.string()).default([]),
+    categories: z.array(z.nativeEnum(PlatformCategory)).default([]),
+  }),
+  
+  // Delivery configuration
+  deliveryMethod: z.enum(['email', 'download']).default('email'),
+  emailTo: z.string().email().optional(),
+  emailSubject: z.string().max(200).optional(),
+  
+  // Status
+  isActive: z.boolean().default(true),
 });
 
+const updateScheduleSchema = createScheduleSchema.partial().extend({
+  id: z.string().cuid()
+});
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+function calculateNextRunTime(frequency: string, dayOfWeek?: number, dayOfMonth?: number, time?: string, timezone = 'UTC') {
+  const now = new Date();
+  const [hours, minutes] = (time || '09:00').split(':').map(Number);
+  
+  const nextRun = new Date();
+  nextRun.setHours(hours, minutes, 0, 0);
+  
+  switch (frequency) {
+    case 'daily':
+      if (nextRun <= now) {
+        nextRun.setDate(nextRun.getDate() + 1);
+      }
+      break;
+      
+    case 'weekly':
+      const targetDay = dayOfWeek ?? 1; // Default to Monday
+      const currentDay = nextRun.getDay();
+      let daysUntilTarget = targetDay - currentDay;
+      
+      if (daysUntilTarget <= 0 || (daysUntilTarget === 0 && nextRun <= now)) {
+        daysUntilTarget += 7;
+      }
+      
+      nextRun.setDate(nextRun.getDate() + daysUntilTarget);
+      break;
+      
+    case 'monthly':
+      const targetDate = dayOfMonth ?? 1; // Default to 1st of month
+      nextRun.setDate(targetDate);
+      
+      if (nextRun <= now) {
+        nextRun.setMonth(nextRun.getMonth() + 1);
+        nextRun.setDate(targetDate);
+      }
+      break;
+  }
+  
+  return nextRun;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+async function validateUserScheduleAccess(userId: string, subscriptionTier?: string) {
+  // Check subscription limits for scheduled reports
+  const currentSchedules = await prisma.scheduledExport.count({
+    where: { userId, isActive: true }
   });
-  response.headers.set('X-Request-ID', requestId);
   
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
+  const limits = {
+    FREE: 1,
+    STARTER: 3,
+    PRO: 10,
+    TEAM: 25,
+    ENTERPRISE: 100
+  };
   
-  return response;
-}
-
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `reports-schedule:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
+  const maxSchedules = limits[subscriptionTier as keyof typeof limits] || limits.FREE;
+  
+  return {
+    canCreate: currentSchedules < maxSchedules,
+    currentCount: currentSchedules,
+    maxAllowed: maxSchedules,
+    remaining: maxSchedules - currentSchedules
+  };
 }
 
 // =============================================================================
 // HTTP METHOD HANDLERS
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
 export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * GET - Manage scheduled reports
- * 
- * TODO Implementation Checklist:
-   * - GET: List user's scheduled reports
-   * - POST: Create new scheduled report
-   * - PUT: Update schedule settings
-   * - DELETE: Cancel scheduled report
-   * - Validate schedule against subscription
-   * - Calculate next run times
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     }
-    
-    const userId = session!.user.id;
+  });
+}
 
-    // Parse query parameters
+/**
+ * GET - List user's scheduled reports
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
+
+    const rateLimitResult = await checkLimit(
+      apiRateLimiter, 
+      30, 
+      `schedule-reports:${session.user.id}`
+    );
+
+    if (!rateLimitResult.success) {
+      return apiResponse.rateLimited(60, requestId);
+    }
+
+    // Parse query
     const { searchParams } = new URL(request.url);
     const queryValidation = querySchema.safeParse({
       page: searchParams.get('page'),
       limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
+      isActive: searchParams.get('isActive'),
+      frequency: searchParams.get('frequency'),
+      sortBy: searchParams.get('sortBy'),
+      sortOrder: searchParams.get('sortOrder'),
     });
 
     if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+      return apiResponse.validationError(
+        'Invalid query parameters',
+        queryValidation.error.errors,
+        requestId
       );
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    const { page, limit, isActive, frequency, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Build where clause
+    const where: any = { userId: session.user.id };
+    if (typeof isActive === 'boolean') where.isActive = isActive;
+    if (frequency) where.frequency = frequency;
 
-    logger.info('GET reports/schedule completed', {
-      userId,
-      page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
+    // Get scheduled exports with pagination
+    const [schedules, total] = await Promise.all([
+      prisma.scheduledExport.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          frequency: true,
+          dayOfWeek: true,
+          dayOfMonth: true,
+          time: true,
+          timezone: true,
+          isActive: true,
+          lastRunAt: true,
+          lastRunStatus: true,
+          nextRunAt: true,
+          runCount: true,
+          failureCount: true,
+          createdAt: true,
+          updatedAt: true,
+          // Include partial report config for display
+          format: true,
+          deliveryMethod: true,
+          emailTo: true,
+        }
+      }),
+      prisma.scheduledExport.count({ where })
+    ]);
+
+    // Get user's subscription info for limits
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        subscription: {
+          select: { tier: true }
+        }
+      }
     });
 
-    const response = apiResponse.paginated(
-      data,
+    const accessInfo = await validateUserScheduleAccess(
+      session.user.id, 
+      user?.subscription?.tier
+    );
+
+    logger.info('Scheduled reports listed', {
+      requestId,
+      userId: session.user.id,
+      total,
+      page
+    });
+
+    return apiResponse.paginated(
+      schedules,
       {
         page,
         limit,
@@ -230,252 +271,345 @@ export async function GET(
         hasNextPage: page < Math.ceil(total / limit),
         hasPreviousPage: page > 1,
       },
+      {
+        meta: { 
+          requestId,
+          subscriptionLimits: accessInfo
+        }
+      }
+    );
+
+  } catch (error) {
+    logger.error('GET scheduled reports failed', { requestId }, error);
+    return apiResponse.internalError('Failed to fetch scheduled reports', requestId);
+  }
+}
+
+/**
+ * POST - Create new scheduled report
+ */
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
+
+    const rateLimitResult = await checkLimit(
+      apiRateLimiter, 
+      10, 
+      `create-schedule:${session.user.id}`
+    );
+
+    if (!rateLimitResult.success) {
+      return apiResponse.rateLimited(180, requestId);
+    }
+
+    // Check subscription limits
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        subscription: {
+          select: { tier: true }
+        }
+      }
+    });
+
+    const accessInfo = await validateUserScheduleAccess(
+      session.user.id, 
+      user?.subscription?.tier
+    );
+
+    if (!accessInfo.canCreate) {
+      return apiResponse.forbidden(
+        `Schedule limit reached. You can create ${accessInfo.maxAllowed} scheduled reports with your current plan.`,
+        requestId
+      );
+    }
+
+    // Parse and validate request
+    const body = await request.json();
+    const validation = createScheduleSchema.safeParse(body);
+
+    if (!validation.success) {
+      return apiResponse.validationError(
+        'Invalid schedule configuration',
+        validation.error.errors,
+        requestId
+      );
+    }
+
+    const data = validation.data;
+
+    // Validate email for email delivery
+    if (data.deliveryMethod === 'email' && !data.emailTo) {
+      return apiResponse.validationError(
+        'Email address required for email delivery',
+        [{ path: ['emailTo'], message: 'Required for email delivery' }],
+        requestId
+      );
+    }
+
+    // Calculate next run time
+    const nextRunAt = calculateNextRunTime(
+      data.frequency,
+      data.dayOfWeek,
+      data.dayOfMonth,
+      data.time,
+      data.timezone
+    );
+
+    // Create scheduled export
+    const schedule = await prisma.scheduledExport.create({
+      data: {
+        userId: session.user.id,
+        name: data.name,
+        description: data.description,
+        frequency: data.frequency,
+        dayOfWeek: data.dayOfWeek,
+        dayOfMonth: data.dayOfMonth,
+        time: data.time,
+        timezone: data.timezone,
+        format: 'JSON', // Default format
+        platforms: data.reportConfig.platforms,
+        categories: data.reportConfig.categories,
+        relativeDateRange: data.reportConfig.relativeDateRange,
+        deliveryMethod: data.deliveryMethod,
+        emailTo: data.emailTo,
+        emailSubject: data.emailSubject || `${data.name} - Automated Report`,
+        isActive: data.isActive,
+        nextRunAt,
+        runCount: 0,
+        failureCount: 0,
+      }
+    });
+
+    // Log audit
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: AuditAction.CREATE,
+        category: 'scheduled_reports',
+        entityType: 'scheduled_export',
+        entityId: schedule.id,
+        description: `Created scheduled report: ${data.name}`,
+        newValue: {
+          name: data.name,
+          frequency: data.frequency,
+          deliveryMethod: data.deliveryMethod,
+          nextRunAt
+        },
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
+    });
+
+    logger.info('Scheduled report created', {
+      requestId,
+      userId: session.user.id,
+      scheduleId: schedule.id,
+      frequency: data.frequency,
+      nextRunAt
+    });
+
+    return apiResponse.created(schedule, { meta: { requestId } });
+
+  } catch (error) {
+    logger.error('POST scheduled report failed', { requestId }, error);
+    return apiResponse.internalError('Failed to create scheduled report', requestId);
+  }
+}
+
+/**
+ * PUT - Update scheduled report
+ */
+export async function PUT(request: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
+
+    const rateLimitResult = await checkLimit(
+      apiRateLimiter, 
+      20, 
+      `update-schedule:${session.user.id}`
+    );
+
+    if (!rateLimitResult.success) {
+      return apiResponse.rateLimited(120, requestId);
+    }
+
+    // Parse request
+    const body = await request.json();
+    const validation = updateScheduleSchema.safeParse(body);
+
+    if (!validation.success) {
+      return apiResponse.validationError(
+        'Invalid update data',
+        validation.error.errors,
+        requestId
+      );
+    }
+
+    const { id, ...updateData } = validation.data;
+
+    // Check if schedule exists and belongs to user
+    const existingSchedule = await prisma.scheduledExport.findFirst({
+      where: {
+        id,
+        userId: session.user.id
+      }
+    });
+
+    if (!existingSchedule) {
+      return apiResponse.notFound('Scheduled report', requestId);
+    }
+
+    // Calculate new next run time if schedule changed
+    const nextRunAt = calculateNextRunTime(
+  updateData.frequency || existingSchedule.frequency,
+  (updateData.dayOfWeek ?? existingSchedule.dayOfWeek) ?? undefined,
+  (updateData.dayOfMonth ?? existingSchedule.dayOfMonth) ?? undefined,
+  updateData.time || existingSchedule.time,
+  updateData.timezone || existingSchedule.timezone
+);
+
+
+    // Update schedule
+    const updatedSchedule = await prisma.scheduledExport.update({
+      where: { id },
+      data: {
+        ...updateData,
+        nextRunAt,
+        // Reset failure count if reactivating
+        ...(updateData.isActive === true && { failureCount: 0 })
+      }
+    });
+
+    // Log audit
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: AuditAction.UPDATE,
+        category: 'scheduled_reports',
+        entityType: 'scheduled_export',
+        entityId: id,
+        description: `Updated scheduled report: ${existingSchedule.name}`,
+        oldValue: existingSchedule,
+        newValue: updateData,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
+    });
+
+    logger.info('Scheduled report updated', {
+      requestId,
+      userId: session.user.id,
+      scheduleId: id,
+      changes: Object.keys(updateData)
+    });
+
+    return apiResponse.success(updatedSchedule, { meta: { requestId } });
+
+  } catch (error) {
+    logger.error('PUT scheduled report failed', { requestId }, error);
+    return apiResponse.internalError('Failed to update scheduled report', requestId);
+  }
+}
+
+/**
+ * DELETE - Delete scheduled report
+ */
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
+
+    const rateLimitResult = await checkLimit(
+      apiRateLimiter, 
+      15, 
+      `delete-schedule:${session.user.id}`
+    );
+
+    if (!rateLimitResult.success) {
+      return apiResponse.rateLimited(180, requestId);
+    }
+
+    // Get schedule ID from query or body
+    const { searchParams } = new URL(request.url);
+    let scheduleId = searchParams.get('id');
+
+    if (!scheduleId) {
+      const body = await request.json();
+      scheduleId = body.id;
+    }
+
+    if (!scheduleId) {
+      return apiResponse.validationError(
+        'Schedule ID required',
+        [{ path: ['id'], message: 'Schedule ID is required' }],
+        requestId
+      );
+    }
+
+    // Check if schedule exists and belongs to user
+    const existingSchedule = await prisma.scheduledExport.findFirst({
+      where: {
+        id: scheduleId,
+        userId: session.user.id
+      }
+    });
+
+    if (!existingSchedule) {
+      return apiResponse.notFound('Scheduled report', requestId);
+    }
+
+    // Delete the schedule
+    await prisma.scheduledExport.delete({
+      where: { id: scheduleId }
+    });
+
+    // Log audit
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        action: AuditAction.DELETE,
+        category: 'scheduled_reports',
+        entityType: 'scheduled_export',
+        entityId: scheduleId,
+        description: `Deleted scheduled report: ${existingSchedule.name}`,
+        oldValue: existingSchedule,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
+    });
+
+    logger.info('Scheduled report deleted', {
+      requestId,
+      userId: session.user.id,
+      scheduleId,
+      name: existingSchedule.name
+    });
+
+    return apiResponse.success(
+      { message: 'Scheduled report deleted successfully' },
       { meta: { requestId } }
     );
 
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET reports/schedule failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('DELETE scheduled report failed', { requestId }, error);
+    return apiResponse.internalError('Failed to delete scheduled report', requestId);
   }
 }
-
-/**
- * POST - Manage scheduled reports
- * 
- * TODO Implementation Checklist:
-   * - GET: List user's scheduled reports
-   * - POST: Create new scheduled report
-   * - PUT: Update schedule settings
-   * - DELETE: Cancel scheduled report
-   * - Validate schedule against subscription
-   * - Calculate next run times
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('POST reports/schedule completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST reports/schedule failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-/**
- * PUT - Manage scheduled reports
- * 
- * TODO Implementation Checklist:
-   * - GET: List user's scheduled reports
-   * - POST: Create new scheduled report
-   * - PUT: Update schedule settings
-   * - DELETE: Cancel scheduled report
-   * - Validate schedule against subscription
-   * - Calculate next run times
- */
-export async function PUT(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement update logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Validate update is allowed
-    // 4. Update database record
-    // 5. Create audit log with changes
-    // 6. Trigger side effects if needed
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual update
-
-    logger.info('PUT reports/schedule completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.success(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('PUT reports/schedule failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-/**
- * DELETE - Manage scheduled reports
- * 
- * TODO Implementation Checklist:
-   * - GET: List user's scheduled reports
-   * - POST: Create new scheduled report
-   * - PUT: Update schedule settings
-   * - DELETE: Cancel scheduled report
-   * - Validate schedule against subscription
-   * - Calculate next run times
- */
-export async function DELETE(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // TODO: Implement deletion logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Check if deletion is allowed (dependencies, etc.)
-    // 4. Soft delete or hard delete based on requirements
-    // 5. Create audit log
-    // 6. Clean up related data if needed
-    // -------------------------------------------------------------------------
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('DELETE reports/schedule completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.success({ deleted: true }, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('DELETE reports/schedule failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

@@ -725,6 +725,22 @@ export function isAuthType(value: unknown): value is AuthType {
 export function isSyncStatus(value: unknown): value is SyncStatus {
   return typeof value === 'string' && value in SyncStatusMap;
 }
+export function getCategoryDisplayName(category: PrismaPlatformCategory): string {
+  switch (category) {
+    case 'DSA': return 'DSA';
+    case 'JOB': return 'Jobs';
+    case 'GIT': return 'Git & GitHub';
+    case 'LEARNING': return 'Learning';
+    case 'HACKATHON': return 'Hackathons';
+    case 'OPENSOURCE': return 'Open Source';
+    case 'COMPANY': return 'Companies';
+    case 'DESIGN': return 'Design';
+    case 'DATA_SCIENCE': return 'Data Science';
+    case 'OTHER':
+    default:
+      return 'Other';
+  }
+}
 
 // =============================================================================
 // DEFAULT EXPORT

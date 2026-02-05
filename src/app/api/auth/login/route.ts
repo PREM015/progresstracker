@@ -1,249 +1,551 @@
-// =============================================================================
-// auth/login/route.ts
-// =============================================================================
-// Description: Direct login with email and password
-// Methods: POST
-// Auth Required: False
-// Rate Limit: 10 requests/minute
-// Tags: auth, login
-// Generated: 2026-02-02T11:57:44.493177
-// =============================================================================
+// src/app/api/auth/login/route.ts
+// Direct login with email and password (returns JWT tokens)
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
+import { signJwt } from '@/lib/jwt';
+import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+
 
 // =============================================================================
-// CONSTANTS
+// CONFIGURATION
 // =============================================================================
 
-const RATE_LIMIT = 10;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+const CONSTANT_TIME_MS = 300;
+const MAX_PAYLOAD_SIZE = 2048;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// SCHEMAS
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const LoginSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email address')
+    .max(255)
+    .transform((e) => e.toLowerCase().trim()),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .max(128),
+  rememberMe: z.boolean().optional().default(false),
+  deviceId: z.string().optional(),
 });
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface DeviceInfo {
+  userAgent: string | null;
+  ip: string;
+  device: string | null;
+  browser: string | null;
+  os: string | null;
+}
 
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
+function parseUserAgent(userAgent: string | null): Partial<DeviceInfo> {
+  if (!userAgent) return {};
   
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
+  const isTablet = /iPad|Tablet/i.test(userAgent);
+  
+  let browser = 'Unknown';
+  if (userAgent.includes('Firefox')) browser = 'Firefox';
+  else if (userAgent.includes('Chrome')) browser = 'Chrome';
+  else if (userAgent.includes('Safari')) browser = 'Safari';
+  else if (userAgent.includes('Edge')) browser = 'Edge';
+  
+  let os = 'Unknown';
+  if (userAgent.includes('Windows')) os = 'Windows';
+  else if (userAgent.includes('Mac')) os = 'macOS';
+  else if (userAgent.includes('Linux')) os = 'Linux';
+  else if (userAgent.includes('Android')) os = 'Android';
+  else if (userAgent.includes('iOS') || userAgent.includes('iPhone')) os = 'iOS';
+  
+  return {
+    device: isTablet ? 'Tablet' : isMobile ? 'Mobile' : 'Desktop',
+    browser,
+    os,
+  };
+}
+
+async function constantTimeDelay(start: number): Promise<void> {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
   }
-  
-  return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `auth-login:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  
-  return { error: null, session: null, rateLimitResult };
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('X-Request-ID', requestId);
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  return res;
 }
 
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
+async function recordLoginAttempt(
+  email: string,
+  userId: string | null,
+  success: boolean,
+  failureReason: string | null,
+  deviceInfo: DeviceInfo,
+  twoFactorRequired: boolean = false
+): Promise<void> {
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    await prisma.loginAttempt.create({
+      data: {
+        userId,
+        email,
+        success,
+        failureReason,
+        ipAddress: deviceInfo.ip,
+        userAgent: deviceInfo.userAgent,
+        twoFactorRequired,
+        twoFactorPassed: false,
+      },
+    });
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
+    logger.error('Failed to record login attempt', { email }, error);
   }
 }
 
-/**
- * POST - Direct login with email and password
- * 
- * TODO Implementation Checklist:
-   * - Validate email and password from request body
-   * - Check if user exists by email
-   * - Verify password using bcrypt.compare()
-   * - Check if account is active and not banned
-   * - Check if email is verified (optional based on settings)
-   * - Generate JWT access token and refresh token
-   * - Create/update ActiveSession record
-   * - Record LoginAttempt (success or failure)
-   * - Update user's lastLoginAt timestamp
-   * - Check for 2FA requirement and return appropriate response
-   * - Set secure HTTP-only cookies for tokens
-   * - Return user data (without sensitive fields) and tokens
-   * - Implement login attempt rate limiting per email/IP
-   * - Send security alert email if login from new device/location
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+async function checkAccountLockout(email: string): Promise<{
+  locked: boolean;
+  remainingMs: number;
+  attempts: number;
+}> {
+  const windowStart = new Date(Date.now() - LOCKOUT_DURATION_MS);
+  
+  const recentAttempts = await prisma.loginAttempt.count({
+    where: {
+      email,
+      success: false,
+      createdAt: { gte: windowStart },
+    },
+  });
+  
+  if (recentAttempts >= MAX_LOGIN_ATTEMPTS) {
+    const lastAttempt = await prisma.loginAttempt.findFirst({
+      where: { email, success: false },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    
+    if (lastAttempt) {
+      const lockoutEnd = lastAttempt.createdAt.getTime() + LOCKOUT_DURATION_MS;
+      const remainingMs = lockoutEnd - Date.now();
+      
+      if (remainingMs > 0) {
+        return { locked: true, remainingMs, attempts: recentAttempts };
+      }
+    }
+  }
+  
+  return { locked: false, remainingMs: 0, attempts: recentAttempts };
+}
+
+// =============================================================================
+// POST - Login
+// =============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
   const requestId = generateRequestId();
-  const startTime = Date.now();
+  const clientIP = getClientIP(req);
+  const userAgent = req.headers.get('user-agent');
+  
+  const deviceInfo: DeviceInfo = {
+    userAgent,
+    ip: clientIP,
+    ...parseUserAgent(userAgent),
+  };
 
   try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    // Rate limiting
+    const rateLimitKey = `login:${clientIP}`;
+    const rateLimitResult = await checkLimit(authRateLimiter, 10, rateLimitKey);
+    
+    if (!rateLimitResult.success) {
+      logger.warn('Login rate limit exceeded', { ip: clientIP, requestId });
+      await constantTimeDelay(start);
+      return secureResponse(
+        { 
+          success: false, 
+          error: 'Too many login attempts. Please try again later.',
+          code: 'RATE_LIMIT_EXCEEDED',
+        },
+        429,
+        requestId
+      );
     }
-    
-    
 
-    // Parse request body
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse and validate body
+    const raw = await req.text();
+    if (raw.length > MAX_PAYLOAD_SIZE) {
+      return secureResponse(
+        { success: false, error: 'Request payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(raw);
     } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
+      return secureResponse(
+        { success: false, error: 'Invalid JSON payload', code: 'INVALID_JSON' },
+        400,
+        requestId
       );
     }
 
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+    const parsed = LoginSchema.safeParse(body);
+    if (!parsed.success) {
+      logger.debug('Login validation failed', { errors: parsed.error.flatten(), requestId });
+      return secureResponse(
+        { 
+          success: false, 
+          error: 'Invalid credentials format',
+          code: 'VALIDATION_ERROR',
+        },
+        400,
+        requestId
       );
     }
 
-    const data = validation.data;
+    const { email, password, rememberMe, deviceId } = parsed.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Check account lockout
+    const lockoutStatus = await checkAccountLockout(email);
+    if (lockoutStatus.locked) {
+      const remainingMinutes = Math.ceil(lockoutStatus.remainingMs / 60000);
+      logger.warn('Account locked due to failed attempts', { email, attempts: lockoutStatus.attempts, requestId });
+      await constantTimeDelay(start);
+      return secureResponse(
+        {
+          success: false,
+          error: `Account temporarily locked. Try again in ${remainingMinutes} minutes.`,
+          code: 'ACCOUNT_LOCKED',
+          retryAfter: Math.ceil(lockoutStatus.remainingMs / 1000),
+        },
+        423,
+        requestId
+      );
+    }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('POST auth/login completed', {
-      
-      requestId,
-      duration: Date.now() - startTime,
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        username: true,
+        image: true,
+        role: true,
+        isAdmin: true,
+        isActive: true,
+        isBanned: true,
+        banReason: true,
+        emailVerified: true,
+        deletedAt: true,
+        twoFactorAuth: {
+          select: {
+            isEnabled: true,
+          },
+        },
+      },
     });
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
+    // User not found - use constant time to prevent enumeration
+    if (!user || !user.password) {
+      await recordLoginAttempt(email, null, false, 'user_not_found', deviceInfo);
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' },
+        401,
+        requestId
+      );
+    }
+
+    // Check account status
+    if (user.deletedAt) {
+      await recordLoginAttempt(email, user.id, false, 'account_deleted', deviceInfo);
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'This account has been deleted', code: 'ACCOUNT_DELETED' },
+        401,
+        requestId
+      );
+    }
+
+    if (!user.isActive) {
+      await recordLoginAttempt(email, user.id, false, 'account_inactive', deviceInfo);
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'This account is deactivated', code: 'ACCOUNT_INACTIVE' },
+        401,
+        requestId
+      );
+    }
+
+    if (user.isBanned) {
+      await recordLoginAttempt(email, user.id, false, 'account_banned', deviceInfo);
+      await constantTimeDelay(start);
+      return secureResponse(
+        { 
+          success: false, 
+          error: `Account suspended: ${user.banReason || 'Policy violation'}`,
+          code: 'ACCOUNT_BANNED',
+        },
+        403,
+        requestId
+      );
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      await recordLoginAttempt(email, user.id, false, 'invalid_password', deviceInfo);
+      logger.info('Invalid password attempt', { userId: user.id, ip: clientIP, requestId });
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Invalid email or password', code: 'INVALID_CREDENTIALS' },
+        401,
+        requestId
+      );
+    }
+
+    // Check 2FA requirement
+    if (user.twoFactorAuth?.isEnabled) {
+      // Generate a temporary token for 2FA verification
+      const twoFactorToken = crypto.randomBytes(32).toString('hex');
+      const twoFactorTokenHash = hashToken(twoFactorToken);
+      
+      // Store temporary token (expires in 5 minutes)
+      await prisma.passwordReset.create({
+        data: {
+          userId: user.id,
+          token: twoFactorTokenHash,
+          expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          ipAddress: clientIP,
+          userAgent: userAgent?.slice(0, 255),
+        },
+      });
+
+      await recordLoginAttempt(email, user.id, false, null, deviceInfo, true);
+      await constantTimeDelay(start);
+      
+      return secureResponse(
+        {
+          success: false,
+          requiresTwoFactor: true,
+          twoFactorToken,
+          message: 'Two-factor authentication required',
+          code: 'TWO_FACTOR_REQUIRED',
+        },
+        200,
+        requestId
+      );
+    }
+
+    // Generate tokens
+    const accessToken = signJwt({
+      userId: user.id,
+      email: user.email!,
+      role: user.role,
+    });
+
+    const refreshToken = crypto.randomBytes(48).toString('hex');
+    const refreshTokenHash = hashToken(refreshToken);
+    const tokenFamily = crypto.randomBytes(16).toString('hex');
+    const refreshExpiresAt = new Date(
+      Date.now() + (rememberMe ? REFRESH_TOKEN_EXPIRY_DAYS : 7) * 24 * 60 * 60 * 1000
+    );
+
+    // Create session and refresh token in transaction
+    await prisma.$transaction(async (tx) => {
+      // Create refresh token
+      await tx.refreshToken.create({
+        data: {
+          userId: user.id,
+          token: refreshTokenHash,
+          family: tokenFamily,
+          deviceId,
+          expiresAt: refreshExpiresAt,
+          isValid: true,
+        },
+      });
+
+      // Create active session
+      await tx.activeSession.create({
+        data: {
+          userId: user.id,
+          token: crypto.randomBytes(32).toString('hex'),
+          userAgent,
+          ipAddress: clientIP,
+          device: deviceInfo.device,
+          browser: deviceInfo.browser,
+          os: deviceInfo.os,
+          isValid: true,
+          isCurrent: true,
+          expiresAt: refreshExpiresAt,
+          lastActiveAt: new Date(),
+        },
+      });
+
+      // Update user login timestamp
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          lastActiveAt: new Date(),
+        },
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'LOGIN',
+          category: 'auth',
+          entityType: 'user',
+          entityId: user.id,
+          description: 'User logged in successfully',
+          ipAddress: clientIP,
+          userAgent: userAgent?.slice(0, 255),
+          status: 'success',
+        },
+      });
+    });
+
+    // Record successful login
+    await recordLoginAttempt(email, user.id, true, null, deviceInfo);
+
+    logger.info('User logged in successfully', {
+      userId: user.id,
+      email: user.email,
+      ip: clientIP,
+      requestId,
+    });
+
+    await constantTimeDelay(start);
+
+    return secureResponse(
+      {
+        success: true,
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          username: user.username,
+          image: user.image,
+          role: user.role,
+          isAdmin: user.isAdmin,
+          emailVerified: !!user.emailVerified,
+        },
+        tokens: {
+          accessToken,
+          refreshToken,
+          expiresAt: refreshExpiresAt.toISOString(),
+        },
+      },
+      200,
+      requestId
+    );
+
   } catch (error) {
-    logger.error('POST auth/login failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Login error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'An error occurred during login', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
+// =============================================================================
+// OTHER METHODS - Not Allowed
+// =============================================================================
+
+export async function GET(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function DELETE(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.headers.set('Access-Control-Max-Age', '86400');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
 
 // =============================================================================
-// ROUTE CONFIGURATION
+// ROUTE CONFIG
 // =============================================================================
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

@@ -1,11 +1,14 @@
 // src/app/api/auth/refresh/route.ts
+// Refresh access token using refresh token
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import crypto from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { signJwt } from '@/lib/jwt';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
 // =============================================================================
 // CONFIGURATION
@@ -13,30 +16,22 @@ import { signJwt } from '@/lib/jwt';
 
 const CONSTANT_TIME_MS = 250;
 const MAX_PAYLOAD_SIZE = 2048;
-const REFRESH_TOKEN_EXPIRY_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+
+// =============================================================================
+// SCHEMAS
+// =============================================================================
+
+const RefreshSchema = z.object({
+  refreshToken: z.string().min(64).max(128),
+});
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
-async function constantTimeDelay(start: number) {
-  const elapsed = Date.now() - start;
-  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
-  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
-}
-
-function secureResponse(body: object, status: number) {
-  const res = NextResponse.json(body, { status });
-  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.headers.set('Pragma', 'no-cache');
-  res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('X-Frame-Options', 'DENY');
-  res.headers.set('Referrer-Policy', 'no-referrer');
-  return res;
-}
-
-function hashToken(token: string) {
-  return crypto.createHash('sha256').update(token).digest('hex');
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
 function getClientIP(req: NextRequest): string {
@@ -47,36 +42,92 @@ function getClientIP(req: NextRequest): string {
   );
 }
 
+function hashToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+async function constantTimeDelay(start: number): Promise<void> {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
+  }
+}
+
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('X-Request-ID', requestId);
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('Referrer-Policy', 'no-referrer');
+  return res;
+}
+
 // =============================================================================
-// HANDLER
+// POST - Refresh Token
 // =============================================================================
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const start = Date.now();
+  const requestId = generateRequestId();
   const clientIP = getClientIP(req);
 
   try {
-    if (!req.headers.get('content-type')?.includes('application/json')) {
-      return secureResponse({ error: 'Content-Type must be application/json' }, 415);
+    // Rate limiting
+    const rateLimitKey = `refresh:${clientIP}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
+      );
     }
 
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse body
     const raw = await req.text();
     if (raw.length > MAX_PAYLOAD_SIZE) {
-      return secureResponse({ error: 'Payload too large' }, 413);
+      return secureResponse(
+        { success: false, error: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
     }
 
-    let body: { refreshToken?: string };
+    let body: unknown;
     try {
       body = JSON.parse(raw);
     } catch {
-      return secureResponse({ error: 'Invalid JSON' }, 400);
+      return secureResponse(
+        { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+        400,
+        requestId
+      );
     }
 
-    const { refreshToken } = body;
-    if (!refreshToken) {
-      return secureResponse({ error: 'Refresh token required' }, 400);
+    const parsed = RefreshSchema.safeParse(body);
+    if (!parsed.success) {
+      return secureResponse(
+        { success: false, error: 'Refresh token is required', code: 'VALIDATION_ERROR' },
+        400,
+        requestId
+      );
     }
 
+    const { refreshToken } = parsed.data;
     const hashedToken = hashToken(refreshToken);
 
     // Find valid token
@@ -94,19 +145,25 @@ export async function POST(req: NextRequest) {
             role: true,
             isActive: true,
             isBanned: true,
+            deletedAt: true,
           },
         },
       },
     });
 
     if (!tokenRecord || !tokenRecord.user) {
-      logger.warn('Invalid refresh token attempt', { ip: clientIP });
+      logger.warn('Invalid refresh token attempt', { ip: clientIP, requestId });
       await constantTimeDelay(start);
-      return secureResponse({ error: 'Invalid refresh token' }, 401);
+      return secureResponse(
+        { success: false, error: 'Invalid refresh token', code: 'INVALID_TOKEN' },
+        401,
+        requestId
+      );
     }
 
     // Check user status
-    if (!tokenRecord.user.isActive || tokenRecord.user.isBanned) {
+    if (!tokenRecord.user.isActive || tokenRecord.user.isBanned || tokenRecord.user.deletedAt) {
+      // Revoke token
       await prisma.refreshToken.update({
         where: { id: tokenRecord.id },
         data: {
@@ -115,16 +172,21 @@ export async function POST(req: NextRequest) {
           revokedReason: 'user_inactive',
         },
       });
+
       await constantTimeDelay(start);
-      return secureResponse({ error: 'Account is not active' }, 401);
+      return secureResponse(
+        { success: false, error: 'Account is not active', code: 'ACCOUNT_INACTIVE' },
+        401,
+        requestId
+      );
     }
 
     const user = tokenRecord.user;
 
-    // Rotate token: invalidate old, create new
+    // Token rotation: invalidate old, create new
     const newToken = crypto.randomBytes(48).toString('hex');
     const newHashedToken = hashToken(newToken);
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
     await prisma.$transaction([
       prisma.refreshToken.update({
@@ -148,54 +210,74 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    // Create new JWT access token
+    // Generate new access token
     const accessToken = signJwt({
       userId: user.id,
-   email: user.email ?? undefined,
-
+      email: user.email ?? undefined,
       role: user.role,
-    });
-
- 
-    await prisma.auditLog.create({
-      data: {
-        userId: user.id,
-        action: 'LOGIN',
-        category: 'auth',
-        entityType: 'refresh_token',
-        entityId: tokenRecord.id,
-        description: 'Token refreshed',
-        ipAddress: clientIP,
-        userAgent: req.headers.get('user-agent')?.slice(0, 255),
-        status: 'success',
-        // ✅ Use newValue for additional data
-        newValue: {
-          deviceId: tokenRecord.deviceId || 'unknown',
-          family: tokenRecord.family,
-        },
-      },
     });
 
     logger.info('Token refreshed', {
       userId: user.id,
       deviceId: tokenRecord.deviceId,
+      ip: clientIP,
+      requestId,
     });
 
     await constantTimeDelay(start);
-    return secureResponse({
-      success: true,
-      accessToken,
-      refreshToken: newToken,
-      expiresAt: expiresAt.toISOString(),
-    }, 200);
+    return secureResponse(
+      {
+        success: true,
+        accessToken,
+        refreshToken: newToken,
+        expiresAt: expiresAt.toISOString(),
+      },
+      200,
+      requestId
+    );
 
   } catch (error) {
-    logger.error('Refresh token error', { ip: clientIP }, error);
+    logger.error('Refresh token error', { ip: clientIP, requestId }, error);
     await constantTimeDelay(start);
-    return secureResponse({ error: 'Something went wrong' }, 500);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
-export async function GET() { return secureResponse({ error: 'Method not allowed' }, 405); }
-export async function PUT() { return secureResponse({ error: 'Method not allowed' }, 405); }
-export async function DELETE() { return secureResponse({ error: 'Method not allowed' }, 405); }
+// =============================================================================
+// OTHER METHODS
+// =============================================================================
+
+export async function GET(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function DELETE(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

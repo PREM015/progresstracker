@@ -1,253 +1,376 @@
-// =============================================================================
-// auth/social/connect/route.ts
-// =============================================================================
-// Description: Connect a social account to existing user
-// Methods: POST
-// Auth Required: True
-// Rate Limit: 20 requests/minute
-// Tags: auth, oauth, social
-// Generated: 2026-02-02T11:57:44.498906
-// =============================================================================
+// src/app/api/auth/social/connect/route.ts
+// Connect a social account to existing user
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+import crypto from 'crypto';
+
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
+import { encrypt } from '@/lib/crypto';
 
 // =============================================================================
-// CONSTANTS
+// CONFIGURATION
 // =============================================================================
 
-const RATE_LIMIT = 20;
+const CONSTANT_TIME_MS = 200;
+const MAX_PAYLOAD_SIZE = 4096;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+const SUPPORTED_PROVIDERS = ['google', 'github', 'discord', 'twitter'] as const;
+type Provider = typeof SUPPORTED_PROVIDERS[number];
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// SCHEMAS
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const ConnectSocialSchema = z.object({
+  provider: z.enum(SUPPORTED_PROVIDERS),
+  providerAccountId: z.string().min(1).max(255),
+  accessToken: z.string().min(1).max(2048).optional(),
+  refreshToken: z.string().min(1).max(2048).optional(),
+  expiresAt: z.number().optional(),
+  tokenType: z.string().optional(),
+  scope: z.string().optional(),
+  providerUsername: z.string().max(255).optional(),
+  providerEmail: z.string().email().optional(),
+  providerAvatar: z.string().url().optional(),
+  providerProfileUrl: z.string().url().optional(),
 });
 
-
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+async function constantTimeDelay(start: number): Promise<void> {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
   }
-  
-  return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `auth-social-connect:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('X-Request-ID', requestId);
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  return res;
 }
 
 // =============================================================================
-// HTTP METHOD HANDLERS
+// GET - List connected social accounts
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
   const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
+    const session = await getServerSession(authOptions);
 
-/**
- * POST - Connect a social account to existing user
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Extract provider and OAuth tokens from request
-   * - Validate OAuth tokens with provider (Google, GitHub, etc.)
-   * - Check if social account is already linked to another user
-   * - Create Account record linking social account to user
-   * - Store provider profile data (username, avatar, email)
-   * - Create audit log entry for account linking
-   * - Send notification email about connected account
-   * - Return updated user with connected accounts list
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
+    if (!session?.user?.id) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        401,
+        requestId
       );
     }
 
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('POST auth/social/connect completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
+    const accounts = await prisma.account.findMany({
+      where: { userId: session.user.id },
+      select: {
+        id: true,
+        provider: true,
+        providerAccountId: true,
+        providerUsername: true,
+        providerEmail: true,
+        providerAvatar: true,
+        providerProfileUrl: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
+    await constantTimeDelay(start);
+    return secureResponse(
+      {
+        success: true,
+        accounts: accounts.map((acc) => ({
+          id: acc.id,
+          provider: acc.provider,
+          providerAccountId: acc.providerAccountId,
+          username: acc.providerUsername,
+          email: acc.providerEmail,
+          avatar: acc.providerAvatar,
+          profileUrl: acc.providerProfileUrl,
+          connectedAt: acc.createdAt,
+        })),
+        availableProviders: SUPPORTED_PROVIDERS.filter(
+          (p) => !accounts.some((a) => a.provider === p)
+        ),
+      },
+      200,
+      requestId
+    );
+
   } catch (error) {
-    logger.error('POST auth/social/connect failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Get connected accounts error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
+// =============================================================================
+// POST - Connect social account
+// =============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
+  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
+  const userAgent = req.headers.get('user-agent');
+
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        401,
+        requestId
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Rate limiting
+    const rateLimitKey = `social-connect:${userId}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 10, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
+      );
+    }
+
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse body
+    const raw = await req.text();
+    if (raw.length > MAX_PAYLOAD_SIZE) {
+      return secureResponse(
+        { success: false, error: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
+    }
+
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return secureResponse(
+        { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+        400,
+        requestId
+      );
+    }
+
+    const parsed = ConnectSocialSchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.errors.map((e) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      }));
+      return secureResponse(
+        { success: false, error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors },
+        400,
+        requestId
+      );
+    }
+
+    const data = parsed.data;
+
+    // Check if this provider is already connected to current user
+    const existingAccount = await prisma.account.findFirst({
+      where: {
+        userId,
+        provider: data.provider,
+      },
+    });
+
+    if (existingAccount) {
+      return secureResponse(
+        { success: false, error: `${data.provider} account is already connected`, code: 'ALREADY_CONNECTED' },
+        409,
+        requestId
+      );
+    }
+
+    // Check if this social account is connected to another user
+    const accountOnOtherUser = await prisma.account.findFirst({
+      where: {
+        provider: data.provider,
+        providerAccountId: data.providerAccountId,
+      },
+    });
+
+    if (accountOnOtherUser) {
+      return secureResponse(
+        { success: false, error: 'This social account is already linked to another user', code: 'ACCOUNT_LINKED_TO_OTHER' },
+        409,
+        requestId
+      );
+    }
+
+    // Create account connection
+    const account = await prisma.$transaction(async (tx) => {
+      const newAccount = await tx.account.create({
+        data: {
+          userId,
+          type: 'oauth',
+          provider: data.provider,
+          providerAccountId: data.providerAccountId,
+          access_token: data.accessToken ? encrypt(data.accessToken) : null,
+          refresh_token: data.refreshToken ? encrypt(data.refreshToken) : null,
+          expires_at: data.expiresAt,
+          token_type: data.tokenType,
+          scope: data.scope,
+          providerUsername: data.providerUsername,
+          providerEmail: data.providerEmail,
+          providerAvatar: data.providerAvatar,
+          providerProfileUrl: data.providerProfileUrl,
+        },
+        select: {
+          id: true,
+          provider: true,
+          providerAccountId: true,
+          providerUsername: true,
+          providerEmail: true,
+          createdAt: true,
+        },
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'CREATE',
+          category: 'auth',
+          entityType: 'account',
+          entityId: newAccount.id,
+          description: `Connected ${data.provider} account`,
+          ipAddress: clientIP,
+          userAgent: userAgent?.slice(0, 255),
+          status: 'success',
+          newValue: {
+            provider: data.provider,
+            providerAccountId: data.providerAccountId,
+            providerUsername: data.providerUsername,
+          },
+        },
+      });
+
+      return newAccount;
+    });
+
+    logger.info('Social account connected', {
+      userId,
+      provider: data.provider,
+      ip: clientIP,
+      requestId,
+    });
+
+    await constantTimeDelay(start);
+    return secureResponse(
+      {
+        success: true,
+        message: `${data.provider} account connected successfully`,
+        account: {
+          id: account.id,
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          username: account.providerUsername,
+          email: account.providerEmail,
+          connectedAt: account.createdAt,
+        },
+      },
+      201,
+      requestId
+    );
+
+  } catch (error) {
+    logger.error('Connect social account error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
+  }
+}
 
 // =============================================================================
-// ROUTE CONFIGURATION
+// OTHER METHODS
 // =============================================================================
+
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function DELETE(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed. Use /api/auth/social/disconnect', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

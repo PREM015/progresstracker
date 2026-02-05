@@ -1,32 +1,32 @@
 // =============================================================================
-// sync/history/route.ts
+// src/app/api/sync/history/route.ts
 // =============================================================================
-// Description: Full sync history
-// Methods: GET
-// Auth Required: True
-// Rate Limit: 50 requests/minute
-// Tags: sync, history
-// Generated: 2026-02-02T11:57:44.569754
+// Description: Sync history with filtering and pagination
+// Methods: GET, DELETE, HEAD, OPTIONS
+// Auth Required: Yes
+// Rate Limit: 60/min
 // =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+import { SyncService } from '@/services/syncService';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { SyncStatus, Prisma } from '@prisma/client';
 
 // =============================================================================
-// CONSTANTS
+// CONSTANTS & TYPES
 // =============================================================================
 
-const RATE_LIMIT = 50;
+const log = logger.child({ route: 'api/sync/history' });
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'GET, DELETE, HEAD, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
@@ -41,146 +41,127 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  platformId: z.string().cuid().optional(),
+  status: z.nativeEnum(SyncStatus).optional(),
+  triggeredBy: z.enum(['manual', 'scheduled', 'webhook', 'system']).optional(),
+  hasError: z.coerce.boolean().optional(),
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional(),
+  sortBy: z.enum(['createdAt', 'duration', 'itemsCreated']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
+const deleteSchema = z.object({
+  olderThan: z.string().datetime().optional(),
+  status: z.nativeEnum(SyncStatus).optional(),
+  keepLast: z.coerce.number().min(0).max(100).default(10),
+});
 
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `sync-history:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
 // =============================================================================
-// HTTP METHOD HANDLERS
+// OPTIONS
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
 export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+  return addHeaders(new NextResponse(null, { status: 204 }), generateRequestId());
 }
 
-/**
- * HEAD - Resource metadata
- */
+// =============================================================================
+// HEAD
+// =============================================================================
+
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
+  
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse(null, { status: 401 });
+    }
+
+    const totalLogs = await prisma.syncLog.count({
+      where: { userId: session.user.id },
+    });
+
     const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Total-Count', String(totalLogs));
+    
     return addHeaders(response, requestId);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
+    log.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
   }
 }
 
-/**
- * GET - Full sync history
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse pagination and filter params
-   * - Query SyncLog for user's syncs
-   * - Filter by platform, status, date range
-   * - Include sync statistics (duration, items)
-   * - Return paginated history with details
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// GET - Sync History with Filters
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, 60, `sync:history:${ip}`);
     
-    const userId = session!.user.id;
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
 
-    // Parse query parameters
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return addHeaders(
+        apiResponse.unauthorized('Authentication required', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Parse and validate query
     const { searchParams } = new URL(request.url);
     const queryValidation = querySchema.safeParse({
       page: searchParams.get('page'),
       limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
+      platformId: searchParams.get('platformId'),
+      status: searchParams.get('status'),
+      triggeredBy: searchParams.get('triggeredBy'),
+      hasError: searchParams.get('hasError'),
+      dateFrom: searchParams.get('dateFrom'),
+      dateTo: searchParams.get('dateTo'),
+      sortBy: searchParams.get('sortBy'),
+      sortOrder: searchParams.get('sortOrder'),
     });
 
     if (!queryValidation.success) {
@@ -191,46 +172,222 @@ export async function GET(
       );
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
-
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
-
-    logger.info('GET sync/history completed', {
-      userId,
+    const {
       page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
+      limit,
+      platformId,
+      status,
+      triggeredBy,
+      hasError,
+      dateFrom,
+      dateTo,
+      sortBy,
+      sortOrder,
+    } = queryValidation.data;
+
+    // Build where clause
+    const where: Prisma.SyncLogWhereInput = { userId };
+
+    if (platformId) where.platformId = platformId;
+    if (status) where.status = status;
+    if (triggeredBy) where.triggeredBy = triggeredBy;
+    if (hasError !== undefined) where.hasError = hasError;
+
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
+    }
+
+    // Build order by
+    const orderBy: Prisma.SyncLogOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    // Execute query with pagination
+    const [logs, total] = await Promise.all([
+      prisma.syncLog.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          platform: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              icon: true,
+              color: true,
+            },
+          },
+        },
+      }),
+      prisma.syncLog.count({ where }),
+    ]);
+
+    // Get aggregate stats
+    const aggregateStats = await prisma.syncLog.aggregate({
+      where: { userId },
+      _avg: { duration: true },
+      _sum: { itemsCreated: true, itemsUpdated: true },
+      _count: { id: true },
     });
 
+    const statusCounts = await prisma.syncLog.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { id: true },
+    });
+
+    const totalPages = Math.ceil(total / limit);
+    const duration = Date.now() - startTime;
+
+    log.debug('Sync history retrieved', { userId, requestId, page, limit, total, duration });
+
     const response = apiResponse.paginated(
-      data,
+      logs.map((l) => ({
+        id: l.id,
+        platform: l.platform,
+        status: l.status,
+        triggeredBy: l.triggeredBy,
+        startedAt: l.startedAt,
+        completedAt: l.completedAt,
+        duration: l.duration,
+        itemsFound: l.itemsFound,
+        itemsCreated: l.itemsCreated,
+        itemsUpdated: l.itemsUpdated,
+        itemsSkipped: l.itemsSkipped,
+        itemsFailed: l.itemsFailed,
+        hasError: l.hasError,
+        errorCode: l.errorCode,
+        errorMessage: l.errorMessage,
+        attemptNumber: l.attemptNumber,
+      })),
       {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
+        totalPages,
+        hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
       },
-      { meta: { requestId } }
+      {
+        meta: {
+          requestId,
+          duration,
+          stats: {
+            totalLogs: aggregateStats._count.id,
+            avgDuration: Math.round(aggregateStats._avg.duration || 0),
+            totalItemsCreated: aggregateStats._sum.itemsCreated || 0,
+            totalItemsUpdated: aggregateStats._sum.itemsUpdated || 0,
+            statusBreakdown: Object.fromEntries(
+              statusCounts.map((s) => [s.status, s._count.id])
+            ),
+          },
+        },
+      }
     );
 
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET sync/history failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    log.error('GET sync history failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to get sync history', requestId), requestId);
   }
 }
 
+// =============================================================================
+// DELETE - Clear Sync History
+// =============================================================================
+
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, 10, `sync:history:delete:${ip}`);
+    
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return addHeaders(
+        apiResponse.unauthorized('Authentication required', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Parse body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
+
+    const validation = deleteSchema.safeParse(body);
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid request body', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const { olderThan, status, keepLast } = validation.data;
+
+    // Build where clause
+    const where: Prisma.SyncLogWhereInput = { userId };
+
+    if (olderThan) {
+      where.createdAt = { lt: new Date(olderThan) };
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
+    // Get IDs to keep (most recent)
+    const logsToKeep = await prisma.syncLog.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: keepLast,
+      select: { id: true },
+    });
+
+    const idsToKeep = logsToKeep.map((l) => l.id);
+
+    // Delete logs
+    const deleteResult = await prisma.syncLog.deleteMany({
+      where: {
+        ...where,
+        id: { notIn: idsToKeep },
+      },
+    });
+
+    const duration = Date.now() - startTime;
+    log.info('Sync history cleared', { userId, requestId, deletedCount: deleteResult.count, duration });
+
+    const response = apiResponse.success(
+      {
+        deletedCount: deleteResult.count,
+        keptCount: idsToKeep.length,
+      },
+      { meta: { requestId, duration }, message: `Deleted ${deleteResult.count} sync logs` }
+    );
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    log.error('DELETE sync history failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to clear sync history', requestId), requestId);
+  }
+}
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -238,8 +395,3 @@ export async function GET(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

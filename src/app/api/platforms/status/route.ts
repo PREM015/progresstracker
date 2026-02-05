@@ -1,115 +1,139 @@
-// =============================================================================
-// platforms/status/route.ts
-// =============================================================================
-// Description: Get platform health status
-// Methods: GET
-// Auth Required: False
-// Rate Limit: 100 requests/minute
-// Tags: platform, health, status
-// Generated: 2026-02-02T11:57:44.507086
-// =============================================================================
+// src/app/api/platforms/status/route.ts
+/**
+ * Platform Status API
+ *
+ * @route GET /api/platforms/status - Get platform health status for user's connections
+ * @route HEAD /api/platforms/status - Quick health check
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { UnauthorizedError } from '@/lib/apiError';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-const RATE_LIMIT = 100;
+const RATE_LIMIT = 60;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
+  'Cache-Control': 'private, no-cache',
 };
 
+const log = logger.child({ route: 'platforms/status' });
+
 // =============================================================================
-// VALIDATION SCHEMAS
+// TYPES
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
-});
+interface PlatformStatus {
+  platformId: string;
+  platform: {
+    id: string;
+    name: string;
+    slug: string;
+    icon: string | null;
+    healthStatus: string | null;
+    healthMessage: string | null;
+    lastHealthCheck: Date | null;
+    maintenanceMode: boolean;
+    maintenanceMessage: string | null;
+  };
+  connectionStatus: string;
+  syncStatus: string;
+  lastSyncedAt: Date | null;
+  lastSyncError: string | null;
+  nextSyncAt: Date | null;
+  consecutiveFailures: number;
+  isActive: boolean;
+  autoSync: boolean;
+}
 
+interface StatusSummary {
+  total: number;
+  healthy: number;
+  syncing: number;
+  failing: number;
+  maintenance: number;
+  disconnected: number;
+  errors: number;
+}
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `platforms-status:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+function categorizeConnections(connections: PlatformStatus[]): StatusSummary {
+  const summary: StatusSummary = {
+    total: connections.length,
+    healthy: 0,
+    syncing: 0,
+    failing: 0,
+    maintenance: 0,
+    disconnected: 0,
+    errors: 0,
+  };
 
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
+  for (const conn of connections) {
+    if (conn.platform.maintenanceMode) {
+      summary.maintenance++;
+    } else if (conn.connectionStatus === 'disconnected') {
+      summary.disconnected++;
+    } else if (conn.connectionStatus === 'error' || conn.lastSyncError) {
+      summary.errors++;
+    } else if (conn.consecutiveFailures >= 3) {
+      summary.failing++;
+    } else if (conn.syncStatus === 'IN_PROGRESS') {
+      summary.syncing++;
+    } else if (
+      conn.connectionStatus === 'connected' &&
+      conn.syncStatus === 'SUCCESS' &&
+      conn.consecutiveFailures === 0
+    ) {
+      summary.healthy++;
+    }
   }
 
-  
-  return { error: null, session: null, rateLimitResult };
+  return summary;
 }
 
 // =============================================================================
-// HTTP METHOD HANDLERS
+// ROUTE HANDLERS
 // =============================================================================
 
 /**
@@ -121,108 +145,165 @@ export async function OPTIONS(): Promise<NextResponse> {
 }
 
 /**
- * HEAD - Resource metadata
+ * HEAD - Quick health check
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return new NextResponse(null, { status: 401 });
+    }
+
+    const [totalConnections, healthyConnections] = await Promise.all([
+      prisma.userPlatform.count({
+        where: { userId: session.user.id },
+      }),
+      prisma.userPlatform.count({
+        where: {
+          userId: session.user.id,
+          connectionStatus: 'connected',
+          syncStatus: 'SUCCESS',
+          consecutiveFailures: 0,
+        },
+      }),
+    ]);
+
     const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Total-Connections', String(totalConnections));
+    response.headers.set('X-Healthy-Connections', String(healthyConnections));
+
     return addHeaders(response, requestId);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
+    log.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
   }
 }
 
 /**
- * GET - Get platform health status
- * 
- * TODO Implementation Checklist:
-   * - Get all active platforms from database
-   * - Return last health check status for each
-   * - Include success rates and avg sync duration
-   * - Check for any platforms in maintenance mode
-   * - Return overall system health status
-   * - Include any scheduled maintenance windows
-   * - Cache response for performance (TTL: 60s)
+ * GET /api/platforms/status
+ *
+ * Get platform health status for all user's connections
  */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
+    // Authentication
+    const session = await getServerSession(authOptions);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (!session?.user?.id) {
+      throw new UnauthorizedError('Authentication required');
     }
-    
-    
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
+    const userId = session.user.id;
+
+    // Rate limiting
+    const rateLimitKey = `platforms:status:${userId}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    // Get user's platform connections with sync status
+    const connections = await prisma.userPlatform.findMany({
+      where: { userId },
+      include: {
+        platform: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            icon: true,
+            healthStatus: true,
+            healthMessage: true,
+            lastHealthCheck: true,
+            maintenanceMode: true,
+            maintenanceMessage: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
     });
 
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
+    // Format platform statuses
+    const platformStatuses: PlatformStatus[] = connections.map((conn) => ({
+      platformId: conn.platformId,
+      platform: conn.platform,
+      connectionStatus: conn.connectionStatus,
+      syncStatus: conn.syncStatus,
+      lastSyncedAt: conn.lastSyncedAt,
+      lastSyncError: conn.lastSyncError,
+      nextSyncAt: conn.nextSyncAt,
+      consecutiveFailures: conn.consecutiveFailures,
+      isActive: conn.isActive,
+      autoSync: conn.autoSync,
+    }));
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    // Calculate summary
+    const summary = categorizeConnections(platformStatuses);
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Get sync statistics for last 24 hours
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [successfulSyncs, failedSyncs, totalSyncs] = await Promise.all([
+      prisma.syncLog.count({
+        where: {
+          userId,
+          status: 'SUCCESS',
+          createdAt: { gte: last24Hours },
+        },
+      }),
+      prisma.syncLog.count({
+        where: {
+          userId,
+          status: 'FAILED',
+          createdAt: { gte: last24Hours },
+        },
+      }),
+      prisma.syncLog.count({
+        where: {
+          userId,
+          createdAt: { gte: last24Hours },
+        },
+      }),
+    ]);
 
-    logger.info('GET platforms/status completed', {
-      
-      page,
-      total,
+    log.info('Platform status fetched', {
+      userId,
+      totalConnections: connections.length,
+      healthyCount: summary.healthy,
       requestId,
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.paginated(
-      data,
-      {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      },
-      { meta: { requestId } }
+    return addHeaders(
+      apiResponse.success(
+        {
+          platforms: platformStatuses,
+          summary,
+          syncStats: {
+            last24Hours: {
+              total: totalSyncs,
+              successful: successfulSyncs,
+              failed: failedSyncs,
+              successRate: totalSyncs > 0 ? Math.round((successfulSyncs / totalSyncs) * 100) : 100,
+            },
+          },
+        },
+        { meta: { requestId, duration: Date.now() - startTime } }
+      ),
+      requestId,
+      rateLimitResult
     );
-
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET platforms/status failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    log.error('Error fetching platform status', { requestId }, error);
+    return addHeaders(apiResponse.error(error, requestId), requestId);
   }
 }
-
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -230,8 +311,3 @@ export async function GET(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

@@ -1,215 +1,389 @@
-// src/app/api/goals/[id]/route.ts
+// =============================================================================
+// src/app/api/goals/[id]/stats/route.ts
+// =============================================================================
+// Description: Get statistics for a specific goal
+// Methods: GET, OPTIONS, HEAD
+// Auth Required: Yes
+// Rate Limit: 50 requests/minute
+// =============================================================================
 
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { GoalService } from "@/services/goalService";
-import { logger } from "@/lib/logger";
-import { z } from "zod";
-import { GoalStatus } from "@prisma/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 interface RouteContext {
-  params: Promise<{
-    id: string;
-  }>;
+  params: Promise<{ id: string }>;
 }
 
-/**
- * ✅ Use Prisma enum directly (prevents mismatch like "draft" vs "DRAFT")
- */
-const updateGoalSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  status: z.nativeEnum(GoalStatus).optional(), // ✅ Prisma enum
-  target: z.number().min(0).optional(),
-  progress: z.number().min(0).optional(),
-  dueDate: z.string().datetime().optional(),
-  priority: z.number().int().min(1).max(5).optional(),
-  tags: z.array(z.string()).optional(),
-});
+interface GoalMilestone {
+  value: number;
+  label: string;
+  reached: boolean;
+  reachedAt?: string;
+}
 
-const progressSchema = z.object({
-  progress: z.number().min(0).optional(),
-  increment: z.number().optional(),
-});
+interface GoalBestDay {
+  date: string;
+  progress: number;
+}
 
-// ✅ GET – Get single goal
-export async function GET(_request: NextRequest, context: RouteContext) {
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const RATE_LIMIT = 50;
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
+};
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Cache-Control': 'private, max-age=60',
+};
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
+const idSchema = z.string().cuid('Invalid goal ID format');
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number }
+): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  response.headers.set('X-Request-ID', requestId);
+
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+
+  return response;
+}
+
+async function validateRequest(request: NextRequest, requestId: string) {
+  const ip = getClientIp(request);
+  const rateLimitKey = `goals-stats:${ip}`;
+  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+  if (!rateLimitResult.success) {
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult,
+    };
+  }
+
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult,
+    };
+  }
+
+  return { error: null, session, rateLimitResult };
+}
+
+function parseJsonField<T>(field: unknown): T | null {
+  if (!field) return null;
+  if (typeof field === 'object') return field as T;
   try {
-    const { id } = await context.params;
+    return JSON.parse(field as string) as T;
+  } catch {
+    return null;
+  }
+}
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      logger.warn("Unauthorized goal access attempt");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+function calculateProgressPercentage(progress: number, target: number): number {
+  if (target <= 0) return 0;
+  return Math.min(100, Math.round((progress / target) * 100 * 10) / 10);
+}
+
+// =============================================================================
+// OPTIONS - CORS Preflight
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const response = new NextResponse(null, { status: 204 });
+  return addHeaders(response, requestId);
+}
+
+// =============================================================================
+// HEAD - Resource Metadata
+// =============================================================================
+
+export async function HEAD(
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+
+  try {
+    const { error, session, rateLimitResult } = await validateRequest(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    logger.debug("Fetching goal", { userId: session.user.id, goalId: id });
+    const { id } = await context.params;
+    const userId = session!.user.id;
 
-    const goal = await GoalService.getGoalById(session.user.id, id);
+    const goal = await prisma.goal.findFirst({
+      where: { id, userId },
+      select: { id: true, updatedAt: true },
+    });
 
     if (!goal) {
-      logger.warn("Goal not found", { userId: session.user.id, goalId: id });
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
+      return new NextResponse(null, { status: 404 });
     }
 
-    logger.info("Goal fetched successfully", { userId: session.user.id, goalId: id });
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('Last-Modified', goal.updatedAt.toUTCString());
 
-    return NextResponse.json({
-      success: true,
-      data: goal,
-    });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error("Failed to get goal", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to get goal" },
-      { status: 500 }
-    );
+    logger.error('HEAD /api/goals/[id]/stats failed', { requestId }, error);
+    return new NextResponse(null, { status: 500 });
   }
 }
 
-// ✅ PUT – Update goal
-export async function PUT(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+// =============================================================================
+// GET - Get Goal Statistics
+// =============================================================================
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const { error, session, rateLimitResult } = await validateRequest(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
     }
 
-    const rawBody = await request.json();
-    const body = updateGoalSchema.parse(rawBody);
+    const { id } = await context.params;
+    const userId = session!.user.id;
 
-    logger.debug("Updating goal", {
-      userId: session.user.id,
+    // Validate ID
+    const idValidation = idSchema.safeParse(id);
+    if (!idValidation.success) {
+      const response = apiResponse.validationError(
+        'Invalid goal ID',
+        idValidation.error.errors,
+        requestId
+      );
+      return addHeaders(response, requestId, rateLimitResult);
+    }
+
+    // Fetch goal with reminders
+    const goal = await prisma.goal.findFirst({
+      where: { id, userId },
+      include: {
+        platform: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        reminders: {
+          select: {
+            id: true,
+            isActive: true,
+            sendCount: true,
+          },
+        },
+      },
+    });
+
+    if (!goal) {
+      const response = apiResponse.notFound('Goal', requestId);
+      return addHeaders(response, requestId, rateLimitResult);
+    }
+
+    // Calculate time-based stats
+    const now = new Date();
+    const startDate = new Date(goal.startDate);
+    const daysElapsed = Math.max(
+      1,
+      Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
+
+    let daysLeft: number | null = null;
+    let totalDays: number | null = null;
+    let percentTimeElapsed: number | null = null;
+
+    if (goal.deadline) {
+      const deadline = new Date(goal.deadline);
+      daysLeft = Math.max(
+        0,
+        Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      totalDays = Math.ceil(
+        (deadline.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      percentTimeElapsed = totalDays > 0 ? Math.round((daysElapsed / totalDays) * 100) : 100;
+    }
+
+    // Progress stats
+    const progress = goal.progress;
+    const target = goal.target;
+    const percentage = calculateProgressPercentage(progress, target);
+    const remaining = Math.max(0, target - progress);
+    const avgPerDay = progress / daysElapsed;
+
+    // Projection
+    let projectedCompletion: Date | null = null;
+    let projectedDaysNeeded: number | null = null;
+    let onTrack = true;
+
+    if (avgPerDay > 0 && remaining > 0) {
+      projectedDaysNeeded = Math.ceil(remaining / avgPerDay);
+      projectedCompletion = new Date(now.getTime() + projectedDaysNeeded * 24 * 60 * 60 * 1000);
+
+      if (goal.deadline) {
+        onTrack = projectedCompletion <= new Date(goal.deadline);
+      }
+    }
+
+    // Required pace
+    let requiredPerDay: number | null = null;
+    if (daysLeft !== null && daysLeft > 0 && remaining > 0) {
+      requiredPerDay = remaining / daysLeft;
+    }
+
+    // Parse JSON fields
+    const milestones = parseJsonField<GoalMilestone[]>(goal.milestones) || [];
+    const bestDay = parseJsonField<GoalBestDay>(goal.bestDay);
+
+    // Milestone stats
+    const milestonesReached = milestones.filter((m) => m.reached).length;
+    const totalMilestones = milestones.length;
+    const nextMilestone = milestones.find((m) => !m.reached);
+
+    // Reminder stats
+    const activeReminders = goal.reminders.filter((r) => r.isActive).length;
+    const totalRemindersSent = goal.reminders.reduce((sum, r) => sum + r.sendCount, 0);
+
+    const stats = {
+      goal: {
+        id: goal.id,
+        title: goal.title,
+        status: goal.status,
+        category: goal.category,
+        goalType: goal.goalType,
+        metric: goal.metric,
+        platform: goal.platform,
+      },
+      progress: {
+        current: progress,
+        target,
+        remaining,
+        percentage,
+        isComplete: progress >= target,
+      },
+      time: {
+        startDate: goal.startDate,
+        deadline: goal.deadline,
+        daysElapsed,
+        daysLeft,
+        totalDays,
+        percentTimeElapsed,
+        completedAt: goal.completedAt,
+      },
+      pace: {
+        avgPerDay: Math.round(avgPerDay * 100) / 100,
+        requiredPerDay: requiredPerDay ? Math.round(requiredPerDay * 100) / 100 : null,
+        onTrack,
+        projectedCompletion,
+        projectedDaysNeeded,
+      },
+      milestones: {
+        reached: milestonesReached,
+        total: totalMilestones,
+        percentage: totalMilestones > 0 
+          ? Math.round((milestonesReached / totalMilestones) * 100) 
+          : 0,
+        next: nextMilestone,
+        all: milestones,
+      },
+      activity: {
+        daysActive: goal.daysActive,
+        avgDailyProgress: goal.avgDailyProgress,
+        bestDay,
+        currentStreak: goal.currentStreakDays,
+        requiredStreak: goal.requiredStreakDays,
+      },
+      reminders: {
+        enabled: goal.reminderEnabled,
+        active: activeReminders,
+        total: goal.reminders.length,
+        totalSent: totalRemindersSent,
+      },
+      metadata: {
+        createdAt: goal.createdAt,
+        updatedAt: goal.updatedAt,
+        isPublic: goal.isPublic,
+        shareCode: goal.shareCode,
+      },
+    };
+
+    logger.info('GET /api/goals/[id]/stats completed', {
+      userId,
       goalId: id,
-      fields: Object.keys(body),
+      requestId,
+      duration: Date.now() - startTime,
     });
 
-    const existing = await GoalService.getGoalById(session.user.id, id);
-    if (!existing) {
-      logger.warn("Goal not found for update", { userId: session.user.id, goalId: id });
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-    }
-
-    const goal = await GoalService.updateGoal(session.user.id, id, body);
-
-    logger.info("Goal updated successfully", { userId: session.user.id, goalId: id });
-
-    return NextResponse.json({
-      success: true,
-      data: goal,
-    });
+    const response = apiResponse.success(stats, { requestId });
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Failed to update goal", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update goal" },
-      { status: 500 }
-    );
+    logger.error('GET /api/goals/[id]/stats failed', { requestId }, error);
+    const response = apiResponse.internalError('Failed to fetch goal stats', requestId);
+    return addHeaders(response, requestId);
   }
 }
 
-// ✅ PATCH – Update goal progress
-export async function PATCH(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
 
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const rawBody = await request.json();
-    const { progress, increment } = progressSchema.parse(rawBody);
-
-    logger.debug("Updating goal progress", {
-      userId: session.user.id,
-      goalId: id,
-      progress,
-      increment,
-    });
-
-    let goal;
-
-    if (typeof increment === "number") {
-      goal = await GoalService.incrementProgress(session.user.id, id, increment);
-      logger.info("Goal progress incremented", {
-        userId: session.user.id,
-        goalId: id,
-        increment,
-      });
-    } else if (typeof progress === "number") {
-      goal = await GoalService.updateProgress(session.user.id, id, progress);
-      logger.info("Goal progress set", {
-        userId: session.user.id,
-        goalId: id,
-        progress,
-      });
-    } else {
-      return NextResponse.json(
-        { error: "Progress or increment value required" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: goal,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Failed to update goal progress", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update progress" },
-      { status: 500 }
-    );
-  }
-}
-
-// ✅ DELETE – Delete goal
-export async function DELETE(_request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
-
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    logger.info("Deleting goal", { userId: session.user.id, goalId: id });
-
-    const deleted = await GoalService.deleteGoal(session.user.id, id);
-
-    if (!deleted) {
-      logger.warn("Goal not found for deletion", { userId: session.user.id, goalId: id });
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 });
-    }
-
-    logger.info("Goal deleted successfully", { userId: session.user.id, goalId: id });
-
-    return NextResponse.json({
-      success: true,
-      message: "Goal deleted",
-    });
-  } catch (error) {
-    logger.error("Failed to delete goal", {}, error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to delete goal" },
-      { status: 500 }
-    );
-  }
-}
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

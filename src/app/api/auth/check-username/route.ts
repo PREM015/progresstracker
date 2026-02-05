@@ -1,335 +1,328 @@
-// =============================================================================
-// auth/check-username/route.ts
-// =============================================================================
-// Description: Check if username is available
-// Methods: GET, POST
-// Auth Required: False
-// Rate Limit: 30 requests/minute
-// Tags: auth, validation
-// Generated: 2026-02-02T11:57:44.495139
-// =============================================================================
+// src/app/api/auth/check-username/route.ts
+// Check if username is available for registration
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+import crypto from 'crypto';
+
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
 // =============================================================================
-// CONSTANTS
+// CONFIGURATION
 // =============================================================================
 
-const RATE_LIMIT = 30;
+const CONSTANT_TIME_MS = 150;
+const MAX_PAYLOAD_SIZE = 512;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+// Reserved usernames
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'root', 'system', 'support', 'help', 'info',
+  'contact', 'api', 'www', 'mail', 'email', 'account', 'accounts',
+  'dashboard', 'settings', 'profile', 'user', 'users', 'login', 'logout',
+  'register', 'signup', 'signin', 'auth', 'oauth', 'callback', 'webhook',
+  'webhooks', 'null', 'undefined', 'true', 'false', 'test', 'demo',
+  'moderator', 'mod', 'staff', 'team', 'official', 'verified', 'bot',
+]);
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// SCHEMAS
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+const CheckUsernameSchema = z.object({
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be at most 30 characters')
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      'Username can only contain letters, numbers, underscores, and hyphens'
+    )
+    .transform((u) => u.toLowerCase().trim()),
 });
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
-
-
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+async function constantTimeDelay(start: number): Promise<void> {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
   }
-  
-  return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `auth-check-username:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('X-Request-ID', requestId);
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  return res;
+}
 
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+function generateSuggestions(username: string): string[] {
+  const suggestions: string[] = [];
+  const base = username.replace(/[0-9]+$/, '');
+
+  for (let i = 0; i < 3; i++) {
+    const suffix = Math.floor(Math.random() * 1000);
+    suggestions.push(`${base}${suffix}`);
+  }
+
+  suggestions.push(`${base}_${Math.floor(Math.random() * 100)}`);
+  suggestions.push(`the_${base}`);
+
+  return suggestions.slice(0, 5);
+}
+
+async function checkUsernameAvailability(username: string): Promise<{
+  available: boolean;
+  reason?: string;
+  suggestions?: string[];
+}> {
+  // Check reserved username
+  if (RESERVED_USERNAMES.has(username)) {
+    return {
+      available: false,
+      reason: 'reserved',
+      suggestions: generateSuggestions(username),
     };
   }
 
-  
-  return { error: null, session: null, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * GET - Check if username is available
- * 
- * TODO Implementation Checklist:
-   * - Extract username from query params (GET) or body (POST)
-   * - Validate username format (alphanumeric, min/max length, allowed chars)
-   * - Check against reserved usernames list
-   * - Query database for existing username (case-insensitive)
-   * - Return availability status and suggestions if taken
-   * - Implement rate limiting to prevent enumeration attacks
-   * - Add delay for security (prevent timing attacks)
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+  // Check offensive patterns (basic check)
+  const offensivePatterns = [/admin/i, /fuck/i, /shit/i, /damn/i];
+  for (const pattern of offensivePatterns) {
+    if (pattern.test(username)) {
+      return {
+        available: false,
+        reason: 'inappropriate',
+      };
     }
-    
-    
+  }
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
+  // Check if username exists
+  const existingUser = await prisma.user.findUnique({
+    where: { username },
+    select: { id: true },
+  });
 
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+  if (existingUser) {
+    return {
+      available: false,
+      reason: 'taken',
+      suggestions: generateSuggestions(username),
+    };
+  }
+
+  return { available: true };
+}
+
+// =============================================================================
+// GET - Check username via query parameter
+// =============================================================================
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
+  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
+
+  try {
+    // Rate limiting
+    const rateLimitKey = `check-username:${clientIP}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
       );
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    // Parse query parameter
+    const { searchParams } = new URL(req.url);
+    const username = searchParams.get('username');
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    const parsed = CheckUsernameSchema.safeParse({ username });
 
-    logger.info('GET auth/check-username completed', {
-      
-      page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
-    });
+    if (!parsed.success) {
+      const errors = parsed.error.errors.map((e) => e.message);
+      return secureResponse(
+        {
+          success: false,
+          error: errors[0] || 'Invalid username format',
+          code: 'VALIDATION_ERROR',
+        },
+        400,
+        requestId
+      );
+    }
 
-    const response = apiResponse.paginated(
-      data,
+    const result = await checkUsernameAvailability(parsed.data.username);
+
+    await constantTimeDelay(start);
+
+    return secureResponse(
       {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
+        success: true,
+        username: parsed.data.username,
+        available: result.available,
+        ...(result.reason && { reason: result.reason }),
+        ...(result.suggestions && { suggestions: result.suggestions }),
       },
-      { meta: { requestId } }
+      200,
+      requestId
     );
 
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET auth/check-username failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Check username error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Internal error', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
-/**
- * POST - Check if username is available
- * 
- * TODO Implementation Checklist:
-   * - Extract username from query params (GET) or body (POST)
-   * - Validate username format (alphanumeric, min/max length, allowed chars)
-   * - Check against reserved usernames list
-   * - Query database for existing username (case-insensitive)
-   * - Return availability status and suggestions if taken
-   * - Implement rate limiting to prevent enumeration attacks
-   * - Add delay for security (prevent timing attacks)
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// POST - Check username via body
+// =============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
   const requestId = generateRequestId();
-  const startTime = Date.now();
+  const clientIP = getClientIP(req);
 
   try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
+    // Rate limiting
+    const rateLimitKey = `check-username:${clientIP}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
+      );
     }
-    
-    
 
-    // Parse request body
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse body
+    const raw = await req.text();
+    if (raw.length > MAX_PAYLOAD_SIZE) {
+      return secureResponse(
+        { success: false, error: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(raw);
     } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
+      return secureResponse(
+        { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+        400,
+        requestId
       );
     }
 
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+    const parsed = CheckUsernameSchema.safeParse(body);
+    if (!parsed.success) {
+      const errors = parsed.error.errors.map((e) => e.message);
+      return secureResponse(
+        {
+          success: false,
+          error: errors[0] || 'Invalid username format',
+          code: 'VALIDATION_ERROR',
+        },
+        400,
+        requestId
       );
     }
 
-    const data = validation.data;
+    const result = await checkUsernameAvailability(parsed.data.username);
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    await constantTimeDelay(start);
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    return secureResponse(
+      {
+        success: true,
+        username: parsed.data.username,
+        available: result.available,
+        ...(result.reason && { reason: result.reason }),
+        ...(result.suggestions && { suggestions: result.suggestions }),
+      },
+      200,
+      requestId
+    );
 
-    logger.info('POST auth/check-username completed', {
-      
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST auth/check-username failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Check username error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Internal error', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
+// =============================================================================
+// OTHER METHODS
+// =============================================================================
 
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function DELETE(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

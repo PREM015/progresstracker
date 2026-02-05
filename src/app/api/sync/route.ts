@@ -1,338 +1,383 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// =============================================================================
 // src/app/api/sync/route.ts
+// =============================================================================
+// Description: Main sync endpoint - Get sync overview & trigger sync
+// Methods: GET, POST, HEAD, OPTIONS
+// Auth Required: Yes
+// Rate Limit: GET: 60/min, POST: 10/min
+// =============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { logger } from '@/lib/logger';
-import { syncOrchestrator } from '@/services/sync/syncOrchestrator';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
+import { SyncService } from '@/services/syncService';
+import { SyncQueue } from '@/services/sync/syncQueue';
+import { SyncScheduler } from '@/services/sync/syncScheduler';
+import { sseSyncService } from '@/services/sseSyncService';
+import { apiRateLimiter, syncRateLimiter, checkLimit } from '@/lib/rateLimit';
+import apiResponse from '@/lib/apiResponse';
+import { SyncStatus } from '@prisma/client';
 
-// Validation schema for sync request
-const syncRequestSchema = z.object({
-  platformIds: z.array(z.string()).optional(),
+// =============================================================================
+// CONSTANTS
+// =============================================================================
+
+const log = logger.child({ route: 'api/sync' });
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
+  'Access-Control-Allow-Methods': 'GET, POST, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
+  'Access-Control-Max-Age': '86400',
+};
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+};
+
+// =============================================================================
+// VALIDATION SCHEMAS
+// =============================================================================
+
+const triggerSyncSchema = z.object({
+  platformIds: z.array(z.string().cuid()).optional(),
   force: z.boolean().default(false),
-  priority: z.enum(['low', 'normal', 'high']).default('normal'),
+  priority: z.enum(['high', 'normal', 'low']).default('normal'),
 });
 
-/**
- * GET /api/sync
- * Get sync status for user
- */
-export async function GET(req: NextRequest) {
-  const startTime = Date.now();
-  const log = logger.child({ route: 'GET /api/sync' });
+const querySchema = z.object({
+  include: z.enum(['platforms', 'queue', 'schedule', 'all']).optional(),
+  detailed: z.coerce.boolean().default(false),
+});
 
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+}
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
+
+function addHeaders(
+  response: NextResponse,
+  requestId: string,
+  rateLimitResult?: { limit: number; remaining: number; reset: number }
+): NextResponse {
+  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  
+  response.headers.set('X-Request-ID', requestId);
+  
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+    response.headers.set('X-RateLimit-Reset', String(rateLimitResult.reset));
+  }
+  
+  return response;
+}
+
+// =============================================================================
+// OPTIONS - CORS Preflight
+// =============================================================================
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return addHeaders(new NextResponse(null, { status: 204 }), generateRequestId());
+}
+
+// =============================================================================
+// HEAD - Resource Metadata
+// =============================================================================
+
+export async function HEAD(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      log.warn('Unauthorized sync status request');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return new NextResponse(null, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const jobId = searchParams.get('jobId');
-
-    log.debug('Checking sync status', { userId: session.user.id, jobId });
-
-    if (jobId) {
-      // Get specific job status
-      const job = syncOrchestrator.getJobStatus(jobId);
-      if (!job) {
-        log.warn('Sync job not found', { jobId });
-        return NextResponse.json(
-          { success: false, error: 'Job not found' },
-          { status: 404 }
-        );
-      }
-
-      log.info('Job status retrieved', {
-        jobId,
-        status: job.status,
-        duration: Date.now() - startTime,
-      });
-
-      return NextResponse.json({ success: true, job });
-    }
-
-    // Get overall queue state and recent syncs
-    const [queueStatus, recentSyncs, platformStatuses] = await Promise.all([
-      Promise.resolve(syncOrchestrator.getQueueStatus()),
-      prisma.syncLog.findMany({
-        where: { userId: session.user.id },
-        orderBy: { startedAt: 'desc' },
-        take: 10,
-        include: {
-          platform: {
-            select: { name: true, slug: true, icon: true },
-          },
-        },
+    // Get sync counts for headers
+    const [activeSyncs, pendingSyncs, connectedPlatforms] = await Promise.all([
+      prisma.syncLog.count({
+        where: { userId: session.user.id, status: SyncStatus.IN_PROGRESS },
       }),
-      prisma.userPlatform.findMany({
+      prisma.syncLog.count({
+        where: { userId: session.user.id, status: SyncStatus.PENDING },
+      }),
+      prisma.userPlatform.count({
         where: { userId: session.user.id, isActive: true },
-        select: {
-          id: true,
-          platformId: true,
-          syncStatus: true,
-          lastSyncedAt: true,
-          nextSyncAt: true,
-          consecutiveFailures: true,
-          platform: {
-            select: { name: true, slug: true },
-          },
-        },
       }),
     ]);
 
-    // Get user's active jobs
-    const userJobs = syncOrchestrator.getUserJobs(session.user.id);
-
-    log.info('Sync status retrieved', {
-      userId: session.user.id,
-      queueLength: queueStatus.queueLength,
-      activeJobs: queueStatus.activeJobs,
-      recentSyncsCount: recentSyncs.length,
-      duration: Date.now() - startTime,
-    });
-
-    return NextResponse.json({
-      success: true,
-      queue: queueStatus,
-      userJobs,
-      recentSyncs,
-      platformStatuses,
-    });
+    const response = new NextResponse(null, { status: 200 });
+    response.headers.set('X-Active-Syncs', String(activeSyncs));
+    response.headers.set('X-Pending-Syncs', String(pendingSyncs));
+    response.headers.set('X-Connected-Platforms', String(connectedPlatforms));
+    
+    return addHeaders(response, requestId);
   } catch (error) {
-    log.error(
-      'Failed to get sync status',
-      { duration: Date.now() - startTime },
-      error
-    );
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to get sync status',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    log.error('HEAD request failed', { requestId }, error);
+    return new NextResponse(null, { status: 500 });
   }
 }
 
-/**
- * POST /api/sync
- * Trigger sync for platforms
- */
-export async function POST(req: NextRequest) {
+// =============================================================================
+// GET - Sync Overview & Status
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
-  const log = logger.child({ route: 'POST /api/sync' });
 
   try {
+    // Rate limit check
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, 60, `sync:get:${ip}`);
+    
+    if (!rateLimitResult.success) {
+      log.warn('Rate limit exceeded', { requestId, ip });
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    // Auth check
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      log.warn('Unauthorized sync trigger attempt');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+      return addHeaders(apiResponse.unauthorized('Authentication required', requestId), requestId, rateLimitResult);
+    }
+
+    const userId = session.user.id;
+
+    // Parse query params
+    const { searchParams } = new URL(request.url);
+    const queryValidation = querySchema.safeParse({
+      include: searchParams.get('include'),
+      detailed: searchParams.get('detailed'),
+    });
+
+    if (!queryValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const body = await req.json().catch(() => ({}));
-    const validated = syncRequestSchema.parse(body);
+    const { include, detailed } = queryValidation.data;
 
-    log.info('Sync requested', {
-      userId: session.user.id,
-      platformIds: validated.platformIds,
-      force: validated.force,
-      priority: validated.priority,
-    });
+    // Get sync status
+    const syncStatus = await SyncService.getSyncStatus(userId);
 
-    // Check subscription limits
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    if (!subscription) {
-      log.warn('No subscription found for user', { userId: session.user.id });
-      // Create default free subscription
-      await prisma.subscription.create({
-        data: {
-          userId: session.user.id,
-          tier: 'FREE',
-          status: 'ACTIVE',
-          billingInterval: 'MONTHLY',
-          platformLimit: 5,
-          syncFrequencyMinutes: 1440,
-          exportLimitMonthly: 3,
-          apiRequestsDaily: 100,
-        },
-      });
-    }
-
-    const activeSub = subscription || { syncFrequencyMinutes: 1440 };
-
-    // Check if user has exceeded sync frequency limit (unless force)
-    if (!validated.force) {
-      const lastSync = await prisma.syncLog.findFirst({
-        where: {
-          userId: session.user.id,
-          status: { in: ['SUCCESS', 'PARTIAL'] },
-        },
-        orderBy: { completedAt: 'desc' },
-      });
-
-      if (lastSync?.completedAt) {
-        const minInterval = activeSub.syncFrequencyMinutes * 60 * 1000;
-        const timeSinceLastSync = Date.now() - lastSync.completedAt.getTime();
-
-        if (timeSinceLastSync < minInterval) {
-          const waitTime = Math.ceil((minInterval - timeSinceLastSync) / 60000);
-          log.warn('Sync rate limited', {
-            userId: session.user.id,
-            waitMinutes: waitTime,
-          });
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Please wait ${waitTime} minutes before syncing again`,
-              code: 'RATE_LIMITED',
-              retryAfter: waitTime,
-            },
-            { status: 429 }
-          );
-        }
-      }
-    }
-
-    // Enqueue sync job
-    const jobId = await syncOrchestrator.enqueue({
-      userId: session.user.id,
-      platformIds: validated.platformIds,
-      force: validated.force,
-      priority: validated.priority,
-    });
-
-    const job = syncOrchestrator.getJobStatus(jobId);
-
-    log.info('Sync job enqueued', {
-      userId: session.user.id,
-      jobId,
-      platformCount: job?.totalPlatforms || 0,
-      duration: Date.now() - startTime,
-    });
-
-    return NextResponse.json({
-      success: true,
-      jobId,
-      message: `Syncing ${job?.totalPlatforms || 0} platform(s)`,
-      platformCount: job?.totalPlatforms || 0,
-      job,
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      log.warn('Invalid sync request', { errors: error.errors });
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid request',
-          details: error.errors,
-        },
-        { status: 400 }
-      );
-    }
-
-    log.error(
-      'Failed to trigger sync',
-      { duration: Date.now() - startTime },
-      error
-    );
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to trigger sync',
-        message: error instanceof Error ? error.message : 'Unknown error',
+    // Build response data
+    const responseData: Record<string, unknown> = {
+      status: {
+        isRunning: syncStatus.isRunning,
+        activeSyncs: syncStatus.activeSyncs,
+        lastSync: syncStatus.lastSync,
+        health: syncStatus.health,
       },
-      { status: 500 }
-    );
+      platforms: syncStatus.platforms.map((p) => ({
+        platformId: p.platformId,
+        name: p.name,
+        slug: p.slug,
+        icon: p.icon,
+        status: p.status,
+        lastSyncedAt: p.lastSyncedAt,
+        failures: p.failures,
+        ...(detailed ? { lastError: p.lastError } : {}),
+      })),
+    };
+
+    // Include additional data based on query
+    if (include === 'queue' || include === 'all') {
+      const queueStats = await SyncQueue.getStats();
+      const userJobs = await SyncQueue.getUserJobs(userId);
+      responseData.queue = {
+        stats: queueStats,
+        jobs: userJobs.map((j) => ({
+          id: j.id,
+          platformId: j.platformId,
+          status: j.status,
+          priority: j.priority,
+          createdAt: j.createdAt,
+          attemptNumber: j.attemptNumber,
+        })),
+      };
+    }
+
+    if (include === 'schedule' || include === 'all') {
+      const schedules = await SyncScheduler.getUserSchedules(userId);
+      responseData.schedules = schedules.map((s) => ({
+        platformId: s.platformId,
+        nextSyncAt: s.nextSyncAt,
+        syncInterval: s.syncInterval,
+        isActive: s.isActive,
+      }));
+    }
+
+    if (include === 'platforms' || include === 'all') {
+      const recentLogs = syncStatus.recentLogs.slice(0, 5);
+      responseData.recentActivity = recentLogs.map((l) => ({
+        id: l.id,
+        platformName: l.platform?.name,
+        status: l.status,
+        createdAt: l.createdAt,
+        duration: l.duration,
+        itemsCreated: l.itemsCreated,
+      }));
+    }
+
+    const duration = Date.now() - startTime;
+    log.info('Sync overview retrieved', { userId, requestId, duration });
+
+    const response = apiResponse.success(responseData, {
+      meta: { requestId, duration },
+    });
+    
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    log.error('GET sync failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to get sync status', requestId), requestId);
   }
 }
 
-/**
- * DELETE /api/sync
- * Cancel sync job
- */
-export async function DELETE(req: NextRequest) {
+// =============================================================================
+// POST - Trigger Sync
+// =============================================================================
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
   const startTime = Date.now();
-  const log = logger.child({ route: 'DELETE /api/sync' });
 
   try {
+    // Rate limit check (stricter for POST)
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(syncRateLimiter, 10, `sync:trigger:${ip}`);
+    
+    if (!rateLimitResult.success) {
+      log.warn('Sync rate limit exceeded', { requestId, ip });
+      return addHeaders(apiResponse.rateLimited(300, requestId), requestId, rateLimitResult);
+    }
+
+    // Auth check
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      log.warn('Unauthorized sync cancel attempt');
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
+      return addHeaders(apiResponse.unauthorized('Authentication required', requestId), requestId, rateLimitResult);
+    }
+
+    const userId = session.user.id;
+
+    // Parse and validate body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      body = {}; // Empty body is valid
+    }
+
+    const validation = triggerSyncSchema.safeParse(body);
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid request body', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const jobId = searchParams.get('jobId');
+    const { platformIds, force, priority } = validation.data;
 
-    if (!jobId) {
-      log.warn('Cancel requested without job ID');
-      return NextResponse.json(
-        { success: false, error: 'Job ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify job belongs to user
-    const job = syncOrchestrator.getJobStatus(jobId);
-    if (job && job.userId !== session.user.id) {
-      log.warn('Attempt to cancel another user\'s job', { 
-        jobId, 
-        jobUserId: job.userId, 
-        requestUserId: session.user.id 
-      });
-      return NextResponse.json(
-        { success: false, error: 'Not authorized to cancel this job' },
-        { status: 403 }
-      );
-    }
-
-    log.info('Cancelling sync job', { userId: session.user.id, jobId });
-
-    const cancelled = syncOrchestrator.cancelJob(jobId);
-
-    if (cancelled) {
-      log.info('Sync job cancelled', {
-        jobId,
-        duration: Date.now() - startTime,
-      });
-    } else {
-      log.warn('Could not cancel sync job', { jobId });
-    }
-
-    return NextResponse.json({
-      success: cancelled,
-      message: cancelled ? 'Sync cancelled' : 'Could not cancel sync (may already be complete)',
-    });
-  } catch (error) {
-    log.error(
-      'Failed to cancel sync',
-      { duration: Date.now() - startTime },
-      error
-    );
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to cancel sync',
-        message: error instanceof Error ? error.message : 'Unknown error',
+    // Check if sync already in progress
+    const activeSyncs = await prisma.syncLog.count({
+      where: {
+        userId,
+        status: { in: [SyncStatus.IN_PROGRESS, SyncStatus.PENDING] },
       },
-      { status: 500 }
+    });
+
+    if (activeSyncs > 0 && !force) {
+      return addHeaders(
+        apiResponse.error(
+          { message: 'Sync already in progress', statusCode: 409, code: 'SYNC_IN_PROGRESS' },
+          requestId
+        ),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Trigger sync
+    log.info('Triggering sync', { userId, requestId, platformIds, force, priority });
+
+    const result = await SyncService.syncAllPlatforms(userId, {
+      platformIds,
+      force,
+      priority,
+      triggeredBy: 'manual',
+    });
+
+    // Send SSE notification
+    if (sseSyncService.hasActiveConnection(userId)) {
+      sseSyncService.sendSyncStarted(
+        userId,
+        result.jobId,
+        platformIds?.[0] || 'all',
+        'All Platforms'
+      );
+    }
+
+    const duration = Date.now() - startTime;
+    log.info('Sync triggered', { userId, requestId, jobId: result.jobId, duration });
+
+    const response = apiResponse.success(
+      {
+        jobId: result.jobId,
+        platformCount: result.platformCount,
+        successCount: result.successCount,
+        failCount: result.failCount,
+        skippedCount: result.skippedCount,
+        duration: result.duration,
+        results: result.results.map((r) => ({
+          platformId: r.platformId,
+          platformName: r.platformName,
+          success: r.success,
+          status: r.status,
+          entriesAdded: r.entriesAdded,
+          entriesUpdated: r.entriesUpdated,
+          error: r.error,
+        })),
+      },
+      { meta: { requestId, duration }, message: 'Sync completed' }
     );
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    log.error('POST sync failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to trigger sync', requestId), requestId);
   }
 }
+
+// =============================================================================
+// ROUTE CONFIGURATION
+// =============================================================================
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes for long syncs

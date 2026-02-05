@@ -7,6 +7,8 @@ import { writeFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 

@@ -1,282 +1,403 @@
-// src/app/api/admin/feature-flags/[id]/route.ts
+// =============================================================================
+// api/admin/feature-flags/[id]/route.ts
+// =============================================================================
+// Description: Admin feature flag management by ID
+// Methods: GET, PUT, PATCH, DELETE, OPTIONS
+// Auth Required: Yes (Admin only)
+// Rate Limit: 50 requests/minute
+// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { SubscriptionTier, Prisma, AuditAction } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { SubscriptionTier } from '@prisma/client';
 
 // =============================================================================
-// CONSTANTS
+// VALIDATION SCHEMAS
 // =============================================================================
 
-const RATE_LIMIT = 100;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
-// =============================================================================
-// VALIDATION
-// =============================================================================
+const paramsSchema = z.object({
+  id: z.string().cuid()
+});
 
 const updateSchema = z.object({
-  name: z.string().min(3).max(200).optional(),
-  description: z.string().max(1000).optional(),
+  name: z.string().min(1).max(200).optional(),
+  description: z.string().max(500).nullable().optional(),
   isEnabled: z.boolean().optional(),
   enabledForAll: z.boolean().optional(),
-  enabledUserIds: z.array(z.string().cuid()).optional(),
+  enabledUserIds: z.array(z.string()).optional(),
   enabledTiers: z.array(z.nativeEnum(SubscriptionTier)).optional(),
   enabledPercentage: z.number().int().min(0).max(100).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.unknown()).nullable().optional(),
 });
 
 // =============================================================================
-// HELPERS
+// HELPER FUNCTIONS
 // =============================================================================
 
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: { limit: number; remaining: number }): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  return response;
-}
-
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `admin-flag-detail:${ip}`);
-
-  if (!rateLimitResult.success) {
-    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
-  }
-
+async function checkAdminAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
-
+  
   if (!session?.user?.id) {
-    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
+    return { error: apiResponse.unauthorized('Authentication required', requestId) };
   }
 
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { error: apiResponse.forbidden('Admin access required', requestId), session: null, rateLimitResult };
+  if (!session.user.isAdmin) {
+    return { error: apiResponse.forbidden('Admin access required', requestId) };
   }
 
-  return { error: null, session, rateLimitResult };
-}
-
-interface RouteContext {
-  params: Promise<{ id: string }>;
+  return { session };
 }
 
 // =============================================================================
-// OPTIONS
+// HTTP METHOD HANDLERS
 // =============================================================================
 
 export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || '*',
+      'Access-Control-Allow-Methods': 'GET, PUT, PATCH, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    }
+  });
 }
 
-// =============================================================================
-// GET - Get single feature flag
-// =============================================================================
-
-export async function GET(request: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { id } = await context.params;
-    const { error, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-
-    const flag = await prisma.featureFlag.findUnique({ where: { id } });
-
-    if (!flag) {
-      return addHeaders(apiResponse.notFound('Feature flag', requestId), requestId, rateLimitResult);
-    }
-
-    logger.info('Feature flag fetched', {
-      flagId: id,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.success(flag, { meta: { requestId } });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('GET admin feature flag failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Failed to fetch feature flag', requestId), requestId);
-  }
-}
-
-// =============================================================================
-// PUT/PATCH - Update feature flag
-// =============================================================================
-
-export async function PUT(request: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
+/**
+ * GET - Get feature flag details (Admin)
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
 
   try {
-    const { id } = await context.params;
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
+    // Auth check
+    const { error, session } = await checkAdminAuth(request, requestId);
+    if (error) return error;
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-
-    const userId = session!.user.id;
-
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
+    // Validate params
+    const validation = paramsSchema.safeParse(params);
+    if (!validation.success) {
+      return apiResponse.validationError(
+        'Invalid feature flag ID',
+        validation.error.errors,
+        requestId
       );
     }
 
+    const { id } = validation.data;
+
+    // Fetch feature flag
+    const flag = await prisma.featureFlag.findUnique({
+      where: { id }
+    });
+
+    if (!flag) {
+      return apiResponse.notFound('Feature flag', requestId);
+    }
+
+    // Get usage stats
+    const [userCount, recentLogs] = await Promise.all([
+      prisma.user.count({
+        where: {
+          id: { in: flag.enabledUserIds }
+        }
+      }),
+      prisma.auditLog.findMany({
+        where: {
+          entityType: 'feature_flag',
+          entityId: id
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          action: true,
+          description: true,
+          userId: true,
+          createdAt: true,
+        }
+      })
+    ]);
+
+    logger.info('Admin fetched feature flag', {
+      requestId,
+      adminId: session!.user.id,
+      flagId: id
+    });
+
+    return apiResponse.success({
+      ...flag,
+      stats: {
+        enabledUserCount: flag.enabledUserIds.length,
+        validUserCount: userCount,
+        enabledTierCount: flag.enabledTiers.length,
+      },
+      recentActivity: recentLogs
+    }, { meta: { requestId } });
+  } catch (error) {
+    logger.error('GET admin/feature-flags/[id] failed', { requestId }, error);
+    return apiResponse.internalError('Failed to fetch feature flag', requestId);
+  }
+}
+
+/**
+ * PUT - Replace feature flag (Admin)
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+
+  try {
+    // Auth check
+    const { error, session } = await checkAdminAuth(request, requestId);
+    if (error) return error;
+
+    // Validate params
+    const paramsValidation = paramsSchema.safeParse(params);
+    if (!paramsValidation.success) {
+      return apiResponse.validationError(
+        'Invalid feature flag ID',
+        paramsValidation.error.errors,
+        requestId
+      );
+    }
+
+    const { id } = paramsValidation.data;
+
+    // Parse body (requires all fields for PUT)
+    const body = await request.json();
+    const fullUpdateSchema = updateSchema.required();
+    const validation = fullUpdateSchema.safeParse(body);
+
+    if (!validation.success) {
+      return apiResponse.validationError(
+        'Invalid request body - all fields required for PUT',
+        validation.error.errors,
+        requestId
+      );
+    }
+
+    const data = validation.data;
+
+    // Check if exists
+    const existing = await prisma.featureFlag.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return apiResponse.notFound('Feature flag', requestId);
+    }
+
+    // Update feature flag
+    const flag = await prisma.featureFlag.update({
+      where: { id },
+      data: {
+        name: data.name,
+        description: data.description,
+        isEnabled: data.isEnabled,
+        enabledForAll: data.enabledForAll,
+        enabledUserIds: data.enabledUserIds,
+        enabledTiers: data.enabledTiers,
+        enabledPercentage: data.enabledPercentage,
+        metadata: data.metadata || {},
+      }
+    });
+
+    // Log admin action
+    await prisma.auditLog.create({
+      data: {
+        userId: session!.user.id,
+        action: 'UPDATE',
+        category: 'feature_flags',
+        entityType: 'feature_flag',
+        entityId: id,
+        description: `Updated feature flag: ${existing.key}`,
+        oldValue: existing,
+        newValue: flag,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
+    });
+
+    logger.info('Feature flag updated (PUT)', {
+      requestId,
+      adminId: session!.user.id,
+      flagId: id
+    });
+
+    return apiResponse.success(flag, { meta: { requestId } });
+  } catch (error) {
+    logger.error('PUT admin/feature-flags/[id] failed', { requestId }, error);
+    return apiResponse.internalError('Failed to update feature flag', requestId);
+  }
+}
+
+/**
+ * PATCH - Partially update feature flag (Admin)
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+
+  try {
+    // Auth check
+    const { error, session } = await checkAdminAuth(request, requestId);
+    if (error) return error;
+
+    // Validate params
+    const paramsValidation = paramsSchema.safeParse(params);
+    if (!paramsValidation.success) {
+      return apiResponse.validationError(
+        'Invalid feature flag ID',
+        paramsValidation.error.errors,
+        requestId
+      );
+    }
+
+    const { id } = paramsValidation.data;
+
+    // Parse body
+    const body = await request.json();
     const validation = updateSchema.safeParse(body);
 
     if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+      return apiResponse.validationError(
+        'Invalid request body',
+        validation.error.errors,
+        requestId
       );
     }
 
-    const currentFlag = await prisma.featureFlag.findUnique({ where: { id } });
+    const data = validation.data;
 
-    if (!currentFlag) {
-      return addHeaders(apiResponse.notFound('Feature flag', requestId), requestId, rateLimitResult);
+    // Check if exists
+    const existing = await prisma.featureFlag.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return apiResponse.notFound('Feature flag', requestId);
     }
 
-    const updated = await prisma.featureFlag.update({
+    // Update feature flag
+    const flag = await prisma.featureFlag.update({
       where: { id },
-      data: { ...validation.data, updatedAt: new Date() },
+      data
     });
 
-    // Audit log
+    // Log admin action
     await prisma.auditLog.create({
       data: {
-        userId,
-        action: 'UPDATE' as AuditAction,
-        category: 'admin',
-        entityType: 'featureFlag',
+        userId: session!.user.id,
+        action: 'UPDATE',
+        category: 'feature_flags',
+        entityType: 'feature_flag',
         entityId: id,
-        description: `Updated feature flag: ${updated.key}`,
-        oldValue: currentFlag as unknown as Prisma.InputJsonValue,
-        newValue: updated as unknown as Prisma.InputJsonValue,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
+        description: `Partially updated feature flag: ${existing.key}`,
+        oldValue: existing,
+        newValue: flag,
+        changes: data,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
     });
 
-    logger.info('Feature flag updated', {
-      flagId: id,
-      adminId: userId,
-      changes: Object.keys(validation.data),
+    logger.info('Feature flag updated (PATCH)', {
       requestId,
-      duration: Date.now() - startTime,
+      adminId: session!.user.id,
+      flagId: id,
+      changes: Object.keys(data)
     });
 
-    const response = apiResponse.success(updated, { meta: { requestId } });
-    return addHeaders(response, requestId, rateLimitResult);
+    return apiResponse.success(flag, { meta: { requestId } });
   } catch (error) {
-    logger.error('PUT admin feature flag failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Failed to update feature flag', requestId), requestId);
+    logger.error('PATCH admin/feature-flags/[id] failed', { requestId }, error);
+    return apiResponse.internalError('Failed to update feature flag', requestId);
   }
 }
 
-export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
-  return PUT(request, context);
-}
-
-// =============================================================================
-// DELETE - Delete feature flag
-// =============================================================================
-
-export async function DELETE(request: NextRequest, context: RouteContext): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
+/**
+ * DELETE - Delete feature flag (Admin)
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
 
   try {
-    const { id } = await context.params;
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
+    // Auth check
+    const { error, session } = await checkAdminAuth(request, requestId);
+    if (error) return error;
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    // Validate params
+    const validation = paramsSchema.safeParse(params);
+    if (!validation.success) {
+      return apiResponse.validationError(
+        'Invalid feature flag ID',
+        validation.error.errors,
+        requestId
+      );
     }
 
-    const userId = session!.user.id;
+    const { id } = validation.data;
 
-    const flag = await prisma.featureFlag.findUnique({ where: { id } });
+    // Check if exists
+    const existing = await prisma.featureFlag.findUnique({
+      where: { id }
+    });
 
-    if (!flag) {
-      return addHeaders(apiResponse.notFound('Feature flag', requestId), requestId, rateLimitResult);
+    if (!existing) {
+      return apiResponse.notFound('Feature flag', requestId);
     }
 
-    await prisma.featureFlag.delete({ where: { id } });
+    // Delete feature flag
+    await prisma.featureFlag.delete({
+      where: { id }
+    });
 
-    // Audit log
+    // Log admin action
     await prisma.auditLog.create({
       data: {
-        userId,
-        action: 'DELETE' as AuditAction,
-        category: 'admin',
-        entityType: 'featureFlag',
+        userId: session!.user.id,
+        action: 'DELETE',
+        category: 'feature_flags',
+        entityType: 'feature_flag',
         entityId: id,
-        description: `Deleted feature flag: ${flag.key}`,
-        oldValue: flag as unknown as Prisma.InputJsonValue,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
+        description: `Deleted feature flag: ${existing.key}`,
+        oldValue: existing,
+        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
+        userAgent: request.headers.get('user-agent'),
+      }
     });
 
     logger.info('Feature flag deleted', {
-      flagId: id,
-      adminId: userId,
       requestId,
-      duration: Date.now() - startTime,
+      adminId: session!.user.id,
+      flagId: id,
+      key: existing.key
     });
 
-    const response = apiResponse.success({ message: 'Feature flag deleted' }, { meta: { requestId } });
-    return addHeaders(response, requestId, rateLimitResult);
+    return apiResponse.success(
+      { message: 'Feature flag deleted successfully' },
+      { meta: { requestId } }
+    );
   } catch (error) {
-    logger.error('DELETE admin feature flag failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Failed to delete feature flag', requestId), requestId);
+    logger.error('DELETE admin/feature-flags/[id] failed', { requestId }, error);
+    return apiResponse.internalError('Failed to delete feature flag', requestId);
   }
 }
 

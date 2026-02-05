@@ -1,125 +1,85 @@
-// =============================================================================
-// platforms/refresh-token/route.ts
-// =============================================================================
-// Description: Refresh OAuth token for platform
-// Methods: POST
-// Auth Required: True
-// Rate Limit: 30 requests/minute
-// Tags: platform, oauth, token
-// Generated: 2026-02-02T11:57:44.506607
-// =============================================================================
+// src/app/api/platforms/refresh-token/route.ts
+/**
+ * Platform Token Refresh API
+ *
+ * @route POST /api/platforms/refresh-token - Refresh OAuth tokens
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { UnauthorizedError, ValidationError, NotFoundError } from '@/lib/apiError';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { encrypt, encryptJSON } from '@/lib/encryption';
+import type { Prisma } from '@prisma/client';
 
 // =============================================================================
 // CONSTANTS
 // =============================================================================
 
-const RATE_LIMIT = 30;
+const RATE_LIMIT = 20;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
+  'Cache-Control': 'no-store, private',
 };
 
+const log = logger.child({ route: 'platforms/refresh-token' });
+
 // =============================================================================
-// VALIDATION SCHEMAS
+// VALIDATION SCHEMA
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const RefreshTokenSchema = z.object({
+  platformId: z.string().cuid('Invalid platform ID'),
+  accessToken: z.string().min(1, 'Access token is required'),
+  refreshToken: z.string().min(1).optional(),
+  expiresAt: z.string().datetime().optional(),
 });
-
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `platforms-refresh-token:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
 // =============================================================================
-// HTTP METHOD HANDLERS
+// ROUTE HANDLERS
 // =============================================================================
 
 /**
@@ -131,114 +91,166 @@ export async function OPTIONS(): Promise<NextResponse> {
 }
 
 /**
- * HEAD - Resource metadata
+ * POST /api/platforms/refresh-token
+ *
+ * Refresh OAuth tokens for a platform connection
  */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Refresh OAuth token for platform
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Extract platform ID from request
-   * - Get UserPlatform record with stored refresh token
-   * - Check if platform supports OAuth token refresh
-   * - Call platform OAuth endpoint to refresh tokens
-   * - Update stored access token and refresh token
-   * - Update tokenExpiresAt timestamp
-   * - Handle refresh failures (mark as disconnected)
-   * - Return new token expiration info
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    // Authentication
+    const session = await getServerSession(authOptions);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (!session?.user?.id) {
+      throw new UnauthorizedError('Authentication required');
     }
-    
-    const userId = session!.user.id;
 
-    // Parse request body
+    const userId = session.user.id;
+
+    // Rate limiting
+    const rateLimitKey = `platforms:refresh-token:${userId}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    // Parse body
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
+      throw new ValidationError('Invalid JSON body');
     }
 
-    const validation = bodySchema.safeParse(body);
-
+    // Validate
+    const validation = RefreshTokenSchema.safeParse(body);
     if (!validation.success) {
       return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        apiResponse.validationError(
+          'Validation failed',
+          validation.error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+          requestId
+        ),
         requestId,
         rateLimitResult
       );
     }
 
-    const data = validation.data;
+    const { platformId, accessToken, refreshToken, expiresAt } = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Check if connection exists
+    const connection = await prisma.userPlatform.findUnique({
+      where: {
+        userId_platformId: { userId, platformId },
+      },
+      include: {
+        platform: {
+          select: {
+            name: true,
+            authType: true,
+          },
+        },
+      },
+    });
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    if (!connection) {
+      throw new NotFoundError('Platform connection');
+    }
 
-    logger.info('POST platforms/refresh-token completed', {
+    if (connection.platform.authType !== 'OAUTH') {
+      throw new ValidationError('Token refresh is only available for OAuth platforms');
+    }
+
+    // Encrypt tokens
+    const encryptedAccessToken = encrypt(accessToken);
+    const encryptedRefreshToken = refreshToken ? encrypt(refreshToken) : undefined;
+
+    // Build credentials JSON
+    const credentialsData = {
+      access_token: accessToken,
+      refresh_token: refreshToken ?? connection.refreshToken ?? '',
+      expires_at: expiresAt ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Update connection
+    const updateData: Prisma.UserPlatformUpdateInput = {
+      accessToken: encryptedAccessToken,
+      tokenExpiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      connectionStatus: 'connected',
+      connectionError: null,
+      updatedAt: new Date(),
+      credentials: encryptJSON(credentialsData) as unknown as Prisma.InputJsonValue,
+    };
+
+    if (encryptedRefreshToken) {
+      updateData.refreshToken = encryptedRefreshToken;
+    }
+
+    const updated = await prisma.userPlatform.update({
+      where: {
+        userId_platformId: { userId, platformId },
+      },
+      data: updateData,
+      select: {
+        id: true,
+        platformId: true,
+        tokenExpiresAt: true,
+        connectionStatus: true,
+        updatedAt: true,
+      },
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'UPDATE',
+        category: 'platform',
+        entityType: 'user_platform',
+        entityId: connection.id,
+        description: `Refreshed OAuth tokens for ${connection.platform.name}`,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent') || undefined,
+      },
+    });
+
+    log.info('Platform tokens refreshed', {
       userId,
+      platformId,
+      platformName: connection.platform.name,
       requestId,
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
+    return addHeaders(
+      apiResponse.success(
+        {
+          refreshed: true,
+          platform: {
+            id: platformId,
+            name: connection.platform.name,
+          },
+          tokenExpiresAt: updated.tokenExpiresAt,
+          connectionStatus: updated.connectionStatus,
+          updatedAt: updated.updatedAt,
+        },
+        { meta: { requestId, message: 'Tokens refreshed successfully' } }
+      ),
+      requestId,
+      rateLimitResult
+    );
   } catch (error) {
-    logger.error('POST platforms/refresh-token failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    log.error('Error refreshing tokens', { requestId }, error);
+    return addHeaders(apiResponse.error(error, requestId), requestId);
   }
 }
-
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -246,8 +258,3 @@ export async function POST(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

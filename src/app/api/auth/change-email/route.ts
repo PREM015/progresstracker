@@ -1,84 +1,278 @@
-// app/api/auth/change-email/route.ts
+// src/app/api/auth/change-email/route.ts
+// Request email change (requires verification of both old and new email)
+
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import crypto from 'crypto';
 
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { sendEmail } from '@/lib/email'; // <-- You need a generic email sender function
+import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { sendEmail } from '@/lib/email';
 
-const ChangeEmailSchema = z.object({
-  oldEmail: z.string().email('Invalid old email'),
-  newEmail: z.string().email('Invalid new email'),
-});
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
 
 const CONSTANT_TIME_MS = 250;
 const MAX_PAYLOAD_SIZE = 1024;
+const TOKEN_EXPIRY_HOURS = 1;
 
-function hashToken(token: string) {
+// Disposable email domains
+const DISPOSABLE_DOMAINS = new Set([
+  'tempmail.com', 'throwaway.email', 'guerrillamail.com', 'mailinator.com',
+  '10minutemail.com', 'temp-mail.org', 'fakeinbox.com', 'sharklasers.com',
+  'yopmail.com', 'trashmail.com', 'getairmail.com', 'mohmal.com',
+]);
+
+// =============================================================================
+// SCHEMAS
+// =============================================================================
+
+const ChangeEmailSchema = z.object({
+  newEmail: z
+    .string()
+    .email('Invalid email format')
+    .max(255)
+    .transform((e) => e.toLowerCase().trim()),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .max(128),
+});
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
+}
+
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
+}
+
+function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-async function constantTimeDelay(start: number) {
+async function constantTimeDelay(start: number): Promise<void> {
   const elapsed = Date.now() - start;
   const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
-  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
+  }
 }
 
-function secureResponse(body: object, status: number) {
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
   const res = NextResponse.json(body, { status });
-  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.headers.set('Pragma', 'no-cache');
+  res.headers.set('X-Request-ID', requestId);
   res.headers.set('X-Content-Type-Options', 'nosniff');
   res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
   return res;
 }
 
-export async function POST(req: NextRequest) {
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return DISPOSABLE_DOMAINS.has(domain);
+}
+
+// =============================================================================
+// POST - Request Email Change
+// =============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
   const start = Date.now();
+  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
+  const userAgent = req.headers.get('user-agent');
+
   try {
-    if (!req.headers.get('content-type')?.includes('application/json')) {
-      return secureResponse({ error: 'Content-Type must be application/json' }, 415);
+    // Get session
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        401,
+        requestId
+      );
     }
 
+    const userId = session.user.id;
+
+    // Rate limiting
+    const rateLimitKey = `change-email:${userId}`;
+    const rateLimitResult = await checkLimit(authRateLimiter, 3, rateLimitKey);
+
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests. Please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
+      );
+    }
+
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse body
     const raw = await req.text();
-    if (raw.length > MAX_PAYLOAD_SIZE) return secureResponse({ error: 'Payload too large' }, 413);
+    if (raw.length > MAX_PAYLOAD_SIZE) {
+      return secureResponse(
+        { success: false, error: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
+    }
 
     let body: unknown;
     try {
       body = JSON.parse(raw);
     } catch {
-      return secureResponse({ error: 'Invalid JSON' }, 400);
+      return secureResponse(
+        { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+        400,
+        requestId
+      );
     }
 
     const parsed = ChangeEmailSchema.safeParse(body);
-    if (!parsed.success) return secureResponse({ error: 'Invalid request payload' }, 400);
+    if (!parsed.success) {
+      const errors = parsed.error.errors.map((e) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      }));
+      return secureResponse(
+        { success: false, error: 'Validation failed', code: 'VALIDATION_ERROR', details: errors },
+        400,
+        requestId
+      );
+    }
 
-    const { oldEmail, newEmail } = parsed.data;
+    const { newEmail, password } = parsed.data;
 
-    const user = await prisma.user.findUnique({ where: { email: oldEmail } });
-    if (!user) {
+    // Get user with password
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        isActive: true,
+        isBanned: true,
+      },
+    });
+
+    if (!user || !user.isActive || user.isBanned) {
       await constantTimeDelay(start);
-      return secureResponse({ message: 'If an account exists, an email change request was sent.' }, 200);
+      return secureResponse(
+        { success: false, error: 'Account not found or inactive', code: 'ACCOUNT_INACTIVE' },
+        403,
+        requestId
+      );
     }
 
-    if (oldEmail === newEmail) {
-      return secureResponse({ error: 'New email must be different from old email' }, 400);
+    // Check if user has password (OAuth users may not)
+    if (!user.password) {
+      return secureResponse(
+        { success: false, error: 'Cannot change email for OAuth-only accounts. Please set a password first.', code: 'NO_PASSWORD' },
+        400,
+        requestId
+      );
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email: newEmail } });
+    // Verify password
+    const bcrypt = await import('bcryptjs');
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) {
+      logger.warn('Email change failed - invalid password', { userId, ip: clientIP, requestId });
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Incorrect password', code: 'INVALID_PASSWORD' },
+        401,
+        requestId
+      );
+    }
+
+    // Check if same email
+    if (user.email === newEmail) {
+      return secureResponse(
+        { success: false, error: 'New email must be different from current email', code: 'SAME_EMAIL' },
+        400,
+        requestId
+      );
+    }
+
+    // Check for disposable email
+    if (isDisposableEmail(newEmail)) {
+      return secureResponse(
+        { success: false, error: 'Disposable email addresses are not allowed', code: 'DISPOSABLE_EMAIL' },
+        400,
+        requestId
+      );
+    }
+
+    // Check if new email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: newEmail },
+      select: { id: true },
+    });
+
     if (existingUser) {
-      return secureResponse({ error: 'Email already in use' }, 409);
+      return secureResponse(
+        { success: false, error: 'This email is already in use', code: 'EMAIL_EXISTS' },
+        409,
+        requestId
+      );
     }
 
+    // Check for pending email change requests
+    const pendingRequest = await prisma.emailChangeRequest.findFirst({
+      where: {
+        userId,
+        completedAt: null,
+        cancelledAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (pendingRequest) {
+      // Cancel existing request
+      await prisma.emailChangeRequest.update({
+        where: { id: pendingRequest.id },
+        data: { cancelledAt: new Date() },
+      });
+    }
+
+    // Generate tokens
     const oldEmailToken = crypto.randomBytes(48).toString('hex');
     const newEmailToken = crypto.randomBytes(48).toString('hex');
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
 
+    // Create email change request
     await prisma.emailChangeRequest.create({
       data: {
-        userId: user.id,
-        oldEmail,
+        userId,
+        oldEmail: user.email!,
         newEmail,
         oldEmailToken: hashToken(oldEmailToken),
         newEmailToken: hashToken(newEmailToken),
@@ -86,40 +280,240 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // === SEND EMAILS ===
-    try {
-      await sendEmail({
-        to: oldEmail,
-        subject: 'Confirm your email change (old email)',
-        html: `<p>Hello ${user.name || 'User'},</p>
-               <p>We received a request to change your email to <strong>${newEmail}</strong>.</p>
-               <p>Click the link below to confirm you want to keep your old email:</p>
-               <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm-email-change?token=${oldEmailToken}&type=old">Confirm Old Email</a></p>
-               <p>If you did not request this change, ignore this email.</p>`,
-      });
+    // Send confirmation emails
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-      await sendEmail({
-        to: newEmail,
-        subject: 'Confirm your new email',
-        html: `<p>Hello ${user.name || 'User'},</p>
-               <p>You requested to change your email from <strong>${oldEmail}</strong> to this email.</p>
-               <p>Click the link below to confirm your new email:</p>
-               <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm-email-change?token=${newEmailToken}&type=new">Confirm New Email</a></p>
-               <p>If you did not request this change, ignore this email.</p>`,
-      });
-    } catch (emailError) {
-      logger.error('Failed to send change email notifications', { emailError });
-    }
+    // Email to old address
+    sendEmail({
+      to: user.email!,
+      subject: 'Confirm Email Change Request',
+      html: `
+        <h1>Email Change Request</h1>
+        <p>Hi ${user.name || 'there'},</p>
+        <p>We received a request to change your email address to <strong>${newEmail}</strong>.</p>
+        <p>If you made this request, please confirm by clicking the link below:</p>
+        <p><a href="${baseUrl}/auth/confirm-email-change?token=${oldEmailToken}&type=old" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Confirm from Old Email</a></p>
+        <p>This link will expire in ${TOKEN_EXPIRY_HOURS} hour(s).</p>
+        <p>If you did not request this change, please ignore this email and consider changing your password.</p>
+        <p>Request details:</p>
+        <ul>
+          <li>IP Address: ${clientIP}</li>
+          <li>Time: ${new Date().toISOString()}</li>
+        </ul>
+      `,
+    }).catch((err) => {
+      logger.error('Failed to send old email confirmation', { userId, requestId }, err);
+    });
+
+    // Email to new address
+    sendEmail({
+      to: newEmail,
+      subject: 'Confirm Your New Email Address',
+      html: `
+        <h1>Confirm Your Email</h1>
+        <p>Hi ${user.name || 'there'},</p>
+        <p>Someone is trying to change their account email to this address.</p>
+        <p>If this was you, please confirm by clicking the link below:</p>
+        <p><a href="${baseUrl}/auth/confirm-email-change?token=${newEmailToken}&type=new" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Confirm New Email</a></p>
+        <p>This link will expire in ${TOKEN_EXPIRY_HOURS} hour(s).</p>
+        <p>If you did not request this, please ignore this email.</p>
+      `,
+    }).catch((err) => {
+      logger.error('Failed to send new email confirmation', { userId, newEmail, requestId }, err);
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'EMAIL_CHANGE',
+        category: 'auth',
+        entityType: 'user',
+        entityId: userId,
+        description: 'Email change requested',
+        ipAddress: clientIP,
+        userAgent: userAgent?.slice(0, 255),
+        status: 'success',
+        newValue: { newEmail },
+      },
+    });
+
+    logger.info('Email change requested', {
+      userId,
+      oldEmail: user.email,
+      newEmail,
+      ip: clientIP,
+      requestId,
+    });
 
     await constantTimeDelay(start);
-    return secureResponse({ message: 'If an account exists, an email change request was sent.' }, 200);
+    return secureResponse(
+      {
+        success: true,
+        message: 'Verification emails sent. Please check both your current and new email addresses.',
+        expiresAt: expiresAt.toISOString(),
+      },
+      200,
+      requestId
+    );
+
   } catch (error) {
-    logger.error('Change email error', { error });
+    logger.error('Change email error', { ip: clientIP, requestId }, error);
     await constantTimeDelay(start);
-    return secureResponse({ error: 'Something went wrong' }, 500);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
-export async function GET() { return secureResponse({ error: 'Method not allowed' }, 405); }
-export async function PUT() { return secureResponse({ error: 'Method not allowed' }, 405); }
-export async function DELETE() { return secureResponse({ error: 'Method not allowed' }, 405); }
+// =============================================================================
+// GET - Get Pending Email Change Status
+// =============================================================================
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
+  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
+
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        401,
+        requestId
+      );
+    }
+
+    const pendingRequest = await prisma.emailChangeRequest.findFirst({
+      where: {
+        userId: session.user.id,
+        completedAt: null,
+        cancelledAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      select: {
+        id: true,
+        newEmail: true,
+        oldEmailVerified: true,
+        newEmailVerified: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+    });
+
+    await constantTimeDelay(start);
+    return secureResponse(
+      {
+        success: true,
+        hasPendingRequest: !!pendingRequest,
+        pendingRequest: pendingRequest ? {
+          id: pendingRequest.id,
+          newEmail: pendingRequest.newEmail,
+          oldEmailVerified: pendingRequest.oldEmailVerified,
+          newEmailVerified: pendingRequest.newEmailVerified,
+          expiresAt: pendingRequest.expiresAt,
+          createdAt: pendingRequest.createdAt,
+        } : null,
+      },
+      200,
+      requestId
+    );
+
+  } catch (error) {
+    logger.error('Get email change status error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
+  }
+}
+
+// =============================================================================
+// DELETE - Cancel Pending Email Change
+// =============================================================================
+
+export async function DELETE(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
+  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
+
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Authentication required', code: 'UNAUTHORIZED' },
+        401,
+        requestId
+      );
+    }
+
+    const result = await prisma.emailChangeRequest.updateMany({
+      where: {
+        userId: session.user.id,
+        completedAt: null,
+        cancelledAt: null,
+      },
+      data: {
+        cancelledAt: new Date(),
+      },
+    });
+
+    logger.info('Email change cancelled', { userId: session.user.id, count: result.count, requestId });
+
+    await constantTimeDelay(start);
+    return secureResponse(
+      {
+        success: true,
+        message: result.count > 0 ? 'Email change request cancelled' : 'No pending request found',
+        cancelled: result.count,
+      },
+      200,
+      requestId
+    );
+
+  } catch (error) {
+    logger.error('Cancel email change error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Something went wrong', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
+  }
+}
+
+// =============================================================================
+// OTHER METHODS
+// =============================================================================
+
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

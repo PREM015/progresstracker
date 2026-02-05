@@ -11,10 +11,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -172,9 +171,9 @@ export async function GET(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    const resolvedParams = await params;
-    const { id }} = resolvedParams;
-    const userId = session!.user.id;
+ const { id } = await params;
+const userId = session!.user.id;
+
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
@@ -229,7 +228,7 @@ export async function GET(
 
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET goals/[id]/stats failed', { requestId }, error);
+    logger.error('GET goals/[id]/stats failed', { }, error);
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }

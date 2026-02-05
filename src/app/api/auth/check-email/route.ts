@@ -1,337 +1,291 @@
-// =============================================================================
-// auth/check-email/route.ts
-// =============================================================================
-// Description: Check if email is available
-// Methods: GET, POST
-// Auth Required: False
-// Rate Limit: 20 requests/minute
-// Tags: auth, validation
-// Generated: 2026-02-02T11:57:44.498025
-// =============================================================================
+// src/app/api/auth/check-email/route.ts
+// Check if email is available for registration
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { z } from 'zod';
+import crypto from 'crypto';
+
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
 // =============================================================================
-// CONSTANTS
+// CONFIGURATION
 // =============================================================================
 
-const RATE_LIMIT = 20;
+const CONSTANT_TIME_MS = 150;
+const MAX_PAYLOAD_SIZE = 512;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+// Disposable email domains
+const DISPOSABLE_DOMAINS = new Set([
+  'tempmail.com', 'throwaway.email', 'guerrillamail.com', 'mailinator.com',
+  '10minutemail.com', 'temp-mail.org', 'fakeinbox.com', 'sharklasers.com',
+  'yopmail.com', 'trashmail.com', 'getairmail.com', 'mohmal.com',
+]);
 
 // =============================================================================
-// VALIDATION SCHEMAS
+// SCHEMAS
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+const CheckEmailSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email format')
+    .max(255)
+    .transform((e) => e.toLowerCase().trim()),
 });
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const QuerySchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email format')
+    .max(255)
+    .transform((e) => e.toLowerCase().trim()),
 });
 
-
 // =============================================================================
-// HELPER FUNCTIONS
+// HELPERS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
+  return `req_${Date.now().toString(36)}_${crypto.randomBytes(8).toString('hex')}`;
 }
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+function getClientIP(req: NextRequest): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+  );
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+async function constantTimeDelay(start: number): Promise<void> {
+  const elapsed = Date.now() - start;
+  const remaining = Math.max(0, CONSTANT_TIME_MS - elapsed);
+  if (remaining > 0) {
+    await new Promise((r) => setTimeout(r, remaining));
+  }
+}
+
+function secureResponse(body: object, status: number, requestId: string): NextResponse {
+  const res = NextResponse.json(body, { status });
+  res.headers.set('X-Request-ID', requestId);
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.headers.set('Pragma', 'no-cache');
+  return res;
+}
+
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  return DISPOSABLE_DOMAINS.has(domain);
+}
+
+async function checkEmailAvailability(email: string): Promise<{
+  available: boolean;
+  reason?: string;
+}> {
+  // Check disposable email
+  if (isDisposableEmail(email)) {
+    return { available: false, reason: 'disposable_email' };
+  }
+
+  // Check if email exists in database
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
   });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `auth-check-email:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
+  if (existingUser) {
+    return { available: false, reason: 'already_registered' };
   }
 
-  
-  return { error: null, session: null, rateLimitResult };
+  return { available: true };
 }
 
 // =============================================================================
-// HTTP METHOD HANDLERS
+// GET - Check email via query parameter
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
   const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
+  const clientIP = getClientIP(req);
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
+    // Rate limiting
+    const rateLimitKey = `check-email:${clientIP}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
 
-/**
- * GET - Check if email is available
- * 
- * TODO Implementation Checklist:
-   * - Extract email from query params (GET) or body (POST)
-   * - Validate email format using zod email validator
-   * - Check against disposable email domains list
-   * - Query database for existing email (case-insensitive)
-   * - Return availability status (generic message for security)
-   * - Implement rate limiting to prevent enumeration attacks
-   * - Always return same response time (prevent timing attacks)
-   * - Log suspicious enumeration attempts
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    
-
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
-
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
       );
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
-
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
-
-    logger.info('GET auth/check-email completed', {
-      
-      page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
+    // Parse query parameter
+    const { searchParams } = new URL(req.url);
+    const parsed = QuerySchema.safeParse({
+      email: searchParams.get('email'),
     });
 
-    const response = apiResponse.paginated(
-      data,
+    if (!parsed.success) {
+      return secureResponse(
+        { success: false, error: 'Valid email is required', code: 'VALIDATION_ERROR' },
+        400,
+        requestId
+      );
+    }
+
+    const { email } = parsed.data;
+
+    const result = await checkEmailAvailability(email);
+
+    await constantTimeDelay(start);
+
+    return secureResponse(
       {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
+        success: true,
+        email,
+        available: result.available,
+        ...(result.reason && { reason: result.reason }),
       },
-      { meta: { requestId } }
+      200,
+      requestId
     );
 
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET auth/check-email failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Check email error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Internal error', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
-/**
- * POST - Check if email is available
- * 
- * TODO Implementation Checklist:
-   * - Extract email from query params (GET) or body (POST)
-   * - Validate email format using zod email validator
-   * - Check against disposable email domains list
-   * - Query database for existing email (case-insensitive)
-   * - Return availability status (generic message for security)
-   * - Implement rate limiting to prevent enumeration attacks
-   * - Always return same response time (prevent timing attacks)
-   * - Log suspicious enumeration attempts
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// POST - Check email via body
+// =============================================================================
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const start = Date.now();
   const requestId = generateRequestId();
-  const startTime = Date.now();
+  const clientIP = getClientIP(req);
 
   try {
-    const { error, rateLimitResult } = await validateSession(request, requestId);
+    // Rate limiting
+    const rateLimitKey = `check-email:${clientIP}`;
+    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (!rateLimitResult.success) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
+        429,
+        requestId
+      );
     }
-    
-    
 
-    // Parse request body
+    // Content-Type validation
+    if (!req.headers.get('content-type')?.includes('application/json')) {
+      return secureResponse(
+        { success: false, error: 'Content-Type must be application/json', code: 'INVALID_CONTENT_TYPE' },
+        415,
+        requestId
+      );
+    }
+
+    // Parse body
+    const raw = await req.text();
+    if (raw.length > MAX_PAYLOAD_SIZE) {
+      return secureResponse(
+        { success: false, error: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' },
+        413,
+        requestId
+      );
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(raw);
     } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
+      return secureResponse(
+        { success: false, error: 'Invalid JSON', code: 'INVALID_JSON' },
+        400,
+        requestId
       );
     }
 
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
+    const parsed = CheckEmailSchema.safeParse(body);
+    if (!parsed.success) {
+      return secureResponse(
+        { success: false, error: 'Valid email is required', code: 'VALIDATION_ERROR' },
+        400,
+        requestId
       );
     }
 
-    const data = validation.data;
+    const { email } = parsed.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    const result = await checkEmailAvailability(email);
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    await constantTimeDelay(start);
 
-    logger.info('POST auth/check-email completed', {
-      
-      requestId,
-      duration: Date.now() - startTime,
-    });
+    return secureResponse(
+      {
+        success: true,
+        email,
+        available: result.available,
+        ...(result.reason && { reason: result.reason }),
+      },
+      200,
+      requestId
+    );
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST auth/check-email failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('Check email error', { ip: clientIP, requestId }, error);
+    await constantTimeDelay(start);
+    return secureResponse(
+      { success: false, error: 'Internal error', code: 'INTERNAL_ERROR' },
+      500,
+      requestId
+    );
   }
 }
 
+// =============================================================================
+// OTHER METHODS
+// =============================================================================
 
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
+export async function PUT(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function PATCH(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function DELETE(): Promise<NextResponse> {
+  return secureResponse({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }, 405, generateRequestId());
+}
+
+export async function OPTIONS(): Promise<NextResponse> {
+  const res = new NextResponse(null, { status: 204 });
+  res.headers.set('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || '*');
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.headers.set('Access-Control-Allow-Headers', 'Content-Type');
+  return res;
+}
+
+export async function HEAD(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200 });
+}
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-

@@ -1,13 +1,15 @@
+// src/app/api/user/onboarding/route.ts
 // =============================================================================
-// user/onboarding/route.ts
+// USER ONBOARDING ROUTES
 // =============================================================================
-// Description: Get/update onboarding status
-// Methods: GET, PUT
+// Description: Manage user onboarding status and progress
+// Methods: GET, PUT, PATCH, OPTIONS, HEAD
 // Auth Required: True
 // Rate Limit: 30 requests/minute
-// Tags: user, onboarding
-// Generated: 2026-02-02T11:57:44.503864
 // =============================================================================
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -24,252 +26,397 @@ import apiResponse from '@/lib/apiResponse';
 
 const RATE_LIMIT = 30;
 
-const CORS_HEADERS = {
+const ONBOARDING_STEPS = [
+  'welcome',
+  'profile',
+  'platforms',
+  'goals',
+  'preferences',
+  'complete',
+] as const;
+
+type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Methods': 'GET, PUT, PATCH, OPTIONS, HEAD',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
+  'Access-Control-Max-Age': '86400',
 };
 
-const SECURITY_HEADERS = {
+const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
+  'Cache-Control': 'private, max-age=60',
 };
 
 // =============================================================================
 // VALIDATION SCHEMAS
 // =============================================================================
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+const updateOnboardingSchema = z.object({
+  currentStep: z.enum(ONBOARDING_STEPS).optional(),
+  completedSteps: z.array(z.enum(ONBOARDING_STEPS)).optional(),
+  stepData: z.record(z.unknown()).optional(),
+  skipped: z.boolean().optional(),
 });
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const patchOnboardingSchema = z.object({
+  step: z.enum(ONBOARDING_STEPS),
+  completed: z.boolean().default(true),
+  data: z.record(z.unknown()).optional(),
 });
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface OnboardingState {
+  isComplete: boolean;
+  currentStep: OnboardingStep;
+  completedSteps: OnboardingStep[];
+  skipped: boolean;
+  progress: number;
+  stepData: Record<string, unknown>;
+  startedAt: Date | null;
+  completedAt: Date | null;
+}
+
+// Type for JSON-safe onboarding data
+interface OnboardingJsonData {
+  onboarding: Prisma.JsonObject;
+  onboardingCurrentStep: OnboardingStep;
+  onboardingSkipped: boolean;
+  onboardingUpdatedAt: string;
+}
 
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
 }
 
-/**
- * Add standard headers to response
- */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
 async function validateSession(request: NextRequest, requestId: string) {
   const ip = getClientIp(request);
   const rateLimitKey = `user-onboarding:${ip}`;
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult,
+      ip,
     };
   }
 
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult,
+      ip,
     };
   }
 
-  return { error: null, session, rateLimitResult };
+  return { error: null, session, rateLimitResult, ip };
+}
+
+/**
+ * Converts a Record<string, unknown> to a Prisma-compatible JsonObject
+ * by serializing and deserializing through JSON
+ */
+function toJsonObject(data: Record<string, unknown>): Prisma.JsonObject {
+  // Serialize and parse to ensure JSON compatibility
+  return JSON.parse(JSON.stringify(data)) as Prisma.JsonObject;
+}
+
+async function getOnboardingState(userId: string): Promise<OnboardingState> {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: {
+      dashboardLayout: true,
+      showWelcomeBanner: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      name: true,
+      username: true,
+      bio: true,
+      image: true,
+      timezone: true,
+      preferredLanguage: true,
+      createdAt: true,
+      _count: {
+        select: {
+          platforms: true,
+          goals: true,
+        },
+      },
+    },
+  });
+
+  // Determine completed steps based on user data
+  const completedSteps: OnboardingStep[] = ['welcome']; // Always completed after signup
+
+  // Check profile step
+  if (user?.name && user?.username) {
+    completedSteps.push('profile');
+  }
+
+  // Check platforms step
+  if (user?._count.platforms && user._count.platforms > 0) {
+    completedSteps.push('platforms');
+  }
+
+  // Check goals step
+  if (user?._count.goals && user._count.goals > 0) {
+    completedSteps.push('goals');
+  }
+
+  // Check preferences step
+  if (user?.timezone && user?.preferredLanguage) {
+    completedSteps.push('preferences');
+  }
+
+  // Check if all steps are complete
+  const isComplete = completedSteps.length >= ONBOARDING_STEPS.length - 1; // -1 because 'complete' is the final step
+  if (isComplete) {
+    completedSteps.push('complete');
+  }
+
+  // Determine current step
+  let currentStep: OnboardingStep = 'welcome';
+  for (const step of ONBOARDING_STEPS) {
+    if (!completedSteps.includes(step)) {
+      currentStep = step;
+      break;
+    }
+  }
+
+  // Calculate progress
+  const progress = Math.round((completedSteps.length / ONBOARDING_STEPS.length) * 100);
+
+  // Get step data from settings - safely cast the JsonValue
+  const dashboardLayout = settings?.dashboardLayout as Prisma.JsonObject | null;
+  const stepData = (dashboardLayout?.onboarding as Record<string, unknown>) || {};
+
+  return {
+    isComplete,
+    currentStep,
+    completedSteps,
+    skipped: dashboardLayout?.onboardingSkipped === true,
+    progress,
+    stepData,
+    startedAt: user?.createdAt || null,
+    completedAt: isComplete ? settings?.updatedAt || null : null,
+  };
+}
+
+async function updateOnboardingState(
+  userId: string,
+  updates: {
+    currentStep?: OnboardingStep;
+    completedSteps?: OnboardingStep[];
+    stepData?: Record<string, unknown>;
+    skipped?: boolean;
+  }
+): Promise<OnboardingState> {
+  // Get current state
+  const currentState = await getOnboardingState(userId);
+
+  // Merge step data
+  const newStepData = {
+    ...currentState.stepData,
+    ...updates.stepData,
+  };
+
+  // Create JSON-safe onboarding data object
+  const onboardingData: OnboardingJsonData = {
+    onboarding: toJsonObject(newStepData),
+    onboardingCurrentStep: updates.currentStep || currentState.currentStep,
+    onboardingSkipped: updates.skipped ?? currentState.skipped,
+    onboardingUpdatedAt: new Date().toISOString(),
+  };
+
+  // Convert the entire object to InputJsonValue
+  const dashboardLayout = toJsonObject(
+    onboardingData as unknown as Record<string, unknown>
+  ) as Prisma.InputJsonValue;
+
+  await prisma.userSettings.upsert({
+    where: { userId },
+    create: {
+      userId,
+      dashboardLayout,
+      showWelcomeBanner: !updates.skipped,
+    },
+    update: {
+      dashboardLayout,
+      showWelcomeBanner: !updates.skipped,
+      updatedAt: new Date(),
+    },
+  });
+
+  // Return updated state
+  return getOnboardingState(userId);
 }
 
 // =============================================================================
-// HTTP METHOD HANDLERS
+// OPTIONS - CORS Preflight
 // =============================================================================
 
-/**
- * OPTIONS - CORS preflight
- */
 export async function OPTIONS(): Promise<NextResponse> {
   const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
+  const response = new NextResponse(null, { status: 204 });
+  return addHeaders(response, requestId);
 }
 
-/**
- * HEAD - Resource metadata
- */
+// =============================================================================
+// HEAD - Check Onboarding Status
+// =============================================================================
+
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return addHeaders(new NextResponse(null, { status: 401 }), requestId);
+    }
+
+    const state = await getOnboardingState(session.user.id);
+
+    const response = new NextResponse(null, {
+      status: 200,
+      headers: {
+        'X-Onboarding-Complete': String(state.isComplete),
+        'X-Onboarding-Progress': String(state.progress),
+        'X-Onboarding-Current-Step': state.currentStep,
+      },
+    });
+
     return addHeaders(response, requestId);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
+    logger.error('HEAD onboarding failed', { requestId }, error);
+    return addHeaders(new NextResponse(null, { status: 500 }), requestId);
   }
 }
 
-/**
- * GET - Get/update onboarding status
- * 
- * TODO Implementation Checklist:
-   * - GET: Check onboarding completion status
-   * - GET: Return completed steps and remaining steps
-   * - GET: Calculate onboarding progress percentage
-   * - PUT: Update specific onboarding step as complete
-   * - Define onboarding steps (profile, platforms, goals, etc.)
-   * - Track step completion timestamps
-   * - Trigger welcome achievements on completion
-   * - Send onboarding reminder emails if incomplete
-   * - Return next recommended action
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// GET - Get Onboarding Status
+// =============================================================================
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    const validation = await validateSession(request, requestId);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (validation.error) {
+      return addHeaders(validation.error, requestId, validation.rateLimitResult);
     }
-    
+
+    const { session, rateLimitResult, ip } = validation;
     const userId = session!.user.id;
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
+    const state = await getOnboardingState(userId);
 
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
+    // Get step requirements
+    const stepRequirements = ONBOARDING_STEPS.map((step) => ({
+      step,
+      completed: state.completedSteps.includes(step),
+      required: step !== 'complete',
+      description: getStepDescription(step),
+    }));
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    // Get recommendations for next step
+    const nextStepRecommendation = getNextStepRecommendation(state.currentStep);
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
-
-    logger.info('GET user/onboarding completed', {
+    logger.debug('Onboarding status fetched', {
       userId,
-      page,
-      total,
+      isComplete: state.isComplete,
+      currentStep: state.currentStep,
+      progress: state.progress,
       requestId,
+      ip,
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.paginated(
-      data,
+    const response = apiResponse.success(
       {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
+        ...state,
+        steps: stepRequirements,
+        nextStepRecommendation,
       },
-      { meta: { requestId } }
+      {
+        meta: { requestId },
+      }
     );
 
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET user/onboarding failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('GET onboarding failed', { requestId }, error);
+    return addHeaders(
+      apiResponse.internalError('Failed to fetch onboarding status', requestId),
+      requestId
+    );
   }
 }
 
-/**
- * PUT - Get/update onboarding status
- * 
- * TODO Implementation Checklist:
-   * - GET: Check onboarding completion status
-   * - GET: Return completed steps and remaining steps
-   * - GET: Calculate onboarding progress percentage
-   * - PUT: Update specific onboarding step as complete
-   * - Define onboarding steps (profile, platforms, goals, etc.)
-   * - Track step completion timestamps
-   * - Trigger welcome achievements on completion
-   * - Send onboarding reminder emails if incomplete
-   * - Return next recommended action
- */
-export async function PUT(
-  request: NextRequest
-): Promise<NextResponse> {
+// =============================================================================
+// PUT - Update Full Onboarding State
+// =============================================================================
+
+export async function PUT(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+    const validation = await validateSession(request, requestId);
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
+    if (validation.error) {
+      return addHeaders(validation.error, requestId, validation.rateLimitResult);
     }
-    
+
+    const { session, rateLimitResult, ip } = validation;
     const userId = session!.user.id;
 
     // Parse request body
@@ -284,44 +431,169 @@ export async function PUT(
       );
     }
 
-    const validation = bodySchema.safeParse(body);
+    const bodyValidation = updateOnboardingSchema.safeParse(body);
 
-    if (!validation.success) {
+    if (!bodyValidation.success) {
       return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
+        apiResponse.validationError('Validation failed', bodyValidation.error.errors, requestId),
         requestId,
         rateLimitResult
       );
     }
 
-    const data = validation.data;
+    const state = await updateOnboardingState(userId, bodyValidation.data);
 
-    // TODO: Implement update logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Validate update is allowed
-    // 4. Update database record
-    // 5. Create audit log with changes
-    // 6. Trigger side effects if needed
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual update
-
-    logger.info('PUT user/onboarding completed', {
+    logger.info('Onboarding state updated', {
       userId,
+      currentStep: state.currentStep,
+      progress: state.progress,
       requestId,
+      ip,
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.success(result, { requestId });
+    const response = apiResponse.success(state, {
+      meta: { requestId },
+      message: 'Onboarding state updated',
+    });
+
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('PUT user/onboarding failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    logger.error('PUT onboarding failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to update onboarding', requestId), requestId);
   }
 }
 
+// =============================================================================
+// PATCH - Mark Step as Complete
+// =============================================================================
+
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  try {
+    const validation = await validateSession(request, requestId);
+
+    if (validation.error) {
+      return addHeaders(validation.error, requestId, validation.rateLimitResult);
+    }
+
+    const { session, rateLimitResult, ip } = validation;
+    const userId = session!.user.id;
+
+    // Parse request body
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return addHeaders(
+        apiResponse.validationError('Invalid JSON body', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const bodyValidation = patchOnboardingSchema.safeParse(body);
+
+    if (!bodyValidation.success) {
+      return addHeaders(
+        apiResponse.validationError('Validation failed', bodyValidation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const { step, completed, data } = bodyValidation.data;
+
+    // Get current state
+    const currentState = await getOnboardingState(userId);
+
+    // Update completed steps
+    let completedSteps = [...currentState.completedSteps];
+    if (completed && !completedSteps.includes(step)) {
+      completedSteps.push(step);
+    } else if (!completed) {
+      completedSteps = completedSteps.filter((s) => s !== step);
+    }
+
+    // Determine next step
+    let nextStep: OnboardingStep = 'complete';
+    for (const s of ONBOARDING_STEPS) {
+      if (!completedSteps.includes(s)) {
+        nextStep = s;
+        break;
+      }
+    }
+
+    // Update state
+    const state = await updateOnboardingState(userId, {
+      currentStep: nextStep,
+      completedSteps,
+      stepData: data ? { [step]: data } : undefined,
+    });
+
+    logger.info('Onboarding step updated', {
+      userId,
+      step,
+      completed,
+      nextStep,
+      progress: state.progress,
+      requestId,
+      ip,
+      duration: Date.now() - startTime,
+    });
+
+    const response = apiResponse.success(
+      {
+        ...state,
+        updatedStep: step,
+        message: completed
+          ? `Step "${step}" marked as complete`
+          : `Step "${step}" marked as incomplete`,
+      },
+      {
+        meta: { requestId },
+      }
+    );
+
+    return addHeaders(response, requestId, rateLimitResult);
+  } catch (error) {
+    logger.error('PATCH onboarding failed', { requestId }, error);
+    return addHeaders(
+      apiResponse.internalError('Failed to update onboarding step', requestId),
+      requestId
+    );
+  }
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+function getStepDescription(step: OnboardingStep): string {
+  const descriptions: Record<OnboardingStep, string> = {
+    welcome: 'Welcome to the platform',
+    profile: 'Complete your profile with name and username',
+    platforms: 'Connect at least one platform',
+    goals: 'Create your first goal',
+    preferences: 'Set your timezone and language',
+    complete: 'Onboarding complete!',
+  };
+  return descriptions[step];
+}
+
+function getNextStepRecommendation(currentStep: OnboardingStep): string {
+  const recommendations: Record<OnboardingStep, string> = {
+    welcome: 'Start by completing your profile to personalize your experience.',
+    profile: 'Connect a platform like GitHub or LeetCode to start tracking.',
+    platforms: 'Create a goal to stay motivated and track your progress.',
+    goals: 'Set your timezone and language preferences for accurate tracking.',
+    preferences: "You're almost done! Review and complete onboarding.",
+    complete: 'Explore the dashboard and start tracking your progress!',
+  };
+  return recommendations[currentStep];
+}
 
 // =============================================================================
 // ROUTE CONFIGURATION
@@ -329,8 +601,3 @@ export async function PUT(
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
