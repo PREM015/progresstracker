@@ -1,147 +1,82 @@
-/**
- * Component: ExportModal
- * Location: components/reports/ExportModal.tsx
- * 
- * Description: Export modal
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/export
-// - /api/export/csv
-// - /api/export/pdf
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - ExportJob
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for ExportJob model
-interface IExportJob {
-  id: string;
-  // Add fields from your Prisma ExportJob model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/export
-const fetchExportModalData = async () => {
-  try {
-    const response = await apiClient.get('/api/export');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/export/csv
-const fetchExportModalData = async () => {
-  try {
-    const response = await apiClient.get('/api/export/csv');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/export/pdf
-const fetchExportModalData = async () => {
-  try {
-    const response = await apiClient.get('/api/export/pdf');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ExportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onExport: (format: string) => Promise<void>;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ExportModal: React.FC<ExportModalProps> = ({
-  className,
+  isOpen,
+  onClose,
+  onExport,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [format, setFormat] = useState<'pdf' | 'csv' | 'xlsx'>('pdf');
+  const [exporting, setExporting] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await onExport(format);
+      onClose();
+    } finally {
+      setExporting(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
+  if (!isOpen) return null;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ExportModal</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className={`bg-white rounded-2xl p-8 max-w-md w-full ${className}`}>
+        <h3 className="text-2xl font-bold mb-6">Export Report</h3>
+
+        <div className="space-y-4 mb-6">
+          <label className="block font-medium mb-3">Select Format</label>
+          {(['pdf', 'csv', 'xlsx'] as const).map(fmt => (
+            <label key={fmt} className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+              <input
+                type="radio"
+                name="format"
+                value={fmt}
+                checked={format === fmt}
+                onChange={(e) => setFormat(e.target.value as any)}
+                className="w-5 h-5"
+              />
+              <div>
+                <div className="font-semibold uppercase">{fmt}</div>
+                <div className="text-sm text-gray-600">
+                  {fmt === 'pdf' && 'Portable Document Format'}
+                  {fmt === 'csv' && 'Comma-Separated Values'}
+                  {fmt === 'xlsx' && 'Excel Spreadsheet'}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {exporting ? 'Exporting...' : 'Export'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ExportModal;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/export
- * - API: /api/export/csv
- * - API: /api/export/pdf
- *  * - Model: ExportJob
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

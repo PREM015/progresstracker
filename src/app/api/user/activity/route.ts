@@ -271,8 +271,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       entityType: activity.entityType,
       entityId: activity.entityId,
       description: activity.description,
-      location: activity.city && activity.country 
-        ? `${activity.city}, ${activity.country}` 
+      location: activity.city && activity.country
+        ? `${activity.city}, ${activity.country}`
         : activity.country || null,
       ipAddress: activity.ipAddress ? maskIpAddress(activity.ipAddress) : null,
       status: activity.status,

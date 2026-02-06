@@ -1,35 +1,21 @@
-import { Metadata } from "next";
+import { ReportExport } from '@/components/admin';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: "Reports | Progress Tracker",
-  description: "Reports page for Progress Tracker application",
-};
-
-interface PageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-export default async function AdminReportsIdPage({ params, searchParams }: PageProps) {
+export default function ReportDetailPage({ params }: { params: { id: string } }) {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Reports</h1>
-      
-      {/* TODO: Implement Reports */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Reports page content goes here.
-        </p>
-        
-        <div className="mt-4 p-4 bg-muted rounded-md">
-          <p className="text-sm font-mono">
-            Debug - Route params:
-            <br />- id: {params.id}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/reports" className="text-zinc-400 hover:text-white">
+          ← Back to Reports
+        </Link>
       </div>
+
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Report Details</h1>
+        <p className="text-zinc-400">View and export report data</p>
+      </div>
+
+      <ReportExport reportType={params.id} />
     </div>
   );
 }

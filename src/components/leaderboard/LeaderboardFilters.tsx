@@ -1,107 +1,45 @@
-/**
- * Component: LeaderboardFilters
- * Location: components/leaderboard/LeaderboardFilters.tsx
- * 
- * Description: Filter controls
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/leaderboard/category/[category]
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/leaderboard/category/[category]
-const fetchLeaderboardFiltersData = async () => {
-  try {
-    const response = await apiClient.get('/api/leaderboard/category/[category]');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface LeaderboardFiltersProps {
+  timeframe: string;
+  category: string;
+  onChange: (filters: { timeframe: string; category: string }) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const LeaderboardFilters: React.FC<LeaderboardFiltersProps> = ({
-  className,
+  timeframe,
+  category,
+  onChange,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>LeaderboardFilters</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`flex gap-4 ${className}`}>
+      <select
+        value={timeframe}
+        onChange={(e) => onChange({ timeframe: e.target.value, category })}
+        className="px-4 py-2 border rounded-lg"
+      >
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="alltime">All Time</option>
+      </select>
+
+      <select
+        value={category}
+        onChange={(e) => onChange({ timeframe, category: e.target.value })}
+        className="px-4 py-2 border rounded-lg"
+      >
+        <option value="overall">Overall</option>
+        <option value="problems">Problems Solved</option>
+        <option value="streak">Longest Streak</option>
+        <option value="hours">Hours Studied</option>
+      </select>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default LeaderboardFilters;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/leaderboard/category/[category]
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

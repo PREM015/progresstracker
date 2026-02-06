@@ -1,135 +1,77 @@
-/**
- * Component: GoalShare
- * Location: components/goals/GoalShare.tsx
- * 
- * Description: Share goal modal
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/share
-// - /api/share/goal
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/share
-const fetchGoalShareData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/share');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/share/goal
-const fetchGoalShareData = async () => {
-  try {
-    const response = await apiClient.get('/api/share/goal');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalShareProps {
+  goalId: string;
+  goalTitle: string;
+  progress: number;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalShare: React.FC<GoalShareProps> = ({
-  className,
+  goalId,
+  goalTitle,
+  progress,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `${window.location.origin}/goals/${goalId}`;
+  const shareText = `I'm ${progress}% towards my goal: ${goalTitle}!`;
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  // Component logic
-  
-  // Render
+  const shareOptions = [
+    {
+      name: 'Twitter',
+      icon: '🐦',
+      url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+    },
+    {
+      name: 'LinkedIn',
+      icon: '💼',
+      url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+    },
+    {
+      name: 'Facebook',
+      icon: '📘',
+      url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+    },
+  ];
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalShare</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-4">Share Your Progress</h3>
+      <p className="opacity-90 mb-6">Show your friends how you're crushing your goals!</p>
+
+      <div className="space-y-3">
+        {shareOptions.map((option) => (
+          <a
+            key={option.name}
+            href={option.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-white/20 backdrop-blur rounded-lg hover:bg-white/30 transition-colors"
+          >
+            <span className="text-2xl">{option.icon}</span>
+            <span className="font-medium">Share on {option.name}</span>
+          </a>
+        ))}
+
+        <button
+          onClick={copyLink}
+          className="w-full flex items-center gap-3 p-3 bg-white/20 backdrop-blur rounded-lg hover:bg-white/30 transition-colors"
+        >
+          <span className="text-2xl">🔗</span>
+          <span className="font-medium">{copied ? 'Link Copied!' : 'Copy Link'}</span>
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalShare;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/share
- * - API: /api/share/goal
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

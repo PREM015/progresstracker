@@ -1,134 +1,58 @@
-/**
- * Component: ProfileActivity
- * Location: components/profile/ProfileActivity.tsx
- * 
- * Description: Activity display
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/stats/heatmap
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - DailyStats
-// - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for DailyStats model
-interface IDailyStats {
+interface Activity {
   id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  type: string;
+  description: string;
+  timestamp: string;
 }
 
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/stats/heatmap
-const fetchProfileActivityData = async () => {
-  try {
-    const response = await apiClient.get('/api/stats/heatmap');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileActivityProps {
+  activities: Activity[];
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ProfileActivity: React.FC<ProfileActivityProps> = ({
-  className,
+  activities,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const getActivityIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      problem: '✅',
+      goal: '🎯',
+      achievement: '🏆',
+      sync: '🔄',
+    };
+    return icons[type] || '📌';
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileActivity</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Recent Activity</h3>
+
+      <div className="space-y-4">
+        {activities.map(activity => (
+          <div key={activity.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+            <span className="text-2xl">{getActivityIcon(activity.type)}</span>
+            <div className="flex-1">
+              <div className="font-medium">{activity.description}</div>
+              <div className="text-sm text-gray-600 mt-1">
+                {new Date(activity.timestamp).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {activities.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No recent activity
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileActivity;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/stats/heatmap
- *  * - Model: DailyStats
- * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

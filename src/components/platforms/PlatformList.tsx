@@ -1,146 +1,81 @@
-/**
- * Component: PlatformList
- * Location: components/platforms/PlatformList.tsx
- * 
- * Description: List all available platforms
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms
-// - /api/platforms/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-// - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
+interface Platform {
   id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  slug: string;
+  isConnected: boolean;
 }
 
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms
-const fetchPlatformListData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/platforms/categories
-const fetchPlatformListData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformListProps {
+  category?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const PlatformList: React.FC<PlatformListProps> = ({
-  className,
+  category,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'connected' | 'available'>('all');
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetch(`/api/platforms${category ? `?category=${category}` : ''}`)
+      .then(r => r.json())
+      .then(data => setPlatforms(data))
+      .finally(() => setLoading(false));
+  }, [category]);
 
-  // Component logic
-  
-  // Render
+  const filteredPlatforms = platforms.filter(p => {
+    if (filter === 'connected') return p.isConnected;
+    if (filter === 'available') return !p.isConnected;
+    return true;
+  });
+
+  if (loading) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      {/* Filters */}
+      <div className="flex gap-2 mb-6">
+        {(['all', 'connected', 'available'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredPlatforms.map(platform => (
+          <div key={platform.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{platform.name}</h3>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs px-3 py-1 rounded-full ${platform.isConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                {platform.isConnected ? '✓ Connected' : 'Not Connected'}
+              </span>
+              <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                {platform.isConnected ? 'Manage' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms
- * - API: /api/platforms/categories
- *  * - Model: Platform
- * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

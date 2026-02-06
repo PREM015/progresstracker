@@ -1,123 +1,61 @@
-/**
- * Component: ReferralList
- * Location: components/referral/ReferralList.tsx
- * 
- * Description: List of referrals
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/referrals
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
+interface Referral {
   id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  email: string;
+  status: 'pending' | 'accepted' | 'active';
+  signedUpAt?: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/referrals
-const fetchReferralListData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/referrals');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ReferralListProps {
+  referrals: Referral[];
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ReferralList: React.FC<ReferralListProps> = ({
-  className,
+  referrals,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const statusConfig = {
+    pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700' },
+    accepted: { label: 'Accepted', color: 'bg-green-100 text-green-700' },
+    active: { label: 'Active', color: 'bg-indigo-100 text-indigo-700' },
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReferralList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Your Referrals ({referrals.length})</h3>
+
+      <div className="space-y-3">
+        {referrals.map(referral => {
+          const config = statusConfig[referral.status];
+          return (
+            <div key={referral.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <div className="font-medium">{referral.email}</div>
+                {referral.signedUpAt && (
+                  <div className="text-sm text-gray-600 mt-1">
+                    Signed up {new Date(referral.signedUpAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
+                {config.label}
+              </span>
+            </div>
+          );
+        })}
+
+        {referrals.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No referrals yet. Share your link to get started!
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReferralList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/referrals
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

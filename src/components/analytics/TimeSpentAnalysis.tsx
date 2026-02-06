@@ -1,123 +1,145 @@
-/**
- * Component: TimeSpentAnalysis
- * Location: components/analytics/TimeSpentAnalysis.tsx
- * 
- * Description: Time analysis
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/time-spent
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface TimeData {
+  category: string;
+  hours: number;
+  percentage: number;
+  color: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/time-spent
-const fetchTimeSpentAnalysisData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/time-spent');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TimeSpentAnalysisProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const TimeSpentAnalysis: React.FC<TimeSpentAnalysisProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+interface TimeSpentResponse {
+  summary: {
+    totalTime: number;
+  };
+  data: Array<{
+    label: string;
+    time: number;
+    percentage: number;
+  }>;
+}
+
+const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#14B8A6', '#6B7280'];
+
+export const TimeSpentAnalysis: React.FC<TimeSpentAnalysisProps> = ({
+  className = '',
+}) => {
+  const [timeData, setTimeData] = useState<TimeData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalHours, setTotalHours] = useState(0);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchTime = async () => {
+      try {
+        const res = await fetch('/api/analytics/time-spent?groupBy=category&days=30');
+        const json = (await res.json()) as ApiSuccess<TimeSpentResponse>;
+        if (!res.ok || !json?.success) throw new Error('Failed to fetch time spent data');
+
+        const items = (json.data?.data || []).map((item, idx) => ({
+          category: item.label,
+          hours: Math.round((item.time / 60) * 10) / 10,
+          percentage: item.percentage,
+          color: COLORS[idx % COLORS.length],
+        }));
+
+        if (isMounted) {
+          setTimeData(items);
+          setTotalHours(Math.round(((json.data?.summary?.totalTime || 0) / 60) * 10) / 10);
+        }
+      } catch (error) {
+        console.error('Failed to load time spent analysis:', error);
+        if (isMounted) {
+          setTimeData([]);
+          setTotalHours(0);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTime();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TimeSpentAnalysis</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Time Spent Analysis</h3>
+
+      <div className="text-center mb-8 p-6 bg-indigo-50 rounded-xl">
+        <div className="text-4xl font-bold text-indigo-600 mb-1">{totalHours.toFixed(1)}h</div>
+        <div className="text-sm text-gray-600">Total Time Tracked</div>
+      </div>
+
+      <div className="flex justify-center mb-8">
+        <div className="relative w-48 h-48">
+          <svg viewBox="0 0 100 100" className="transform -rotate-90">
+            {timeData.reduce((acc, item, idx) => {
+              const prevPercentage = timeData.slice(0, idx).reduce((sum, i) => sum + i.percentage, 0);
+              const startAngle = (prevPercentage / 100) * 360;
+              const endAngle = ((prevPercentage + item.percentage) / 100) * 360;
+
+              const start = polarToCartesian(50, 50, 40, endAngle);
+              const end = polarToCartesian(50, 50, 40, startAngle);
+              const largeArc = item.percentage > 50 ? 1 : 0;
+
+              const d = [
+                'M', start.x, start.y,
+                'A', 40, 40, 0, largeArc, 0, end.x, end.y,
+                'L', 50, 50,
+                'Z'
+              ].join(' ');
+
+              return [...acc, <path key={idx} d={d} fill={item.color} />];
+            }, [] as JSX.Element[])}
+          </svg>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {timeData.map((item, idx) => (
+          <div key={idx} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: item.color }} />
+              <span className="text-sm font-medium text-gray-700">{item.category}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">{item.hours.toFixed(1)}h</span>
+              <span className="text-sm font-bold text-gray-900">{item.percentage}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
+function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
+  const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+  return {
+    x: centerX + (radius * Math.cos(angleInRadians)),
+    y: centerY + (radius * Math.sin(angleInRadians))
+  };
+}
 
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TimeSpentAnalysis;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/time-spent
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

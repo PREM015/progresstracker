@@ -1,146 +1,118 @@
-/**
- * Component: GoalSetupStep
- * Location: components/onboarding/GoalSetupStep.tsx
- * 
- * Description: Set first goals
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals
-// - /api/goals/templates
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-// - GoalTemplate
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
+interface GoalTemplate {
   id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  target: number;
+  category: string;
+  description?: string | null;
 }
 
-// Interface for GoalTemplate model
-interface IGoalTemplate {
-  id: string;
-  // Add fields from your Prisma GoalTemplate model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface GoalSelection {
+  templateId: string;
+  title: string;
+  target: number;
+  category: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals
-const fetchGoalSetupStepData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/goals/templates
-const fetchGoalSetupStepData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/templates');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalSetupStepProps {
+  onNext: (goals: GoalSelection[]) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalSetupStep: React.FC<GoalSetupStepProps> = ({
-  className,
+  onNext,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<GoalTemplate[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    const fetchTemplates = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/goals/templates?limit=6');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error?.message || 'Failed to fetch templates');
+        setTemplates(json?.data?.templates || []);
+      } catch (err) {
+        console.error(err);
+        setTemplates([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTemplates();
   }, []);
 
-  // Component logic
-  
-  // Render
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleContinue = () => {
+    const selected = templates.filter((t) => selectedIds.includes(t.id));
+    const goals: GoalSelection[] = selected.map((t) => ({
+      templateId: t.id,
+      title: t.title,
+      target: t.target,
+      category: t.category,
+    }));
+    onNext(goals);
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalSetupStep</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white rounded-2xl p-8 ${className}`}>
+      <h2 className="text-3xl font-bold mb-2">Set Your Goals</h2>
+      <p className="text-gray-600 mb-8">Choose some goals to get started</p>
+
+      <div className="space-y-3 mb-8">
+        {loading ? (
+          <div className="text-center text-gray-500">Loading templates...</div>
+        ) : templates.length === 0 ? (
+          <div className="text-center text-gray-500">No goal templates available</div>
+        ) : (
+          templates.map((goal) => (
+            <label
+              key={goal.id}
+              className="flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <input
+                type="checkbox"
+                className="w-6 h-6"
+                checked={selectedIds.includes(goal.id)}
+                onChange={() => toggleSelect(goal.id)}
+              />
+              <div className="flex-1">
+                <div className="font-semibold">{goal.title}</div>
+                <div className="text-sm text-gray-600">Target: {goal.target}</div>
+              </div>
+            </label>
+          ))
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={() => onNext([])}
+          className="flex-1 px-6 py-3 border rounded-lg hover:bg-gray-50"
+        >
+          Skip
+        </button>
+        <button
+          onClick={handleContinue}
+          className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalSetupStep;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals
- * - API: /api/goals/templates
- *  * - Model: Goal
- * - Model: GoalTemplate
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

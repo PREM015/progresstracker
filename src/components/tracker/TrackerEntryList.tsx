@@ -1,123 +1,58 @@
-/**
- * Component: TrackerEntryList
- * Location: components/tracker/TrackerEntryList.tsx
- * 
- * Description: List view of entries
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
+interface Entry {
   id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  platform: string;
+  value: number;
+  date: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker
-const fetchTrackerEntryListData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerEntryListProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerEntryList: React.FC<TrackerEntryListProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/tracker')
+      .then(r => r.json())
+      .then(data => setEntries(data))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerEntryList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">All Entries</h3>
+
+      <div className="space-y-3">
+        {entries.map(entry => (
+          <div key={entry.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+            <div>
+              <div className="font-semibold">{entry.title}</div>
+              <div className="text-sm text-gray-600">{entry.platform} • {new Date(entry.date).toLocaleDateString()}</div>
+            </div>
+            <div className="text-2xl font-bold text-indigo-600">{entry.value}</div>
+          </div>
+        ))}
+
+        {entries.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <span className="text-5xl mb-4 block">📝</span>
+            No entries yet
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerEntryList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

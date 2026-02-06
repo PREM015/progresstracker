@@ -1,135 +1,148 @@
-/**
- * Component: RecentActivity
- * Location: components/dashboard/RecentActivity.tsx
- * 
- * Description: Recent activity feed
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker
-// - /api/user/activity
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
+interface Activity {
   id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  description: string;
+  timestamp: string;
+  category?: string | null;
+  status?: string | null;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker
-const fetchRecentActivityData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/user/activity
-const fetchRecentActivityData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/activity');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface RecentActivityProps {
   className?: string;
-  // Add component-specific props here
+  limit?: number;
 }
 
-// ===== COMPONENT =====
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+  meta?: {
+    pagination?: {
+      total?: number;
+    };
+  };
+}
+
+interface ActivityApiItem {
+  id: string;
+  action?: string | null;
+  category?: string | null;
+  description?: string | null;
+  createdAt?: string;
+  status?: string | null;
+}
+
 export const RecentActivity: React.FC<RecentActivityProps> = ({
-  className,
+  className = '',
+  limit = 10,
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    let isMounted = true;
 
-  // Component logic
-  
-  // Render
+    const fetchActivity = async () => {
+      try {
+        const res = await fetch(`/api/user/activity?limit=${limit}`);
+        const json = (await res.json()) as ApiSuccess<ActivityApiItem[]>;
+
+        if (!res.ok || !json?.success) {
+          throw new Error('Failed to fetch activity');
+        }
+
+        const mapped = (json.data || []).map((item) => ({
+          id: item.id,
+          title: item.action ? item.action.replace(/_/g, ' ') : 'Activity',
+          description: item.description || '',
+          timestamp: item.createdAt || new Date().toISOString(),
+          category: item.category || null,
+          status: item.status || null,
+        })) as Activity[];
+
+        if (isMounted) {
+          setActivities(mapped);
+        }
+      } catch (error) {
+        console.error('Failed to load activity:', error);
+        if (isMounted) {
+          setActivities([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchActivity();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [limit]);
+
+  const getTimeAgo = (timestamp: string) => {
+    const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
+  const getBadge = (category?: string | null) => {
+    if (!category) return 'AC';
+    return category.slice(0, 2).toUpperCase();
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>RecentActivity</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-gray-900">Recent Activity</h3>
+        <button className="text-sm text-indigo-600 hover:text-indigo-700">View All</button>
+      </div>
+
+      {activities.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          <div className="text-sm uppercase tracking-widest mb-2">No activity</div>
+          Your recent actions will show up here.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <div key={activity.id} className="flex items-start gap-4 p-4 hover:bg-gray-50 rounded-lg transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-xs font-semibold">
+                {getBadge(activity.category)}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-gray-900 truncate">{activity.title}</h4>
+                <p className="text-sm text-gray-600 truncate">{activity.description}</p>
+              </div>
+
+              <div className="flex-shrink-0 text-xs text-gray-500">
+                {getTimeAgo(activity.timestamp)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default RecentActivity;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker
- * - API: /api/user/activity
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

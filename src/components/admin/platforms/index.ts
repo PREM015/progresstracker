@@ -1,6 +1,6 @@
-export { default as PlatformsList } from './PlatformsList';
-export { default as PlatformForm } from './PlatformForm';
-export { default as PlatformDetail } from './PlatformDetail';
-export { default as PlatformHealth } from './PlatformHealth';
-export { default as PlatformStats } from './PlatformStats';
-export { default as PlatformConfig } from './PlatformConfig';
+export { PlatformsList } from './PlatformsList';
+export { PlatformConfig } from './PlatformConfig';
+export { PlatformDetail } from './PlatformDetail';
+export { PlatformForm } from './PlatformForm';
+export { PlatformHealth } from './PlatformHealth';
+export { PlatformStats } from './PlatformStats';

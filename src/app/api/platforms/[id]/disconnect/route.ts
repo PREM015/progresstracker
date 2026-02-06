@@ -14,7 +14,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-import { UnauthorizedError, NotFoundError, ValidationError } from '@/lib/apiError';
+import { UnauthorizedError, NotFoundError } from '@/lib/apiError';
 import { auditLogService } from '@/services/auditLogService';
 import { AuditAction } from '@prisma/client';
 

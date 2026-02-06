@@ -1,123 +1,107 @@
-/**
- * Component: LeaderboardTable
- * Location: components/leaderboard/LeaderboardTable.tsx
- * 
- * Description: Rankings table
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/leaderboard
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  avatar?: string;
+  score: number;
+  change?: number;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/leaderboard
-const fetchLeaderboardTableData = async () => {
-  try {
-    const response = await apiClient.get('/api/leaderboard');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface LeaderboardTableProps {
+  category?: string;
+  timeRange?: 'day' | 'week' | 'month' | 'all';
+  limit?: number;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
-  className,
+  category,
+  timeRange = 'week',
+  limit = 50,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    const params = new URLSearchParams({
+      ...(category && { category }),
+      timeRange,
+      limit: limit.toString(),
+    });
 
-  // Component logic
-  
-  // Render
+    fetch(`/api/leaderboard?${params}`)
+      .then(r => r.json())
+      .then(data => setEntries(data))
+      .finally(() => setLoading(false));
+  }, [category, timeRange, limit]);
+
+  if (loading) {
+    return <div className="space-y-2">
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+      ))}
+    </div>;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>LeaderboardTable</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl overflow-hidden ${className}`}>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Rank</th>
+              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">User</th>
+              <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Score</th>
+              <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Change</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {entries.map((entry) => (
+              <tr key={entry.userId} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${entry.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
+                      entry.rank === 2 ? 'bg-gradient-to-br from-gray-400 to-gray-600' :
+                        entry.rank === 3 ? 'bg-gradient-to-br from-orange-600 to-orange-800' :
+                          'bg-gray-300 text-gray-700'
+                    }`}>
+                    {entry.rank}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    {entry.avatar ? (
+                      <img src={entry.avatar} alt={entry.username} className="w-10 h-10 rounded-full" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                        {entry.username.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="font-medium text-gray-900">{entry.username}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right font-bold text-gray-900">
+                  {entry.score.toLocaleString()}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  {entry.change !== undefined && (
+                    <span className={`text-sm font-medium ${entry.change > 0 ? 'text-green-600' : entry.change < 0 ? 'text-red-600' : 'text-gray-500'
+                      }`}>
+                      {entry.change > 0 && '+'}{entry.change}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default LeaderboardTable;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/leaderboard
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

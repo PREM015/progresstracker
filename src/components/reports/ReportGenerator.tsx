@@ -1,135 +1,101 @@
-/**
- * Component: ReportGenerator
- * Location: components/reports/ReportGenerator.tsx
- * 
- * Description: Generate new report
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/reports/generate
-// - /api/analytics/report
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Report
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Report model
-interface IReport {
-  id: string;
-  // Add fields from your Prisma Report model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/reports/generate
-const fetchReportGeneratorData = async () => {
-  try {
-    const response = await apiClient.get('/api/reports/generate');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/analytics/report
-const fetchReportGeneratorData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/report');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ReportGeneratorProps {
+  userId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ReportGenerator: React.FC<ReportGeneratorProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [reportType, setReportType] = useState('progress');
+  const [dateRange, setDateRange] = useState('last_30_days');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleGenerate = async () => {
+    setIsGenerating(true);
 
-  // Component logic
-  
-  // Render
+    try {
+      const res = await fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: reportType, dateRange }),
+      });
+
+      if (!res.ok) throw new Error('Report generation failed');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${reportType}_${Date.now()}.pdf`;
+      a.click();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReportGenerator</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-2xl p-8 ${className}`}>
+      <h3 className="text-2xl font-bold text-gray-900 mb-6">Generate Report</h3>
+
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+          <select
+            value={reportType}
+            onChange={(e) => setReportType(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="progress">Progress Report</option>
+            <option value="analytics">Analytics Summary</option>
+            <option value="achievements">Achievements Report</option>
+            <option value="goals">Goals Summary</option>
+            <option value="platforms">Platform Activity</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="last_7_days">Last 7 Days</option>
+            <option value="last_30_days">Last 30 Days</option>
+            <option value="last_90_days">Last 90 Days</option>
+            <option value="this_year">This Year</option>
+            <option value="all_time">All Time</option>
+          </select>
+        </div>
+
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+          <h4 className="font-semibold text-indigo-900 mb-2">📄 Report Contents:</h4>
+          <ul className="text-sm text-indigo-700 space-y-1">
+            <li>• Detailed statistics and metrics</li>
+            <li>• Charts and visualizations</li>
+            <li>• Progress over time</li>
+            <li>• Platform breakdown</li>
+            <li>• Export as PDF</li>
+          </ul>
+        </div>
+
+        <button
+          onClick={handleGenerate}
+          disabled={isGenerating}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
+        >
+          {isGenerating ? 'Generating Report...' : 'Generate & Download Report'}
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReportGenerator;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/reports/generate
- * - API: /api/analytics/report
- *  * - Model: Report
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

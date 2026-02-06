@@ -1,134 +1,99 @@
-/**
- * Component: PredictionsCard
- * Location: components/analytics/PredictionsCard.tsx
- * 
- * Description: Predictions
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/predictions
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-// - DailyStats
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface Prediction {
+  title: string;
+  prediction: string | number;
+  confidence: number;
+  timeframe: string;
 }
 
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/predictions
-const fetchPredictionsCardData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/predictions');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PredictionsCardProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const PredictionsCard: React.FC<PredictionsCardProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+interface PredictionsResponse {
+  predictions: Prediction[];
+}
+
+export const PredictionsCard: React.FC<PredictionsCardProps> = ({
+  className = '',
+}) => {
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchPredictions = async () => {
+      try {
+        const res = await fetch('/api/analytics/predictions?includeFactors=false');
+        const json = (await res.json()) as ApiSuccess<PredictionsResponse>;
+        if (!res.ok || !json?.success) throw new Error('Failed to fetch predictions');
+
+        if (isMounted) {
+          setPredictions(json.data?.predictions || []);
+        }
+      } catch (error) {
+        console.error('Failed to load predictions:', error);
+        if (isMounted) {
+          setPredictions([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchPredictions();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PredictionsCard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-br from-indigo-600 to-slate-800 text-white rounded-xl p-6 ${className}`}>
+      <div className="mb-6">
+        <h3 className="text-xl font-bold">Predictions</h3>
+        <p className="text-sm text-white/70">Data-driven projections</p>
+      </div>
+
+      <div className="space-y-4">
+        {predictions.map((pred, idx) => (
+          <div key={idx} className="bg-white/10 backdrop-blur rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold">{pred.title}</span>
+              <span className="text-xs px-2 py-1 bg-white/20 rounded">{pred.timeframe}</span>
+            </div>
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="text-2xl font-bold">{pred.prediction}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-white/20 rounded-full h-2">
+                <div
+                  className="bg-white h-2 rounded-full"
+                  style={{ width: `${pred.confidence}%` }}
+                />
+              </div>
+              <span className="text-xs opacity-75">{pred.confidence}% confidence</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PredictionsCard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/predictions
- *  * - Model: TrackerEntry
- * - Model: DailyStats
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

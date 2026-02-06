@@ -1,6 +1,4 @@
-export { default as TicketsList } from './TicketsList';
-export { default as TicketDetail } from './TicketDetail';
-export { default as TicketReply } from './TicketReply';
-export { default as TicketFilters } from './TicketFilters';
-export { default as TicketStats } from './TicketStats';
-export { default as TicketAssignment } from './TicketAssignment';
+export { SupportTicketsList } from './SupportTicketsList';
+export { SupportTicketDetail } from './SupportTicketDetail';
+export { SupportTicketFilters } from './SupportTicketFilters';
+export { SupportTicketStats } from './SupportTicketStats';

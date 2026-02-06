@@ -1,5 +1,5 @@
-export { default as BillingDashboard } from './BillingDashboard';
-export { default as SubscriptionsList } from './SubscriptionsList';
-export { default as InvoicesList } from './InvoicesList';
-export { default as RevenueChart } from './RevenueChart';
-export { default as PaymentMethodsList } from './PaymentMethodsList';
+export { BillingDashboard } from './BillingDashboard';
+export { InvoicesList } from './InvoicesList';
+export { PaymentMethodsList } from './PaymentMethodsList';
+export { RevenueChart } from './RevenueChart';
+export { SubscriptionsList } from './SubscriptionsList';

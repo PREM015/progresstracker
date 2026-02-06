@@ -1,21 +1,22 @@
-import { Metadata } from "next";
+import { BillingDashboard, InvoicesList, SubscriptionsList, PaymentMethodsList, RevenueChart } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Billing | Progress Tracker",
-  description: "Billing page for Progress Tracker application",
-};
-
-export default async function AdminBillingPage() {
+export default function BillingPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Billing</h1>
-      
-      {/* TODO: Implement Billing */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Billing page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Billing</h1>
+        <p className="text-zinc-400">Revenue, subscriptions, and payments</p>
       </div>
+
+      <BillingDashboard />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RevenueChart />
+        <PaymentMethodsList />
+      </div>
+
+      <SubscriptionsList />
+      <InvoicesList />
     </div>
   );
 }

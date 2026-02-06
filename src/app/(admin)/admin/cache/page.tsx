@@ -1,21 +1,15 @@
-import { Metadata } from "next";
+import { CacheDashboard, CacheKeys } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Cache | Progress Tracker",
-  description: "Cache page for Progress Tracker application",
-};
-
-export default async function AdminCachePage() {
+export default function CachePage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Cache</h1>
-      
-      {/* TODO: Implement Cache */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Cache page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Cache Management</h1>
+        <p className="text-zinc-400">Monitor and manage application cache</p>
       </div>
+
+      <CacheDashboard />
+      <CacheKeys />
     </div>
   );
 }

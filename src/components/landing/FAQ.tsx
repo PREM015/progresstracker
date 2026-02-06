@@ -1,87 +1,54 @@
-/**
- * Component: FAQ
- * Location: components/landing/FAQ.tsx
- * 
- * Description: FAQ section
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface FAQProps {
-  className?: string;
-  // Add component-specific props here
+interface FAQ {
+  question: string;
+  answer: string;
 }
 
-// ===== COMPONENT =====
+interface FAQProps {
+  className?: string;
+}
+
 export const FAQ: React.FC<FAQProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const faqs: FAQ[] = [
+    { question: 'Is it really free?', answer: 'Yes! Our free plan is free forever with no credit card required.' },
+    { question: 'Which platforms do you support?', answer: 'We support LeetCode, GitHub, HackerRank, Codeforces, and many more!' },
+    { question: 'Can I cancel anytime?', answer: 'Absolutely! Cancel your subscription at any time with one click.' },
+    { question: 'Do you offer refunds?', answer: 'Yes, we offer a 30-day money-back guarantee on all paid plans.' },
+  ];
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>FAQ</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 bg-gray-50 ${className}`}>
+      <div className="container mx-auto px-6 max-w-3xl">
+        <h2 className="text-4xl font-bold text-center mb-16">Frequently Asked Questions</h2>
+
+        <div className="space-y-4">
+          {faqs.map((faq, idx) => (
+            <div key={idx} className="bg-white border rounded-xl overflow-hidden">
+              <button
+                onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
+                className="w-full px-6 py-4 text-left font-semibold flex items-center justify-between hover:bg-gray-50"
+              >
+                {faq.question}
+                <span className="text-2xl">{openIndex === idx ? '−' : '+'}</span>
+              </button>
+              {openIndex === idx && (
+                <div className="px-6 py-4 border-t bg-gray-50 text-gray-700">
+                  {faq.answer}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default FAQ;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

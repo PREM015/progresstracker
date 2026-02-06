@@ -1,21 +1,21 @@
-import { Metadata } from "next";
+import { GoalTemplateForm } from '@/components/admin';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: "New | Progress Tracker",
-  description: "New page for Progress Tracker application",
-};
-
-export default async function AdminGoalTemplatesNewPage() {
+export default function NewGoalTemplatePage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">New</h1>
-      
-      {/* TODO: Implement New */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          New page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/goal-templates" className="text-zinc-400 hover:text-white">
+          ← Back to Templates
+        </Link>
       </div>
+
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Create Goal Template</h1>
+        <p className="text-zinc-400">Define a new goal template for users</p>
+      </div>
+
+      <GoalTemplateForm />
     </div>
   );
 }

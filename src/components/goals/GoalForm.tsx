@@ -1,158 +1,222 @@
-/**
- * Component: GoalForm
- * Location: components/goals/GoalForm.tsx
- * 
- * Description: Create/edit goal
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals
-// - /api/goals/[id]
-// - /api/goals/templates
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-// - GoalTemplate
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface GoalFormData {
+  title: string;
+  description: string;
+  targetValue: number;
+  currentValue: number;
+  deadline: string;
+  category: string;
+  priority: 'low' | 'medium' | 'high';
 }
 
-// Interface for GoalTemplate model
-interface IGoalTemplate {
-  id: string;
-  // Add fields from your Prisma GoalTemplate model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals
-const fetchGoalFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/goals/[id]
-const fetchGoalFormData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/goals/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/goals/templates
-const fetchGoalFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/templates');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalFormProps {
+  goalId?: string;
+  initialData?: Partial<GoalFormData>;
+  onSuccess: () => void;
+  onCancel: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalForm: React.FC<GoalFormProps> = ({
-  className,
+  goalId,
+  initialData,
+  onSuccess,
+  onCancel,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [formData, setFormData] = useState<GoalFormData>({
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    targetValue: initialData?.targetValue || 100,
+    currentValue: initialData?.currentValue || 0,
+    deadline: initialData?.deadline || '',
+    category: initialData?.category || '',
+    priority: initialData?.priority || 'medium',
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const updateField = <K extends keyof GoalFormData>(field: K, value: GoalFormData[K]) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
-  // Component logic
-  
-  // Render
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const url = goalId ? `/api/goals/${goalId}` : '/api/goals';
+      const method = goalId ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to save goal');
+      }
+
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalForm</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className={`space-y-6 ${className}`}>
+      <div>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          {goalId ? 'Edit Goal' : 'Create New Goal'}
+        </h3>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Title */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Goal Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={formData.title}
+          onChange={(e) => updateField('title', e.target.value)}
+          required
+          placeholder="e.g., Learn React in 30 days"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Description */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Description
+        </label>
+        <textarea
+          value={formData.description}
+          onChange={(e) => updateField('description', e.target.value)}
+          rows={3}
+          placeholder="What do you want to achieve?"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+        />
+      </div>
+
+      {/* Target and Current Value */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Target Value <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            value={formData.targetValue}
+            onChange={(e) => updateField('targetValue', parseInt(e.target.value) || 0)}
+            required
+            min="1"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Current Progress
+          </label>
+          <input
+            type="number"
+            value={formData.currentValue}
+            onChange={(e) => updateField('currentValue', parseInt(e.target.value) || 0)}
+            min="0"
+            max={formData.targetValue}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Deadline and Category */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Deadline
+          </label>
+          <input
+            type="date"
+            value={formData.deadline}
+            onChange={(e) => updateField('deadline', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Category
+          </label>
+          <input
+            type="text"
+            value={formData.category}
+            onChange={(e) => updateField('category', e.target.value)}
+            placeholder="e.g., Learning, Fitness"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+        </div>
+      </div>
+
+      {/* Priority */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Priority
+        </label>
+        <div className="flex gap-3">
+          {(['low', 'medium', 'high'] as const).map((priority) => (
+            <button
+              key={priority}
+              type="button"
+              onClick={() => updateField('priority', priority)}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${formData.priority === priority
+                  ? priority === 'high'
+                    ? 'bg-red-600 text-white'
+                    : priority === 'medium'
+                      ? 'bg-yellow-600 text-white'
+                      : 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+            >
+              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting || !formData.title}
+          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? 'Saving...' : goalId ? 'Update Goal' : 'Create Goal'}
+        </button>
+      </div>
+    </form>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalForm;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals
- * - API: /api/goals/[id]
- * - API: /api/goals/templates
- *  * - Model: Goal
- * - Model: GoalTemplate
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

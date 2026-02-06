@@ -1,103 +1,47 @@
-/**
- * Component: SyncStatusBadge
- * Location: components/platforms/SyncStatusBadge.tsx
- * 
- * Description: Sync status indicator
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SyncStatusBadgeProps {
+  status: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSync?: string;
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
-  className,
+  status,
+  lastSync,
+  size = 'md',
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const statusConfig = {
+    idle: { icon: '⏸️ ', label: 'Idle', color: 'bg-gray-100 text-gray-700' },
+    syncing: { icon: '🔄', label: 'Syncing', color: 'bg-blue-100 text-blue-700' },
+    synced: { icon: '✅', label: 'Synced', color: 'bg-green-100 text-green-700' },
+    error: { icon: '❌', label: 'Error', color: 'bg-red-100 text-red-700' },
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const sizeClasses = {
+    sm: 'px-2 py-1 text-xs',
+    md: 'px-3 py-1 text-sm',
+    lg: 'px-4 py-2 text-base',
+  };
 
-  // Component logic
-  
-  // Render
+  const config = statusConfig[status];
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SyncStatusBadge</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`inline-flex flex-col gap-1 ${className}`}>
+      <span className={`inline-flex items-center gap-1 rounded-full font-medium ${config.color} ${sizeClasses[size]} ${status === 'syncing' ? 'animate-pulse' : ''
+        }`}>
+        <span className={status === 'syncing' ? 'animate-spin inline-block' : ''}>{config.icon}</span>
+        {config.label}
+      </span>
+      {lastSync && size !== 'sm' && (
+        <span className="text-xs text-gray-500">Last: {lastSync}</span>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SyncStatusBadge;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,107 +1,52 @@
-/**
- * Component: ReferralRewards
- * Location: components/referral/ReferralRewards.tsx
- * 
- * Description: Rewards earned
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/referral/rewards
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/referral/rewards
-const fetchReferralRewardsData = async () => {
-  try {
-    const response = await apiClient.get('/api/referral/rewards');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface ReferralRewardsProps {
-  className?: string;
-  // Add component-specific props here
+interface Reward {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  points: number;
+  unlocked: boolean;
 }
 
-// ===== COMPONENT =====
+interface ReferralRewardsProps {
+  rewards: Reward[];
+  className?: string;
+}
+
 export const ReferralRewards: React.FC<ReferralRewardsProps> = ({
-  className,
+  rewards,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReferralRewards</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Referral Rewards</h3>
+
+      <div className="space-y-3">
+        {rewards.map(reward => (
+          <div
+            key={reward.id}
+            className={`flex items-center gap-4 p-4 border-2 rounded-xl ${reward.unlocked ? 'border-green-400 bg-green-50' : 'border-gray-200'
+              }`}
+          >
+            <div className={`text-4xl ${!reward.unlocked && 'grayscale opacity-50'}`}>
+              {reward.icon}
+            </div>
+            <div className="flex-1">
+              <div className="font-semibold">{reward.title}</div>
+              <div className="text-sm text-gray-600">{reward.description}</div>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-indigo-600">{reward.points} pts</div>
+              {reward.unlocked && <div className="text-xs text-green-600">Unlocked</div>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReferralRewards;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/referral/rewards
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

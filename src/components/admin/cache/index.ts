@@ -1,4 +1,4 @@
-export { default as CacheDashboard } from './CacheDashboard';
-export { default as CacheStats } from './CacheStats';
-export { default as CacheKeys } from './CacheKeys';
-export { default as CacheClearButton } from './CacheClearButton';
+export { CacheClearButton } from './CacheClearButton';
+export { CacheDashboard } from './CacheDashboard';
+export { CacheKeys } from './CacheKeys';
+export { CacheStats } from './CacheStats';

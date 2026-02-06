@@ -1,5 +1,5 @@
-export { default as FeedbackList } from './FeedbackList';
-export { default as FeedbackDetail } from './FeedbackDetail';
-export { default as FeedbackFilters } from './FeedbackFilters';
-export { default as FeedbackStats } from './FeedbackStats';
-export { default as FeedbackResponse } from './FeedbackResponse';
+export { FeedbackList } from './FeedbackList';
+export { FeedbackDetail } from './FeedbackDetail';
+export { FeedbackFilters } from './FeedbackFilters';
+export { FeedbackResponse } from './FeedbackResponse';
+export { FeedbackStats } from './FeedbackStats';

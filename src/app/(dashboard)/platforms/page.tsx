@@ -1,33 +1,37 @@
 "use client";
 
-import { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import PlatformCard from "@/components/platforms/PlatformCard";
+import PlatformList from "@/components/platforms/PlatformList";
+import SyncHistoryList from "@/components/platforms/SyncHistoryList";
 
 export default function PlatformsPage() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const { data: session } = useSession();
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Platforms</h1>
-      
-      {/* TODO: Implement Platforms */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Platforms page content goes here.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">Connected Platforms</h1>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <PlatformList />
+          </div>
+
+          <div className="space-y-6">
+            <PlatformCard
+              platform={{
+                id: "leetcode",
+                name: "LeetCode",
+                slug: "leetcode",
+                icon: "💻",
+                category: "Coding",
+                isConnected: false,
+              }}
+            />
+            <SyncHistoryList platformId="leetcode" />
+          </div>
+        </div>
       </div>
     </div>
   );

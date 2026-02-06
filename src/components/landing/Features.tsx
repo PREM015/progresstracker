@@ -1,87 +1,40 @@
-/**
- * Component: Features
- * Location: components/landing/Features.tsx
- * 
- * Description: Features section
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface FeaturesProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const Features: React.FC<FeaturesProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const features = [
+    { icon: '📊', title: 'Real-time Tracking', desc: 'Monitor your progress across all platforms in real-time' },
+    { icon: '🎯', title: 'Goal Setting', desc: 'Set and track goals to stay motivated' },
+    { icon: '📈', title: 'Advanced Analytics', desc: 'Visualize your growth with beautiful charts' },
+    { icon: '🏆', title: 'Achievements', desc: 'Earn badges and celebrate milestones' },
+    { icon: '🔄', title: 'Auto Sync', desc: 'Automatic sync with your favorite platforms' },
+    { icon: '🌍', title: 'Community', desc: 'Compare and compete with friends' },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>Features</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 bg-gray-50 ${className}`}>
+      <div className="container mx-auto px-6">
+        <h2 className="text-4xl font-bold text-center mb-16">Everything You Need</h2>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {features.map((feature, idx) => (
+            <div key={idx} className="bg-white rounded-xl p-8 hover:shadow-xl transition-shadow">
+              <div className="text-5xl mb-4">{feature.icon}</div>
+              <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
+              <p className="text-gray-600">{feature.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default Features;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

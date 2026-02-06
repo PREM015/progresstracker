@@ -1,134 +1,109 @@
-/**
- * Component: GoalReminders
- * Location: components/goals/GoalReminders.tsx
- * 
- * Description: Reminder settings
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/[id]/reminders
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-// - GoalReminder
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
+interface Reminder {
   id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  time: string;
+  enabled: boolean;
 }
 
-// Interface for GoalReminder model
-interface IGoalReminder {
-  id: string;
-  // Add fields from your Prisma GoalReminder model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/[id]/reminders
-const fetchGoalRemindersData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/goals/${{id}}/reminders`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalRemindersProps {
+  goalId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalReminders: React.FC<GoalRemindersProps> = ({
-  className,
+  goalId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newReminder, setNewReminder] = useState({ frequency: 'daily' as const, time: '09:00' });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const addReminder = async () => {
+    const res = await fetch(`/api/goals/${goalId}/reminders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newReminder),
+    });
+    const reminder = await res.json();
+    setReminders([...reminders, reminder]);
+    setShowAddForm(false);
+  };
 
-  // Component logic
-  
-  // Render
+  const toggleReminder = async (id: string) => {
+    await fetch(`/api/goals/${goalId}/reminders/${id}/toggle`, { method: 'PATCH' });
+    setReminders(reminders.map(r => r.id === id ? { ...r, enabled: !r.enabled } : r));
+  };
+
+  const deleteReminder = async (id: string) => {
+    await fetch(`/api/goals/${goalId}/reminders/${id}`, { method: 'DELETE' });
+    setReminders(reminders.filter(r => r.id !== id));
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalReminders</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🔔</span>
+          <h3 className="text-xl font-bold text-gray-900">Reminders</h3>
+        </div>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+        >
+          + Add
+        </button>
+      </div>
+
+      {showAddForm && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
+          <select
+            value={newReminder.frequency}
+            onChange={(e) => setNewReminder({ ...newReminder, frequency: e.target.value as any })}
+            className="w-full px-4 py-2 border rounded-lg"
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <input
+            type="time"
+            value={newReminder.time}
+            onChange={(e) => setNewReminder({ ...newReminder, time: e.target.value })}
+            className="w-full px-4 py-2 border rounded-lg"
+          />
+          <button onClick={addReminder} className="w-full px-4 py-2 bg-green-600 text-white rounded-lg">
+            Create Reminder
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {reminders.map((reminder) => (
+          <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={reminder.enabled}
+                onChange={() => toggleReminder(reminder.id)}
+                className="w-5 h-5"
+              />
+              <div>
+                <div className="font-medium capitalize">{reminder.frequency}</div>
+                <div className="text-sm text-gray-500">at {reminder.time}</div>
+              </div>
+            </div>
+            <button onClick={() => deleteReminder(reminder.id)} className="text-red-600 hover:text-red-700">
+              🗑️
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalReminders;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/[id]/reminders
- *  * - Model: Goal
- * - Model: GoalReminder
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

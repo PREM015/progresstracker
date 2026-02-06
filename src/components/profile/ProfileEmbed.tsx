@@ -1,123 +1,55 @@
-/**
- * Component: ProfileEmbed
- * Location: components/profile/ProfileEmbed.tsx
- * 
- * Description: Embeddable widget
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/profile/[username]/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/profile/[username]/stats
-const fetchProfileEmbedData = async () => {
-  try {
-    const response = await apiClient.get('/api/profile/[username]/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileEmbedProps {
+  username: string;
+  theme?: 'light' | 'dark';
+  showStats?: boolean;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ProfileEmbed: React.FC<ProfileEmbedProps> = ({
-  className,
+  username,
+  theme = 'light',
+  showStats = true,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const embedUrl = `https://progresstracker.app/embed/profile/${username}?theme=${theme}&stats=${showStats}`;
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileEmbed</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-4">Embed Your Profile</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="flex items-center gap-3 mb-3">
+            <input
+              type="checkbox"
+              checked={showStats}
+              className="w-5 h-5"
+              readOnly
+            />
+            <span>Show Statistics</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Embed Code</label>
+          <textarea
+            readOnly
+            value={`<iframe src="${embedUrl}" width="100%" height="300" frameborder="0"></iframe>`}
+            className="w-full px-4 py-3 border rounded-lg font-mono text-sm bg-gray-50"
+            rows={3}
+          />
+        </div>
+
+        <button className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+          📋 Copy Embed Code
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileEmbed;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/profile/[username]/stats
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

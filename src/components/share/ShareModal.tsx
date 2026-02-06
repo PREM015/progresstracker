@@ -1,107 +1,83 @@
-/**
- * Component: ShareModal
- * Location: components/share/ShareModal.tsx
- * 
- * Description: Share modal
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/share
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/share
-const fetchShareModalData = async () => {
-  try {
-    const response = await apiClient.get('/api/share');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  shareUrl: string;
+  title: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ShareModal: React.FC<ShareModalProps> = ({
-  className,
+  isOpen,
+  onClose,
+  shareUrl,
+  title,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-  // Component logic
-  
-  // Render
+  if (!isOpen) return null;
+
+  const shareLinks = [
+    { name: 'Twitter', icon: '🐦', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}` },
+    { name: 'Facebook', icon: '👍', url: `https://facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
+    { name: 'LinkedIn', icon: '💼', url: `https://linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}` },
+  ];
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ShareModal</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className={`bg-white rounded-2xl p-8 max-w-md w-full ${className}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-bold text-gray-900">Share</h3>
+          <button onClick={onClose} className="text-2xl hover:bg-gray-100 rounded-lg p-2">×</button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex gap-3 justify-center">
+            {shareLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+              >
+                <span className="text-4xl">{link.icon}</span>
+                <span className="text-sm text-gray-600">{link.name}</span>
+              </a>
+            ))}
+          </div>
+
+          <div className="border-t pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Share Link</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={shareUrl}
+                readOnly
+                className="flex-1 px-4 py-2 border rounded-lg bg-gray-50"
+              />
+              <button
+                onClick={copyToClipboard}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                {copied ? '✓' : '📋'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ShareModal;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/share
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

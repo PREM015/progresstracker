@@ -1,135 +1,76 @@
-/**
- * Component: LeaderboardPage
- * Location: components/leaderboard/LeaderboardPage.tsx
- * 
- * Description: Main leaderboard
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/leaderboard
-// - /api/analytics/leaderboard
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface LeaderboardUser {
+  rank: number;
+  username: string;
+  avatar?: string;
+  score: number;
+  streak: number;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/leaderboard
-const fetchLeaderboardPageData = async () => {
-  try {
-    const response = await apiClient.get('/api/leaderboard');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/analytics/leaderboard
-const fetchLeaderboardPageData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/leaderboard');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface LeaderboardPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const LeaderboardPage: React.FC<LeaderboardPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<LeaderboardUser[]>([]);
+  const [timeframe, setTimeframe] = useState<'week' | 'month' | 'alltime'>('week');
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetch(`/api/leaderboard?timeframe=${timeframe}`)
+      .then(r => r.json())
+      .then(data => setUsers(data));
+  }, [timeframe]);
 
-  // Component logic
-  
-  // Render
+  const getRankColor = (rank: number) => {
+    if (rank === 1) return 'from-yellow-400 to-yellow-500';
+    if (rank === 2) return 'from-gray-300 to-gray-400';
+    if (rank === 3) return 'from-amber-600 to-amber-700';
+    return 'from-gray-100 to-gray-200';
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>LeaderboardPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-3xl font-bold">🏆 Leaderboard</h2>
+
+        <select
+          value={timeframe}
+          onChange={(e) => setTimeframe(e.target.value as any)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+          <option value="alltime">All Time</option>
+        </select>
+      </div>
+
+      <div className="space-y-3">
+        {users.map(user => (
+          <div
+            key={user.username}
+            className={`flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r ${getRankColor(user.rank)}`}
+          >
+            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center font-bold text-lg">
+              #{user.rank}
+            </div>
+            {user.avatar && (
+              <img src={user.avatar} alt={user.username} className="w-12 h-12 rounded-full" />
+            )}
+            <div className="flex-1">
+              <div className="font-bold">{user.username}</div>
+              <div className="text-sm opacity-75">🔥 {user.streak} day streak</div>
+            </div>
+            <div className="text-2xl font-bold">{user.score}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default LeaderboardPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/leaderboard
- * - API: /api/analytics/leaderboard
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

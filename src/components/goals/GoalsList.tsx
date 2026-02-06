@@ -1,123 +1,165 @@
-/**
- * Component: GoalsList
- * Location: components/goals/GoalsList.tsx
- * 
- * Description: List all goals
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface GoalStats {
+  totalGoals: number;
+  activeGoals: number;
+  completedGoals: number;
+  completionRate: number;
+  averageProgress: number;
+  dueThisWeek: number;
+  overdue: number;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals
-const fetchGoalsListData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalsListProps {
+  userId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalsList: React.FC<GoalsListProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [stats, setStats] = useState<GoalStats | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetchGoals();
+  }, [userId, filter]);
 
-  // Component logic
-  
-  // Render
+  const fetchGoals = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ filter });
+      const res = await fetch(`/api/goals?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch goals');
+
+      const data = await res.json();
+      setGoals(data.goals || []);
+      setStats(data.stats || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={`space-y-4 ${className}`}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <p className="text-red-600">{error}</p>
+        <button
+          onClick={fetchGoals}
+          className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalsList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      {/* Stats Overview */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="text-2xl font-bold text-gray-900">{stats.totalGoals}</div>
+            <div className="text-sm text-gray-600">Total Goals</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="text-2xl font-bold text-blue-600">{stats.activeGoals}</div>
+            <div className="text-sm text-gray-600">Active</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="text-2xl font-bold text-green-600">{stats.completedGoals}</div>
+            <div className="text-sm text-gray-600">Completed</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="text-2xl font-bold text-indigo-600">{stats.completionRate}%</div>
+            <div className="text-sm text-gray-600">Success Rate</div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-4">
+        {(['all', 'active', 'completed'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Goals List */}
+      <div className="space-y-4">
+        {goals.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-xl">
+            <p className="text-gray-500">No goals found</p>
+            <button className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              Create Your First Goal
+            </button>
+          </div>
+        ) : (
+          goals.map((goal) => (
+            <div
+              key={goal.id}
+              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="text-lg font-bold text-gray-900">{goal.title}</h3>
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${goal.status === 'completed'
+                    ? 'bg-green-100 text-green-700'
+                    : goal.status === 'active'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                  {goal.status}
+                </span>
+              </div>
+              {goal.description && (
+                <p className="text-sm text-gray-600 mb-4">{goal.description}</p>
+              )}
+              <div className="flex items-center gap-4 text-sm text-gray-500">
+                <span>Target: {goal.targetValue}</span>
+                <span>•</span>
+                <span>Progress: {goal.currentValue}</span>
+                {goal.deadline && (
+                  <>
+                    <span>•</span>
+                    <span>Due: {new Date(goal.deadline).toLocaleDateString()}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalsList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

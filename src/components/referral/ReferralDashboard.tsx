@@ -1,135 +1,51 @@
-/**
- * Component: ReferralDashboard
- * Location: components/referral/ReferralDashboard.tsx
- * 
- * Description: Referral overview
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/referral
-// - /api/referral/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/referral
-const fetchReferralDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/referral');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/referral/stats
-const fetchReferralDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/referral/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ReferralDashboardProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ReferralDashboard: React.FC<ReferralDashboardProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stats] = useState({ totalReferrals: 24, accepted: 18, rewards: 450 });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReferralDashboard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-8 ${className}`}>
+      <h3 className="text-2xl font-bold mb-6">Referral Dashboard</h3>
+
+      <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold">{stats.totalReferrals}</div>
+          <div className="text-sm opacity-90">Total Referrals</div>
+        </div>
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold">{stats.accepted}</div>
+          <div className="text-sm opacity-90">Accepted</div>
+        </div>
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold">${stats.rewards}</div>
+          <div className="text-sm opacity-90">Rewards Earned</div>
+        </div>
+      </div>
+
+      <div className="bg-white/10 backdrop-blur rounded-xl p-6">
+        <div className="text-sm mb-3">Your Referral Link</div>
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value="https://progresstracker.app/ref/ABC123"
+            readOnly
+            className="flex-1 px-4 py-2 bg-white/20 rounded-lg"
+          />
+          <button className="px-6 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 font-bold">
+            Copy
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReferralDashboard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/referral
- * - API: /api/referral/stats
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

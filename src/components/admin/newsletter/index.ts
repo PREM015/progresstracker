@@ -1,6 +1,7 @@
-export { default as NewsletterDashboard } from './NewsletterDashboard';
-export { default as SubscribersList } from './SubscribersList';
-export { default as NewsletterForm } from './NewsletterForm';
-export { default as NewsletterEditor } from './NewsletterEditor';
-export { default as NewsletterPreview } from './NewsletterPreview';
-export { default as NewsletterStats } from './NewsletterStats';
+export { NewsletterList } from './NewsletterList';
+export { NewsletterDashboard } from './NewsletterDashboard';
+export { NewsletterEditor } from './NewsletterEditor';
+export { NewsletterForm } from './NewsletterForm';
+export { NewsletterPreview } from './NewsletterPreview';
+export { NewsletterStats } from './NewsletterStats';
+export { SubscribersList } from './SubscribersList';

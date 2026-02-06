@@ -1,4 +1,4 @@
-export { default as ChangelogList } from './ChangelogList';
-export { default as ChangelogForm } from './ChangelogForm';
-export { default as ChangelogEditor } from './ChangelogEditor';
-export { default as ChangelogPreview } from './ChangelogPreview';
+export { ChangelogEditor } from './ChangelogEditor';
+export { ChangelogForm } from './ChangelogForm';
+export { ChangelogList } from './ChangelogList';
+export { ChangelogPreview } from './ChangelogPreview';

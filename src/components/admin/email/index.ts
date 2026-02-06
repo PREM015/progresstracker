@@ -1,7 +1,7 @@
-export { default as EmailDashboard } from './EmailDashboard';
-export { default as EmailTemplatesList } from './EmailTemplatesList';
-export { default as EmailTemplateForm } from './EmailTemplateForm';
-export { default as EmailTemplateEditor } from './EmailTemplateEditor';
-export { default as EmailTemplatePreview } from './EmailTemplatePreview';
-export { default as EmailTestSend } from './EmailTestSend';
-export { default as EmailStats } from './EmailStats';
+export { EmailDashboard } from './EmailDashboard';
+export { EmailStats } from './EmailStats';
+export { EmailTemplateEditor } from './EmailTemplateEditor';
+export { EmailTemplateForm } from './EmailTemplateForm';
+export { EmailTemplatePreview } from './EmailTemplatePreview';
+export { EmailTemplatesList } from './EmailTemplatesList';
+export { EmailTestSend } from './EmailTestSend';

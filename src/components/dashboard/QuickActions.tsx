@@ -1,119 +1,85 @@
-/**
- * Component: QuickActions
- * Location: components/dashboard/QuickActions.tsx
- * 
- * Description: Quick action buttons
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useRouter } from 'next/navigation';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/sync/trigger-all
-// - /api/tracker
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/sync/trigger-all
-const fetchQuickActionsData = async () => {
-  try {
-    const response = await apiClient.get('/api/sync/trigger-all');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/tracker
-const fetchQuickActionsData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface QuickActionsProps {
-  className?: string;
-  // Add component-specific props here
+interface QuickAction {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+  action: () => void;
 }
 
-// ===== COMPONENT =====
+interface QuickActionsProps {
+  className?: string;
+}
+
 export const QuickActions: React.FC<QuickActionsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const actions: QuickAction[] = [
+    {
+      id: 'add-entry',
+      title: 'Add Entry',
+      description: 'Log a new tracker entry',
+      icon: '➕',
+      color: 'from-blue-500 to-cyan-500',
+      action: () => router.push('/tracker/new'),
+    },
+    {
+      id: 'create-goal',
+      title: 'Create Goal',
+      description: 'Set a new goal',
+      icon: '🎯',
+      color: 'from-purple-500 to-pink-500',
+      action: () => router.push('/goals/new'),
+    },
+    {
+      id: 'sync-platforms',
+      title: 'Sync Platforms',
+      description: 'Sync all connected platforms',
+      icon: '🔄',
+      color: 'from-green-500 to-emerald-500',
+      action: async () => {
+        await fetch('/api/sync/trigger-all', { method: 'POST' });
+      },
+    },
+    {
+      id: 'view-analytics',
+      title: 'View Analytics',
+      description: 'Check your progress',
+      icon: '📊',
+      color: 'from-orange-500 to-red-500',
+      action: () => router.push('/analytics'),
+    },
+  ];
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>QuickActions</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            onClick={action.action}
+            className={`relative overflow-hidden bg-gradient-to-br ${action.color} text-white rounded-xl p-6 hover:scale-105 transition-transform group`}
+          >
+            <div className="relative z-10">
+              <div className="text-4xl mb-3">{action.icon}</div>
+              <div className="font-bold mb-1">{action.title}</div>
+              <div className="text-xs opacity-90">{action.description}</div>
+            </div>
+            <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default QuickActions;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/sync/trigger-all
- * - API: /api/tracker
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

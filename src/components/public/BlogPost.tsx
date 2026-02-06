@@ -1,123 +1,50 @@
-/**
- * Component: BlogPost
- * Location: components/public/BlogPost.tsx
- * 
- * Description: Blog post view
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/public/blog/[slug]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - BlogPost
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for BlogPost model
-interface IBlogPost {
-  id: string;
-  // Add fields from your Prisma BlogPost model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/public/blog/[slug]
-const fetchBlogPostData = async () => {
-  try {
-    const response = await apiClient.get('/api/public/blog/[slug]');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface BlogPostProps {
+  post: {
+    title: string;
+    content: string;
+    author: string;
+    publishedAt: string;
+    category: string;
+    readTime?: number;
+  };
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const BlogPost: React.FC<BlogPostProps> = ({
-  className,
+  post,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>BlogPost</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <article className={`bg-white rounded-xl ${className}`}>
+      <div className="max-w-3xl mx-auto p-8">
+        <div className="mb-8">
+          <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded-full mb-4">
+            {post.category}
+          </span>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+          <div className="flex items-center gap-4 text-gray-600 text-sm">
+            <span>By {post.author}</span>
+            <span>•</span>
+            <span>{new Date(post.publishedAt).toLocaleDateString()}</span>
+            {post.readTime && (
+              <>
+                <span>•</span>
+                <span>{post.readTime} min read</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="prose prose-lg max-w-none">
+          {post.content}
+        </div>
+      </div>
+    </article>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default BlogPost;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/public/blog/[slug]
- *  * - Model: BlogPost
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

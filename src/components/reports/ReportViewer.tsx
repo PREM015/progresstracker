@@ -1,123 +1,59 @@
-/**
- * Component: ReportViewer
- * Location: components/reports/ReportViewer.tsx
- * 
- * Description: View full report
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/reports/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Report
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Report model
-interface IReport {
+interface Report {
   id: string;
-  // Add fields from your Prisma Report model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  type: string;
+  generatedAt: string;
+  size: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/reports/[id]
-const fetchReportViewerData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/reports/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ReportViewerProps {
+  reportId?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ReportViewer: React.FC<ReportViewerProps> = ({
-  className,
+  reportId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    if (reportId) {
+      fetch(`/api/reports/${reportId}`)
+        .then(r => r.json())
+        .then(data => setReport(data));
+    }
+  }, [reportId]);
 
-  // Component logic
-  
-  // Render
+  if (!report) {
+    return <div className="bg-gray-100 rounded-xl p-12 text-center text-gray-500">
+      Select a report to view
+    </div>;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReportViewer</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h3 className="text-2xl font-bold text-gray-900">{report.title}</h3>
+          <p className="text-sm text-gray-600">Generated {new Date(report.generatedAt).toLocaleString()}</p>
+        </div>
+        <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+          📥 Download
+        </button>
+      </div>
+
+      <div className="border-t pt-6">
+        <div className="prose max-w-none">
+          <p className="text-gray-700">Report content would be rendered here...</p>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReportViewer;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/reports/[id]
- *  * - Model: Report
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

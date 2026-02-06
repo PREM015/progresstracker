@@ -48,7 +48,7 @@ export const Hero: React.FC<HeroProps> = ({
   }, []);
 
   // Component logic
-  
+
   // Render
   return (
     <div className={className}>

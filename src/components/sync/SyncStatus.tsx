@@ -1,123 +1,45 @@
-/**
- * Component: SyncStatus
- * Location: components/sync/SyncStatus.tsx
- * 
- * Description: Current sync status
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/sync/status
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/sync/status
-const fetchSyncStatusData = async () => {
-  try {
-    const response = await apiClient.get('/api/sync/status');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SyncStatusProps {
+  platform: string;
+  status: 'idle' | 'syncing' | 'success' | 'error';
+  lastSync?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SyncStatus: React.FC<SyncStatusProps> = ({
-  className,
+  platform,
+  status,
+  lastSync,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const statusConfig = {
+    idle: { icon: '⏸️', color: 'text-gray-600', bg: 'bg-gray-100' },
+    syncing: { icon: '🔄', color: 'text-blue-600', bg: 'bg-blue-100' },
+    success: { icon: '✅', color: 'text-green-600', bg: 'bg-green-100' },
+    error: { icon: '❌', color: 'text-red-600', bg: 'bg-red-100' },
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const config = statusConfig[status];
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SyncStatus</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`flex items-center gap-3 p-4 border rounded-lg ${className}`}>
+      <span className={`text-2xl ${status === 'syncing' ? 'animate-spin' : ''}`}>
+        {config.icon}
+      </span>
+      <div className="flex-1">
+        <div className="font-semibold">{platform}</div>
+        {lastSync && (
+          <div className="text-sm text-gray-600">Last sync: {lastSync}</div>
+        )}
+      </div>
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${config.bg} ${config.color} capitalize`}>
+        {status}
+      </span>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SyncStatus;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/sync/status
- *  * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

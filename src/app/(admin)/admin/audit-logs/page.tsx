@@ -1,21 +1,14 @@
-import { Metadata } from "next";
+import { AuditLogsList } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Audit Logs | Progress Tracker",
-  description: "Audit Logs page for Progress Tracker application",
-};
-
-export default async function AdminAuditLogsPage() {
+export default function AuditLogsPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Audit Logs</h1>
-      
-      {/* TODO: Implement Audit Logs */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Audit Logs page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Audit Logs</h1>
+        <p className="text-zinc-400">System activity and security logs</p>
       </div>
+
+      <AuditLogsList />
     </div>
   );
 }

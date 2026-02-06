@@ -1,123 +1,51 @@
-/**
- * Component: BlogSidebar
- * Location: components/public/BlogSidebar.tsx
- * 
- * Description: Blog sidebar
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/public/blog
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - BlogPost
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for BlogPost model
-interface IBlogPost {
-  id: string;
-  // Add fields from your Prisma BlogPost model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/public/blog
-const fetchBlogSidebarData = async () => {
-  try {
-    const response = await apiClient.get('/api/public/blog');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface BlogSidebarProps {
+  categories: string[];
+  recentPosts: Array<{ title: string; slug: string }>;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const BlogSidebar: React.FC<BlogSidebarProps> = ({
-  className,
+  categories,
+  recentPosts,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>BlogSidebar</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <aside className={`bg-white border rounded-xl p-6 ${className}`}>
+      <div className="mb-8">
+        <h3 className="font-bold text-lg mb-4">Categories</h3>
+        <div className="space-y-2">
+          {categories.map(category => (
+            <a
+              key={category}
+              href={`/blog/category/${category.toLowerCase()}`}
+              className="block px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              {category}
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-bold text-lg mb-4">Recent Posts</h3>
+        <div className="space-y-3">
+          {recentPosts.map(post => (
+            <a
+              key={post.slug}
+              href={`/blog/${post.slug}`}
+              className="block text-sm text-gray-700 hover:text-indigo-600"
+            >
+              {post.title}
+            </a>
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default BlogSidebar;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/public/blog
- *  * - Model: BlogPost
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

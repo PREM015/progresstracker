@@ -1,146 +1,109 @@
-/**
- * Component: SyncDashboard
- * Location: components/sync/SyncDashboard.tsx
- * 
- * Description: Sync overview
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/sync
-// - /api/sync/status
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - SyncLog
-// - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for SyncLog model
-interface ISyncLog {
-  id: string;
-  // Add fields from your Prisma SyncLog model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/sync
-const fetchSyncDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/sync');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/sync/status
-const fetchSyncDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/sync/status');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SyncDashboardProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SyncDashboard: React.FC<SyncDashboardProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    const fetchSummary = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/platforms/summary');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to fetch platforms');
+        setPlatforms(json?.data?.platforms || []);
+      } catch (err) {
+        console.error(err);
+        setPlatforms([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSummary();
   }, []);
 
-  // Component logic
-  
-  // Render
+  const triggerSyncAll = async () => {
+    setSyncingAll(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/sync/trigger-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message || json?.error || 'Failed to trigger sync');
+      setMessage(json?.data?.message || json?.message || 'Sync queued');
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to trigger sync');
+    } finally {
+      setSyncingAll(false);
+    }
+  };
+
+  const timeAgo = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    const ts = new Date(dateStr).getTime();
+    const diff = Math.max(0, Date.now() - ts);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const getStatusColor = (connected: boolean) => {
+    return connected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600';
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SyncDashboard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Sync Dashboard</h3>
+
+      <div className="space-y-3">
+        {loading ? (
+          <div className="p-4 text-sm text-gray-500">Loading platforms...</div>
+        ) : platforms.length === 0 ? (
+          <div className="p-4 text-sm text-gray-500">No platforms connected</div>
+        ) : (
+          platforms.map((platform) => (
+            <div key={platform.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+              <div>
+                <div className="font-semibold text-gray-900">{platform.name}</div>
+                <div className="text-sm text-gray-600">
+                  Last sync: {timeAgo(platform.lastSync)} - {platform.itemsCount ?? 0} items
+                </div>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(platform.connected)}`}>
+                {platform.connected ? 'connected' : 'not connected'}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button
+        onClick={triggerSyncAll}
+        disabled={syncingAll || platforms.length === 0}
+        className="w-full mt-6 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {syncingAll ? 'Syncing...' : 'Sync All Platforms'}
+      </button>
+      {message && <div className="mt-3 text-sm text-gray-600">{message}</div>}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SyncDashboard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/sync
- * - API: /api/sync/status
- *  * - Model: SyncLog
- * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,123 +1,87 @@
-/**
- * Component: TrackerEntryCard
- * Location: components/tracker/TrackerEntryCard.tsx
- * 
- * Description: Individual entry display
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
+interface Entry {
   id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  platform: string;
+  value: number;
+  date: string;
+  category: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker/[id]
-const fetchTrackerEntryCardData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/tracker/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerEntryCardProps {
+  entry: Entry;
+  onEdit?: () => void;
+  onDelete?: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerEntryCard: React.FC<TrackerEntryCardProps> = ({
-  className,
+  entry,
+  onEdit,
+  onDelete,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const platformIcons: Record<string, string> = {
+    leetcode: '💻',
+    github: '🐙',
+    hackerrank: '🏅',
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerEntryCard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all ${className}`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-4xl">{platformIcons[entry.platform] || '📊'}</span>
+          <div>
+            <h4 className="font-bold text-gray-900">{entry.title}</h4>
+            <p className="text-sm text-gray-600">{entry.platform}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Edit"
+            >
+              ✏️
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete"
+            >
+              🗑️
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-indigo-50 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold text-indigo-600">{entry.value}</div>
+          <div className="text-xs text-gray-600">Value</div>
+        </div>
+        <div className="bg-purple-50 rounded-lg p-3 text-center">
+          <div className="text-sm font-bold text-purple-600">{new Date(entry.date).toLocaleDateString()}</div>
+          <div className="text-xs text-gray-600">Date</div>
+        </div>
+      </div>
+
+      {entry.category && (
+        <div className="flex gap-2">
+          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium capitalize">
+            {entry.category}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerEntryCard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker/[id]
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,123 +1,100 @@
-/**
- * Component: CustomPlatformList
- * Location: components/platforms/CustomPlatformList.tsx
- * 
- * Description: List user's custom platforms
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/custom-platforms
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - CustomPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for CustomPlatform model
-interface ICustomPlatform {
+interface CustomPlatform {
   id: string;
-  // Add fields from your Prisma CustomPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  baseUrl: string;
+  icon: string;
+  color: string;
+  isConnected: boolean;
+  createdAt: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/custom-platforms
-const fetchCustomPlatformListData = async () => {
-  try {
-    const response = await apiClient.get('/api/custom-platforms');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface CustomPlatformListProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const CustomPlatformList: React.FC<CustomPlatformListProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<CustomPlatform[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/platforms/custom')
+      .then(r => r.json())
+      .then(data => setPlatforms(data))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Component logic
-  
-  // Render
+  const deletePlatform = async (id: string) => {
+    if (confirm('Delete this custom platform?')) {
+      await fetch(`/api/platforms/custom/${id}`, { method: 'DELETE' });
+      setPlatforms(platforms.filter(p => p.id !== id));
+    }
+  };
+
+  if (loading) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>CustomPlatformList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      <h3 className="text-xl font-bold text-gray-900 mb-4">Your Custom Platforms</h3>
+
+      {platforms.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-xl">
+          <span className="text-5xl mb-4 block">🔗</span>
+          <p className="text-gray-500">No custom platforms yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {platforms.map((platform) => (
+            <div
+              key={platform.id}
+              className="border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all"
+              style={{ borderColor: platform.color + '40' }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
+                    style={{ backgroundColor: platform.color + '20' }}
+                  >
+                    {platform.icon}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900">{platform.name}</h4>
+                    <p className="text-xs text-gray-500">{platform.baseUrl}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => deletePlatform(platform.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  🗑️
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-3 py-1 rounded-full ${platform.isConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                  {platform.isConnected ? '✓ Connected' : 'Not Connected'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  Added {new Date(platform.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default CustomPlatformList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/custom-platforms
- *  * - Model: CustomPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

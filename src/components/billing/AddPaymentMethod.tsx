@@ -1,123 +1,100 @@
-/**
- * Component: AddPaymentMethod
- * Location: components/billing/AddPaymentMethod.tsx
- * 
- * Description: Add payment method
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/stripe/payment-methods
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - PaymentMethod
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for PaymentMethod model
-interface IPaymentMethod {
-  id: string;
-  // Add fields from your Prisma PaymentMethod model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/stripe/payment-methods
-const fetchAddPaymentMethodData = async () => {
-  try {
-    const response = await apiClient.get('/api/stripe/payment-methods');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface AddPaymentMethodProps {
+  onSuccess: () => void;
+  onCancel: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const AddPaymentMethod: React.FC<AddPaymentMethodProps> = ({
-  className,
+  onSuccess,
+  onCancel,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    cardNumber: '',
+    cardName: '',
+    expiryDate: '',
+    cvv: '',
+  });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/billing/payment-methods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    onSuccess();
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>AddPaymentMethod</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Add Payment Method</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
+          <input
+            type="text"
+            placeholder="1234 5678 9012 3456"
+            value={formData.cardNumber}
+            onChange={(e) => setFormData({ ...formData, cardNumber: e.target.value })}
+            required
+            className="w-full px-4 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
+          <input
+            type="text"
+            placeholder="John Doe"
+            value={formData.cardName}
+            onChange={(e) => setFormData({ ...formData, cardName: e.target.value })}
+            required
+            className="w-full px-4 py-2 border rounded-lg"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date</label>
+            <input
+              type="text"
+              placeholder="MM/YY"
+              value={formData.expiryDate}
+              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+              required
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+            <input
+              type="text"
+              placeholder="123"
+              value={formData.cvv}
+              onChange={(e) => setFormData({ ...formData, cvv: e.target.value })}
+              required
+              className="w-full px-4 py-2 border rounded-lg"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button type="button" onClick={onCancel} className="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50">
+            Cancel
+          </button>
+          <button type="submit" className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            Add Card
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default AddPaymentMethod;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/stripe/payment-methods
- *  * - Model: PaymentMethod
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,135 +1,145 @@
-/**
- * Component: CustomPlatformForm
- * Location: components/platforms/CustomPlatformForm.tsx
- * 
- * Description: Create/edit custom platform
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/custom-platforms
-// - /api/custom-platforms/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - CustomPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for CustomPlatform model
-interface ICustomPlatform {
-  id: string;
-  // Add fields from your Prisma CustomPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/custom-platforms
-const fetchCustomPlatformFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/custom-platforms');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/custom-platforms/[id]
-const fetchCustomPlatformFormData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/custom-platforms/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface CustomPlatformFormProps {
+  onSubmit: (data: CustomPlatform Data) => Promise<void>;
+  onCancel?: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface CustomPlatformData {
+  name: string;
+  baseUrl: string;
+  apiEndpoint: string;
+  authType: 'api_key' | 'oauth' | 'username_password';
+  icon?: string;
+  color?: string;
+}
+
 export const CustomPlatformForm: React.FC<CustomPlatformFormProps> = ({
-  className,
+  onSubmit,
+  onCancel,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<CustomPlatformData>({
+    name: '',
+    baseUrl: '',
+    apiEndpoint: '',
+    authType: 'api_key',
+    icon: '🔗',
+    color: '#6366f1',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await onSubmit(formData);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>CustomPlatformForm</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Add Custom Platform</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Platform Name</label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="My Custom Platform"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
+          <input
+            type="url"
+            value={formData.baseUrl}
+            onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="https://api.example.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">API Endpoint</label>
+          <input
+            type="text"
+            value={formData.apiEndpoint}
+            onChange={(e) => setFormData({ ...formData, apiEndpoint: e.target.value })}
+            required
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="/api/v1/stats"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Authentication Type</label>
+          <select
+            value={formData.authType}
+            onChange={(e) => setFormData({ ...formData, authType: e.target.value as any })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="api_key">API Key</option>
+            <option value="oauth">OAuth</option>
+            <option value="username_password">Username/Password</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Icon (Emoji)</label>
+            <input
+              type="text"
+              value={formData.icon}
+              onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-center text-2xl"
+              placeholder="🔗"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+            <input
+              type="color"
+              value={formData.color}
+              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              className="w-full h-10 border border-gray-300 rounded-lg"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {isSubmitting ? 'Adding...' : 'Add Platform'}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default CustomPlatformForm;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/custom-platforms
- * - API: /api/custom-platforms/[id]
- *  * - Model: CustomPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

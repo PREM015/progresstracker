@@ -1,123 +1,99 @@
-/**
- * Component: PlatformDisconnect
- * Location: components/platforms/PlatformDisconnect.tsx
- * 
- * Description: Disconnect platform confirmation
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/disconnect
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/disconnect
-const fetchPlatformDisconnectData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/disconnect');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformDisconnectProps {
+  platformId: string;
+  platformName: string;
+  onSuccess: () => void;
+  onCancel: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const PlatformDisconnect: React.FC<PlatformDisconnectProps> = ({
-  className,
+  platformId,
+  platformName,
+  onSuccess,
+  onCancel,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [deleteData, setDeleteData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    setError(null);
 
-  // Component logic
-  
-  // Render
+    try {
+      const res = await fetch(`/api/platforms/${platformId}/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteData }),
+      });
+
+      if (!res.ok) throw new Error('Disconnection failed');
+
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformDisconnect</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border-2 border-red-200 rounded-2xl p-8 max-w-md mx-auto ${className}`}>
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">⚠️</span>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Disconnect {platformName}?</h3>
+        <p className="text-gray-600">
+          This will stop syncing data from this platform. You can reconnect at any time.
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      <div className="mb-6">
+        <label className="flex items-start gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+          <input
+            type="checkbox"
+            checked={deleteData}
+            onChange={(e) => setDeleteData(e.target.checked)}
+            className="mt-1"
+          />
+          <div>
+            <div className="font-medium text-gray-900">Delete synced data</div>
+            <div className="text-sm text-gray-600">
+              Permanently remove all data synced from this platform. This cannot be undone.
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onCancel}
+          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleDisconnect}
+          disabled={isDisconnecting}
+          className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+        >
+          {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformDisconnect;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/disconnect
- *  * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,4 +1,4 @@
-export { default as AuditLogsList } from './AuditLogsList';
-export { default as AuditLogFilters } from './AuditLogFilters';
-export { default as AuditLogDetail } from './AuditLogDetail';
-export { default as AuditLogExport } from './AuditLogExport';
+export { AuditLogsList } from './AuditLogsList';
+export { AuditLogDetail } from './AuditLogDetail';
+export { AuditLogExport } from './AuditLogExport';
+export { AuditLogFilters } from './AuditLogFilters';

@@ -1,123 +1,84 @@
-/**
- * Component: GoalTemplates
- * Location: components/goals/GoalTemplates.tsx
- * 
- * Description: Goal template browser
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/templates
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - GoalTemplate
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for GoalTemplate model
-interface IGoalTemplate {
+interface GoalTemplate {
   id: string;
-  // Add fields from your Prisma GoalTemplate model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  description: string;
+  category: string;
+  targetValue: number;
+  suggestedDeadlineDays: number;
+  icon: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/templates
-const fetchGoalTemplatesData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/templates');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalTemplatesProps {
+  onSelectTemplate: (template: GoalTemplate) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalTemplates: React.FC<GoalTemplatesProps> = ({
-  className,
+  onSelectTemplate,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<GoalTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('all');
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/goals/templates')
+      .then(r => r.json())
+      .then(data => setTemplates(data))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Component logic
-  
-  // Render
+  const filteredTemplates = category === 'all'
+    ? templates
+    : templates.filter(t => t.category === category);
+
+  if (loading) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-48 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalTemplates</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      <div className="mb-6">
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">Goal Templates</h3>
+        <div className="flex gap-2 flex-wrap">
+          {['all', 'learning', 'fitness', 'career', 'personal'].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${category === cat ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+            >
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredTemplates.map((template) => (
+          <div
+            key={template.id}
+            className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer"
+            onClick={() => onSelectTemplate(template)}
+          >
+            <div className="text-4xl mb-3">{template.icon}</div>
+            <h4 className="font-bold text-gray-900 mb-2">{template.title}</h4>
+            <p className="text-sm text-gray-600 mb-4">{template.description}</p>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span className="px-2 py-1 bg-gray-100 rounded capitalize">{template.category}</span>
+              <span>{template.suggestedDeadlineDays} days</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalTemplates;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/templates
- *  * - Model: GoalTemplate
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

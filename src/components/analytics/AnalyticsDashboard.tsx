@@ -1,146 +1,193 @@
-/**
- * Component: AnalyticsDashboard
- * Location: components/analytics/AnalyticsDashboard.tsx
- * 
- * Description: Main analytics page
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics
-// - /api/analytics/dashboard
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - DailyStats
-// - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface Analytics {
+  totalProblems: number;
+  totalCommits: number;
+  totalTimeSpent: number;
+  totalPoints: number;
+  averagePerDay: number;
+  mostActiveDay: string;
+  topPlatform: string;
+  weeklyGrowth: number;
 }
 
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics
-const fetchAnalyticsDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/analytics/dashboard
-const fetchAnalyticsDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/dashboard');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface AnalyticsDashboardProps {
+  userId: string;
+  timeRange?: '7d' | '30d' | '90d' | 'all';
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
+
+interface AnalyticsResponse {
+  overview: {
+    totalProblems: number;
+    totalCommits: number;
+    totalTimeSpent: number;
+    totalPoints: number;
+    avgProblemsPerDay: number;
+  };
+  platforms?: Array<{
+    platformName: string;
+    problems: number;
+  }> | null;
+}
+
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
-  className,
+  userId,
+  timeRange = '30d',
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedRange, setSelectedRange] = useState(timeRange);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetchAnalytics();
+  }, [userId, selectedRange]);
 
-  // Component logic
-  
-  // Render
+  const rangeToDays = (range: '7d' | '30d' | '90d' | 'all') => {
+    if (range === '7d') return 7;
+    if (range === '90d') return 90;
+    if (range === 'all') return 365;
+    return 30;
+  };
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const days = rangeToDays(selectedRange);
+      const res = await fetch(`/api/analytics?days=${days}&includePlatforms=true`);
+      const json = (await res.json()) as ApiSuccess<AnalyticsResponse>;
+      if (!res.ok || !json?.success) throw new Error('Failed to fetch analytics');
+
+      const overview = json.data?.overview;
+      const topPlatform = json.data?.platforms?.[0]?.platformName || 'None';
+
+      const mapped: Analytics = {
+        totalProblems: overview?.totalProblems || 0,
+        totalCommits: overview?.totalCommits || 0,
+        totalTimeSpent: overview?.totalTimeSpent || 0,
+        totalPoints: overview?.totalPoints || 0,
+        averagePerDay: overview?.avgProblemsPerDay || 0,
+        mostActiveDay: 'N/A',
+        topPlatform,
+        weeklyGrowth: 0,
+      };
+
+      setAnalytics(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error || !analytics) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <p className="text-red-600">{error || 'No analytics data available'}</p>
+        <button
+          onClick={fetchAnalytics}
+          className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>AnalyticsDashboard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      <div className="flex gap-2 mb-6">
+        {(['7d', '30d', '90d', 'all'] as const).map((range) => (
+          <button
+            key={range}
+            onClick={() => setSelectedRange(range)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedRange === range
+              ? 'bg-indigo-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            {range === 'all' ? 'All Time' : `Last ${range}`}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <StatCard label="Problems Solved" value={analytics.totalProblems.toLocaleString()} color="blue" />
+        <StatCard label="Total Commits" value={analytics.totalCommits.toLocaleString()} color="green" />
+        <StatCard label="Time Spent" value={`${Math.floor(analytics.totalTimeSpent / 60)}h`} color="purple" />
+        <StatCard label="Total Points" value={analytics.totalPoints.toLocaleString()} color="yellow" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Average Per Day</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {analytics.averagePerDay.toFixed(1)}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">problems/day</p>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Top Platform</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {analytics.topPlatform}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">by activity</p>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Weekly Growth</div>
+          <div className={`text-2xl font-bold ${analytics.weeklyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {analytics.weeklyGrowth >= 0 ? '+' : ''}{analytics.weeklyGrowth}%
+          </div>
+          <p className="text-xs text-gray-500 mt-1">vs last week</p>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
+interface StatCardProps {
+  label: string;
+  value: string;
+  color: 'blue' | 'green' | 'purple' | 'yellow';
+}
 
-// ===== STYLES =====
-// Add any component-specific styles
+function StatCard({ label, value, color }: StatCardProps) {
+  const colorMap = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    yellow: 'bg-yellow-50 border-yellow-200',
+  };
 
-// ===== EXPORTS =====
+  return (
+    <div className={`border-2 rounded-xl p-6 ${colorMap[color]}`}>
+      <div className="text-sm font-medium text-gray-700 mb-2">{label}</div>
+      <div className="text-3xl font-bold text-gray-900">{value}</div>
+    </div>
+  );
+}
+
 export default AnalyticsDashboard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics
- * - API: /api/analytics/dashboard
- *  * - Model: DailyStats
- * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

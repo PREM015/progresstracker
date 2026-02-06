@@ -1,135 +1,59 @@
-/**
- * Component: ConnectedAccounts
- * Location: components/settings/ConnectedAccounts.tsx
- * 
- * Description: OAuth connections
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/auth/social/connect
-// - /api/auth/social/disconnect
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Account
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Account model
-interface IAccount {
+interface ConnectedAccount {
   id: string;
-  // Add fields from your Prisma Account model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  platform: string;
+  username: string;
+  connectedAt: string;
+  icon: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/auth/social/connect
-const fetchConnectedAccountsData = async () => {
-  try {
-    const response = await apiClient.get('/api/auth/social/connect');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/auth/social/disconnect
-const fetchConnectedAccountsData = async () => {
-  try {
-    const response = await apiClient.get('/api/auth/social/disconnect');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ConnectedAccountsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ConnectedAccounts: React.FC<ConnectedAccountsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/user/connected-accounts')
+      .then(r => r.json())
+      .then(data => setAccounts(data));
   }, []);
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ConnectedAccounts</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Connected Accounts</h3>
+
+      <div className="space-y-3">
+        {accounts.map(account => (
+          <div key={account.id} className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex items-center gap-4">
+              <span className="text-3xl">{account.icon}</span>
+              <div>
+                <div className="font-semibold">{account.platform}</div>
+                <div className="text-sm text-gray-600">@{account.username}</div>
+              </div>
+            </div>
+            <button className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg">
+              Disconnect
+            </button>
+          </div>
+        ))}
+
+        {accounts.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <span className="text-5xl mb-4 block">🔗</span>
+            No accounts connected
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ConnectedAccounts;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/auth/social/connect
- * - API: /api/auth/social/disconnect
- *  * - Model: Account
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

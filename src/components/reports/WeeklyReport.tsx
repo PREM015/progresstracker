@@ -1,123 +1,54 @@
-/**
- * Component: WeeklyReport
- * Location: components/reports/WeeklyReport.tsx
- * 
- * Description: Weekly report template
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/reports/weekly
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Report
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Report model
-interface IReport {
-  id: string;
-  // Add fields from your Prisma Report model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/reports/weekly
-const fetchWeeklyReportData = async () => {
-  try {
-    const response = await apiClient.get('/api/reports/weekly');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface WeeklyReportProps {
+  data: {
+    week: string;
+    totalProblems: number;
+    hoursStudied: number;
+    goalsCompleted: number;
+    topPlatforms: Array<{ name: string; count: number }>;
+  };
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const WeeklyReport: React.FC<WeeklyReportProps> = ({
-  className,
+  data,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>WeeklyReport</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-8 ${className}`}>
+      <h2 className="text-2xl font-bold mb-6">📊 Week of {data.week}</h2>
+
+      <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-indigo-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-indigo-600">{data.totalProblems}</div>
+          <div className="text-sm text-gray-600 mt-2">Problems Solved</div>
+        </div>
+        <div className="bg-purple-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-purple-600">{data.hoursStudied}h</div>
+          <div className="text-sm text-gray-600 mt-2">Hours Studied</div>
+        </div>
+        <div className="bg-green-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-green-600">{data.goalsCompleted}</div>
+          <div className="text-sm text-gray-600 mt-2">Goals Completed</div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-bold mb-4">Top Platforms</h3>
+        <div className="space-y-2">
+          {data.topPlatforms.map(platform => (
+            <div key={platform.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="font-medium">{platform.name}</span>
+              <span className="font-bold text-indigo-600">{platform.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default WeeklyReport;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/reports/weekly
- *  * - Model: Report
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

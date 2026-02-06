@@ -1,123 +1,53 @@
-/**
- * Component: MonthlyReport
- * Location: components/reports/MonthlyReport.tsx
- * 
- * Description: Monthly report template
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/reports/monthly
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Report
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Report model
-interface IReport {
-  id: string;
-  // Add fields from your Prisma Report model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/reports/monthly
-const fetchMonthlyReportData = async () => {
-  try {
-    const response = await apiClient.get('/api/reports/monthly');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface MonthlyReportProps {
+  data: {
+    month: string;
+    totalProblems: number;
+    streak: number;
+    achievements: number;
+    growth: number;
+  };
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const MonthlyReport: React.FC<MonthlyReportProps> = ({
-  className,
+  data,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>MonthlyReport</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-xl p-8 ${className}`}>
+      <h2 className="text-3xl font-bold mb-6">📈 {data.month} Summary</h2>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6">
+          <div className="text-4xl font-bold mb-2">{data.totalProblems}</div>
+          <div className="text-sm opacity-90">Total Problems</div>
+          <div className="text-xs opacity-75 mt-2">
+            {data.growth > 0 ? `↑ ${data.growth}% vs last month` : 'First month!'}
+          </div>
+        </div>
+
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6">
+          <div className="text-4xl font-bold mb-2">🔥 {data.streak}</div>
+          <div className="text-sm opacity-90">Day Streak</div>
+        </div>
+
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6">
+          <div className="text-4xl font-bold mb-2">🏆 {data.achievements}</div>
+          <div className="text-sm opacity-90">Achievements Unlocked</div>
+        </div>
+
+        <div className="bg-white/20 backdrop-blur rounded-xl p-6 flex items-center justify-center">
+          <button className="px-6 py-3 bg-white text-indigo-600 rounded-lg hover:bg-gray-100 font-bold">
+            📥 Download Report
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default MonthlyReport;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/reports/monthly
- *  * - Model: Report
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,21 +1,23 @@
-import { Metadata } from "next";
+import { RolesList } from '@/components/admin';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: "Roles | Progress Tracker",
-  description: "Roles page for Progress Tracker application",
-};
-
-export default async function AdminRolesPage() {
+export default function RolesPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Roles</h1>
-      
-      {/* TODO: Implement Roles */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Roles page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Roles</h1>
+          <p className="text-zinc-400">Manage user roles and permissions</p>
+        </div>
+        <Link
+          href="/admin/roles/new"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+        >
+          New Role
+        </Link>
       </div>
+
+      <RolesList />
     </div>
   );
 }

@@ -1,135 +1,118 @@
-/**
- * Component: NotificationDropdown
- * Location: components/notifications/NotificationDropdown.tsx
- * 
- * Description: Navbar dropdown
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/notifications
-// - /api/notifications/unread-count
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Notification
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Notification model
-interface INotification {
-  id: string;
-  // Add fields from your Prisma Notification model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/notifications
-const fetchNotificationDropdownData = async () => {
-  try {
-    const response = await apiClient.get('/api/notifications');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/notifications/unread-count
-const fetchNotificationDropdownData = async () => {
-  try {
-    const response = await apiClient.get('/api/notifications/unread-count');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface NotificationDropdownProps {
+  isOpen: boolean;
+  onClose: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
-  className,
+  isOpen,
+  onClose,
+  className = '',
 }) => {
-  // Component state
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    if (!isOpen) return;
 
-  // Component logic
-  
-  // Render
+    const fetchNotifications = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/notifications?limit=10');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to fetch notifications');
+        setNotifications(json?.data?.notifications || []);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load notifications');
+        setNotifications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, [isOpen]);
+
+  const markAllRead = async () => {
+    try {
+      await fetch('/api/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAllAsRead: true }),
+      });
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const timeAgo = (dateStr: string) => {
+    const ts = new Date(dateStr).getTime();
+    const diff = Math.max(0, Date.now() - ts);
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>NotificationDropdown</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <>
+      <div className="fixed inset-0" onClick={onClose} />
+      <div className={`absolute right-0 top-full mt-2 w-80 bg-white border rounded-xl shadow-2xl z-50 ${className}`}>
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold">Notifications</h4>
+            <button onClick={markAllRead} className="text-xs text-indigo-600">
+              Mark all as read
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-96 overflow-y-auto">
+          {loading ? (
+            <div className="p-4 text-sm text-gray-500">Loading...</div>
+          ) : error ? (
+            <div className="p-4 text-sm text-red-500">{error}</div>
+          ) : notifications.length === 0 ? (
+            <div className="p-4 text-sm text-gray-500">No notifications</div>
+          ) : (
+            notifications.map((notif) => (
+              <div
+                key={notif.id}
+                className={`p-4 border-b hover:bg-gray-50 cursor-pointer ${notif.isRead ? '' : 'bg-blue-50'}`}
+              >
+                <div className="flex items-start gap-3">
+                  {!notif.isRead && <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2" />}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{notif.title || notif.shortMessage || 'Notification'}</div>
+                    <div className="text-xs text-gray-600 mt-1">{notif.message}</div>
+                    <div className="text-xs text-gray-500 mt-1">{timeAgo(notif.createdAt)}</div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="p-3 border-t text-center">
+          <a href="/notifications" className="text-sm text-indigo-600 hover:text-indigo-700">
+            View All Notifications
+          </a>
+        </div>
+      </div>
+    </>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default NotificationDropdown;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/notifications
- * - API: /api/notifications/unread-count
- *  * - Model: Notification
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

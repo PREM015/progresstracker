@@ -1,123 +1,48 @@
-/**
- * Component: ReferralStats
- * Location: components/referral/ReferralStats.tsx
- * 
- * Description: Referral statistics
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/referral/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/referral/stats
-const fetchReferralStatsData = async () => {
-  try {
-    const response = await apiClient.get('/api/referral/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ReferralStatsProps {
+  stats: {
+    totalReferrals: number;
+    accepted: number;
+    pending: number;
+    rewards: number;
+  };
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ReferralStats: React.FC<ReferralStatsProps> = ({
-  className,
+  stats,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ReferralStats</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Referral Statistics</h3>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bg-indigo-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-indigo-600 mb-2">{stats.totalReferrals}</div>
+          <div className="text-sm text-gray-600">Total Referrals</div>
+        </div>
+
+        <div className="bg-green-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-green-600 mb-2">{stats.accepted}</div>
+          <div className="text-sm text-gray-600">Accepted</div>
+        </div>
+
+        <div className="bg-yellow-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-yellow-600 mb-2">{stats.pending}</div>
+          <div className="text-sm text-gray-600">Pending</div>
+        </div>
+
+        <div className="bg-purple-50 rounded-xl p-6 text-center">
+          <div className="text-4xl font-bold text-purple-600 mb-2">${stats.rewards}</div>
+          <div className="text-sm text-gray-600">Rewards Earned</div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ReferralStats;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/referral/stats
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

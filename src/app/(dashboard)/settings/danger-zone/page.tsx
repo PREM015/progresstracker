@@ -1,33 +1,57 @@
 "use client";
 
-import { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
-export default function SettingsDangerZonePage() {
-  const [isLoading, setIsLoading] = useState(true);
+export default function DangerZonePage() {
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm !== "DELETE") return;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+    setDeleting(true);
+    try {
+      await fetch('/api/user/delete-account', { method: 'POST' });
+      window.location.href = '/';
+    } catch (err) {
+      console.error(err);
+      setDeleting(false);
+    }
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Danger Zone</h1>
-      
-      {/* TODO: Implement Danger Zone */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Danger Zone page content goes here.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8 text-red-600">Danger Zone</h1>
+
+        <div className="bg-red-50 border-2 border-red-600 rounded-xl p-8">
+          <h2 className="text-2xl font-bold text-red-700 mb-4">Delete Account</h2>
+          <p className="text-gray-700 mb-6">
+            Once you delete your account, there is no going back. All your data, progress, achievements,
+            and settings will be permanently deleted. This action cannot be undone.
+          </p>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type <strong>DELETE</strong> to confirm:
+            </label>
+            <input
+              type="text"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-red-300 rounded-lg focus:outline-none focus:border-red-600"
+              placeholder="Type DELETE"
+            />
+          </div>
+
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleteConfirm !== "DELETE" || deleting}
+            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? 'Deleting Account...' : 'Permanently Delete My Account'}
+          </button>
+        </div>
       </div>
     </div>
   );

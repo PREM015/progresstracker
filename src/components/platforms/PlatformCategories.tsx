@@ -1,123 +1,55 @@
-/**
- * Component: PlatformCategories
- * Location: components/platforms/PlatformCategories.tsx
- * 
- * Description: Platform category filters
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
+interface Category {
   id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  icon: string;
+  platformCount: number;
+  connectedCount: number;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/categories
-const fetchPlatformCategoriesData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformCategoriesProps {
+  onSelectCategory: (categoryId: string) => void;
+  selectedCategory?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+const CATEGORIES: Category[] = [
+  { id: 'coding', name: 'Coding Platforms', icon: '💻', platformCount: 8, connectedCount: 0 },
+  { id: 'productivity', name: 'Productivity', icon: '✅', platformCount: 5, connectedCount: 0 },
+  { id: 'fitness', name: 'Fitness & Health', icon: '💪', platformCount: 6, connectedCount: 0 },
+  { id: 'learning', name: 'Learning', icon: '📚', platformCount: 7, connectedCount: 0 },
+  { id: 'social', name: 'Social Media', icon: '📱', platformCount: 4, connectedCount: 0 },
+  { id: 'finance', name: 'Finance', icon: '💰', platformCount: 3, connectedCount: 0 },
+];
+
 export const PlatformCategories: React.FC<PlatformCategoriesProps> = ({
-  className,
+  onSelectCategory,
+  selectedCategory,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformCategories</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 ${className}`}>
+      {CATEGORIES.map((category) => (
+        <button
+          key={category.id}
+          onClick={() => onSelectCategory(category.id)}
+          className={`p-6 rounded-xl border-2 transition-all hover:scale-105 ${selectedCategory === category.id
+              ? 'border-indigo-600 bg-indigo-50 shadow-lg'
+              : 'border-gray-200 bg-white hover:border-indigo-300'
+            }`}
+        >
+          <div className="text-4xl mb-3">{category.icon}</div>
+          <h3 className="font-semibold text-gray-900 mb-1 text-sm">{category.name}</h3>
+          <div className="text-xs text-gray-500">
+            {category.connectedCount}/{category.platformCount} connected
+          </div>
+        </button>
+      ))}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformCategories;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/categories
- *  * - Model: Platform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

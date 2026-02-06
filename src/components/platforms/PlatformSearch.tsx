@@ -1,123 +1,83 @@
-/**
- * Component: PlatformSearch
- * Location: components/platforms/PlatformSearch.tsx
- * 
- * Description: Search platforms
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/search
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
+interface Platform {
   id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  category: string;
+  icon: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/search
-const fetchPlatformSearchData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/search');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformSearchProps {
+  platforms: Platform[];
+  onSelect: (platform: Platform) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const PlatformSearch: React.FC<PlatformSearchProps> = ({
-  className,
+  platforms,
+  onSelect,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const filteredPlatforms = platforms.filter(p => {
+    const matchesQuery = p.name.toLowerCase().includes(query.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+    return matchesQuery && matchesCategory;
+  });
 
-  // Component logic
-  
-  // Render
+  const categories = ['all', ...Array.from(new Set(platforms.map(p => p.category)))];
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformSearch</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="mb-4">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search platforms..."
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-3 py-1 rounded-full text-sm ${selectedCategory === cat
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+        {filteredPlatforms.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            No platforms found
+          </div>
+        ) : (
+          filteredPlatforms.map((platform) => (
+            <button
+              key={platform.id}
+              onClick={() => onSelect(platform)}
+              className="p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-lg transition-all text-center"
+            >
+              <div className="text-4xl mb-2">{platform.icon}</div>
+              <div className="font-semibold text-gray-900 text-sm">{platform.name}</div>
+            </button>
+          ))
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformSearch;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/search
- *  * - Model: Platform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

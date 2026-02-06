@@ -1,87 +1,69 @@
-/**
- * Component: Footer
- * Location: components/navigation/Footer.tsx
- * 
- * Description: Site footer
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface FooterProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const Footer: React.FC<FooterProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const sections = [
+    {
+      title: 'Product',
+      links: [{ label: 'Features', href: '/features' }, { label: 'Pricing', href: '/pricing' }, { label: 'FAQ', href: '/faq' }],
+    },
+    {
+      title: 'Company',
+      links: [{ label: 'About', href: '/about' }, { label: 'Blog', href: '/blog' }, { label: 'Careers', href: '/careers' }],
+    },
+    {
+      title: 'Support',
+      links: [{ label: 'Help Center', href: '/help' }, { label: 'Contact', href: '/contact' }, { label: 'Status', href: '/status' }],
+    },
+    {
+      title: 'Legal',
+      links: [{ label: 'Privacy', href: '/privacy' }, { label: 'Terms', href: '/terms' }, { label: 'Security', href: '/security' }],
+    },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>Footer</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <footer className={`bg-gray-900 text-white py-16 ${className}`}>
+      <div className="container mx-auto px-6">
+        <div className="grid md:grid-cols-5 gap-8 mb-12">
+          <div>
+            <div className="text-2xl font-bold mb-4">Progress Tracker</div>
+            <p className="text-gray-400 text-sm">Track your progress, achieve your goals</p>
+          </div>
+
+          {sections.map((section) => (
+            <div key={section.title}>
+              <h4 className="font-bold mb-4">{section.title}</h4>
+              <ul className="space-y-2">
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <a href={link.href} className="text-gray-400 hover:text-white text-sm">
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="border-t border-gray-800 pt-8 flex items-center justify-between text-sm text-gray-400">
+          <div>© 2024 Progress Tracker. All rights reserved.</div>
+          <div className="flex gap-4">
+            <a href="#" className="hover:text-white">Twitter</a>
+            <a href="#" className="hover:text-white">GitHub</a>
+            <a href="#" className="hover:text-white">LinkedIn</a>
+          </div>
+        </div>
+      </div>
+    </footer>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default Footer;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,33 +1,47 @@
 "use client";
 
-import { Metadata } from "next";
 import { useState, useEffect } from "react";
+import LeaderboardTable from "@/components/leaderboard/LeaderboardTable";
+import LeaderboardFilters from "@/components/leaderboard/LeaderboardFilters";
+import TopPerformers from "@/components/leaderboard/LeaderboardCard";
+import UserRankBadge from "@/components/leaderboard/UserRankBadge";
 
 export default function LeaderboardPage() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState({ timeframe: "week", category: "overall" });
+  const [loading, setLoading] = useState(true);
+  const [userRank, setUserRank] = useState<{ rank: number; change: number } | null>(null);
 
   useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+    // Fetch user's rank
+    fetch('/api/leaderboard/user-rank')
+      .then(r => r.json())
+      .then(data => setUserRank(data))
+      .catch(err => console.error('Failed to fetch user rank:', err))
+      .finally(() => setLoading(false));
+  }, [filters]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Leaderboard</h1>
-      
-      {/* TODO: Implement Leaderboard */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Leaderboard page content goes here.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-4xl font-bold">Leaderboard</h1>
+            {!loading && userRank && (
+              <div className="mt-2">
+                <UserRankBadge rank={userRank.rank} showChange change={userRank.change} />
+              </div>
+            )}
+          </div>
+          <LeaderboardFilters
+            timeframe={filters.timeframe}
+            category={filters.category}
+            onChange={setFilters}
+          />
+        </div>
+
+        <div className="space-y-6">
+          <LeaderboardTable />
+        </div>
       </div>
     </div>
   );

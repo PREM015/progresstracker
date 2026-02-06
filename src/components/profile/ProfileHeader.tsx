@@ -1,123 +1,44 @@
-/**
- * Component: ProfileHeader
- * Location: components/profile/ProfileHeader.tsx
- * 
- * Description: Profile header
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/profile
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/profile
-const fetchProfileHeaderData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/profile');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileHeaderProps {
+  user: {
+    name: string;
+    username: string;
+    bio?: string;
+    avatar?: string;
+    joinedAt: string;
+  };
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
-  className,
+  user,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileHeader</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl p-8 ${className}`}>
+      <div className="flex items-start gap-6">
+        <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-4xl">
+          {user.avatar || user.name.charAt(0)}
+        </div>
+
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold mb-2">{user.name}</h1>
+          <div className="text-lg opacity-90 mb-3">@{user.username}</div>
+          {user.bio && <p className="opacity-90 mb-4">{user.bio}</p>}
+          <div className="text-sm opacity-75">
+            📅 Joined {new Date(user.joinedAt).toLocaleDateString()}
+          </div>
+        </div>
+
+        <button className="px-6 py-2 bg-white text-indigo-600 rounded-lg hover:bg-gray-100 font-semibold">
+          Edit Profile
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileHeader;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/profile
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

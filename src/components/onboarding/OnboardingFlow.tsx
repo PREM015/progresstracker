@@ -1,135 +1,226 @@
-/**
- * Component: OnboardingFlow
- * Location: components/onboarding/OnboardingFlow.tsx
- * 
- * Description: Onboarding wizard
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import WelcomeStep from './WelcomeStep';
+import ProfileSetupStep from './ProfileSetupStep';
+import PlatformConnectStep from './PlatformConnectStep';
+import PreferencesStep from './PreferencesStep';
+import GoalSetupStep from './GoalSetupStep';
+import CompletionStep from './CompletionStep';
+import OnboardingProgress from './OnboardingProgress';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/onboarding
-// - /api/user/onboarding/complete
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/onboarding
-const fetchOnboardingFlowData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/onboarding');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/user/onboarding/complete
-const fetchOnboardingFlowData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/onboarding/complete');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface OnboardingFlowProps {
   className?: string;
-  // Add component-specific props here
+  onComplete?: () => void;
 }
 
-// ===== COMPONENT =====
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+type StepKey = 'welcome' | 'profile' | 'platforms' | 'preferences' | 'goals' | 'complete';
 
-  // Fetch data on mount
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
+  className = '',
+  onComplete,
+}) => {
+  const steps: { key: StepKey; title: string }[] = [
+    { key: 'welcome', title: 'Welcome' },
+    { key: 'profile', title: 'Profile' },
+    { key: 'platforms', title: 'Platforms' },
+    { key: 'preferences', title: 'Preferences' },
+    { key: 'goals', title: 'Goals' },
+    { key: 'complete', title: 'Complete' },
+  ];
+
+  const [currentStep, setCurrentStep] = useState<StepKey>('welcome');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stepData, setStepData] = useState<Record<string, any>>({});
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    const fetchState = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/api/user/onboarding');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error?.message || 'Failed to load onboarding');
+        const data = json?.data || json;
+        setCurrentStep(data.currentStep || 'welcome');
+        setStepData(data.stepData || {});
+      } catch (err: any) {
+        setError(err.message || 'Failed to load onboarding');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchState();
   }, []);
 
-  // Component logic
-  
-  // Render
+  const markStepComplete = async (step: StepKey, data?: Record<string, any>) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/user/onboarding', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step, completed: true, data }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message || 'Failed to update onboarding');
+      const updated = json?.data || json;
+      setCurrentStep(updated.currentStep || step);
+      if (data) {
+        setStepData((prev) => ({ ...prev, [step]: data }));
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update onboarding');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateProfile = async (data: { name: string; bio?: string }) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: data.name, bio: data.bio || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message || 'Failed to update profile');
+      await markStepComplete('profile', data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile');
+      setSaving(false);
+    }
+  };
+
+  const checkPlatforms = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/platforms/connected?activeOnly=true');
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message || 'Failed to check platforms');
+      const connections = json?.data?.connections || [];
+      if (connections.length === 0) {
+        setError('Connect at least one platform to continue.');
+        setSaving(false);
+        return;
+      }
+      await markStepComplete('platforms');
+    } catch (err: any) {
+      setError(err.message || 'Failed to check platforms');
+      setSaving(false);
+    }
+  };
+
+  const savePreferences = async (prefs: any) => {
+    await markStepComplete('preferences', prefs);
+  };
+
+  const createGoalsFromTemplates = async (goals: { templateId: string; title: string; target: number; category: string }[]) => {
+    setSaving(true);
+    setError(null);
+    try {
+      if (goals.length === 0) {
+        await markStepComplete('goals', { count: 0 });
+        return;
+      }
+      for (const goal of goals) {
+        const res = await fetch('/api/goals/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateId: goal.templateId,
+            customizations: { target: goal.target },
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error?.message || 'Failed to create goal');
+      }
+      await markStepComplete('goals', { count: goals.length });
+    } catch (err: any) {
+      setError(err.message || 'Failed to create goals');
+      setSaving(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await fetch('/api/user/onboarding/complete', { method: 'POST' });
+      onComplete?.();
+    } catch (err: any) {
+      setError(err.message || 'Failed to complete onboarding');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentIndex = steps.findIndex((s) => s.key === currentStep);
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>OnboardingFlow</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      <OnboardingProgress
+        currentStep={Math.max(currentIndex, 0)}
+        totalSteps={steps.length}
+        stepTitles={steps.map((s) => s.title)}
+      />
+
+      {loading ? (
+        <div className="bg-white rounded-2xl p-8 text-center text-gray-500">Loading onboarding...</div>
+      ) : (
+        <>
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          {currentStep === 'welcome' && (
+            <WelcomeStep onNext={() => markStepComplete('welcome')} />
+          )}
+
+          {currentStep === 'profile' && (
+            <ProfileSetupStep onNext={updateProfile} />
+          )}
+
+          {currentStep === 'platforms' && (
+            <PlatformConnectStep onNext={checkPlatforms} />
+          )}
+
+          {currentStep === 'preferences' && (
+            <PreferencesStep onNext={savePreferences} />
+          )}
+
+          {currentStep === 'goals' && (
+            <GoalSetupStep onNext={createGoalsFromTemplates} />
+          )}
+
+          {currentStep === 'complete' && (
+            <div className="space-y-4">
+              <CompletionStep userName={stepData.profile?.name || 'there'} />
+              <button
+                onClick={handleComplete}
+                disabled={saving}
+                className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {saving ? 'Finalizing...' : 'Finish Onboarding'}
+              </button>
+            </div>
+          )}
+
+          {saving && (
+            <div className="mt-4 text-sm text-gray-500">Saving...</div>
+          )}
+        </>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default OnboardingFlow;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/onboarding
- * - API: /api/user/onboarding/complete
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,123 +1,96 @@
-/**
- * Component: ChangelogPage
- * Location: components/public/ChangelogPage.tsx
- * 
- * Description: Public changelog
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/public/changelog
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - ChangelogEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for ChangelogEntry model
-interface IChangelogEntry {
+interface ChangelogEntry {
   id: string;
-  // Add fields from your Prisma ChangelogEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  version: string;
+  title: string;
+  description: string;
+  type: string;
+  changes: Array<{ type: string; description: string }> | any;
+  publishedAt: string | null;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/public/changelog
-const fetchChangelogPageData = async () => {
-  try {
-    const response = await apiClient.get('/api/public/changelog');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ChangelogPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ChangelogPage: React.FC<ChangelogPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntries] = useState<ChangelogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    const fetchEntries = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/public/changelog?limit=20');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error || 'Failed to fetch changelog');
+        setEntries(json?.entries || []);
+      } catch (err) {
+        console.error(err);
+        setEntries([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEntries();
   }, []);
 
-  // Component logic
-  
-  // Render
+  const labelFor = (type: string) => {
+    const t = type.toLowerCase();
+    if (t === 'feature' || t === 'added') return { text: 'New', cls: 'bg-green-100 text-green-700' };
+    if (t === 'improvement' || t === 'changed') return { text: 'Improved', cls: 'bg-blue-100 text-blue-700' };
+    if (t === 'security') return { text: 'Security', cls: 'bg-yellow-100 text-yellow-700' };
+    return { text: 'Fixed', cls: 'bg-red-100 text-red-700' };
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ChangelogPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`min-h-screen bg-gray-50 py-12 ${className}`}>
+      <div className="container mx-auto px-6 max-w-4xl">
+        <h1 className="text-4xl font-bold mb-4">Changelog</h1>
+        <p className="text-gray-600 mb-12">Track all updates and improvements</p>
+
+        <div className="space-y-6">
+          {loading ? (
+            <div className="text-center text-gray-500">Loading changelog...</div>
+          ) : entries.length === 0 ? (
+            <div className="text-center text-gray-500">No entries published</div>
+          ) : (
+            entries.map((entry) => (
+              <div key={entry.id} className="bg-white border rounded-xl p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-2xl font-bold">v{entry.version}</h2>
+                  <span className="text-gray-600">
+                    {entry.publishedAt ? new Date(entry.publishedAt).toLocaleDateString() : ''}
+                  </span>
+                </div>
+                <div className="text-gray-700 font-medium mb-2">{entry.title}</div>
+                <div className="text-gray-600 mb-4">{entry.description}</div>
+                <ul className="space-y-2">
+                  {Array.isArray(entry.changes) ? entry.changes.map((change, idx) => {
+                    const badge = labelFor(change.type || entry.type);
+                    return (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className={`px-2 py-0.5 text-xs rounded ${badge.cls}`}>
+                          {badge.text}
+                        </span>
+                        <span>{change.description || change.text || ''}</span>
+                      </li>
+                    );
+                  }) : null}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ChangelogPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/public/changelog
- *  * - Model: ChangelogEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

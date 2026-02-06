@@ -1,123 +1,64 @@
-/**
- * Component: Newsletter
- * Location: components/landing/Newsletter.tsx
- * 
- * Description: Newsletter signup
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/newsletter/subscribe
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - NewsletterSubscriber
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for NewsletterSubscriber model
-interface INewsletterSubscriber {
-  id: string;
-  // Add fields from your Prisma NewsletterSubscriber model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/newsletter/subscribe
-const fetchNewsletterData = async () => {
-  try {
-    const response = await apiClient.get('/api/newsletter/subscribe');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface NewsletterProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const Newsletter: React.FC<NewsletterProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/newsletter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    setSubscribed(true);
+  };
 
-  // Component logic
-  
-  // Render
+  if (subscribed) {
+    return (
+      <section className={`py-20 bg-green-50 ${className}`}>
+        <div className="container mx-auto px-6 text-center">
+          <div className="text-6xl mb-4">✅</div>
+          <h3 className="text-2xl font-bold text-green-900">Thank You!</h3>
+          <p className="text-green-700">You're subscribed to our newsletter</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>Newsletter</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 bg-indigo-50 ${className}`}>
+      <div className="container mx-auto px-6 max-w-2xl text-center">
+        <h2 className="text-4xl font-bold mb-4">Stay Updated</h2>
+        <p className="text-gray-600 mb-8">Get the latest tips and updates delivered to your inbox</p>
+
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            className="flex-1 px-6 py-4 rounded-lg border-2"
+          />
+          <button
+            type="submit"
+            className="px-8 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold"
+          >
+            Subscribe
+          </button>
+        </form>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default Newsletter;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/newsletter/subscribe
- *  * - Model: NewsletterSubscriber
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

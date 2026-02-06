@@ -1,87 +1,40 @@
-/**
- * Component: HowItWorks
- * Location: components/landing/HowItWorks.tsx
- * 
- * Description: How it works
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface HowItWorksProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const HowItWorks: React.FC<HowItWorksProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const steps = [
+    { num: '1', title: 'Connect Platforms', desc: 'Link your LeetCode, GitHub, and other accounts' },
+    { num: '2', title: 'Set Goals', desc: 'Define what you want to achieve' },
+    { num: '3', title: 'Track Progress', desc: 'Watch your growth in real-time' },
+    { num: '4', title: 'Achieve Success', desc: 'Celebrate milestones and earn achievements' },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>HowItWorks</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 ${className}`}>
+      <div className="container mx-auto px-6">
+        <h2 className="text-4xl font-bold text-center mb-16">How It Works</h2>
+
+        <div className="grid md:grid-cols-4 gap-8">
+          {steps.map((step) => (
+            <div key={step.num} className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-500 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
+                {step.num}
+              </div>
+              <h3 className="text-xl font-bold mb-2">{step.title}</h3>
+              <p className="text-gray-600">{step.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default HowItWorks;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,134 +1,51 @@
-/**
- * Component: ProfileStats
- * Location: components/profile/ProfileStats.tsx
- * 
- * Description: Stats display
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-// - DailyStats
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface ProfileStats {
+  totalProblems: number;
+  currentStreak: number;
+  totalHours: number;
+  achievements: number;
+  rank: number;
 }
 
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/stats
-const fetchProfileStatsData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileStatsProps {
+  userId?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ProfileStats: React.FC<ProfileStatsProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<ProfileStats | null>(null);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetch('/api/profile/stats')
+      .then(r => r.json())
+      .then(data => setStats(data));
+  }, [userId]);
 
-  // Component logic
-  
-  // Render
+  if (!stats) return <div className="h-32 bg-gray-100 rounded-xl animate-pulse" />;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileStats</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`grid grid-cols-5 gap-4 ${className}`}>
+      {[
+        { label: 'Problems', value: stats.totalProblems, icon: '💻' },
+        { label: 'Streak', value: `${stats.currentStreak}d`, icon: '🔥' },
+        { label: 'Hours', value: stats.totalHours, icon: '⏱️' },
+        { label: 'Achievements', value: stats.achievements, icon: '🏆' },
+        { label: 'Rank', value: `#${stats.rank}`, icon: '🎖️' },
+      ].map((stat, idx) => (
+        <div key={idx} className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-2">{stat.icon}</div>
+          <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+          <div className="text-sm text-gray-600">{stat.label}</div>
+        </div>
+      ))}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileStats;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/stats
- *  * - Model: User
- * - Model: DailyStats
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

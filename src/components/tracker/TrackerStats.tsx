@@ -1,123 +1,38 @@
-/**
- * Component: TrackerStats
- * Location: components/tracker/TrackerStats.tsx
- * 
- * Description: Statistics summary
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker/stats
-const fetchTrackerStatsData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerStatsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerStats: React.FC<TrackerStatsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ total: 0, avg: 0, max: 0, platforms: 0 });
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/tracker/stats')
+      .then(r => r.json())
+      .then(data => setStats(data));
   }, []);
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerStats</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`grid grid-cols-4 gap-4 ${className}`}>
+      {[
+        { label: 'Total Entries', value: stats.total, icon: '📊' },
+        { label: 'Avg per Day', value: stats.avg, icon: '📈' },
+        { label: 'Max in Day', value: stats.max, icon: '🚀' },
+        { label: 'Platforms', value: stats.platforms, icon: '🔗' },
+      ].map((stat, idx) => (
+        <div key={idx} className="bg-white border rounded-xl p-6 text-center">
+          <div className="text-3xl mb-2">{stat.icon}</div>
+          <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+          <div className="text-sm text-gray-600">{stat.label}</div>
+        </div>
+      ))}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerStats;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker/stats
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

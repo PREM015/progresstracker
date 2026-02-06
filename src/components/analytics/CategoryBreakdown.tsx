@@ -1,123 +1,124 @@
-/**
- * Component: CategoryBreakdown
- * Location: components/analytics/CategoryBreakdown.tsx
- * 
- * Description: Category analysis
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface CategoryData {
+  name: string;
+  count: number;
+  percentage: number;
+  color: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/categories
-const fetchCategoryBreakdownData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface CategoryBreakdownProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+interface CategoriesResponse {
+  categories: Array<{
+    label: string;
+    problems: number;
+    percentage: number;
+    color: string;
+  }>;
+}
+
+export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
+  className = '',
+}) => {
+  const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch('/api/analytics/categories?days=30');
+        const json = (await res.json()) as ApiSuccess<CategoriesResponse>;
+        if (!res.ok || !json?.success) throw new Error('Failed to fetch categories');
+
+        const mapped = (json.data?.categories || []).map((cat) => ({
+          name: cat.label,
+          count: cat.problems,
+          percentage: cat.percentage,
+          color: cat.color,
+        }));
+
+        if (isMounted) {
+          setCategories(mapped);
+        }
+      } catch (error) {
+        console.error('Failed to load category breakdown:', error);
+        if (isMounted) {
+          setCategories([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchCategories();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+  }
+
+  const total = categories.reduce((sum, cat) => sum + cat.count, 0);
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>CategoryBreakdown</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Category Breakdown</h3>
+
+      <div className="mb-6">
+        <div className="flex h-8 rounded-lg overflow-hidden">
+          {categories.map((cat, idx) => (
+            <div
+              key={idx}
+              style={{
+                width: `${cat.percentage}%`,
+                backgroundColor: cat.color,
+              }}
+              title={`${cat.name}: ${cat.count} (${cat.percentage}%)`}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {categories.map((cat, idx) => (
+          <div key={idx} className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded" style={{ backgroundColor: cat.color }} />
+              <span className="text-sm font-medium text-gray-700">{cat.name}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">{cat.count}</span>
+              <span className="text-sm font-bold text-gray-900">{cat.percentage}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="flex justify-between">
+          <span className="text-sm font-semibold text-gray-700">Total</span>
+          <span className="text-sm font-bold text-gray-900">{total}</span>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default CategoryBreakdown;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/categories
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

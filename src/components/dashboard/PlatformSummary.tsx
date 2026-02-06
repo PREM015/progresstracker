@@ -1,146 +1,121 @@
-/**
- * Component: PlatformSummary
- * Location: components/dashboard/PlatformSummary.tsx
- * 
- * Description: Connected platforms summary
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/connected
-// - /api/platforms/[id]/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserPlatform
-// - Platform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface PlatformSummaryData {
+  platforms: Array<{
+    id: string;
+    name: string;
+    icon?: string | null;
+    connected: boolean;
+    lastSync: string;
+    itemsCount: number;
+  }>;
 }
 
-// Interface for Platform model
-interface IPlatform {
-  id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/connected
-const fetchPlatformSummaryData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/connected');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/platforms/[id]/stats
-const fetchPlatformSummaryData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/platforms/${{id}}/stats`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformSummaryProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const PlatformSummary: React.FC<PlatformSummaryProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+export const PlatformSummary: React.FC<PlatformSummaryProps> = ({
+  className = '',
+}) => {
+  const [data, setData] = useState<PlatformSummaryData | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch('/api/platforms/summary');
+        const json = (await res.json()) as ApiSuccess<PlatformSummaryData>;
+        if (!res.ok || !json?.success) {
+          throw new Error('Failed to fetch platform summary');
+        }
+
+        if (isMounted) {
+          setData(json.data);
+        }
+      } catch (error) {
+        console.error('Failed to load platform summary:', error);
+        if (isMounted) {
+          setData(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+  if (!data || !data.platforms) return null;
+
+  const connectedCount = data.platforms.filter(p => p.connected).length;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformSummary</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-gray-900">Platforms</h3>
+        <span className="text-sm text-gray-600">
+          {connectedCount}/{data.platforms.length} connected
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {data.platforms.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <div className="text-sm uppercase tracking-widest mb-2">No Connections</div>
+            <div className="text-sm">Connect a platform to start syncing.</div>
+          </div>
+        ) : (
+          data.platforms.map((platform) => (
+            <div
+              key={platform.id}
+              className={`flex items-center gap-4 p-4 rounded-lg border-2 ${platform.connected
+                ? 'border-green-200 bg-green-50'
+                : 'border-gray-200 bg-gray-50'
+                }`}
+            >
+              <div className="text-xl font-semibold text-gray-700">
+                {platform.icon || platform.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold text-gray-900">{platform.name}</div>
+                <div className="text-xs text-gray-600">
+                  {platform.connected ? (
+                    <>Last sync: {new Date(platform.lastSync).toLocaleString()} - {platform.itemsCount} items</>
+                  ) : (
+                    'Not connected'
+                  )}
+                </div>
+              </div>
+              <div className={`text-xs px-3 py-1 rounded-full ${platform.connected
+                ? 'bg-green-100 text-green-700'
+                : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {platform.connected ? 'Active' : 'Inactive'}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformSummary;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/connected
- * - API: /api/platforms/[id]/stats
- *  * - Model: UserPlatform
- * - Model: Platform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

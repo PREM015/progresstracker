@@ -1,123 +1,91 @@
-/**
- * Component: WelcomeBanner
- * Location: components/dashboard/WelcomeBanner.tsx
- * 
- * Description: Welcome and onboarding banner
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/onboarding
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/onboarding
-const fetchWelcomeBannerData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/onboarding');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface WelcomeBannerProps {
+  userName?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
+
+interface UserProfile {
+  name?: string | null;
+  username?: string | null;
+}
+
 export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
-  className,
+  userName,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [resolvedName, setResolvedName] = useState(userName);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    if (userName) return;
 
-  // Component logic
-  
-  // Render
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/user');
+        const json = (await res.json()) as ApiSuccess<UserProfile>;
+        if (!res.ok || !json?.success) {
+          return;
+        }
+
+        const name = json.data?.name || json.data?.username || 'there';
+        if (isMounted) {
+          setResolvedName(name);
+        }
+      } catch (error) {
+        console.error('Failed to load user profile:', error);
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userName]);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const getMotivation = () => {
+    const messages = [
+      'Focus on one meaningful step today.',
+      'Small progress beats no progress.',
+      'Consistency builds momentum.',
+      'Keep the streak alive.',
+      'Make today count.',
+    ];
+    return messages[Math.floor(Math.random() * messages.length)];
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>WelcomeBanner</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl p-8 ${className}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">
+            {getGreeting()}, {resolvedName || 'there'}
+          </h1>
+          <p className="text-lg opacity-90">{getMotivation()}</p>
+        </div>
+        <div className="text-right hidden md:block">
+          <div className="text-sm uppercase tracking-widest opacity-80">Dashboard</div>
+          <div className="text-2xl font-semibold">Your progress hub</div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default WelcomeBanner;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/onboarding
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

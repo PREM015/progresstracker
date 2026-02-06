@@ -1,135 +1,43 @@
-/**
- * Component: NotificationItem
- * Location: components/notifications/NotificationItem.tsx
- * 
- * Description: Single notification
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/notifications/[id]
-// - /api/notifications/mark-read
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Notification
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Notification model
-interface INotification {
-  id: string;
-  // Add fields from your Prisma Notification model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/notifications/[id]
-const fetchNotificationItemData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/notifications/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/notifications/mark-read
-const fetchNotificationItemData = async () => {
-  try {
-    const response = await apiClient.get('/api/notifications/mark-read');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface NotificationItemProps {
+  title: string;
+  message: string;
+  time: string;
+  icon: string;
+  unread?: boolean;
+  onClick?: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const NotificationItem: React.FC<NotificationItemProps> = ({
-  className,
+  title,
+  message,
+  time,
+  icon,
+  unread = false,
+  onClick,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>NotificationItem</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div
+      onClick={onClick}
+      className={`flex items-start gap-4 p-4 border rounded-lg cursor-pointer transition-colors ${unread ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50'
+        } ${className}`}
+    >
+      <span className="text-3xl">{icon}</span>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <div className="font-semibold">{title}</div>
+          {unread && <div className="w-2 h-2 bg-indigo-600 rounded-full" />}
+        </div>
+        <div className="text-sm text-gray-700 mt-1">{message}</div>
+        <div className="text-xs text-gray-500 mt-2">{time}</div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default NotificationItem;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/notifications/[id]
- * - API: /api/notifications/mark-read
- *  * - Model: Notification
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

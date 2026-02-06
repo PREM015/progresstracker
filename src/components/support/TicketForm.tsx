@@ -1,135 +1,75 @@
-/**
- * Component: TicketForm
- * Location: components/support/TicketForm.tsx
- * 
- * Description: Create ticket
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/support-tickets
-// - /api/support-tickets/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - SupportTicket
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for SupportTicket model
-interface ISupportTicket {
-  id: string;
-  // Add fields from your Prisma SupportTicket model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/support-tickets
-const fetchTicketFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/support-tickets');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/support-tickets/categories
-const fetchTicketFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/support-tickets/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TicketFormProps {
+  onSubmit: (data: { subject: string; category: string; description: string }) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TicketForm: React.FC<TicketFormProps> = ({
-  className,
+  onSubmit,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = React.useState({ subject: '', category: 'general', description: '' });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TicketForm</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Create Support Ticket</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block font-medium mb-2">Subject *</label>
+          <input
+            type="text"
+            value={formData.subject}
+            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+            required
+            className="w-full px-4 py-2 border rounded-lg"
+            placeholder="Brief description of your issue"
+          />
+        </div>
+
+        <div>
+          <label className="block font-medium mb-2">Category</label>
+          <select
+            value={formData.category}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            className="w-full px-4 py-2 border rounded-lg"
+          >
+            <option value="general">General</option>
+            <option value="technical">Technical Issue</option>
+            <option value="billing">Billing</option>
+            <option value="feature">Feature Request</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block font-medium mb-2">Description *</label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            required
+            rows={6}
+            className="w-full px-4 py-2 border rounded-lg"
+            placeholder="Provide detailed information about your issue"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Submit Ticket
+        </button>
+      </div>
+    </form>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TicketForm;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/support-tickets
- * - API: /api/support-tickets/categories
- *  * - Model: SupportTicket
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

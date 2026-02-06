@@ -1,34 +1,20 @@
-import { Metadata } from "next";
+import { PlatformDetail, PlatformConfig, PlatformHealth } from '@/components/admin';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: "Platforms | Progress Tracker",
-  description: "Platforms page for Progress Tracker application",
-};
-
-interface PageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-export default async function AdminPlatformsIdPage({ params, searchParams }: PageProps) {
+export default function PlatformDetailPage({ params }: { params: { id: string } }) {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Platforms</h1>
-      
-      {/* TODO: Implement Platforms */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Platforms page content goes here.
-        </p>
-        
-        <div className="mt-4 p-4 bg-muted rounded-md">
-          <p className="text-sm font-mono">
-            Debug - Route params:
-            <br />- id: {params.id}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/platforms" className="text-zinc-400 hover:text-white">
+          ← Back to Platforms
+        </Link>
+      </div>
+
+      <PlatformDetail platformId={params.id} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PlatformConfig platformId={params.id} />
+        <PlatformHealth platformId={params.id} />
       </div>
     </div>
   );

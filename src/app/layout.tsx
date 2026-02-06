@@ -1,23 +1,18 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "CodeSync Pro - Track Your Coding Journey",
-  description: "Automatically sync and track your progress across 50+ coding platforms",
-};
+// app/layout.tsx
+import SessionProvider from '@/components/providers/SessionProvider';
+import './globals.css';
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

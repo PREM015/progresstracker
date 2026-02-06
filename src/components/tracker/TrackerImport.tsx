@@ -1,135 +1,54 @@
-/**
- * Component: TrackerImport
- * Location: components/tracker/TrackerImport.tsx
- * 
- * Description: Import entries
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker/import
-// - /api/upload/import
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker/import
-const fetchTrackerImportData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker/import');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/upload/import
-const fetchTrackerImportData = async () => {
-  try {
-    const response = await apiClient.get('/api/upload/import');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerImportProps {
+  onSuccess: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerImport: React.FC<TrackerImportProps> = ({
-  className,
+  onSuccess,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleImport = async () => {
+    if (!file) return;
+    setImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      await fetch('/api/tracker/import', { method: 'POST', body: formData });
+      onSuccess();
+    } finally {
+      setImporting(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerImport</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border-2 border-dashed border-gray-300 rounded-xl p-12 text-center ${className}`}>
+      <div className="text-6xl mb-4">📥</div>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">Import Tracker Data</h3>
+      <p className="text-gray-600 mb-6">Upload a CSV or JSON file</p>
+
+      <input
+        type="file"
+        accept=".csv,.json"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        className="mb-4"
+      />
+
+      <button
+        onClick={handleImport}
+        disabled={!file || importing}
+        className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {importing ? 'Importing...' : 'Import Data'}
+      </button>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerImport;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker/import
- * - API: /api/upload/import
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

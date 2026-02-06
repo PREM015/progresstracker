@@ -1,19 +1,24 @@
-// app/(admin)/admin/feature-flags/page.tsx
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Feature Flags',
-  description: 'Toggle features and manage rollouts',
-};
+import { FeatureFlagsList, FeatureFlagStats } from '@/components/admin';
+import Link from 'next/link';
 
 export default function FeatureFlagsPage() {
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-4">Feature Flags</h1>
-      <p className="text-gray-600">
-        Toggle features and manage rollouts
-      </p>
-      {/* TODO: Implement FeatureFlagsPage */}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Feature Flags</h1>
+          <p className="text-zinc-400">Manage feature toggles and rollouts</p>
+        </div>
+        <Link
+          href="/admin/feature-flags/new"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+        >
+          New Flag
+        </Link>
+      </div>
+
+      <FeatureFlagStats />
+      <FeatureFlagsList />
     </div>
   );
 }

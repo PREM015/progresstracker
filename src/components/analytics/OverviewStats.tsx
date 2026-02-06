@@ -1,134 +1,126 @@
-/**
- * Component: OverviewStats
- * Location: components/analytics/OverviewStats.tsx
- * 
- * Description: Key metrics overview
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - DailyStats
-// - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface OverviewStat {
+  label: string;
+  value: string | number;
+  change: number;
+  trend: 'up' | 'down' | 'neutral';
 }
 
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics
-const fetchOverviewStatsData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface OverviewStatsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const OverviewStats: React.FC<OverviewStatsProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+interface SummaryResponse {
+  stats: {
+    problems: number;
+    commits: number;
+    time: number;
+    points: number;
+  };
+  changes: {
+    problems: number;
+    commits: number;
+    time: number;
+  };
+}
+
+export const OverviewStats: React.FC<OverviewStatsProps> = ({
+  className = '',
+}) => {
+  const [stats, setStats] = useState<OverviewStat[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch('/api/analytics/summary?period=week');
+        const json = (await res.json()) as ApiSuccess<SummaryResponse>;
+        if (!res.ok || !json?.success) throw new Error('Failed to fetch overview stats');
+
+        const data = json.data;
+        const mapped: OverviewStat[] = [
+          {
+            label: 'Problems Solved',
+            value: data.stats.problems,
+            change: data.changes.problems,
+            trend: data.changes.problems > 0 ? 'up' : data.changes.problems < 0 ? 'down' : 'neutral',
+          },
+          {
+            label: 'Commits',
+            value: data.stats.commits,
+            change: data.changes.commits,
+            trend: data.changes.commits > 0 ? 'up' : data.changes.commits < 0 ? 'down' : 'neutral',
+          },
+          {
+            label: 'Time Spent',
+            value: `${Math.round(data.stats.time / 60)}h`,
+            change: data.changes.time,
+            trend: data.changes.time > 0 ? 'up' : data.changes.time < 0 ? 'down' : 'neutral',
+          },
+          {
+            label: 'Points',
+            value: data.stats.points,
+            change: 0,
+            trend: 'neutral',
+          },
+        ];
+
+        if (isMounted) {
+          setStats(mapped);
+        }
+      } catch (error) {
+        console.error('Failed to load overview stats:', error);
+        if (isMounted) {
+          setStats([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>OverviewStats</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
+      {stats.map((stat, idx) => (
+        <div key={idx} className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-600">{stat.label}</span>
+            <span className={`text-sm font-medium ${stat.trend === 'up' ? 'text-green-600' :
+                stat.trend === 'down' ? 'text-red-600' : 'text-gray-600'
+              }`}
+            >
+              {stat.change !== 0 && `${stat.change > 0 ? '+' : ''}${stat.change}%`}
+            </span>
+          </div>
+          <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
+        </div>
+      ))}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default OverviewStats;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics
- *  * - Model: DailyStats
- * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

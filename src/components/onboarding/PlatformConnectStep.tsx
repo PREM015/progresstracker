@@ -1,146 +1,85 @@
-/**
- * Component: PlatformConnectStep
- * Location: components/onboarding/PlatformConnectStep.tsx
- * 
- * Description: Connect platforms
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms
-// - /api/platforms/connect
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-// - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
-  id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms
-const fetchPlatformConnectStepData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/platforms/connect
-const fetchPlatformConnectStepData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/connect');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformConnectStepProps {
+  onNext: () => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const PlatformConnectStep: React.FC<PlatformConnectStepProps> = ({
-  className,
+  onNext,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [platforms, setPlatforms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    const fetchPlatforms = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/platforms/available?limit=4&sortBy=popularity');
+        const json = await res.json();
+        if (!res.ok) throw new Error(json?.error?.message || 'Failed to fetch platforms');
+        setPlatforms(json?.data?.platforms || []);
+      } catch (err) {
+        console.error(err);
+        setPlatforms([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlatforms();
   }, []);
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformConnectStep</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white rounded-2xl p-8 ${className}`}>
+      <h2 className="text-3xl font-bold mb-2">Connect Your Platforms</h2>
+      <p className="text-gray-600 mb-8">Link your accounts to start tracking</p>
+
+      <div className="grid md:grid-cols-2 gap-4 mb-8">
+        {loading ? (
+          <div className="col-span-full text-center text-gray-500">Loading platforms...</div>
+        ) : platforms.length === 0 ? (
+          <div className="col-span-full text-center text-gray-500">No platforms available</div>
+        ) : (
+          platforms.map((platform) => (
+            <Link
+              key={platform.id}
+              href={`/platforms/connect?platform=${platform.id}`}
+              className="flex items-center gap-4 p-4 border-2 rounded-xl hover:border-indigo-500 transition-colors"
+            >
+              <span className="text-4xl">{platform.icon || '??'}</span>
+              <div className="flex-1 text-left">
+                <div className="font-semibold">{platform.displayName || platform.name}</div>
+                <div className="text-sm text-gray-600">Connect to start syncing</div>
+              </div>
+              <span className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">
+                Connect
+              </span>
+            </Link>
+          ))
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onNext}
+          className="flex-1 px-6 py-3 border rounded-lg hover:bg-gray-50"
+        >
+          Skip for Now
+        </button>
+        <button
+          onClick={onNext}
+          className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Continue
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformConnectStep;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms
- * - API: /api/platforms/connect
- *  * - Model: Platform
- * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

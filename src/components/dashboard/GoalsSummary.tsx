@@ -1,123 +1,133 @@
-/**
- * Component: GoalsSummary
- * Location: components/dashboard/GoalsSummary.tsx
- * 
- * Description: Active goals summary
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/active
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface GoalSummary {
+  total: number;
+  completed: number;
+  active: number;
+  completionRate: number;
+  recentGoals: Array<{
+    id: string;
+    title: string;
+    progress: number;
+    deadline: string | null;
+  }>;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/active
-const fetchGoalsSummaryData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/active');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalsSummaryProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const GoalsSummary: React.FC<GoalsSummaryProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+export const GoalsSummary: React.FC<GoalsSummaryProps> = ({
+  className = '',
+}) => {
+  const [summary, setSummary] = useState<GoalSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch('/api/goals/summary');
+        const json = (await res.json()) as ApiSuccess<GoalSummary>;
+        if (!res.ok || !json?.success) {
+          throw new Error('Failed to fetch goals summary');
+        }
+
+        if (isMounted) {
+          setSummary(json.data);
+        }
+      } catch (error) {
+        console.error('Failed to load goals summary:', error);
+        if (isMounted) {
+          setSummary(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSummary();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+  if (!summary) return null;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalsSummary</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-gray-900">Goals Summary</h3>
+        <button className="text-sm text-indigo-600 hover:text-indigo-700">View All</button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center p-4 bg-blue-50 rounded-lg">
+          <div className="text-3xl font-bold text-blue-600">{summary.total}</div>
+          <div className="text-xs text-gray-600">Total Goals</div>
+        </div>
+        <div className="text-center p-4 bg-green-50 rounded-lg">
+          <div className="text-3xl font-bold text-green-600">{summary.completed}</div>
+          <div className="text-xs text-gray-600">Completed</div>
+        </div>
+        <div className="text-center p-4 bg-purple-50 rounded-lg">
+          <div className="text-3xl font-bold text-purple-600">{summary.active}</div>
+          <div className="text-xs text-gray-600">Active</div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex justify-between text-sm mb-2">
+          <span className="font-medium text-gray-700">Completion Rate</span>
+          <span className="font-bold text-gray-900">{summary.completionRate}%</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3">
+          <div
+            className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all"
+            style={{ width: `${summary.completionRate}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="font-semibold text-gray-900 text-sm">Recent Goals</h4>
+        {summary.recentGoals && summary.recentGoals.length > 0 ? (
+          summary.recentGoals.map((goal) => (
+            <div key={goal.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900 text-sm truncate">{goal.title}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className="bg-indigo-600 h-1.5 rounded-full"
+                      style={{ width: `${goal.progress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-600">{goal.progress}%</span>
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-6 text-gray-500 text-sm">
+            No recent goals to display
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalsSummary;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/active
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

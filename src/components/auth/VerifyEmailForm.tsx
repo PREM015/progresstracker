@@ -1,95 +1,116 @@
-// components/auth/VerifyEmailForm.tsx
 'use client';
 
 import React, { useState } from 'react';
-import apiClient from '@/lib/apiClient';
-import Link from 'next/link';
 
 interface VerifyEmailFormProps {
-  email?: string;
+  email: string;
+  onVerify: (code: string) => Promise<void>;
+  onResend: () => Promise<void>;
+  className?: string;
 }
 
-export default function VerifyEmailForm({ email }: VerifyEmailFormProps) {
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+export const VerifyEmailForm: React.FC<VerifyEmailFormProps> = ({
+  email,
+  onVerify,
+  onResend,
+  className = '',
+}) => {
+  const [code, setCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
 
-  const handleResend = async () => {
-    if (!email) return;
-    
-    setLoading(true);
-    setError('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setError(null);
 
     try {
-      const response = await apiClient.post('/auth/resend-verification', { email });
-
-      if (response.error) {
-        setError(response.error);
-      } else {
-        setSuccess(true);
-        setTimeout(() => setSuccess(false), 5000);
-      }
+      await onVerify(code);
     } catch (err) {
-      console.error('Resend verification error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError(err instanceof Error ? err.message : 'Verification failed');
     } finally {
-      setLoading(false);
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setIsResending(true);
+    setError(null);
+    setResent(false);
+
+    try {
+      await onResend();
+      setResent(true);
+      setTimeout(() => setResent(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Resend failed');
+    } finally {
+      setIsResending(false);
     }
   };
 
   return (
-    <div className="text-center py-8">
-      <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-        <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
+    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-2xl p-8 max-w-md mx-auto ${className}`}>
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">📧</span>
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Verify Your Email</h2>
+        <p className="text-gray-600">
+          We sent a verification code to<br />
+          <span className="font-semibold">{email}</span>
+        </p>
       </div>
 
-      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-        Verify your email
-      </h3>
-
-      <p className="text-gray-600 dark:text-gray-400 mb-6">
-        {email ? (
-          <>We've sent a verification link to <strong>{email}</strong></>
-        ) : (
-          'Please check your email for a verification link'
-        )}
-      </p>
-
-      {success && (
-        <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-          <p className="text-sm text-green-800 dark:text-green-200">
-            Verification email sent! Check your inbox.
-          </p>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-600 text-sm text-center">{error}</p>
         </div>
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+      {resent && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <p className="text-green-600 text-sm text-center">✓ Verification code resent!</p>
         </div>
       )}
 
       <div className="space-y-4">
-        <p className="text-sm text-gray-500 dark:text-gray-500">
-          Didn't receive the email?{' '}
-          <button
-            onClick={handleResend}
-            disabled={loading || !email}
-            className="text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Sending...' : 'Resend verification email'}
-          </button>
-        </p>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Verification Code</label>
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-center text-2xl tracking-widest"
+            placeholder="000000"
+            maxLength={6}
+          />
+        </div>
 
-        <Link
-          href="/login"
-          className="inline-block text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+        <button
+          type="submit"
+          disabled={isVerifying || code.length !== 6}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
         >
-          ← Back to login
-        </Link>
+          {isVerifying ? 'Verifying...' : 'Verify Email'}
+        </button>
       </div>
-    </div>
+
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={isResending}
+          className="text-sm text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+        >
+          {isResending ? 'Sending...' : "Didn't receive the code? Resend"}
+        </button>
+      </div>
+    </form>
   );
-}
+};
+
+export default VerifyEmailForm;

@@ -1,135 +1,144 @@
-/**
- * Component: GoalCard
- * Location: components/goals/GoalCard.tsx
- * 
- * Description: Goal card display
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/[id]
-// - /api/goals/[id]/progress
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
+interface Goal {
   id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  description?: string;
+  targetValue: number;
+  currentValue: number;
+  deadline?: string;
+  status: 'active' | 'completed' | 'paused' | 'failed';
+  category?: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/[id]
-const fetchGoalCardData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/goals/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/goals/[id]/progress
-const fetchGoalCardData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/goals/${{id}}/progress`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalCardProps {
+  goal: Goal;
   className?: string;
-  // Add component-specific props here
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
-// ===== COMPONENT =====
 export const GoalCard: React.FC<GoalCardProps> = ({
-  className,
+  goal,
+  className = '',
+  onEdit,
+  onDelete,
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [showActions, setShowActions] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const progress = Math.min((goal.currentValue / goal.targetValue) * 100, 100);
+  const isComplete = goal.status === 'completed' || progress >= 100;
+  const isPaused = goal.status === 'paused';
+  const isFailed = goal.status === 'failed';
 
-  // Component logic
-  
-  // Render
+  const statusColors = {
+    active: 'border-blue-200 bg-blue-50',
+    completed: 'border-green-200 bg-green-50',
+    paused: 'border-yellow-200 bg-yellow-50',
+    failed: 'border-red-200 bg-red-50',
+  };
+
+  const statusIcons = {
+    active: '🎯',
+    completed: '✅',
+    paused: '⏸️',
+    failed: '❌',
+  };
+
+  const daysRemaining = goal.deadline
+    ? Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalCard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div
+      className={`bg-white border-2 rounded-xl p-6 hover:shadow-lg transition-all ${statusColors[goal.status]
+        } ${className}`}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-2xl">{statusIcons[goal.status]}</span>
+            <h3 className="text-lg font-bold text-gray-900">{goal.title}</h3>
+          </div>
+          {goal.description && (
+            <p className="text-sm text-gray-600">{goal.description}</p>
+          )}
+        </div>
+
+        {/* Actions */}
+        {showActions && (
+          <div className="flex gap-2 ml-4">
+            {onEdit && (
+              <button
+                onClick={() => onEdit(goal.id)}
+                className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+                title="Edit goal"
+              >
+                ✏️
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(goal.id)}
+                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                title="Delete goal"
+              >
+                🗑️
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Progress */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Progress</span>
+          <span className="text-sm font-bold text-gray-900">
+            {goal.currentValue} / {goal.targetValue}
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-green-500' : isPaused ? 'bg-yellow-500' : isFailed ? 'bg-red-500' : 'bg-blue-500'
+              }`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="text-xs text-gray-500 mt-1">{progress.toFixed(1)}% complete</div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between text-sm">
+        {goal.category && (
+          <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+            {goal.category}
+          </span>
+        )}
+        {daysRemaining !== null && (
+          <span
+            className={`text-xs font-medium ${daysRemaining < 0
+                ? 'text-red-600'
+                : daysRemaining <= 7
+                  ? 'text-orange-600'
+                  : 'text-gray-600'
+              }`}
+          >
+            {daysRemaining < 0
+              ? `${Math.abs(daysRemaining)} days overdue`
+              : daysRemaining === 0
+                ? 'Due today'
+                : `${daysRemaining} days left`}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalCard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/[id]
- * - API: /api/goals/[id]/progress
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

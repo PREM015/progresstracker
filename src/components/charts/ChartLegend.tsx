@@ -1,87 +1,62 @@
-/**
- * Component: ChartLegend
- * Location: components/charts/ChartLegend.tsx
- * 
- * Description: Chart legend
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface ChartLegendProps {
-  className?: string;
-  // Add component-specific props here
+interface LegendItem {
+  label: string;
+  color: string;
+  value?: string | number;
 }
 
-// ===== COMPONENT =====
+interface ChartLegendProps {
+  items: LegendItem[];
+  className?: string;
+  position?: 'top' | 'bottom' | 'left' | 'right';
+  layout?: 'horizontal' | 'vertical';
+}
+
 export const ChartLegend: React.FC<ChartLegendProps> = ({
-  className,
+  items,
+  className = '',
+  position = 'bottom',
+  layout = 'horizontal',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  if (!items || items.length === 0) {
+    return null;
+  }
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const positionClasses = {
+    top: 'mb-4',
+    bottom: 'mt-4',
+    left: 'mr-4',
+    right: 'ml-4',
+  };
 
-  // Component logic
-  
-  // Render
+  const layoutClasses = {
+    horizontal: 'flex flex-wrap items-center gap-4',
+    vertical: 'flex flex-col gap-2',
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ChartLegend</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`${positionClasses[position]} ${className}`}>
+      <div className={layoutClasses[layout]}>
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2 group cursor-pointer">
+            <div
+              className="w-4 h-4 rounded transition-transform group-hover:scale-110"
+              style={{ backgroundColor: item.color }}
+            ></div>
+            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+              {item.label}
+            </span>
+            {item.value !== undefined && (
+              <span className="text-sm text-gray-500">({item.value})</span>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ChartLegend;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

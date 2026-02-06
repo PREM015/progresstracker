@@ -1,87 +1,52 @@
-/**
- * Component: AboutPage
- * Location: components/public/AboutPage.tsx
- * 
- * Description: About page
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface AboutPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const AboutPage: React.FC<AboutPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>AboutPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white rounded-xl p-12 ${className}`}>
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-4xl font-bold text-gray-900 mb-6">About Progress Tracker</h1>
+
+        <div className="prose prose-lg">
+          <p className="text-lg text-gray-700 mb-6">
+            Progress Tracker helps you monitor your growth across all your learning platforms
+            in one beautiful, unified dashboard.
+          </p>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Our Mission</h2>
+          <p className="text-gray-700 mb-6">
+            We believe that tracking progress is essential to achieving your goals. Our platform
+            makes it easy to visualize your journey and stay motivated.
+          </p>
+
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Features</h2>
+          <ul className="space-y-3 mb-6">
+            {['Multi-platform sync', 'Goal tracking', 'Advanced analytics', 'Achievement system'].map(feature => (
+              <li key={feature} className="flex items-center gap-3">
+                <span className="text-green-500">✓</span>
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-6 mt-8">
+            <h3 className="font-bold text-indigo-900 mb-2">Get Started Today</h3>
+            <p className="text-indigo-700 mb-4">Join thousands of learners tracking their progress</p>
+            <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+              Sign Up Free
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default AboutPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

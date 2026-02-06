@@ -1,19 +1,23 @@
-// app/(admin)/admin/changelog/page.tsx
-import { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Changelog Management',
-  description: 'Manage version updates and release notes',
-};
+import { ChangelogList } from '@/components/admin';
+import Link from 'next/link';
 
 export default function ChangelogPage() {
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-4">Changelog Management</h1>
-      <p className="text-gray-600">
-        Manage version updates and release notes
-      </p>
-      {/* TODO: Implement ChangelogPage */}
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-2">Changelog</h1>
+          <p className="text-zinc-400">Product updates and releases</p>
+        </div>
+        <Link
+          href="/admin/changelog/new"
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+        >
+          New Entry
+        </Link>
+      </div>
+
+      <ChangelogList />
     </div>
   );
 }

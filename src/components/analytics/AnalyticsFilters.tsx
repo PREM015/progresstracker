@@ -1,87 +1,100 @@
-/**
- * Component: AnalyticsFilters
- * Location: components/analytics/AnalyticsFilters.tsx
- * 
- * Description: Filter controls
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface AnalyticsFiltersProps {
+  onFilterChange: (filters: FilterState) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface FilterState {
+  timeRange?: string;
+  platform?: string;
+  metric?: string;
+  groupBy?: string;
+}
+
 export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
-  className,
+  onFilterChange,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    timeRange: 'last_30_days',
+    platform: 'all',
+    metric: 'all',
+    groupBy: 'day',
+  });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>AnalyticsFilters</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="font-bold text-gray-900 mb-4">Filters</h3>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+          <select
+            value={filters.timeRange}
+            onChange={(e) => updateFilter('timeRange', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="last_7_days">Last 7 Days</option>
+            <option value="last_30_days">Last 30 Days</option>
+            <option value="last_90_days">Last 90 Days</option>
+            <option value="this_year">This Year</option>
+            <option value="all_time">All Time</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+          <select
+            value={filters.platform}
+            onChange={(e) => updateFilter('platform', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="all">All Platforms</option>
+            <option value="leetcode">LeetCode</option>
+            <option value="github">GitHub</option>
+            <option value="hackerrank">HackerRank</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Metric</label>
+          <select
+            value={filters.metric}
+            onChange={(e) => updateFilter('metric', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="all">All Metrics</option>
+            <option value="problems">Problems Solved</option>
+            <option value="commits">Commits</option>
+            <option value="time">Time Spent</option>
+            <option value="streak">Streak</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Group By</label>
+          <select
+            value={filters.groupBy}
+            onChange={(e) => updateFilter('groupBy', e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="day">Daily</option>
+            <option value="week">Weekly</option>
+            <option value="month">Monthly</option>
+          </select>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default AnalyticsFilters;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

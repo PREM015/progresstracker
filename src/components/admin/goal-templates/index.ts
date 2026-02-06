@@ -1,4 +1,4 @@
-export { default as GoalTemplatesList } from './GoalTemplatesList';
-export { default as GoalTemplateForm } from './GoalTemplateForm';
-export { default as GoalTemplatePreview } from './GoalTemplatePreview';
-export { default as GoalTemplateStats } from './GoalTemplateStats';
+export { GoalTemplatesList } from './GoalTemplatesList';
+export { GoalTemplateForm } from './GoalTemplateForm';
+export { GoalTemplatePreview } from './GoalTemplatePreview';
+export { GoalTemplateStats } from './GoalTemplateStats';

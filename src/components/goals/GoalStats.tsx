@@ -1,123 +1,103 @@
-/**
- * Component: GoalStats
- * Location: components/goals/GoalStats.tsx
- * 
- * Description: Goal statistics
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/stats
-const fetchGoalStatsData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalStatsProps {
+  userId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface Stats {
+  totalGoals: number;
+  completedGoals: number;
+  activeGoals: number;
+  completionRate: number;
+  averageProgress: number;
+  goalsByCategory: Array<{ category: string; count: number }>;
+  goalsByPriority: { low: number; medium: number; high: number };
+}
+
 export const GoalStats: React.FC<GoalStatsProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = React.useState<Stats | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  React.useEffect(() => {
+    fetch('/api/goals/stats')
+      .then(r => r.json())
+      .then(data => setStats(data))
+      .finally(() => setLoading(false));
+  }, [userId]);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="animate-pulse space-y-4">
+      <div className="h-32 bg-gray-200 rounded-xl"></div>
+      <div className="h-48 bg-gray-200 rounded-xl"></div>
+    </div>;
+  }
+
+  if (!stats) return null;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalStats</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`space-y-6 ${className}`}>
+      {/* Overview Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6">
+          <div className="text-3xl font-bold">{stats.totalGoals}</div>
+          <div className="text-sm opacity-90">Total Goals</div>
+        </div>
+        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl p-6">
+          <div className="text-3xl font-bold">{stats.completedGoals}</div>
+          <div className="text-sm opacity-90">Completed</div>
+        </div>
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-xl p-6">
+          <div className="text-3xl font-bold">{stats.activeGoals}</div>
+          <div className="text-sm opacity-90">Active</div>
+        </div>
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6">
+          <div className="text-3xl font-bold">{stats.completionRate}%</div>
+          <div className="text-sm opacity-90">Success Rate</div>
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-bold text-gray-900 mb-4">Goals by Category</h3>
+        <div className="space-y-3">
+          {stats.goalsByCategory.map((cat, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">{cat.category || 'Uncategorized'}</span>
+              <span className="text-sm font-bold text-gray-900">{cat.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Priority Distribution */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <h3 className="font-bold text-gray-900 mb-4">Priority Distribution</h3>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-red-500 rounded"></div>
+            <span className="text-sm text-gray-700 flex-1">High Priority</span>
+            <span className="text-sm font-bold text-gray-900">{stats.goalsByPriority.high}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+            <span className="text-sm text-gray-700 flex-1">Medium Priority</span>
+            <span className="text-sm font-bold text-gray-900">{stats.goalsByPriority.medium}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <span className="text-sm text-gray-700 flex-1">Low Priority</span>
+            <span className="text-sm font-bold text-gray-900">{stats.goalsByPriority.low}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalStats;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/stats
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

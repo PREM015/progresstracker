@@ -1,135 +1,73 @@
-/**
- * Component: TrackerFilters
- * Location: components/tracker/TrackerFilters.tsx
- * 
- * Description: Filter controls
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms
-// - /api/platforms/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
-  id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms
-const fetchTrackerFiltersData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/platforms/categories
-const fetchTrackerFiltersData = async () => {
-  try {
-    const response = await apiClient.get('/api/platforms/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerFiltersProps {
+  onFilterChange: (filters: FilterState) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface FilterState {
+  platform?: string;
+  dateRange?: string;
+  category?: string;
+  sortBy?: string;
+}
+
 export const TrackerFilters: React.FC<TrackerFiltersProps> = ({
-  className,
+  onFilterChange,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({});
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerFilters</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-4 ${className}`}>
+      <div className="grid grid-cols-4 gap-4">
+        <select
+          onChange={(e) => updateFilter('platform', e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="">All Platforms</option>
+          <option value="leetcode">LeetCode</option>
+          <option value="github">GitHub</option>
+        </select>
+
+        <select
+          onChange={(e) => updateFilter('dateRange', e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+
+        <select
+          onChange={(e) => updateFilter('category', e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="">All Categories</option>
+          <option value="coding">Coding</option>
+          <option value="learning">Learning</option>
+        </select>
+
+        <select
+          onChange={(e) => updateFilter('sortBy', e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="date">Sort by Date</option>
+          <option value="value">Sort by Value</option>
+          <option value="platform">Sort by Platform</option>
+        </select>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerFilters;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms
- * - API: /api/platforms/categories
- *  * - Model: Platform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

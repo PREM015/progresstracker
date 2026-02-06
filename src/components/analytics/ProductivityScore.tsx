@@ -1,134 +1,141 @@
-/**
- * Component: ProductivityScore
- * Location: components/analytics/ProductivityScore.tsx
- * 
- * Description: Productivity metrics
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/productivity
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - DailyStats
-// - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/productivity
-const fetchProductivityScoreData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/productivity');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProductivityScoreProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ScoreData {
+  overall: number;
+  breakdown: {
+    consistency: number;
+    volume: number;
+    streak: number;
+    focus: number;
+  };
+  trend: 'improving' | 'stable' | 'declining';
+}
 
-  // Fetch data on mount
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
+
+interface ProductivityResponse {
+  score: number;
+  scoreBreakdown: {
+    consistency: number;
+    volume: number;
+    streak: number;
+    focus: number;
+  };
+  metrics: {
+    activityRate: number;
+  };
+}
+
+export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
+  className = '',
+}) => {
+  const [scoreData, setScoreData] = useState<ScoreData | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchScore = async () => {
+      try {
+        const res = await fetch('/api/analytics/productivity?days=30');
+        const json = (await res.json()) as ApiSuccess<ProductivityResponse>;
+        if (!res.ok || !json?.success) throw new Error('Failed to fetch productivity score');
+
+        const overall = json.data?.score || 0;
+        const breakdown = json.data?.scoreBreakdown || {
+          consistency: 0,
+          volume: 0,
+          streak: 0,
+          focus: 0,
+        };
+
+        const trend: ScoreData['trend'] = overall >= 70 ? 'improving' : overall >= 40 ? 'stable' : 'declining';
+
+        if (isMounted) {
+          setScoreData({ overall, breakdown, trend });
+        }
+      } catch (error) {
+        console.error('Failed to load productivity score:', error);
+        if (isMounted) {
+          setScoreData(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchScore();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
+  }
+
+  if (!scoreData) return null;
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProductivityScore</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Productivity Score</h3>
+
+      <div className="text-center mb-8">
+        <div className={`text-6xl font-bold mb-2 ${getScoreColor(scoreData.overall)}`}>
+          {scoreData.overall}
+        </div>
+        <div className="text-sm text-gray-600 flex items-center justify-center gap-2">
+          <span>Overall Score</span>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${scoreData.trend === 'improving' ? 'bg-green-100 text-green-700' :
+              scoreData.trend === 'stable' ? 'bg-gray-100 text-gray-700' :
+                'bg-red-100 text-red-700'
+            }`}
+          >
+            {scoreData.trend === 'improving' && 'Improving'}
+            {scoreData.trend === 'stable' && 'Stable'}
+            {scoreData.trend === 'declining' && 'Declining'}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {Object.entries(scoreData.breakdown).map(([key, value]) => (
+          <div key={key}>
+            <div className="flex items-center justify-between mb-2 text-sm">
+              <span className="font-medium text-gray-700 capitalize">{key}</span>
+              <span className={`font-bold ${getScoreColor(value)}`}>{value}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full ${value >= 80 ? 'bg-green-500' :
+                    value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                style={{ width: `${value}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProductivityScore;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/productivity
- *  * - Model: DailyStats
- * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

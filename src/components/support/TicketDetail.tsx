@@ -1,146 +1,63 @@
-/**
- * Component: TicketDetail
- * Location: components/support/TicketDetail.tsx
- * 
- * Description: Ticket conversation
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/support-tickets/[id]
-// - /api/support-tickets/[id]/replies
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - SupportTicket
-// - TicketReply
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for SupportTicket model
-interface ISupportTicket {
+interface Ticket {
   id: string;
-  // Add fields from your Prisma SupportTicket model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  messages: Array<{
+    id: string;
+    author: string;
+    content: string;
+    timestamp: string;
+  }>;
+  status: 'open' | 'closed';
 }
 
-// Interface for TicketReply model
-interface ITicketReply {
-  id: string;
-  // Add fields from your Prisma TicketReply model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/support-tickets/[id]
-const fetchTicketDetailData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/support-tickets/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/support-tickets/[id]/replies
-const fetchTicketDetailData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/support-tickets/${{id}}/replies`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TicketDetailProps {
+  ticketId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TicketDetail: React.FC<TicketDetailProps> = ({
-  className,
+  ticketId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [ticket] = useState<Ticket>({
+    id: ticketId,
+    title: 'Need help with sync',
+    messages: [
+      { id: '1', author: 'User', content: 'My LeetCode data is not syncing', timestamp: new Date().toISOString() },
+    ],
+    status: 'open',
+  });
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TicketDetail</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold">{ticket.title}</h3>
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+          ticket.status === 'open' ? 'bg-green-100 text-green-700' : '
+
+bg-gray-100 text-gray-700'
+        }`}>
+          {ticket.status}
+        </span>
+      </div>
+
+      <div className="space-y-4">
+        {ticket.messages.map(msg => (
+          <div key={msg.id} className="p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="font-semibold">{msg.author}</div>
+              <div className="text-xs text-gray-500">{new Date(msg.timestamp).toLocaleString()}</div>
+            </div>
+            <div className="text-gray-700">{msg.content}</div>
+          </div>
+        ))}
+      </div>
+    </div >
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TicketDetail;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/support-tickets/[id]
- * - API: /api/support-tickets/[id]/replies
- *  * - Model: SupportTicket
- * - Model: TicketReply
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

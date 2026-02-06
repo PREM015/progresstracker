@@ -1,34 +1,23 @@
-import { Metadata } from "next";
+import { GoalTemplateForm, GoalTemplatePreview } from '@/components/admin';
+import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: "Goal Templates | Progress Tracker",
-  description: "Goal Templates page for Progress Tracker application",
-};
-
-interface PageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
-
-export default async function AdminGoalTemplatesIdPage({ params, searchParams }: PageProps) {
+export default function GoalTemplateDetailPage({ params }: { params: { id: string } }) {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Goal Templates</h1>
-      
-      {/* TODO: Implement Goal Templates */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Goal Templates page content goes here.
-        </p>
-        
-        <div className="mt-4 p-4 bg-muted rounded-md">
-          <p className="text-sm font-mono">
-            Debug - Route params:
-            <br />- id: {params.id}
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Link href="/admin/goal-templates" className="text-zinc-400 hover:text-white">
+          ← Back to Templates
+        </Link>
+      </div>
+
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Edit Goal Template</h1>
+        <p className="text-zinc-400">Update template details</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GoalTemplateForm templateId={params.id} />
+        <GoalTemplatePreview templateId={params.id} />
       </div>
     </div>
   );

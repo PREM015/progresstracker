@@ -1,169 +1,60 @@
-/**
- * Component: DashboardOverview
- * Location: components/dashboard/DashboardOverview.tsx
- * 
- * Description: Main dashboard overview page
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/stats
-// - /api/stats/summary
-// - /api/analytics/dashboard
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-// - DailyStats
-// - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
+interface DashboardWidget {
   id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  value: string | number;
+  change?: number;
+  icon: string;
+  color: string;
 }
 
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/stats
-const fetchDashboardOverviewData = async () => {
-  try {
-    const response = await apiClient.get('/api/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/stats/summary
-const fetchDashboardOverviewData = async () => {
-  try {
-    const response = await apiClient.get('/api/stats/summary');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/analytics/dashboard
-const fetchDashboardOverviewData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/dashboard');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface DashboardOverviewProps {
+  userId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetch('/api/dashboard/overview')
+      .then(r => r.json())
+      .then(data => setWidgets(Array.isArray(data) ? data : []))
+      .finally(() => setLoading(false));
+  }, [userId]);
 
-  // Component logic
-  
-  // Render
+  if (loading) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>DashboardOverview</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
+      {widgets.map(widget => (
+        <div key={widget.id} className={`bg-gradient-to-br ${widget.color} text-white rounded-xl p-6`}>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-4xl">{widget.icon}</span>
+            {widget.change !== undefined && (
+              <span className={`text-xs font-bold px-2 py-1 rounded ${widget.change >= 0 ? 'bg-white/20' : 'bg-black/20'
+                }`}>
+                {widget.change >= 0 ? '+' : ''}{widget.change}%
+              </span>
+            )}
+          </div>
+          <div className="text-3xl font-bold mb-1">{widget.value}</div>
+          <div className="text-sm opacity-90">{widget.title}</div>
+        </div>
+      ))}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default DashboardOverview;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/stats
- * - API: /api/stats/summary
- * - API: /api/analytics/dashboard
- *  * - Model: User
- * - Model: DailyStats
- * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

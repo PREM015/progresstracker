@@ -1,35 +1,64 @@
-import { Metadata } from "next";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Docs | Progress Tracker",
-  description: "Docs page for Progress Tracker application",
-};
+import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
-interface PageProps {
-  params: {
-    slug: string[];
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
+export default function DocsSlugPage() {
+  const params = useParams();
+  const slug = params.slug as string[];
 
-export default async function DocsSlugPage({ params, searchParams }: PageProps) {
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Docs</h1>
-      
-      {/* TODO: Implement Docs */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Docs page content goes here.
-        </p>
-        
-        <div className="mt-4 p-4 bg-muted rounded-md">
-          <p className="text-sm font-mono">
-            Debug - Route params:
-            <br />- slug: {params.slug?.join('/') || 'N/A'}
-          </p>
+  const [doc, setDoc] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const path = Array.isArray(slug) ? slug.join('/') : slug;
+    fetch(`/api/docs/${path}`)
+      .then(r => r.json())
+      .then(data => setDoc(data.doc))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!doc) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-5xl">📚</span>
+          <p className="mt-4 text-gray-500">Documentation page not found</p>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      <aside className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto">
+        <h2 className="font-bold text-lg mb-4">Documentation</h2>
+        <nav className="space-y-2">
+          {doc.sections?.map((section: any, idx: number) => (
+            <a key={idx} href={`#${section.id}`} className="block px-3 py-2 rounded hover:bg-gray-100 text-sm">
+              {section.title}
+            </a>
+          ))}
+        </nav>
+      </aside>
+
+      <main className="flex-1 p-12">
+        <article className="max-w-4xl">
+          <h1 className="text-5xl font-bold mb-8">{doc.title}</h1>
+          <div className="prose prose-lg max-w-none">
+            <div dangerouslySetInnerHTML={{ __html: doc.content }} />
+          </div>
+        </article>
+      </main>
     </div>
   );
 }

@@ -1,103 +1,51 @@
-/**
- * Component: UserRankBadge
- * Location: components/leaderboard/UserRankBadge.tsx
- * 
- * Description: Rank display
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface UserRankBadgeProps {
+  rank: number;
+  size?: 'sm' | 'md' | 'lg';
+  showChange?: boolean;
+  change?: number;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const UserRankBadge: React.FC<UserRankBadgeProps> = ({
-  className,
+  rank,
+  size = 'md',
+  showChange = false,
+  change = 0,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const getRankDisplay = () => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const sizeClasses = {
+    sm: 'text-sm px-2 py-1',
+    md: 'text-base px-3 py-2',
+    lg: 'text-lg px-4 py-3',
+  };
 
-  // Component logic
-  
-  // Render
+  const getRankColor = () => {
+    if (rank <= 3) return 'from-yellow-400 to-yellow-500';
+    if (rank <= 10) return 'from-indigo-500 to-purple-500';
+    return 'from-gray-400 to-gray-500';
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>UserRankBadge</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`inline-flex items-center gap-2 bg-gradient-to-r ${getRankColor()} text-white rounded-lg font-bold ${sizeClasses[size]} ${className}`}>
+      <span>{getRankDisplay()}</span>
+      {showChange && change !== 0 && (
+        <span className="text-xs">
+          {change > 0 ? `↑${change}` : `↓${Math.abs(change)}`}
+        </span>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default UserRankBadge;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

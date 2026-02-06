@@ -1,46 +1,132 @@
 "use client";
 
-import { Metadata } from "next";
+import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
+export default function PlatformSettingsPage() {
+  const params = useParams();
+  const platformId = params.id as string;
 
-export default function PlatformsIdSettingsPage({ params, searchParams }: PageProps) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState({
+    autoSync: true,
+    syncInterval: 60,
+    notifyOnSync: true,
+    dataTypes: [] as string[],
+  });
+  const [platform, setPlatform] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
+    Promise.all([
+      fetch(`/api/platforms/${platformId}`).then(r => r.json()),
+      fetch(`/api/platforms/${platformId}/settings`).then(r => r.json())
+    ])
+      .then(([platformData, settingsData]) => {
+        setPlatform(platformData.platform);
+        if (settingsData.settings) setSettings(settingsData.settings);
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, [platformId]);
 
-  if (isLoading) {
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetch(`/api/platforms/${platformId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!platform) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <span className="text-5xl">🔌</span>
+          <p className="mt-4 text-gray-500">Platform not found</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
-      
-      {/* TODO: Implement Settings */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Settings page content goes here.
-        </p>
-        
-        <div className="mt-4 p-4 bg-muted rounded-md">
-          <p className="text-sm font-mono">
-            Debug - Route params:
-            <br />- id: {params.id}
-          </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">{platform.name} Settings</h1>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-8">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold">Auto Sync</h3>
+                <p className="text-sm text-gray-600">Automatically sync data from {platform.name}</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.autoSync}
+                  onChange={(e) => setSettings({ ...settings, autoSync: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {settings.autoSync && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sync Interval (minutes)</label>
+                  <input
+                    type="number"
+                    value={settings.syncInterval}
+                    onChange={(e) => setSettings({ ...settings, syncInterval: Number(e.target.value) })}
+                    min="5"
+                    max="1440"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold">Sync Notifications</h3>
+                    <p className="text-sm text-gray-600">Get notified when sync completes</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.notifyOnSync}
+                      onChange={(e) => setSettings({ ...settings, notifyOnSync: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

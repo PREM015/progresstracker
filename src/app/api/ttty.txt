@@ -1,0 +1,1882 @@
+Folder PATH listing for volume New Volume
+Volume serial number is 084B-A865
+D:.
+¦   ttty.txt
+¦   
++---achievements
+¦   ¦   route.ts
+¦   ¦   
+¦   +---available
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---leaderboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---pinned
+¦   ¦       route.ts
+¦   ¦       
+¦   +---progress
+¦   ¦       route.ts
+¦   ¦       
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sync
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unlock
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---pin
+¦               route.ts
+¦               
++---admin
+¦   ¦   route.ts
+¦   ¦   
+¦   +---achievements
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---audit-logs
+¦   ¦       route.ts
+¦   ¦       
+¦   +---billing
+¦   ¦       route.ts
+¦   ¦       
+¦   +---blog
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---cache
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---clear
+¦   ¦           route.ts
+¦   ¦           
+¦   +---changelog
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---dashboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---database
+¦   ¦   +---backup
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---stats
+¦   ¦           route.ts
+¦   ¦           
+¦   +---email
+¦   ¦   +---send-bulk
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---templates
+¦   ¦           route.ts
+¦   ¦           
+¦   +---feature-flags
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---bulk
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---export
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---import
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---stats
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---[id]
+¦   ¦       ¦   route.ts
+¦   ¦       ¦   
+¦   ¦       +---rollout
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---toggle
+¦   ¦               route.ts
+¦   ¦               
+¦   +---feedback
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---goal-templates
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---logs
+¦   ¦   +---export
+¦   ¦           route.ts
+¦   ¦           
+¦   +---maintenance
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---newsletter
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---notifications
+¦   ¦   +---broadcast
+¦   ¦           route.ts
+¦   ¦           
+¦   +---permissions
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platforms
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---health
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---reports
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---roles
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---support-tickets
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sync
+¦   ¦       route.ts
+¦   ¦       
+¦   +---system-settings
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[key]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---users
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦       ¦   route.ts
+¦   ¦       ¦   
+¦   ¦       +---activity
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---ban
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---impersonate
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---reset-password
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---unban
+¦   ¦       ¦       route.ts
+¦   ¦       ¦       
+¦   ¦       +---verify
+¦   ¦               route.ts
+¦   ¦               
+¦   +---waitlist
+¦       ¦   route.ts
+¦       ¦   
+¦       +---[id]
+¦               route.ts
+¦               
++---analytics
+¦   ¦   route.ts
+¦   ¦   
+¦   +---activity
+¦   ¦       route.ts
+¦   ¦       
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---comparison
+¦   ¦       route.ts
+¦   ¦       
+¦   +---dashboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---goals
+¦   ¦       route.ts
+¦   ¦       
+¦   +---heatmap
+¦   ¦       route.ts
+¦   ¦       
+¦   +---insights
+¦   ¦       route.ts
+¦   ¦       
+¦   +---leaderboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---milestones
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platforms
+¦   ¦       route.ts
+¦   ¦       
+¦   +---predictions
+¦   ¦       route.ts
+¦   ¦       
+¦   +---productivity
+¦   ¦       route.ts
+¦   ¦       
+¦   +---report
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streaks
+¦   ¦       route.ts
+¦   ¦       
+¦   +---summary
+¦   ¦       route.ts
+¦   ¦       
+¦   +---time-spent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---trends
+¦   ¦       route.ts
+¦   ¦       
+¦   +---weekly
+¦           route.ts
+¦           
++---api-keys
+¦   ¦   route.ts
+¦   ¦   
+¦   +---usage
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---regenerate
+¦       ¦       route.ts
+¦       ¦       
+¦       +---revoke
+¦       ¦       route.ts
+¦       ¦       
+¦       +---usage
+¦               route.ts
+¦               
++---auth
+¦   +---2fa
+¦   ¦   +---disable
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---setup
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---verify
+¦   ¦           route.ts
+¦   ¦           
+¦   +---backup-codes
+¦   ¦       route.ts
+¦   ¦       
+¦   +---change-email
+¦   ¦       route.ts
+¦   ¦       
+¦   +---change-password
+¦   ¦       route.ts
+¦   ¦       
+¦   +---check-email
+¦   ¦       route.ts
+¦   ¦       
+¦   +---check-username
+¦   ¦       route.ts
+¦   ¦       
+¦   +---confirm-email-change
+¦   ¦       route.ts
+¦   ¦       
+¦   +---forgot-password
+¦   ¦       route.ts
+¦   ¦       
+¦   +---logout-custom
+¦   ¦       route.ts
+¦   ¦       
+¦   +---magic-link
+¦   ¦       route.ts
+¦   ¦       
+¦   +---me
+¦   ¦       route.ts
+¦   ¦       
+¦   +---refresh
+¦   ¦       route.ts
+¦   ¦       
+¦   +---register
+¦   ¦       route.ts
+¦   ¦       
+¦   +---resend-verification
+¦   ¦       route.ts
+¦   ¦       
+¦   +---reset-password
+¦   ¦       route.ts
+¦   ¦       
+¦   +---session
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sessions
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---social
+¦   ¦   +---connect
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---disconnect
+¦   ¦           route.ts
+¦   ¦           
+¦   +---validate-token
+¦   ¦       route.ts
+¦   ¦       
+¦   +---verify-email
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[...nextauth]
+¦           route.ts
+¦           
++---backup-codes
+¦   ¦   route.ts
+¦   ¦   
+¦   +---count
+¦   ¦       route.ts
+¦   ¦       
+¦   +---download
+¦   ¦       route.ts
+¦   ¦       
+¦   +---generate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---regenerate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---revoke
+¦   ¦       route.ts
+¦   ¦       
+¦   +---verify
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---blog
+¦   ¦   route.ts
+¦   ¦   
+¦   +---author
+¦   ¦   +---[authorId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---categories
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[slug]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---featured
+¦   ¦       route.ts
+¦   ¦       
+¦   +---feed
+¦   ¦       route.ts
+¦   ¦       
+¦   +---filter
+¦   ¦       route.ts
+¦   ¦       
+¦   +---popular
+¦   ¦       route.ts
+¦   ¦       
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---related
+¦   ¦   +---[slug]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sitemap
+¦   ¦       route.ts
+¦   ¦       
+¦   +---tags
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[slug]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---[slug]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---comments
+¦       ¦       route.ts
+¦       ¦       
+¦       +---like
+¦       ¦       route.ts
+¦       ¦       
+¦       +---share
+¦       ¦       route.ts
+¦       ¦       
+¦       +---views
+¦               route.ts
+¦               
++---config
+¦       route.ts
+¦       
++---contact
+¦   ¦   route.ts
+¦   ¦   
+¦   +---[id]
+¦           route.ts
+¦           
++---cron
+¦   +---achievement-check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---backup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---daily-sync
+¦   ¦       route.ts
+¦   ¦       
+¦   +---digest-email
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export-cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---file-cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---goal-reminder
+¦   ¦       route.ts
+¦   ¦       
+¦   +---health-check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---leaderboard-update
+¦   ¦       route.ts
+¦   ¦       
+¦   +---monthly-report
+¦   ¦       route.ts
+¦   ¦       
+¦   +---notification-cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platform-health
+¦   ¦       route.ts
+¦   ¦       
+¦   +---rank-update
+¦   ¦       route.ts
+¦   ¦       
+¦   +---scheduled-exports
+¦   ¦       route.ts
+¦   ¦       
+¦   +---scheduled-reports
+¦   ¦       route.ts
+¦   ¦       
+¦   +---session-cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats-aggregate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak-check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak-freeze
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak-reminder
+¦   ¦       route.ts
+¦   ¦       
+¦   +---subscription-check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---token-cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---weekly-report
+¦           route.ts
+¦           
++---custom-platforms
+¦   ¦   route.ts
+¦   ¦   
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---activate
+¦       ¦       route.ts
+¦       ¦       
+¦       +---entries
+¦       ¦       route.ts
+¦       ¦       
+¦       +---stats
+¦               route.ts
+¦               
++---dashboard
+¦   +---overview
+¦           route.ts
+¦           
++---docs
+¦       route.ts
+¦       
++---email
+¦   +---test
+¦           route.ts
+¦           
++---export
+¦   ¦   route.ts
+¦   ¦   
+¦   +---cancel
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---csv
+¦   ¦       route.ts
+¦   ¦       
+¦   +---download
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---excel
+¦   ¦       route.ts
+¦   ¦       
+¦   +---formats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---json
+¦   ¦       route.ts
+¦   ¦       
+¦   +---pdf
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preview
+¦   ¦       route.ts
+¦   ¦       
+¦   +---queue
+¦   ¦       route.ts
+¦   ¦       
+¦   +---retry
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---scheduled
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---pause
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---resume
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---run
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---status
+¦   ¦       route.ts
+¦   ¦       
+¦   +---templates
+¦   ¦       route.ts
+¦   ¦       
+¦   +---xml
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---feature-flags
+¦   ¦   route.ts
+¦   ¦   
+¦   +---check
+¦   ¦       route.ts
+¦   ¦       
+¦   +---enabled
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[key]
+¦           route.ts
+¦           
++---feedback
+¦   ¦   route.ts
+¦   ¦   
+¦   +---[id]
+¦           route.ts
+¦           
++---goals
+¦   ¦   route.ts
+¦   ¦   
+¦   +---active
+¦   ¦       route.ts
+¦   ¦       
+¦   +---archive
+¦   ¦       route.ts
+¦   ¦       
+¦   +---auto-update
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---check-deadlines
+¦   ¦       route.ts
+¦   ¦       
+¦   +---completed
+¦   ¦       route.ts
+¦   ¦       
+¦   +---duplicate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---import
+¦   ¦       route.ts
+¦   ¦       
+¦   +---milestones
+¦   ¦       route.ts
+¦   ¦       
+¦   +---overdue
+¦   ¦       route.ts
+¦   ¦       
+¦   +---reminders
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---share
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streaks
+¦   ¦       route.ts
+¦   ¦       
+¦   +---suggestions
+¦   ¦       route.ts
+¦   ¦       
+¦   +---summary
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sync-progress
+¦   ¦       route.ts
+¦   ¦       
+¦   +---templates
+¦   ¦       route.ts
+¦   ¦       
+¦   +---upcoming
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---activity
+¦       ¦       route.ts
+¦       ¦       
+¦       +---archive
+¦       ¦       route.ts
+¦       ¦       
+¦       +---cancel
+¦       ¦       route.ts
+¦       ¦       
+¦       +---complete
+¦       ¦       route.ts
+¦       ¦       
+¦       +---duplicate
+¦       ¦       route.ts
+¦       ¦       
+¦       +---fail
+¦       ¦       route.ts
+¦       ¦       
+¦       +---history
+¦       ¦       route.ts
+¦       ¦       
+¦       +---milestones
+¦       ¦       route.ts
+¦       ¦       
+¦       +---pause
+¦       ¦       route.ts
+¦       ¦       
+¦       +---progress
+¦       ¦       route.ts
+¦       ¦       
+¦       +---reminders
+¦       ¦       route.ts
+¦       ¦       
+¦       +---resume
+¦       ¦       route.ts
+¦       ¦       
+¦       +---share
+¦       ¦       route.ts
+¦       ¦       
+¦       +---stats
+¦       ¦       route.ts
+¦       ¦       
+¦       +---unarchive
+¦               route.ts
+¦               
++---health
+¦       route.ts
+¦       
++---leaderboard
+¦   ¦   route.ts
+¦   ¦   
+¦   +---achievements
+¦   ¦       route.ts
+¦   ¦       
+¦   +---category
+¦   ¦   +---[category]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---daily
+¦   ¦       route.ts
+¦   ¦       
+¦   +---friends
+¦   ¦       route.ts
+¦   ¦       
+¦   +---global
+¦   ¦       route.ts
+¦   ¦       
+¦   +---history
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[period]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---monthly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---nearby
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platform
+¦   ¦   +---[platformId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---rank
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak
+¦   ¦       route.ts
+¦   ¦       
+¦   +---user
+¦   ¦   +---[userId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---weekly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---yearly
+¦           route.ts
+¦           
++---login-history
+¦       route.ts
+¦       
++---logs
+¦       route.ts
+¦       
++---metrics
+¦       route.ts
+¦       
++---newsletter
+¦   ¦   route.ts
+¦   ¦   
+¦   +---confirm
+¦   ¦   +---[token]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preferences
+¦   ¦       route.ts
+¦   ¦       
+¦   +---resend-confirmation
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---subscribe
+¦   ¦       route.ts
+¦   ¦       
+¦   +---topics
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unsubscribe
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---notifications
+¦   ¦   route.ts
+¦   ¦   
+¦   +---archive
+¦   ¦       route.ts
+¦   ¦       
+¦   +---batch
+¦   ¦       route.ts
+¦   ¦       
+¦   +---channel
+¦   ¦   +---[channel]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---cleanup
+¦   ¦       route.ts
+¦   ¦       
+¦   +---delete-all
+¦   ¦       route.ts
+¦   ¦       
+¦   +---dismiss
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---filter
+¦   ¦       route.ts
+¦   ¦       
+¦   +---mark-all-read
+¦   ¦       route.ts
+¦   ¦       
+¦   +---mark-read
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preferences
+¦   ¦       route.ts
+¦   ¦       
+¦   +---priority
+¦   ¦   +---[priority]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---push
+¦   ¦   +---devices
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---subscribe
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---test
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---unsubscribe
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---scheduled
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---subscribe
+¦   ¦       route.ts
+¦   ¦       
+¦   +---test
+¦   ¦       route.ts
+¦   ¦       
+¦   +---type
+¦   ¦   +---[type]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---unarchive
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unread-count
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unsubscribe
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---archive
+¦       ¦       route.ts
+¦       ¦       
+¦       +---dismiss
+¦               route.ts
+¦               
++---ping
+¦       route.ts
+¦       
++---platforms
+¦   ¦   route.ts
+¦   ¦   
+¦   +---available
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---connect
+¦   ¦       route.ts
+¦   ¦       
+¦   +---connected
+¦   ¦       route.ts
+¦   ¦       
+¦   +---custom
+¦   ¦       route.ts
+¦   ¦       
+¦   +---disconnect
+¦   ¦       route.ts
+¦   ¦       
+¦   +---health
+¦   ¦       route.ts
+¦   ¦       
+¦   +---recommended
+¦   ¦       route.ts
+¦   ¦       
+¦   +---refresh-token
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---status
+¦   ¦       route.ts
+¦   ¦       
+¦   +---summary
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sync-all
+¦   ¦       route.ts
+¦   ¦       
+¦   +---verify
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---disconnect
+¦       ¦       route.ts
+¦       ¦       
+¦       +---health
+¦       ¦       route.ts
+¦       ¦       
+¦       +---logs
+¦       ¦       route.ts
+¦       ¦       
+¦       +---reconnect
+¦       ¦       route.ts
+¦       ¦       
+¦       +---settings
+¦       ¦       route.ts
+¦       ¦       
+¦       +---stats
+¦       ¦       route.ts
+¦       ¦       
+¦       +---sync
+¦       ¦       route.ts
+¦       ¦       
+¦       +---verify
+¦       ¦       route.ts
+¦       ¦       
+¦       +---webhook
+¦               route.ts
+¦               
++---profile
+¦   +---[username]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---achievements
+¦       ¦       route.ts
+¦       ¦       
+¦       +---activity
+¦       ¦       route.ts
+¦       ¦       
+¦       +---badge
+¦       ¦       route.ts
+¦       ¦       
+¦       +---embed
+¦       ¦       route.ts
+¦       ¦       
+¦       +---follow
+¦       ¦       route.ts
+¦       ¦       
+¦       +---followers
+¦       ¦       route.ts
+¦       ¦       
+¦       +---following
+¦       ¦       route.ts
+¦       ¦       
+¦       +---goals
+¦       ¦       route.ts
+¦       ¦       
+¦       +---heatmap
+¦       ¦       route.ts
+¦       ¦       
+¦       +---platforms
+¦       ¦       route.ts
+¦       ¦       
+¦       +---report
+¦       ¦       route.ts
+¦       ¦       
+¦       +---stats
+¦       ¦       route.ts
+¦       ¦       
+¦       +---streak
+¦               route.ts
+¦               
++---public
+¦   +---blog
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[slug]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---changelog
+¦           route.ts
+¦           
++---referral
+¦   ¦   route.ts
+¦   ¦   
+¦   +---apply
+¦   ¦       route.ts
+¦   ¦       
+¦   +---code
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---regenerate
+¦   ¦           route.ts
+¦   ¦           
+¦   +---generate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---leaderboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---pending
+¦   ¦       route.ts
+¦   ¦       
+¦   +---rewards
+¦   ¦       route.ts
+¦   ¦       
+¦   +---share
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦           route.ts
+¦           
++---reports
+¦   ¦   route.ts
+¦   ¦   
+¦   +---compare
+¦   ¦       route.ts
+¦   ¦       
+¦   +---custom
+¦   ¦       route.ts
+¦   ¦       
+¦   +---download
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---generate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---insights
+¦   ¦       route.ts
+¦   ¦       
+¦   +---monthly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preview
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---regenerate
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---schedule
+¦   ¦       route.ts
+¦   ¦       
+¦   +---scheduled
+¦   ¦       route.ts
+¦   ¦       
+¦   +---send
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---share
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---templates
+¦   ¦       route.ts
+¦   ¦       
+¦   +---types
+¦   ¦       route.ts
+¦   ¦       
+¦   +---weekly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---yearly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---search
+¦   ¦   route.ts
+¦   ¦   
+¦   +---achievements
+¦   ¦       route.ts
+¦   ¦       
+¦   +---all
+¦   ¦       route.ts
+¦   ¦       
+¦   +---autocomplete
+¦   ¦       route.ts
+¦   ¦       
+¦   +---entries
+¦   ¦       route.ts
+¦   ¦       
+¦   +---goals
+¦   ¦       route.ts
+¦   ¦       
+¦   +---history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platforms
+¦   ¦       route.ts
+¦   ¦       
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---suggestions
+¦   ¦       route.ts
+¦   ¦       
+¦   +---users
+¦           route.ts
+¦           
++---sentry-example-api
+¦       route.ts
+¦       
++---settings
+¦   +---export
+¦       +---scheduled
+¦           +---[id]
++---share
+¦   ¦   route.ts
+¦   ¦   
+¦   +---achievement
+¦   ¦       route.ts
+¦   ¦       
+¦   +---activity
+¦   ¦       route.ts
+¦   ¦       
+¦   +---embed
+¦   ¦   +---[code]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---generate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---goal
+¦   ¦       route.ts
+¦   ¦       
+¦   +---list
+¦   ¦       route.ts
+¦   ¦       
+¦   +---profile
+¦   ¦       route.ts
+¦   ¦       
+¦   +---report
+¦   ¦       route.ts
+¦   ¦       
+¦   +---revoke
+¦   ¦   +---[code]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦   ¦   +---[code]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---[code]
+¦           route.ts
+¦           
++---sse
+¦   ¦   route.ts
+¦   ¦   
+¦   +---connections
+¦   ¦       route.ts
+¦   ¦       
+¦   +---health
+¦   ¦       route.ts
+¦   ¦       
+¦   +---notifications
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---sync
+¦       ¦   route.ts
+¦       ¦   
+¦       +---analytics
+¦       ¦       route.ts
+¦       ¦       
+¦       +---[platformId]
+¦               route.ts
+¦               
++---stats
+¦   ¦   route.ts
+¦   ¦   
+¦   +---achievements
+¦   ¦       route.ts
+¦   ¦       
+¦   +---category
+¦   ¦   +---[category]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---compare
+¦   ¦       route.ts
+¦   ¦       
+¦   +---daily
+¦   ¦       route.ts
+¦   ¦       
+¦   +---dashboard
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---goals
+¦   ¦       route.ts
+¦   ¦       
+¦   +---heatmap
+¦   ¦       route.ts
+¦   ¦       
+¦   +---monthly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---overview
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platform
+¦   ¦   +---[platformId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---streak
+¦   ¦       route.ts
+¦   ¦       
+¦   +---summary
+¦   ¦       route.ts
+¦   ¦       
+¦   +---trends
+¦   ¦       route.ts
+¦   ¦       
+¦   +---weekly
+¦   ¦       route.ts
+¦   ¦       
+¦   +---yearly
+¦           route.ts
+¦           
++---status
+¦       route.ts
+¦       
++---streak-history
+¦       route.ts
+¦       
++---stripe
+¦   +---apply-coupon
+¦   ¦       route.ts
+¦   ¦       
+¦   +---billing-history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---cancel
+¦   ¦       route.ts
+¦   ¦       
+¦   +---change-plan
+¦   ¦       route.ts
+¦   ¦       
+¦   +---create-checkout
+¦   ¦       route.ts
+¦   ¦       
+¦   +---credits
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---add
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---history
+¦   ¦           route.ts
+¦   ¦           
+¦   +---customer-portal
+¦   ¦       route.ts
+¦   ¦       
+¦   +---invoices
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---download
+¦   ¦   ¦   +---[id]
+¦   ¦   ¦           route.ts
+¦   ¦   ¦           
+¦   ¦   +---upcoming
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---pause
+¦   ¦       route.ts
+¦   ¦       
+¦   +---payment-history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---payment-methods
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---plans
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preview-change
+¦   ¦       route.ts
+¦   ¦       
+¦   +---prices
+¦   ¦       route.ts
+¦   ¦       
+¦   +---refund
+¦   ¦       route.ts
+¦   ¦       
+¦   +---resume
+¦   ¦       route.ts
+¦   ¦       
+¦   +---retry-payment
+¦   ¦       route.ts
+¦   ¦       
+¦   +---subscription
+¦   ¦       route.ts
+¦   ¦       
+¦   +---tax-info
+¦   ¦       route.ts
+¦   ¦       
+¦   +---update-payment
+¦   ¦       route.ts
+¦   ¦       
+¦   +---usage
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate-coupon
+¦   ¦       route.ts
+¦   ¦       
+¦   +---webhook
+¦           route.ts
+¦           
++---support-tickets
+¦   ¦   route.ts
+¦   ¦   
+¦   +---categories
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sla
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---templates
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---assign
+¦       ¦       route.ts
+¦       ¦       
+¦       +---attachments
+¦       ¦       route.ts
+¦       ¦       
+¦       +---close
+¦       ¦       route.ts
+¦       ¦       
+¦       +---history
+¦       ¦       route.ts
+¦       ¦       
+¦       +---rate
+¦       ¦       route.ts
+¦       ¦       
+¦       +---reopen
+¦       ¦       route.ts
+¦       ¦       
+¦       +---replies
+¦       ¦       route.ts
+¦       ¦       
+¦       +---resolve
+¦               route.ts
+¦               
++---sync
+¦   ¦   route.ts
+¦   ¦   
+¦   +---analytics
+¦   ¦       route.ts
+¦   ¦       
+¦   +---batch
+¦   ¦       route.ts
+¦   ¦       
+¦   +---cancel
+¦   ¦       route.ts
+¦   ¦       
+¦   +---conflicts
+¦   ¦       route.ts
+¦   ¦       
+¦   +---health
+¦   ¦       route.ts
+¦   ¦       
+¦   +---history
+¦   ¦       route.ts
+¦   ¦       
+¦   +---logs
+¦   ¦       route.ts
+¦   ¦       
+¦   +---queue
+¦   ¦       route.ts
+¦   ¦       
+¦   +---retry
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---schedule
+¦   ¦       route.ts
+¦   ¦       
+¦   +---settings
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---status
+¦   ¦       route.ts
+¦   ¦       
+¦   +---trigger-all
+¦   ¦       route.ts
+¦   ¦       
+¦   +---webhook
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---bitbucket
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---github
+¦   ¦   ¦       route.ts
+¦   ¦   ¦       
+¦   ¦   +---gitlab
+¦   ¦           route.ts
+¦   ¦           
+¦   +---[platformId]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---cancel
+¦       ¦       route.ts
+¦       ¦       
+¦       +---force
+¦       ¦       route.ts
+¦       ¦       
+¦       +---reset
+¦       ¦       route.ts
+¦       ¦       
+¦       +---schedule
+¦       ¦       route.ts
+¦       ¦       
+¦       +---stats
+¦               route.ts
+¦               
++---tracker
+¦   ¦   route.ts
+¦   ¦   
+¦   +---aggregate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---analytics
+¦   ¦       route.ts
+¦   ¦       
+¦   +---batch-delete
+¦   ¦       route.ts
+¦   ¦       
+¦   +---batch-update
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---calendar
+¦   ¦       route.ts
+¦   ¦       
+¦   +---category
+¦   ¦   +---[category]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---compare
+¦   ¦       route.ts
+¦   ¦       
+¦   +---custom-platform
+¦   ¦   +---[customPlatformId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---daily
+¦   ¦       route.ts
+¦   ¦       
+¦   +---duplicate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export
+¦   ¦       route.ts
+¦   ¦       
+¦   +---heatmap
+¦   ¦       route.ts
+¦   ¦       
+¦   +---import
+¦   ¦       route.ts
+¦   ¦       
+¦   +---languages
+¦   ¦       route.ts
+¦   ¦       
+¦   +---mark-synced
+¦   ¦       route.ts
+¦   ¦       
+¦   +---mood
+¦   ¦       route.ts
+¦   ¦       
+¦   +---platform
+¦   ¦   +---[platformId]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---range
+¦   ¦       route.ts
+¦   ¦       
+¦   +---recent
+¦   ¦       route.ts
+¦   ¦       
+¦   +---search
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak
+¦   ¦       route.ts
+¦   ¦       
+¦   +---summary
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sync-status
+¦   ¦       route.ts
+¦   ¦       
+¦   +---tags
+¦   ¦       route.ts
+¦   ¦       
+¦   +---topics
+¦   ¦       route.ts
+¦   ¦       
+¦   +---trends
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unsynced
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦       ¦   route.ts
+¦       ¦   
+¦       +---duplicate
+¦       ¦       route.ts
+¦       ¦       
+¦       +---history
+¦       ¦       route.ts
+¦       ¦       
+¦       +---notes
+¦       ¦       route.ts
+¦       ¦       
+¦       +---verify
+¦               route.ts
+¦               
++---upload
+¦   ¦   route.ts
+¦   ¦   
+¦   +---attachment
+¦   ¦       route.ts
+¦   ¦       
+¦   +---avatar
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk
+¦   ¦       route.ts
+¦   ¦       
+¦   +---bulk-delete
+¦   ¦       route.ts
+¦   ¦       
+¦   +---document
+¦   ¦       route.ts
+¦   ¦       
+¦   +---image
+¦   ¦       route.ts
+¦   ¦       
+¦   +---import
+¦   ¦       route.ts
+¦   ¦       
+¦   +---list
+¦   ¦       route.ts
+¦   ¦       
+¦   +---presigned
+¦   ¦       route.ts
+¦   ¦       
+¦   +---validate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---user
+¦   ¦   route.ts
+¦   ¦   
+¦   +---2fa
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---verify
+¦   ¦           route.ts
+¦   ¦           
+¦   +---activity
+¦   ¦       route.ts
+¦   ¦       
+¦   +---avatar
+¦   ¦       route.ts
+¦   ¦       
+¦   +---deactivate
+¦   ¦       route.ts
+¦   ¦       
+¦   +---delete
+¦   ¦       route.ts
+¦   ¦       
+¦   +---export-data
+¦   ¦       route.ts
+¦   ¦       
+¦   +---notifications
+¦   ¦       route.ts
+¦   ¦       
+¦   +---onboarding
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---complete
+¦   ¦           route.ts
+¦   ¦           
+¦   +---password
+¦   ¦       route.ts
+¦   ¦       
+¦   +---preferences
+¦   ¦       route.ts
+¦   ¦       
+¦   +---profile
+¦   ¦       route.ts
+¦   ¦       
+¦   +---referrals
+¦   ¦       route.ts
+¦   ¦       
+¦   +---sessions
+¦   ¦   ¦   route.ts
+¦   ¦   ¦   
+¦   ¦   +---[id]
+¦   ¦           route.ts
+¦   ¦           
+¦   +---settings
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---streak
+¦   ¦       route.ts
+¦   ¦       
+¦   +---username
+¦           route.ts
+¦           
++---version
+¦       route.ts
+¦       
++---waitlist
+¦   ¦   route.ts
+¦   ¦   
+¦   +---invite
+¦   ¦       route.ts
+¦   ¦       
+¦   +---join
+¦   ¦       route.ts
+¦   ¦       
+¦   +---position
+¦   ¦       route.ts
+¦   ¦       
+¦   +---referral
+¦   ¦       route.ts
+¦   ¦       
+¦   +---stats
+¦   ¦       route.ts
+¦   ¦       
+¦   +---unsubscribe
+¦   ¦       route.ts
+¦   ¦       
+¦   +---[id]
+¦           route.ts
+¦           
++---webhooks
+    +---bitbucket
+    ¦       route.ts
+    ¦       
+    +---email
+    ¦   +---bounce
+    ¦   ¦       route.ts
+    ¦   ¦       
+    ¦   +---click
+    ¦   ¦       route.ts
+    ¦   ¦       
+    ¦   +---complaint
+    ¦   ¦       route.ts
+    ¦   ¦       
+    ¦   +---delivery
+    ¦   ¦       route.ts
+    ¦   ¦       
+    ¦   +---open
+    ¦           route.ts
+    ¦           
+    +---external
+    ¦   +---[provider]
+    ¦           route.ts
+    ¦           
+    +---github
+    ¦       route.ts
+    ¦       
+    +---gitlab
+    ¦       route.ts
+    ¦       
+    +---incoming
+    ¦   +---[id]
+    ¦           route.ts
+    ¦           
+    +---oauth
+    ¦   +---[provider]
+    ¦           route.ts
+    ¦           
+    +---platform
+    ¦   +---[platform]
+    ¦           route.ts
+    ¦           
+    +---push
+    ¦       route.ts
+    ¦       
+    +---stripe
+            route.ts
+            

@@ -1,33 +1,44 @@
 "use client";
 
-import { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import GoalForm from "@/components/goals/GoalForm";
 
-export default function GoalsNewPage() {
-  const [isLoading, setIsLoading] = useState(true);
+export default function NewGoalPage() {
+  const router = useRouter();
+  const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const handleCreate = async (data: any) => {
+    setIsCreating(true);
+    try {
+      const response = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        router.push(`/goals/${result.goal.id}`);
+      }
+    } catch (error) {
+      console.error('Failed to create goal:', error);
+      setIsCreating(false);
+    }
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">New</h1>
-      
-      {/* TODO: Implement New */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          New page content goes here.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold">Create New Goal</h1>
+          <p className="text-gray-600 mt-2">Set a new milestone to track your progress</p>
+        </div>
+
+        <GoalForm
+          onSubmit={handleCreate}
+          onCancel={() => router.push('/goals')}
+          isSubmitting={isCreating}
+        />
       </div>
     </div>
   );

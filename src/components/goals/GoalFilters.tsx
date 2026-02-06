@@ -1,123 +1,148 @@
-/**
- * Component: GoalFilters
- * Location: components/goals/GoalFilters.tsx
- * 
- * Description: Filter goals
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/categories
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/categories
-const fetchGoalFiltersData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/categories');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalFiltersProps {
+  onFilterChange: (filters: FilterState) => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface FilterState {
+  status?: string;
+  category?: string;
+  priority?: string;
+  dateRange?: string;
+  search?: string;
+}
+
 export const GoalFilters: React.FC<GoalFiltersProps> = ({
-  className,
+  onFilterChange,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({});
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const updateFilter = (key: keyof FilterState, value: string) => {
+    const newFilters = { ...filters, [key]: value || undefined };
+    setFilters(newFilters);
+    onFilterChange(newFilters);
+  };
 
-  // Component logic
-  
-  // Render
+  const clearFilters = () => {
+    setFilters({});
+    onFilterChange({});
+  };
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalFilters</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl ${className}`}>
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 rounded-xl"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-lg">🔍</span>
+          <span className="font-semibold text-gray-900">Filters</span>
+          {activeFilterCount > 0 && (
+            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+              {activeFilterCount}
+            </span>
+          )}
+        </div>
+        <span className="text-gray-400">{isExpanded ? '▲' : '▼'}</span>
+      </button>
+
+      {isExpanded && (
+        <div className="px-6 pb-6 space-y-4 border-t border-gray-200 pt-4">
+          {/* Search */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+            <input
+              type="text"
+              value={filters.search || ''}
+              onChange={(e) => updateFilter('search', e.target.value)}
+              placeholder="Search goals..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select
+              value={filters.status || ''}
+              onChange={(e) => updateFilter('status', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="paused">Paused</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <select
+              value={filters.category || ''}
+              onChange={(e) => updateFilter('category', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Categories</option>
+              <option value="learning">Learning</option>
+              <option value="fitness">Fitness</option>
+              <option value="career">Career</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
+            <select
+              value={filters.priority || ''}
+              onChange={(e) => updateFilter('priority', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Priorities</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+
+          {/* Date Range */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+            <select
+              value={filters.dateRange || ''}
+              onChange={(e) => updateFilter('dateRange', e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="year">This Year</option>
+            </select>
+          </div>
+
+          {/* Actions */}
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium"
+            >
+              Clear All Filters
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalFilters;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/categories
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

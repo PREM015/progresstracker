@@ -16,3 +16,6 @@ export { DangerZone } from './DangerZone';
 export { ApiKeyManager } from './ApiKeyManager';
 export { ConnectedAccounts } from './ConnectedAccounts';
 export { LoginHistory } from './LoginHistory';
+export { IntegrationsSettings } from './IntegrationsSettings';
+export { DataSettings } from './DataSettings';
+export { WebhooksSettings } from './WebhooksSettings';

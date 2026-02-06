@@ -1,135 +1,78 @@
-/**
- * Component: ExportAnalytics
- * Location: components/analytics/ExportAnalytics.tsx
- * 
- * Description: Export analytics
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/export
-// - /api/export
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - ExportJob
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for ExportJob model
-interface IExportJob {
-  id: string;
-  // Add fields from your Prisma ExportJob model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/export
-const fetchExportAnalyticsData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/export');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/export
-const fetchExportAnalyticsData = async () => {
-  try {
-    const response = await apiClient.get('/api/export');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ExportAnalyticsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ExportAnalytics: React.FC<ExportAnalyticsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [format, setFormat] = useState<'pdf' | 'csv' | 'json'>('pdf');
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/analytics/export?format=${format}`);
+      if (!res.ok) {
+        throw new Error('Export failed');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics_${Date.now()}.${format}`;
+      a.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ExportAnalytics</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Export Analytics</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Export Format</label>
+          <div className="space-y-2">
+            {(['pdf', 'csv', 'json'] as const).map((fmt) => (
+              <label key={fmt} className="flex items-center gap-3 p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="format"
+                  value={fmt}
+                  checked={format === fmt}
+                  onChange={(e) => setFormat(e.target.value as any)}
+                  className="w-4 h-4"
+                />
+                <div>
+                  <div className="font-medium text-gray-900 uppercase">{fmt}</div>
+                  <div className="text-xs text-gray-600">
+                    {fmt === 'pdf' && 'Full report with charts and visualizations'}
+                    {fmt === 'csv' && 'Spreadsheet format for data analysis'}
+                    {fmt === 'json' && 'Raw data for developers'}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
+        >
+          {isExporting ? 'Exporting...' : 'Export Analytics'}
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ExportAnalytics;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/export
- * - API: /api/export
- *  * - Model: ExportJob
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

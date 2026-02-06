@@ -1,123 +1,98 @@
-/**
- * Component: GoalArchive
- * Location: components/goals/GoalArchive.tsx
- * 
- * Description: Archived goals
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/archive
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
+interface ArchivedGoal {
   id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  status: 'completed' | 'failed' | 'cancelled';
+  finalProgress: number;
+  archivedAt: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/archive
-const fetchGoalArchiveData = async () => {
-  try {
-    const response = await apiClient.get('/api/goals/archive');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalArchiveProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalArchive: React.FC<GoalArchiveProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [archivedGoals, setArchivedGoals] = useState<ArchivedGoal[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/goals/archived')
+      .then(r => r.json())
+      .then(data => setArchivedGoals(data))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Component logic
-  
-  // Render
+  const restoreGoal = async (id: string) => {
+    await fetch(`/api/goals/${id}/restore`, { method: 'POST' });
+    setArchivedGoals(archivedGoals.filter(g => g.id !== id));
+  };
+
+  const permanentlyDelete = async (id: string) => {
+    if (confirm('Permanently delete this goal? This cannot be undone.')) {
+      await fetch(`/api/goals/${id}`, { method: 'DELETE' });
+      setArchivedGoals(archivedGoals.filter(g => g.id !== id));
+    }
+  };
+
+  if (loading) {
+    return <div className="space-y-3">
+      {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalArchive</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <div className="flex items-center gap-2 mb-6">
+        <span className="text-2xl">📦</span>
+        <h3 className="text-xl font-bold text-gray-900">Archived Goals</h3>
+      </div>
+
+      <div className="space-y-3">
+        {archivedGoals.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">No archived goals</div>
+        ) : (
+          archivedGoals.map((goal) => (
+            <div key={goal.id} className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h4 className="font-semibold text-gray-900">{goal.title}</h4>
+                  <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${goal.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        goal.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                      }`}>
+                      {goal.status}
+                    </span>
+                    <span>Progress: {goal.finalProgress}%</span>
+                    <span>Archived: {new Date(goal.archivedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => restoreGoal(goal.id)}
+                  className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                >
+                  Restore
+                </button>
+                <button
+                  onClick={() => permanentlyDelete(goal.id)}
+                  className="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50"
+                >
+                  Delete Permanently
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalArchive;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/archive
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

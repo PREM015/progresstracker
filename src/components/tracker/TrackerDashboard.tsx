@@ -1,135 +1,44 @@
-/**
- * Component: TrackerDashboard
- * Location: components/tracker/TrackerDashboard.tsx
- * 
- * Description: Main tracker view
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker
-// - /api/tracker/calendar
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker
-const fetchTrackerDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/tracker/calendar
-const fetchTrackerDashboardData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker/calendar');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerDashboardProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerDashboard: React.FC<TrackerDashboardProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ total: 0, thisWeek: 0, today: 0 });
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/tracker/stats')
+      .then(r => r.json())
+      .then(data => setStats(data))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Component logic
-  
-  // Render
+  if (loading) return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerDashboard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`space-y-6 ${className}`}>
+      <div className="grid grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white rounded-xl p-6">
+          <div className="text-4xl font-bold">{stats.total}</div>
+          <div className="text-sm opacity-90">Total Entries</div>
+        </div>
+        <div className="bg-gradient-to-br from-purple-500 to-pink-500 text-white rounded-xl p-6">
+          <div className="text-4xl font-bold">{stats.thisWeek}</div>
+          <div className="text-sm opacity-90">This Week</div>
+        </div>
+        <div className="bg-gradient-to-br from-green-500 to-emerald-500 text-white rounded-xl p-6">
+          <div className="text-4xl font-bold">{stats.today}</div>
+          <div className="text-sm opacity-90">Today</div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerDashboard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker
- * - API: /api/tracker/calendar
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

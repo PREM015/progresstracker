@@ -1,5 +1,5 @@
-export { default as MetricsDashboard } from './MetricsDashboard';
-export { default as SystemMetrics } from './SystemMetrics';
-export { default as PerformanceMetrics } from './PerformanceMetrics';
-export { default as UserMetrics } from './UserMetrics';
-export { default as ApiMetrics } from './ApiMetrics';
+export { MetricsDashboard } from './MetricsDashboard';
+export { ApiMetrics } from './ApiMetrics';
+export { PerformanceMetrics } from './PerformanceMetrics';
+export { SystemMetrics } from './SystemMetrics';
+export { UserMetrics } from './UserMetrics';

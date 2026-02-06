@@ -1,146 +1,66 @@
-/**
- * Component: TrackerHeatmap
- * Location: components/tracker/TrackerHeatmap.tsx
- * 
- * Description: Activity heatmap
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker/aggregate
-// - /api/analytics/heatmap
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-// - DailyStats
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface HeatmapData {
+  date: string;
+  count: number;
 }
 
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker/aggregate
-const fetchTrackerHeatmapData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker/aggregate');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/analytics/heatmap
-const fetchTrackerHeatmapData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/heatmap');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerHeatmapProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerHeatmap: React.FC<TrackerHeatmapProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<HeatmapData[]>([]);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/tracker/heatmap')
+      .then(r => r.json())
+      .then(data => setData(data));
   }, []);
 
-  // Component logic
-  
-  // Render
+  const getColor = (count: number) => {
+    if (count === 0) return 'bg-gray-100';
+    if (count < 3) return 'bg-green-200';
+    if (count < 6) return 'bg-green-400';
+    if (count < 10) return 'bg-green-600';
+    return 'bg-green-800';
+  };
+
+  const weeks = [];
+  for (let w = 0; w < 12; w++) {
+    const days = [];
+    for (let d = 0; d < 7; d++) {
+      const date = new Date();
+      date.setDate(date.getDate() - (11 - w) * 7 - (6 - d));
+      const dateStr = date.toISOString().split('T')[0];
+      const dayData = data.find(d => d.date === dateStr);
+      days.push({ date: dateStr, count: dayData?.count || 0 });
+    }
+    weeks.push(days);
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerHeatmap</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-lg font-bold mb-4">Activity Heatmap</h3>
+      <div className="flex gap-1">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-1">
+            {week.map((day, di) => (
+              <div
+                key={di}
+                className={`w-3 h-3 rounded-sm ${getColor(day.count)}`}
+                title={`${day.date}: ${day.count}`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerHeatmap;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker/aggregate
- * - API: /api/analytics/heatmap
- *  * - Model: TrackerEntry
- * - Model: DailyStats
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,87 +1,65 @@
-/**
- * Component: ChartTooltip
- * Location: components/charts/ChartTooltip.tsx
- * 
- * Description: Chart tooltip
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { ReactNode } from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number | string;
+    color?: string;
+    unit?: string;
+  }>;
+  label?: string;
   className?: string;
-  // Add component-specific props here
+  children?: ReactNode;
 }
 
-// ===== COMPONENT =====
 export const ChartTooltip: React.FC<ChartTooltipProps> = ({
-  className,
+  active,
+  payload,
+  label,
+  className = '',
+  children,
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  if (children) {
+    return <div className={className}>{children}</div>;
+  }
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ChartTooltip</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div
+      className={`bg-gray-900 text-white rounded-lg shadow-xl p-3 border border-gray-700 ${className}`}
+      style={{ maxWidth: '250px' }}
+    >
+      {label && (
+        <div className="font-semibold text-sm mb-2 pb-2 border-b border-gray-700">
+          {label}
+        </div>
+      )}
+      <div className="space-y-1">
+        {payload.map((entry, idx) => (
+          <div key={idx} className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {entry.color && (
+                <div
+                  className="w-3 h-3 rounded"
+                  style={{ backgroundColor: entry.color }}
+                ></div>
+              )}
+              <span className="text-xs text-gray-300">{entry.name}:</span>
+            </div>
+            <span className="text-sm font-semibold">
+              {entry.value}{entry.unit || ''}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ChartTooltip;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

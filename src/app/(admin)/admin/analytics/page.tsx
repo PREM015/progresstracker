@@ -1,21 +1,21 @@
-import { Metadata } from "next";
+import { AdminAnalyticsDashboard, EngagementMetrics, PlatformAnalytics, RevenueAnalytics } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Analytics | Progress Tracker",
-  description: "Analytics page for Progress Tracker application",
-};
-
-export default async function AdminAnalyticsPage() {
+export default function AnalyticsPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Analytics</h1>
-      
-      {/* TODO: Implement Analytics */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Analytics page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Analytics</h1>
+        <p className="text-zinc-400">Platform analytics and insights</p>
       </div>
+
+      <AdminAnalyticsDashboard />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <EngagementMetrics />
+        <PlatformAnalytics />
+      </div>
+
+      <RevenueAnalytics />
     </div>
   );
 }

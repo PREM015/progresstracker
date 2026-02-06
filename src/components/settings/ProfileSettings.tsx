@@ -1,135 +1,128 @@
-/**
- * Component: ProfileSettings
- * Location: components/settings/ProfileSettings.tsx
- * 
- * Description: Profile settings
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/profile
-// - /api/upload/avatar
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/profile
-const fetchProfileSettingsData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/profile');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/upload/avatar
-const fetchProfileSettingsData = async () => {
-  try {
-    const response = await apiClient.get('/api/upload/avatar');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileSettingsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface ProfileData {
+  name: string;
+  email: string;
+  bio: string;
+  location: string;
+  website: string;
+  company: string;
+}
+
 export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<ProfileData>({
+    name: '',
+    email: '',
+    bio: '',
+    location: '',
+    website: '',
+    company: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await fetch('/api/user/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileSettings</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Profile Settings</h3>
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
+          <textarea
+            value={formData.bio}
+            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+            rows={4}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            placeholder="Tell us about yourself..."
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              placeholder="City, Country"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Company</label>
+            <input
+              type="text"
+              value={formData.company}
+              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Website</label>
+          <input
+            type="url"
+            value={formData.website}
+            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+            placeholder="https://example.com"
+          />
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileSettings;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/profile
- * - API: /api/upload/avatar
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

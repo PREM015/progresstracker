@@ -1,123 +1,80 @@
-/**
- * Component: FeedbackForm
- * Location: components/support/FeedbackForm.tsx
- * 
- * Description: Quick feedback
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/feedback
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Feedback
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Feedback model
-interface IFeedback {
-  id: string;
-  // Add fields from your Prisma Feedback model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/feedback
-const fetchFeedbackFormData = async () => {
-  try {
-    const response = await apiClient.get('/api/feedback');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface FeedbackFormProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const FeedbackForm: React.FC<FeedbackFormProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [submitted, setSubmitted] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/support/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating, feedback }),
+    });
+    setSubmitted(true);
+  };
 
-  // Component logic
-  
-  // Render
+  if (submitted) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-12 text-center">
+        <div className="text-6xl mb-4">🙏</div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h3>
+        <p className="text-gray-600">Your feedback helps us improve.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>FeedbackForm</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Share Your Feedback</h3>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">How would you rate your experience?</label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                className="text-4xl hover:scale-110 transition-transform"
+              >
+                {star <= rating ? '⭐' : '☆'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Tell us more</label>
+          <textarea
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            rows={5}
+            className="w-full px-4 py-2 border rounded-lg"
+            placeholder="What did you like? What can we improve?"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={rating === 0}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >
+          Submit Feedback
+        </button>
+      </div>
+    </form>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default FeedbackForm;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/feedback
- *  * - Model: Feedback
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

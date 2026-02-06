@@ -1,33 +1,62 @@
 "use client";
 
-import { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
+import AnalyticsFilters from "@/components/analytics/AnalyticsFilters";
+import OverviewStats from "@/components/analytics/OverviewStats";
+import TrendCharts from "@/components/analytics/TrendCharts";
+import PlatformComparison from "@/components/analytics/PlatformComparison";
+import CategoryBreakdown from "@/components/analytics/CategoryBreakdown";
+import TimeSpentAnalysis from "@/components/analytics/TimeSpentAnalysis";
+import ProductivityScore from "@/components/analytics/ProductivityScore";
+import PredictionsCard from "@/components/analytics/PredictionsCard";
+import InsightsCard from "@/components/analytics/InsightsCard";
+import ExportAnalytics from "@/components/analytics/ExportAnalytics";
 
 export default function AnalyticsPage() {
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: session } = useSession();
+  const userId = session?.user?.id || "";
 
-  useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Sample insights data
+  const insights = [
+    {
+      type: "success" as const,
+      title: "Great Progress!",
+      message: "You've completed 25% more problems this month compared to last month.",
+    },
+    {
+      type: "info" as const,
+      title: "Streak Opportunity",
+      message: "You're 2 days away from your longest streak. Keep it up!",
+    },
+  ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Analytics</h1>
-      
-      {/* TODO: Implement Analytics */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Analytics page content goes here.
-        </p>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold">Analytics</h1>
+          <ExportAnalytics />
+        </div>
+
+        <div className="space-y-6">
+          <AnalyticsFilters onFilterChange={() => { }} />
+          <OverviewStats />
+          <AnalyticsDashboard userId={userId} />
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <TrendCharts />
+            <PlatformComparison />
+            <CategoryBreakdown />
+            <TimeSpentAnalysis />
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-6">
+            <ProductivityScore />
+            <PredictionsCard />
+            <InsightsCard insights={insights} />
+          </div>
+        </div>
       </div>
     </div>
   );

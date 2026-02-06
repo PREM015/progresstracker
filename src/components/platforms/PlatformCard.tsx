@@ -1,146 +1,166 @@
-/**
- * Component: PlatformCard
- * Location: components/platforms/PlatformCard.tsx
- * 
- * Description: Individual platform card
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/[id]
-// - /api/platforms/[id]/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Platform
-// - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Platform model
-interface IPlatform {
+interface Platform {
   id: string;
-  // Add fields from your Prisma Platform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  slug: string;
+  icon?: string;
+  color?: string;
+  category: string;
+  isConnected: boolean;
+  lastSyncedAt?: string;
+  stats?: {
+    problemsSolved?: number;
+    commits?: number;
+    points?: number;
+  };
 }
 
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/[id]
-const fetchPlatformCardData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/platforms/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/platforms/[id]/stats
-const fetchPlatformCardData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/platforms/${{id}}/stats`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformCardProps {
+  platform: Platform;
   className?: string;
-  // Add component-specific props here
+  onConnect?: (id: string) => void;
+  onDisconnect?: (id: string) => void;
+  onViewDetails?: (id: string) => void;
 }
 
-// ===== COMPONENT =====
 export const PlatformCard: React.FC<PlatformCardProps> = ({
-  className,
+  platform,
+  className = '',
+  onConnect,
+  onDisconnect,
+  onViewDetails,
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const formatLastSync = (date?: string) => {
+    if (!date) return 'Never';
+    const diffMs = new Date().getTime() - new Date(date).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformCard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div
+      className={`bg-white border-2 ${platform.isConnected ? 'border-green-200' : 'border-gray-200'
+        } rounded-xl p-6 hover:shadow-lg transition-all ${className}`}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          {platform.icon ? (
+            <img
+              src={platform.icon}
+              alt={platform.name}
+              className="w-12 h-12 rounded-lg"
+            />
+          ) : (
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
+              style={{ backgroundColor: platform.color || '#6366F1' }}
+            >
+              {platform.name.charAt(0)}
+            </div>
+          )}
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">{platform.name}</h3>
+            <p className="text-xs text-gray-500">{platform.category}</p>
+          </div>
+        </div>
+
+        {/* Connection Status */}
+        {platform.isConnected && (
+          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+            ✓ Connected
+          </span>
+        )}
+      </div>
+
+      {/* Stats */}
+      {platform.isConnected && platform.stats && (
+        <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+          {platform.stats.problemsSolved !== undefined && (
+            <div className="text-center">
+              <div className="text-sm font-bold text-gray-900">
+                {platform.stats.problemsSolved}
+              </div>
+              <div className="text-xs text-gray-500">Problems</div>
+            </div>
+          )}
+          {platform.stats.commits !== undefined && (
+            <div className="text-center">
+              <div className="text-sm font-bold text-gray-900">
+                {platform.stats.commits}
+              </div>
+              <div className="text-xs text-gray-500">Commits</div>
+            </div>
+          )}
+          {platform.stats.points !== undefined && (
+            <div className="text-center">
+              <div className="text-sm font-bold text-gray-900">
+                {platform.stats.points}
+              </div>
+              <div className="text-xs text-gray-500">Points</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Last Synced */}
+      {platform.isConnected && (
+        <div className="text-xs text-gray-500 mb-4">
+          Last synced: {formatLastSync(platform.lastSyncedAt)}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        {platform.isConnected ? (
+          <>
+            {onViewDetails && (
+              <button
+                onClick={() => onViewDetails(platform.id)}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              >
+                View Details
+              </button>
+            )}
+            {onDisconnect && (
+              <button
+                onClick={() => onDisconnect(platform.id)}
+                className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 text-sm font-medium"
+              >
+                Disconnect
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {onConnect && (
+              <button
+                onClick={() => onConnect(platform.id)}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              >
+                Connect
+              </button>
+            )}
+            {onViewDetails && (
+              <button
+                onClick={() => onViewDetails(platform.id)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                Learn More
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformCard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/[id]
- * - API: /api/platforms/[id]/stats
- *  * - Model: Platform
- * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

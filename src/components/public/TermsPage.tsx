@@ -1,87 +1,54 @@
-/**
- * Component: TermsPage
- * Location: components/public/TermsPage.tsx
- * 
- * Description: Terms of service
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TermsPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TermsPage: React.FC<TermsPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TermsPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`min-h-screen bg-white py-12 ${className}`}>
+      <div className="container mx-auto px-6 max-w-4xl">
+        <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
+        <p className="text-gray-600 mb-8">Last updated: January 2024</p>
+
+        <div className="prose prose-lg max-w-none">
+          <h2 className="text-2xl font-bold mt-8 mb-4">1. Acceptance of Terms</h2>
+          <p className="text-gray-700 mb-4">
+            By using Progress Tracker, you agree to these terms. If you disagree, do not use our service.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">2. User Accounts</h2>
+          <p className="text-gray-700 mb-4">
+            You are responsible for maintaining the security of your account and password.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">3. Acceptable Use</h2>
+          <p className="text-gray-700 mb-4">
+            You may not use our service for illegal purposes or to violate any laws.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">4. Service Availability</h2>
+          <p className="text-gray-700 mb-4">
+            We strive for 99.9% uptime but do not guarantee uninterrupted access.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">5. Termination</h2>
+          <p className="text-gray-700 mb-4">
+            We reserve the right to terminate accounts that violate these terms.
+          </p>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">6. Contact</h2>
+          <p className="text-gray-700">
+            Questions? Contact legal@progresstracker.app
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TermsPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

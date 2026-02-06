@@ -1,4 +1,3 @@
-export { default as RolesList } from './RolesList';
-export { default as RoleForm } from './RoleForm';
-export { default as RolePermissions } from './RolePermissions';
-export { default as RoleUsers } from './RoleUsers';
+export { RolesList } from './RolesList';
+export { RoleForm } from './RoleForm';
+export { UserRoles } from './UserRoles';

@@ -1,21 +1,15 @@
-import { Metadata } from "next";
+import { SupportTicketsList, SupportTicketStats } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Support Tickets | Progress Tracker",
-  description: "Support Tickets page for Progress Tracker application",
-};
-
-export default async function AdminSupportTicketsPage() {
+export default function SupportTicketsPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Support Tickets</h1>
-      
-      {/* TODO: Implement Support Tickets */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Support Tickets page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Support Tickets</h1>
+        <p className="text-zinc-400">Manage customer support requests</p>
       </div>
+
+      <SupportTicketStats />
+      <SupportTicketsList />
     </div>
   );
 }

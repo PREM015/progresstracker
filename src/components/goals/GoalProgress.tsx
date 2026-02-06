@@ -1,123 +1,118 @@
-/**
- * Component: GoalProgress
- * Location: components/goals/GoalProgress.tsx
- * 
- * Description: Progress visualization
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/goals/[id]/progress
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Goal
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Goal model
-interface IGoal {
-  id: string;
-  // Add fields from your Prisma Goal model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/goals/[id]/progress
-const fetchGoalProgressData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/goals/${{id}}/progress`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface GoalProgressProps {
+  goalId: string;
+  title: string;
+  currentValue: number;
+  targetValue: number;
+  unit?: string;
+  showMilestones?: boolean;
+  milestones?: Array<{ value: number; label: string }>;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const GoalProgress: React.FC<GoalProgressProps> = ({
-  className,
+  goalId,
+  title,
+  currentValue,
+  targetValue,
+  unit = 'units',
+  showMilestones = false,
+  milestones = [],
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const progress = Math.min((currentValue / targetValue) * 100, 100);
+  const remaining = Math.max(targetValue - currentValue, 0);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>GoalProgress</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-lg font-bold text-gray-900 mb-4">{title}</h3>
+
+      {/* Progress Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="text-center p-3 bg-blue-50 rounded-lg">
+          <div className="text-2xl font-bold text-blue-600">{currentValue}</div>
+          <div className="text-xs text-gray-600">Current</div>
+        </div>
+        <div className="text-center p-3 bg-green-50 rounded-lg">
+          <div className="text-2xl font-bold text-green-600">{targetValue}</div>
+          <div className="text-xs text-gray-600">Target</div>
+        </div>
+        <div className="text-center p-3 bg-orange-50 rounded-lg">
+          <div className="text-2xl font-bold text-orange-600">{remaining}</div>
+          <div className="text-xs text-gray-600">Remaining</div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Overall Progress</span>
+          <span className="text-sm font-bold text-indigo-600">{progress.toFixed(1)}%</span>
+        </div>
+        <div className="relative w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+          {/* Milestones Markers */}
+          {showMilestones && milestones.map((milestone, idx) => {
+            const milestonePercent = (milestone.value / targetValue) * 100;
+            return (
+              <div
+                key={idx}
+                className="absolute top-0 bottom-0 w-0.5 bg-white"
+                style={{ left: `${milestonePercent}%` }}
+                title={milestone.label}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Milestones List */}
+      {showMilestones && milestones.length > 0 && (
+        <div className="mt-6">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Milestones</h4>
+          <div className="space-y-2">
+            {milestones.map((milestone, idx) => {
+              const achieved = currentValue >= milestone.value;
+              const milestonePercent = (milestone.value / targetValue) * 100;
+
+              return (
+                <div key={idx} className="flex items-center gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${achieved ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                    }`}>
+                    {achieved ? '✓' : idx + 1}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm font-medium ${achieved ? 'text-gray-900' : 'text-gray-500'}`}>
+                        {milestone.label}
+                      </span>
+                      <span className="text-xs text-gray-500">{milestone.value} {unit}</span>
+                    </div>
+                    <div className="text-xs text-gray-400">{milestonePercent.toFixed(0)}% of target</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Achievement Message */}
+      {progress >= 100 && (
+        <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 font-medium text-center">
+            🎉 Goal Achieved! Congratulations!
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default GoalProgress;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/goals/[id]/progress
- *  * - Model: Goal
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

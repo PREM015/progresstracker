@@ -1,123 +1,73 @@
-/**
- * Component: AdminSidebar
- * Location: components/navigation/AdminSidebar.tsx
- * 
- * Description: Admin panel sidebar
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/admin/stats
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/admin/stats
-const fetchAdminSidebarData = async () => {
-  try {
-    const response = await apiClient.get('/api/admin/stats');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface AdminSidebarProps {
+  activePage?: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
-  className,
+  activePage,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const sections = [
+    {
+      title: 'Overview',
+      items: [
+        { label: 'Dashboard', href: '/admin', icon: '📊' },
+        { label: 'Analytics', href: '/admin/analytics', icon: '📈' },
+      ],
+    },
+    {
+      title: 'Management',
+      items: [
+        { label: 'Users', href: '/admin/users', icon: '👥' },
+        { label: 'Content', href: '/admin/blog', icon: '📝' },
+        { label: 'Platforms', href: '/admin/platforms', icon: '🔗' },
+      ],
+    },
+    {
+      title: 'System',
+      items: [
+        { label: 'Settings', href: '/admin/system-settings', icon: '⚙️' },
+        { label: 'Logs', href: '/admin/logs', icon: '📜' },
+      ],
+    },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>AdminSidebar</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <aside className={`bg-white border-r border-gray-200 w-64 h-full ${className}`}>
+      <div className="p-6">
+        <h2 className="text-2xl font-bold mb-6">Admin</h2>
+
+        <nav className="space-y-6">
+          {sections.map(section => (
+            <div key={section.title}>
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                {section.title}
+              </div>
+              <div className="space-y-1">
+                {section.items.map(item => (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${activePage === item.href
+                        ? 'bg-indigo-50 text-indigo-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                  >
+                    <span>{item.icon}</span>
+                    <span className="font-medium">{item.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </div>
+    </aside>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default AdminSidebar;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/admin/stats
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

@@ -1,135 +1,73 @@
-/**
- * Component: ApiKeyManager
- * Location: components/settings/ApiKeyManager.tsx
- * 
- * Description: API key management
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/api-keys
-// - /api/api-keys/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - ApiKey
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for ApiKey model
-interface IApiKey {
+interface ApiKey {
   id: string;
-  // Add fields from your Prisma ApiKey model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  key: string;
+  createdAt: string;
+  lastUsed?: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/api-keys
-const fetchApiKeyManagerData = async () => {
-  try {
-    const response = await apiClient.get('/api/api-keys');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/api-keys/[id]
-const fetchApiKeyManagerData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/api-keys/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ApiKeyManagerProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [showNewKey, setShowNewKey] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const generateKey = () => {
+    const newKey = {
+      id: Date.now().toString(),
+      name: 'New API Key',
+      key: 'pk_' + Math.random().toString(36).substring(2),
+      createdAt: new Date().toISOString(),
+    };
+    setKeys([...keys, newKey]);
+    setShowNewKey(true);
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ApiKeyManager</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold">API Keys</h3>
+        <button
+          onClick={generateKey}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          + New Key
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {keys.map(key => (
+          <div key={key.id} className="p-4 border rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">{key.name}</div>
+              <button className="text-red-600 hover:text-red-700">Revoke</button>
+            </div>
+            <div className="text-sm font-mono bg-gray-100 px-3 py-2 rounded">
+              {key.key}
+            </div>
+            <div className="text-xs text-gray-600 mt-2">
+              Created {new Date(key.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        ))}
+
+        {keys.length === 0 && (
+          <div className="text-center py-12 text-gray-500">
+            <span className="text-5xl mb-4 block">🔑</span>
+            No API keys created
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ApiKeyManager;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/api-keys
- * - API: /api/api-keys/[id]
- *  * - Model: ApiKey
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

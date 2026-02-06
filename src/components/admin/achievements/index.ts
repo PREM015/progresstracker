@@ -1,4 +1,4 @@
-export { default as AchievementsList } from './AchievementsList';
-export { default as AchievementForm } from './AchievementForm';
-export { default as AchievementStats } from './AchievementStats';
-export { default as AchievementPreview } from './AchievementPreview';
+export { AchievementsList } from './AchievementsList';
+export { AchievementForm } from './AchievementForm';
+export { AchievementPreview } from './AchievementPreview';
+export { AchievementStats } from './AchievementStats';

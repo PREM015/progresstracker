@@ -1,135 +1,66 @@
-/**
- * Component: DangerZone
- * Location: components/settings/DangerZone.tsx
- * 
- * Description: Account deletion
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/delete
-// - /api/user/deactivate
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - User
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for User model
-interface IUser {
-  id: string;
-  // Add fields from your Prisma User model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/delete
-const fetchDangerZoneData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/delete');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/user/deactivate
-const fetchDangerZoneData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/deactivate');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface DangerZoneProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const DangerZone: React.FC<DangerZoneProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>DangerZone</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border-2 border-red-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-red-600 mb-6">Danger Zone</h3>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg">
+          <div>
+            <div className="font-semibold text-gray-900">Delete All Data</div>
+            <div className="text-sm text-gray-600">Permanently delete all your tracker data</div>
+          </div>
+          <button className="px-4 py-2 border border-red-600 text-red-600 rounded-lg hover:bg-red-50">
+            Delete Data
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg">
+          <div>
+            <div className="font-semibold text-gray-900">Delete Account</div>
+            <div className="text-sm text-gray-600">Permanently delete your account and all data</div>
+          </div>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Delete Account
+          </button>
+        </div>
+      </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Delete Account?</h3>
+            <p className="text-gray-600 mb-6">This action cannot be undone. All your data will be permanently deleted.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default DangerZone;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/delete
- * - API: /api/user/deactivate
- *  * - Model: User
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

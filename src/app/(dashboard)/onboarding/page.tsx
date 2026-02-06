@@ -1,33 +1,37 @@
 "use client";
 
-import { Metadata } from "next";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
+import { useRouter } from "next/navigation";
 
 export default function OnboardingPage() {
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const [isCompleting, setIsCompleting] = useState(false);
 
-  useEffect(() => {
-    // Simulate loading
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await fetch('/api/user/onboarding/complete', { method: 'POST' });
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Failed to complete onboarding:', error);
+      setIsCompleting(false);
+    }
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Onboarding</h1>
-      
-      {/* TODO: Implement Onboarding */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Onboarding page content goes here.
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        <OnboardingFlow onComplete={handleComplete} />
+
+        {isCompleting && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Finalizing your setup...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

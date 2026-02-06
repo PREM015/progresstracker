@@ -1,21 +1,15 @@
-import { Metadata } from "next";
+import { FeedbackList, FeedbackStats, FeedbackFilters } from '@/components/admin';
 
-export const metadata: Metadata = {
-  title: "Feedback | Progress Tracker",
-  description: "Feedback page for Progress Tracker application",
-};
-
-export default async function AdminFeedbackPage() {
+export default function FeedbackPage() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Feedback</h1>
-      
-      {/* TODO: Implement Feedback */}
-      <div className="bg-card rounded-lg border p-6">
-        <p className="text-muted-foreground">
-          Feedback page content goes here.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white mb-2">Feedback</h1>
+        <p className="text-zinc-400">User feedback and feature requests</p>
       </div>
+
+      <FeedbackStats />
+      <FeedbackList />
     </div>
   );
 }

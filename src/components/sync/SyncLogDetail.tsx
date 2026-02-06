@@ -1,123 +1,55 @@
-/**
- * Component: SyncLogDetail
- * Location: components/sync/SyncLogDetail.tsx
- * 
- * Description: Detailed sync log
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/sync/logs
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - SyncLog
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for SyncLog model
-interface ISyncLog {
+interface SyncLog {
   id: string;
-  // Add fields from your Prisma SyncLog model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  platform: string;
+  status: 'success' | 'error';
+  timestamp: string;
+  details: string;
+  itemsProcessed: number;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/sync/logs
-const fetchSyncLogDetailData = async () => {
-  try {
-    const response = await apiClient.get('/api/sync/logs');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SyncLogDetailProps {
+  log: SyncLog;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SyncLogDetail: React.FC<SyncLogDetailProps> = ({
-  className,
+  log,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SyncLogDetail</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold">Sync Log Details</h3>
+        <span className={`text-2xl ${log.status === 'success' ? '✅' : '❌'}`} />
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <div className="text-sm font-medium text-gray-600">Platform</div>
+          <div className="text-lg font-semibold">{log.platform}</div>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium text-gray-600">Timestamp</div>
+          <div className="text-lg">{new Date(log.timestamp).toLocaleString()}</div>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium text-gray-600">Items Processed</div>
+          <div className="text-lg font-semibold text-indigo-600">{log.itemsProcessed}</div>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium text-gray-600">Details</div>
+          <div className="p-3 bg-gray-50 rounded-lg text-sm font-mono">{log.details}</div>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SyncLogDetail;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/sync/logs
- *  * - Model: SyncLog
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

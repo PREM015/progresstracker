@@ -1,87 +1,41 @@
-/**
- * Component: ShareCard
- * Location: components/share/ShareCard.tsx
- * 
- * Description: Shareable card
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ShareCardProps {
+  title: string;
+  description: string;
+  imageUrl?: string;
+  url: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const ShareCard: React.FC<ShareCardProps> = ({
-  className,
+export const Share Card: React.FC<ShareCardProps> = ({
+  title,
+  description,
+  imageUrl,
+  url,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ShareCard</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border-2 border-gray-200 rounded-xl overflow-hidden ${className}`}>
+      {imageUrl && (
+        <img src={imageUrl} alt={title} className="w-full h-48 object-cover" />
+      )}
+      <div className="p-6">
+        <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600 mb-4">{description}</p>
+        <div className="flex gap-3">
+          <button className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+            Share
+          </button>
+          <button className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+            Copy Link
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ShareCard;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

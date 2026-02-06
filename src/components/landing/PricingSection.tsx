@@ -1,107 +1,53 @@
-/**
- * Component: PricingSection
- * Location: components/landing/PricingSection.tsx
- * 
- * Description: Pricing section
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/stripe/prices
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/stripe/prices
-const fetchPricingSectionData = async () => {
-  try {
-    const response = await apiClient.get('/api/stripe/prices');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PricingSectionProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const PricingSection: React.FC<PricingSectionProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const plans = [
+    { name: 'Free', price: '$0', features: ['5 platforms', 'Basic analytics', 'Community support'], cta: 'Get Started', popular: false },
+    { name: 'Pro', price: '$9', features: ['Unlimited platforms', 'Advanced analytics', 'Priority support', 'Custom goals'], cta: 'Start Free Trial', popular: true },
+    { name: 'Team', price: '$29', features: ['Everything in Pro', 'Team management', 'Shared dashboards', 'API access'], cta: 'Contact Sales', popular: false },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PricingSection</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 ${className}`}>
+      <div className="container mx-auto px-6">
+        <h2 className="text-4xl font-bold text-center mb-4">Simple Pricing</h2>
+        <p className="text-gray-600 text-center mb-16">Choose the perfect plan for your needs</p>
+
+        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`rounded-2xl p-8 ${plan.popular ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-2xl scale-105' : 'bg-white border-2'
+                }`}
+            >
+              {plan.popular && <div className="text-xs font-bold mb-4 opacity-90">MOST POPULAR</div>}
+              <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+              <div className="text-4xl font-bold mb-6">{plan.price}<span className="text-lg">/mo</span></div>
+              <ul className="space-y-3 mb-8">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span>✓</span> {feature}
+                  </li>
+                ))}
+              </ul>
+              <button className={`w-full py-3 rounded-lg font-bold ${plan.popular ? 'bg-white text-indigo-600 hover:bg-gray-100' : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                }`}>
+                {plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PricingSection;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/stripe/prices
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

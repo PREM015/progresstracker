@@ -1,5 +1,4 @@
-export { default as ReportsList } from './ReportsList';
-export { default as ReportBuilder } from './ReportBuilder';
-export { default as ReportPreview } from './ReportPreview';
-export { default as ReportSchedule } from './ReportSchedule';
-export { default as ReportStats } from './ReportStats';
+export { ReportsAnalytics } from './ReportsAnalytics';
+export { ReportExport } from './ReportExport';
+export { ReportGenerator } from './ReportGenerator';
+export { ReportsList } from './ReportsList';

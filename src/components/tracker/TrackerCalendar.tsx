@@ -1,123 +1,71 @@
-/**
- * Component: TrackerCalendar
- * Location: components/tracker/TrackerCalendar.tsx
- * 
- * Description: Calendar view
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'antml:function_calls>
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/tracker/calendar
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface CalendarDay {
+  date: string;
+  count: number;
+  entries: any[];
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/tracker/calendar
-const fetchTrackerCalendarData = async () => {
-  try {
-    const response = await apiClient.get('/api/tracker/calendar');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TrackerCalendarProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const TrackerCalendar: React.FC<TrackerCalendarProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const getDaysInMonth = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days: CalendarDay[] = [];
 
-  // Component logic
-  
-  // Render
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      days.push({
+        date: new Date(year, month, d).toISOString().split('T')[0],
+        count: Math.floor(Math.random() * 5),
+        entries: [],
+      });
+    }
+    return days;
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>TrackerCalendar</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <div className="flex items-center justify-between mb-6">
+        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}>
+          ←
+        </button>
+        <h3 className="text-xl font-bold">
+          {currentMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        </h3>
+        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}>
+          →
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-2">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="text-center text-sm font-medium text-gray-600">{day}</div>
+        ))}
+        {getDaysInMonth().map((day, idx) => (
+          <button
+            key={idx}
+            onClick={() => setSelectedDay(day)}
+            className={`aspect-square rounded-lg border-2 hover:border-indigo-500 ${day.count > 0 ? 'bg-green-100' : 'bg-gray-50'
+              }`}
+          >
+            {new Date(day.date).getDate()}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default TrackerCalendar;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/tracker/calendar
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

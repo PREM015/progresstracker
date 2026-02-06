@@ -1,123 +1,57 @@
-/**
- * Component: ProfileAchievements
- * Location: components/profile/ProfileAchievements.tsx
- * 
- * Description: Achievements showcase
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/achievements/pinned
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserAchievement
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserAchievement model
-interface IUserAchievement {
+interface Achievement {
   id: string;
-  // Add fields from your Prisma UserAchievement model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  icon: string;
+  tier: 'bronze' | 'silver' | 'gold';
+  unlockedAt: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/achievements/pinned
-const fetchProfileAchievementsData = async () => {
-  try {
-    const response = await apiClient.get('/api/achievements/pinned');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ProfileAchievementsProps {
+  achievements: Achievement[];
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const ProfileAchievements: React.FC<ProfileAchievementsProps> = ({
-  className,
+  achievements,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const tierColors = {
+    bronze: 'from-amber-600 to-amber-700',
+    silver: 'from-gray-400 to-gray-500',
+    gold: 'from-yellow-400 to-yellow-500',
+  };
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ProfileAchievements</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Achievements ({achievements.length})</h3>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {achievements.map(achievement => (
+          <div
+            key={achievement.id}
+            className={`aspect-square bg-gradient-to-br ${tierColors[achievement.tier]} text-white rounded-xl p-4 flex flex-col items-center justify-center text-center`}
+          >
+            <div className="text-4xl mb-2">{achievement.icon}</div>
+            <div className="text-sm font-bold">{achievement.name}</div>
+            <div className="text-xs opacity-75 mt-1">
+              {new Date(achievement.unlockedAt).toLocaleDateString()}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {achievements.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <span className="text-5xl mb-4 block">🏆</span>
+          No achievements yet
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default ProfileAchievements;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/achievements/pinned
- *  * - Model: UserAchievement
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

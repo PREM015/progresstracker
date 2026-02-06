@@ -1,5 +1,5 @@
-export { default as BlogPostsList } from './BlogPostsList';
-export { default as BlogPostForm } from './BlogPostForm';
-export { default as BlogPostEditor } from './BlogPostEditor';
-export { default as BlogPostPreview } from './BlogPostPreview';
-export { default as BlogCategories } from './BlogCategories';
+export { BlogPostsList } from './BlogPostsList';
+export { BlogCategories } from './BlogCategories';
+export { BlogPostEditor } from './BlogPostEditor';
+export { BlogPostForm } from './BlogPostForm';
+export { BlogPostPreview } from './BlogPostPreview';

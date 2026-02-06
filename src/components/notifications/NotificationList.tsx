@@ -1,123 +1,119 @@
-/**
- * Component: NotificationList
- * Location: components/notifications/NotificationList.tsx
- * 
- * Description: Notifications list
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/notifications
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Notification
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Notification model
-interface INotification {
+interface Notification {
   id: string;
-  // Add fields from your Prisma Notification model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  read: boolean;
+  createdAt: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/notifications
-const fetchNotificationListData = async () => {
-  try {
-    const response = await apiClient.get('/api/notifications');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface NotificationListProps {
+  userId: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const NotificationList: React.FC<NotificationListProps> = ({
-  className,
+  userId,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+    fetch('/api/notifications')
+      .then(r => r.json())
+      .then(data => setNotifications(data))
+      .finally(() => setLoading(false));
+  }, [userId]);
 
-  // Component logic
-  
-  // Render
+  const markAsRead = async (id: string) => {
+    await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const filteredNotifications = notifications.filter(n => filter === 'all' || !n.read);
+
+  const typeIcons = {
+    info: '📘',
+    success: '✅',
+    warning: '⚠️',
+    error: '❌',
+  };
+
+  const typeColors = {
+    info: 'bg-blue-50 border-blue-200',
+    success: 'bg-green-50 border-green-200',
+    warning: 'bg-yellow-50 border-yellow-200',
+    error: 'bg-red-50 border-red-200',
+  };
+
+  if (loading) {
+    return <div className="space-y-3">
+      {[1, 2, 3].map(i => <div key={i} className="h-24 bg-gray-100 rounded-xl animate-pulse" />)}
+    </div>;
+  }
+
   return (
     <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>NotificationList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xl font-bold text-gray-900">Notifications</h3>
+        <div className="flex gap-2">
+          {(['all', 'unread'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {filteredNotifications.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            No notifications {filter === 'unread' && 'to read'}
+          </div>
+        ) : (
+          filteredNotifications.map(notif => (
+            <div
+              key={notif.id}
+              className={`border-2 rounded-xl p-4 ${typeColors[notif.type]} ${!notif.read && 'shadow-md'
+                }`}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">{typeIcons[notif.type]}</span>
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-1">
+                    <h4 className="font-semibold text-gray-900">{notif.title}</h4>
+                    {!notif.read && (
+                      <button
+                        onClick={() => markAsRead(notif.id)}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700 mb-2">{notif.message}</p>
+                  <span className="text-xs text-gray-500">
+                    {new Date(notif.createdAt).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default NotificationList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/notifications
- *  * - Model: Notification
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

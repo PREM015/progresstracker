@@ -1,123 +1,70 @@
-/**
- * Component: WaitlistPage
- * Location: components/public/WaitlistPage.tsx
- * 
- * Description: Waitlist signup
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/waitlist/join
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Waitlist
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Waitlist model
-interface IWaitlist {
-  id: string;
-  // Add fields from your Prisma Waitlist model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/waitlist/join
-const fetchWaitlistPageData = async () => {
-  try {
-    const response = await apiClient.get('/api/waitlist/join');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface WaitlistPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const WaitlistPage: React.FC<WaitlistPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [submitted, setSubmitted] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetch('/api/waitlist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    setSubmitted(true);
+  };
 
-  // Component logic
-  
-  // Render
+  if (submitted) {
+    return (
+      <div className={`min-h-screen bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center ${className}`}>
+        <div className="bg-white rounded-2xl p-12 text-center max-w-md">
+          <div className="text-6xl mb-4">✅</div>
+          <h2 className="text-3xl font-bold mb-4">You're on the list!</h2>
+          <p className="text-gray-600">We'll notify you when we launch</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>WaitlistPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`min-h-screen bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center ${className}`}>
+      <div className="bg-white rounded-2xl p-12 max-w-md w-full">
+        <h1 className="text-4xl font-bold mb-4 text-center">Join the Waitlist</h1>
+        <p className="text-gray-600 text-center mb-8">
+          Be the first to know when we launch our new features
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            className="w-full px-4 py-3 border-2 rounded-lg"
+          />
+          <button
+            type="submit"
+            className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold"
+          >
+            Join Waitlist
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-gray-500 mt-6">
+          Over 10,000 people already signed up!
+        </p>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default WaitlistPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/waitlist/join
- *  * - Model: Waitlist
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

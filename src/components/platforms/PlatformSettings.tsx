@@ -1,123 +1,121 @@
-/**
- * Component: PlatformSettings
- * Location: components/platforms/PlatformSettings.tsx
- * 
- * Description: Platform-specific settings
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/platforms/[id]
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserPlatform
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserPlatform model
-interface IUserPlatform {
-  id: string;
-  // Add fields from your Prisma UserPlatform model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/platforms/[id]
-const fetchPlatformSettingsData = async (id: string) => {
-  try {
-    const response = await apiClient.get(`/api/platforms/${{id}}`);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface PlatformSettingsProps {
+  platformId: string;
+  platformName: string;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
+interface Settings {
+  syncFrequency: 'hourly' | 'daily' | 'weekly';
+  autoSync: boolean;
+  notifications: boolean;
+  dataRetention: number;
+}
+
 export const PlatformSettings: React.FC<PlatformSettingsProps> = ({
-  className,
+  platformId,
+  platformName,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings>({
+    syncFrequency: 'daily',
+    autoSync: true,
+    notifications: true,
+    dataRetention: 90,
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await fetch(`/api/platforms/${platformId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>PlatformSettings</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">{platformName} Settings</h3>
+
+      <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Sync Frequency</label>
+          <select
+            value={settings.syncFrequency}
+            onChange={(e) => setSettings({ ...settings, syncFrequency: e.target.value as any })}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="hourly">Every Hour</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.autoSync}
+              onChange={(e) => setSettings({ ...settings, autoSync: e.target.checked })}
+              className="w-5 h-5"
+            />
+            <div>
+              <div className="font-medium text-gray-900">Auto-sync</div>
+              <div className="text-sm text-gray-600">Automatically sync data in the background</div>
+            </div>
+          </label>
+        </div>
+
+        <div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.notifications}
+              onChange={(e) => setSettings({ ...settings, notifications: e.target.checked })}
+              className="w-5 h-5"
+            />
+            <div>
+              <div className="font-medium text-gray-900">Notifications</div>
+              <div className="text-sm text-gray-600">Receive notifications for sync updates</div>
+            </div>
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Data Retention (days)
+          </label>
+          <input
+            type="number"
+            value={settings.dataRetention}
+            onChange={(e) => setSettings({ ...settings, dataRetention: parseInt(e.target.value) })}
+            min={1}
+            max={365}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Data older than this will be automatically deleted
+          </p>
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {isSaving ? 'Saving...' : 'Save Settings'}
+        </button>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default PlatformSettings;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/platforms/[id]
- *  * - Model: UserPlatform
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

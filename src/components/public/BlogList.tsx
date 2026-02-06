@@ -1,123 +1,65 @@
-/**
- * Component: BlogList
- * Location: components/public/BlogList.tsx
- * 
- * Description: Blog listing
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/public/blog
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - BlogPost
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for BlogPost model
-interface IBlogPost {
+interface BlogPost {
   id: string;
-  // Add fields from your Prisma BlogPost model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  title: string;
+  excerpt: string;
+  author: string;
+  publishedAt: string;
+  category: string;
+  thumbnail?: string;
 }
 
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/public/blog
-const fetchBlogListData = async () => {
-  try {
-    const response = await apiClient.get('/api/public/blog');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface BlogListProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const BlogList: React.FC<BlogListProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<BlogPost[]>([]);
 
-  // Fetch data on mount
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    fetch('/api/blog')
+      .then(r => r.json())
+      .then(data => setPosts(data));
   }, []);
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>BlogList</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`${className}`}>
+      <h2 className="text-3xl font-bold mb-8">Latest Articles</h2>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {posts.map(post => (
+          <article key={post.id} className="bg-white border rounded-xl overflow-hidden hover:shadow-lg transition-shadow">
+            {post.thumbnail && (
+              <img src={post.thumbnail} alt={post.title} className="w-full h-48 object-cover" />
+            )}
+            <div className="p-6">
+              <span className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full mb-3">
+                {post.category}
+              </span>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{post.title}</h3>
+              <p className="text-gray-600 text-sm mb-4">{post.excerpt}</p>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>By {post.author}</span>
+                <span>{new Date(post.publishedAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {posts.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <span className="text-5xl mb-4 block">📝</span>
+          No blog posts yet
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default BlogList;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/public/blog
- *  * - Model: BlogPost
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

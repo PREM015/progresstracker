@@ -1,146 +1,116 @@
-/**
- * Component: HeatmapCalendar
- * Location: components/dashboard/HeatmapCalendar.tsx
- * 
- * Description: GitHub-style contribution heatmap
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/analytics/heatmap
-// - /api/stats/heatmap
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - DailyStats
-// - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for DailyStats model
-interface IDailyStats {
-  id: string;
-  // Add fields from your Prisma DailyStats model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+interface HeatmapData {
+  date: string;
+  count: number;
+  level?: number;
 }
 
-// Interface for TrackerEntry model
-interface ITrackerEntry {
-  id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/analytics/heatmap
-const fetchHeatmapCalendarData = async () => {
-  try {
-    const response = await apiClient.get('/api/analytics/heatmap');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// /api/stats/heatmap
-const fetchHeatmapCalendarData = async () => {
-  try {
-    const response = await apiClient.get('/api/stats/heatmap');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface HeatmapCalendarProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
-export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ApiSuccess<T> {
+  success: true;
+  data: T;
+}
 
-  // Fetch data on mount
+interface HeatmapResponse {
+  data: HeatmapData[];
+}
+
+export const HeatmapCalendar: React.FC<HeatmapCalendarProps> = ({
+  className = '',
+}) => {
+  const [data, setData] = useState<HeatmapData[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    let isMounted = true;
+
+    const fetchHeatmap = async () => {
+      try {
+        const res = await fetch('/api/analytics/heatmap?range=3m');
+        const json = (await res.json()) as ApiSuccess<HeatmapResponse>;
+        if (!res.ok || !json?.success) {
+          throw new Error('Failed to fetch heatmap data');
+        }
+
+        const points = Array.isArray(json.data?.data) ? json.data.data : [];
+        if (isMounted) {
+          setData(points);
+        }
+      } catch (error) {
+        console.error('Failed to load heatmap data:', error);
+        if (isMounted) {
+          setData([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchHeatmap();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Component logic
-  
-  // Render
+  const getIntensity = (count: number) => {
+    if (count === 0) return 'bg-gray-100';
+    if (count < 3) return 'bg-green-200';
+    if (count < 6) return 'bg-green-400';
+    if (count < 10) return 'bg-green-600';
+    return 'bg-green-800';
+  };
+
+  if (loading) return <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />;
+
+  const weeks: HeatmapData[][] = [];
+  for (let week = 0; week < 12; week++) {
+    const days: HeatmapData[] = [];
+    for (let day = 0; day < 7; day++) {
+      const date = new Date();
+      date.setDate(date.getDate() - (11 - week) * 7 - (6 - day));
+      const dateStr = date.toISOString().split('T')[0];
+      const dayData = data.find(d => d.date === dateStr);
+      days.push({ date: dateStr, count: dayData?.count || 0 });
+    }
+    weeks.push(days);
+  }
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>HeatmapCalendar</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Activity Heatmap</h3>
+
+      <div className="flex gap-1">
+        {weeks.map((week, weekIdx) => (
+          <div key={weekIdx} className="flex flex-col gap-1">
+            {week.map((day, dayIdx) => (
+              <div
+                key={dayIdx}
+                className={`w-3 h-3 rounded-sm ${getIntensity(day.count)}`}
+                title={`${day.date}: ${day.count} activities`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 mt-4 text-xs text-gray-600">
+        <span>Less</span>
+        {[0, 3, 6, 10, 15].map((count, idx) => (
+          <div key={idx} className={`w-3 h-3 rounded-sm ${getIntensity(count)}`} />
+        ))}
+        <span>More</span>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default HeatmapCalendar;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/analytics/heatmap
- * - API: /api/stats/heatmap
- *  * - Model: DailyStats
- * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

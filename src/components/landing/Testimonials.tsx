@@ -1,87 +1,38 @@
-/**
- * Component: Testimonials
- * Location: components/landing/Testimonials.tsx
- * 
- * Description: User testimonials
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface TestimonialsProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const Testimonials: React.FC<TestimonialsProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const testimonials = [
+    { name: 'Alex Chen', role: 'Software Engineer', text: 'This platform helped me track my progress and land my dream job!', avatar: '👨‍💻' },
+    { name: 'Sarah Miller', role: 'Student', text: 'Love the analytics! Seeing my growth motivates me every day.', avatar: '👩‍🎓' },
+    { name: 'James  Wilson', role: 'Developer', text: 'The best tool for monitoring my coding journey across platforms.', avatar: '👨‍💼' },
+  ];
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>Testimonials</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <section className={`py-20 bg-indigo-50 ${className}`}>
+      <div className="container mx-auto px-6">
+        <h2 className="text-4xl font-bold text-center mb-16">What Users Say</h2>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {testimonials.map((t, idx) => (
+            <div key={idx} className="bg-white rounded-xl p-8">
+              <div className="text-5xl mb-4">{t.avatar}</div>
+              <p className="text-gray-700 mb-6 italic">"{t.text}"</p>
+              <div className="font-bold">{t.name}</div>
+              <div className="text-sm text-gray-600">{t.role}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default Testimonials;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

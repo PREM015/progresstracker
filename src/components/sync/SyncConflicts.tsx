@@ -1,103 +1,75 @@
-/**
- * Component: SyncConflicts
- * Location: components/sync/SyncConflicts.tsx
- * 
- * Description: Conflict resolution
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - TrackerEntry
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for TrackerEntry model
-interface ITrackerEntry {
+interface SyncConflict {
   id: string;
-  // Add fields from your Prisma TrackerEntry model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
+  platform: string;
+  local: any;
+  remote: any;
+  type: string;
 }
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SyncConflictsProps {
+  conflicts: SyncConflict[];
+  onResolve: (id: string, choice: 'local' | 'remote') => void;
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SyncConflicts: React.FC<SyncConflictsProps> = ({
-  className,
+  conflicts,
+  onResolve,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  if (conflicts.length === 0) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-12 text-center">
+        <span className="text-6xl mb-4 block">✅</span>
+        <div className="font-bold text-green-900">No Conflicts</div>
+        <div className="text-sm text-green-700">All syncs completed successfully</div>
+      </div>
+    );
+  }
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SyncConflicts</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold text-red-600 mb-6">⚠️ Sync Conflicts ({conflicts.length})</h3>
+
+      <div className="space-y-4">
+        {conflicts.map(conflict => (
+          <div key={conflict.id} className="border-2 border-red-200 rounded-lg p-4">
+            <div className="font-semibold mb-3">{conflict.platform} - {conflict.type}</div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="p-3 bg-blue-50 rounded">
+                <div className="text-sm font-medium text-blue-900 mb-2">Local Version</div>
+                <div className="text-sm text-gray-700">{JSON.stringify(conflict.local)}</div>
+              </div>
+              <div className="p-3 bg-purple-50 rounded">
+                <div className="text-sm font-medium text-purple-900 mb-2">Remote Version</div>
+                <div className="text-sm text-gray-700">{JSON.stringify(conflict.remote)}</div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => onResolve(conflict.id, 'local')}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Use Local
+              </button>
+              <button
+                onClick={() => onResolve(conflict.id, 'remote')}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                Use Remote
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SyncConflicts;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - Model: TrackerEntry
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

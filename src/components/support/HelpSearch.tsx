@@ -1,107 +1,65 @@
-/**
- * Component: HelpSearch
- * Location: components/support/HelpSearch.tsx
- * 
- * Description: Search help
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/search
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/search
-const fetchHelpSearchData = async () => {
-  try {
-    const response = await apiClient.get('/api/search');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface HelpSearchProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const HelpSearch: React.FC<HelpSearchProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<string[]>([]);
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Simulate search results
+    setResults([
+      'How to connect a platform',
+      'Troubleshooting sync issues',
+      'Understanding analytics',
+    ]);
+  };
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>HelpSearch</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`bg-white border rounded-xl p-6 ${className}`}>
+      <h3 className="text-xl font-bold mb-6">Search Help Articles</h3>
+
+      <form onSubmit={handleSearch} className="mb-6">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for help..."
+            className="flex-1 px-4 py-2 border rounded-lg"
+          />
+          <button
+            type="submit"
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            🔍 Search
+          </button>
+        </div>
+      </form>
+
+      {results.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="font-semibold mb-3">Results</h4>
+          {results.map((result, idx) => (
+            <a
+              key={idx}
+              href="#"
+              className="block p-3 border rounded-lg hover:bg-gray-50"
+            >
+              {result}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default HelpSearch;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/search
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */

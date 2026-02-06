@@ -1,123 +1,45 @@
-/**
- * Component: SettingsPage
- * Location: components/settings/SettingsPage.tsx
- * 
- * Description: Main settings page
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/user/settings
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - UserSettings
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for UserSettings model
-interface IUserSettings {
-  id: string;
-  // Add fields from your Prisma UserSettings model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/user/settings
-const fetchSettingsPageData = async () => {
-  try {
-    const response = await apiClient.get('/api/user/settings');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface SettingsPageProps {
   className?: string;
-  // Add component-specific props here
 }
 
-// ===== COMPONENT =====
 export const SettingsPage: React.FC<SettingsPageProps> = ({
-  className,
+  className = '',
 }) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>SettingsPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className={`min-h-screen bg-gray-50 ${className}`}>
+      <div className="max-w-6xl mx-auto p-8">
+        {/* Would compose SettingsNavigation and other settings components */}
+        <div className="flex gap-8">
+          <aside className="w-64">
+            <div className="bg-white border rounded-xl p-4">
+              <nav className="space-y-1">
+                {['Profile', 'Account', 'Security', 'Notifications', 'Privacy'].map(item => (
+                  <a
+                    key={item}
+                    href={`/settings/${item.toLowerCase()}`}
+                    className="block px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    {item}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
+
+          <main className="flex-1">
+            <div className="bg-white border rounded-xl p-8">
+              <h1 className="text-3xl font-bold mb-6">Settings</h1>
+              <p className="text-gray-600">Select a category from the sidebar</p>
+            </div>
+          </main>
+        </div>
+      </div>
     </div>
   );
 };
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
 export default SettingsPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/user/settings
- *  * - Model: UserSettings
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
