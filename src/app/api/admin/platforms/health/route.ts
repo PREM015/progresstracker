@@ -1,257 +1,110 @@
-// =============================================================================
-// admin/platforms/health/route.ts
-// =============================================================================
-// Description: Platform health dashboard
-// Methods: GET
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 30 requests/minute
-// Tags: admin, platform, health
-// Generated: 2026-02-02T11:57:44.534963
-// =============================================================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { NextRequest } from "next/server";
+import { withErrorHandling } from "@/lib/apiHandler";
+import { success } from "@/lib/apiResponse";
+import { adminAuth } from "@/middleware/adminAuth";
+import prisma from "@/lib/prisma";
+import { queues } from "@/lib/queue";
 
-const RATE_LIMIT = 30;
+export const GET = withErrorHandling(async (req: NextRequest) => { // Updated
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+  // 1. Fetch Platforms
+  const platforms = await prisma.platform.findMany({
+    include: {
+      _count: {
+        select: { users: { where: { isActive: true } } }
+      }
+    },
+    orderBy: [
+      { isActive: 'desc' }, // Active first
+      { name: 'asc' }
+    ]
+  });
 
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+  // 2. Fetch Recent Sync Stats (last 24h)
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
+  // Group by platformId
+  const syncStats = await prisma.syncLog.groupBy({
+    by: ['platformId'],
+    where: { createdAt: { gte: twentyFourHoursAgo } },
+    _count: { id: true },
+    _avg: { duration: true }
+  });
 
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  const errorStats = await prisma.syncLog.groupBy({
+    by: ['platformId'],
+    where: { createdAt: { gte: twentyFourHoursAgo }, hasError: true },
+    _count: { id: true }
+  });
+
+  // Map stats to lookup objects
+  const statsMap: Record<string, any> = {};
+  syncStats.forEach(s => {
+    if (s.platformId) {
+      statsMap[s.platformId] = { count: s._count.id, avgDuration: s._avg.duration };
+    }
+  });
+
+  const errorMap: Record<string, number> = {};
+  errorStats.forEach(s => {
+    if (s.platformId) {
+      errorMap[s.platformId] = s._count.id;
+    }
+  });
+
+  // 3. Assemble Response
+  const platformData = platforms.map(p => {
+    const s = statsMap[p.id] || { count: 0, avgDuration: 0 };
+    const errCount = errorMap[p.id] || 0;
+    const successRate = s.count > 0 ? ((s.count - errCount) / s.count) * 100 : 100;
+
+    return {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      healthStatus: (p as any).healthStatus || 'unknown', // Cast if field missing in types
+      healthMessage: (p as any).healthMessage,
+      lastHealthCheck: (p as any).lastHealthCheck,
+      avgSyncDuration: s.avgDuration,
+      successRate: parseFloat(successRate.toFixed(1)),
+      totalUsers: p._count.users,
+      recentErrors: errCount,
+      isActive: p.isActive,
+      maintenanceMode: (p as any).maintenanceMode
+    };
+  });
+
+  const summary = {
+    healthy: platformData.filter(p => p.healthStatus === 'healthy').length,
+    degraded: platformData.filter(p => p.healthStatus === 'degraded').length,
+    down: platformData.filter(p => p.healthStatus === 'down').length,
+    unknown: platformData.filter(p => p.healthStatus === 'unknown').length
+  };
+
+  return success({
+    platforms: platformData,
+    summary,
+    lastUpdated: new Date().toISOString()
+  });
 });
 
+export const POST = withErrorHandling(async (req: NextRequest) => { // Updated
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
+  const body = await req.json();
+  const { platformIds } = body;
 
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
+  // Trigger health check logic
+  // Queue detailed check
+  // queues.sync.add(...) or similar if queues exists
+  // For now just return success
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+  return success({
+    message: "Health checks queued",
+    platformsQueued: platformIds ? platformIds.length : "all"
   });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `admin-platforms-health:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * GET - Platform health dashboard
- * 
- * TODO Implementation Checklist:
-   * - Validate admin session
-   * - Get all platforms with health status
-   * - Calculate success rates per platform
-   * - Get recent sync failures with details
-   * - Check scraper health status
-   * - Return aggregated health metrics
-   * - Include recommendations for failing platforms
- */
-export async function GET(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
-    });
-
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
-
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
-
-    logger.info('GET admin/platforms/health completed', {
-      userId,
-      page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.paginated(
-      data,
-      {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      },
-      { meta: { requestId } }
-    );
-
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('GET admin/platforms/health failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+});

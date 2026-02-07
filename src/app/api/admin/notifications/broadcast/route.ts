@@ -1,296 +1,143 @@
-// src/app/api/admin/notifications/broadcast/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { NotificationType, NotificationPriority, Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { NextRequest } from "next/server";
+import { withErrorHandling } from "@/lib/apiHandler";
+import { success, validationError, rateLimited } from "@/lib/apiResponse";
+import { adminAuth } from "@/middleware/adminAuth";
+import prisma from "@/lib/prisma";
+import { queueNotifications, queueEmailBroadcast } from "@/lib/queue";
+import { pushService } from "@/services/pushService";
+import auditLogService from "@/services/auditLogService";
+import { AuditAction, NotificationType, NotificationPriority, SubscriptionTier, Role } from "@prisma/client";
+import { getToken } from "next-auth/jwt";
 
-const RATE_LIMIT = 50; // Lower rate limit for broadcasts
+export const POST = withErrorHandling(async (req: NextRequest) => {
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const adminId = token?.sub;
 
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+  const body = await req.json();
+  const {
+    title,
+    message,
+    type,
+    priority,
+    channels = [],
+    actionUrl,
+    actionLabel,
+    imageUrl,
+    filters,
+    scheduledFor
+  } = body;
 
-// =============================================================================
-// VALIDATION
-// =============================================================================
+  if (!title || !message || channels.length === 0) {
+    return validationError("Title, message and at least one channel required");
+  }
 
-const broadcastSchema = z.object({
-  type: z.nativeEnum(NotificationType).default('SYSTEM'),
-  priority: z.nativeEnum(NotificationPriority).default('NORMAL'),
-  title: z.string().min(5).max(300),
-  message: z.string().min(10).max(2000),
-  shortMessage: z.string().max(200).optional(),
-  actionUrl: z.string().url().optional(),
-  actionLabel: z.string().max(100).optional(),
-  imageUrl: z.string().url().optional(),
-  metadata: z.record(z.unknown()).optional(),
-  targetAudience: z.enum(['all', 'active', 'premium', 'free', 'custom']).default('all'),
-  userIds: z.array(z.string().cuid()).optional(),
-  scheduledFor: z.string().datetime().optional(),
-  expiresAt: z.string().datetime().optional(),
-  channels: z.array(z.enum(['in_app', 'email', 'push'])).min(1).default(['in_app']),
-});
+  // 1. Filter Recipients
+  const where: any = {
+    deletedAt: null,
+    isActive: filters?.isActive ?? true,
+  };
 
-// =============================================================================
-// HELPERS
-// =============================================================================
+  if (filters?.role) where.role = filters.role;
+  if (filters?.tier) where.subscription = { tier: { in: filters.tier } };
+  if (filters?.registeredAfter) where.createdAt = { gte: new Date(filters.registeredAfter) };
 
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: { limit: number; remaining: number }): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+  const recipients = await prisma.user.findMany({
+    where,
+    select: {
+      id: true,
+      email: true,
+      notificationPrefs: true
+      // pushSubscriptions logic handled in pushService ideally, but we need IDs
+    }
   });
-  response.headers.set('X-Request-ID', requestId);
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  return response;
-}
 
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `admin-broadcast:${ip}`);
-
-  if (!rateLimitResult.success) {
-    return { error: apiResponse.rateLimited(60, requestId), session: null, rateLimitResult };
+  if (recipients.length === 0) {
+    return validationError("No recipients match filters");
   }
 
-  const session = await getServerSession(authOptions);
+  const recipientIds = recipients.map(u => u.id);
+  const broadcastId = "bc-" + Date.now();
 
-  if (!session?.user?.id) {
-    return { error: apiResponse.unauthorized('Authentication required', requestId), session: null, rateLimitResult };
-  }
+  // 2. Process Channels
+  const promises = [];
 
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { error: apiResponse.forbidden('Admin access required', requestId), session: null, rateLimitResult };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// OPTIONS
-// =============================================================================
-
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-// =============================================================================
-// POST - Broadcast notification
-// =============================================================================
-
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-
-    const userId = session!.user.id;
-
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = broadcastSchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const {
-      type,
-      priority,
-      title,
-      message,
-      shortMessage,
-      actionUrl,
-      actionLabel,
-      imageUrl,
-      metadata,
-      targetAudience,
-      userIds,
-      scheduledFor,
-      expiresAt,
-      channels,
-    } = validation.data;
-
-    logger.info('Broadcasting notification', {
-      targetAudience,
-      channels,
-      adminId: userId,
-      requestId,
-    });
-
-    // Get target users
-    let targetUserIds: string[] = [];
-
-    if (targetAudience === 'custom' && userIds) {
-      targetUserIds = userIds;
-    } else {
-      const whereClause: Prisma.UserWhereInput = { isActive: true };
-
-      switch (targetAudience) {
-        case 'active':
-          whereClause.lastActiveAt = {
-            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
-          };
-          break;
-        case 'premium':
-          whereClause.subscription = {
-            tier: { not: 'FREE' },
-            status: 'ACTIVE',
-          };
-          break;
-        case 'free':
-          whereClause.OR = [
-            { subscription: null },
-            { subscription: { tier: 'FREE' } },
-          ];
-          break;
-        case 'all':
-        default:
-          // No additional filters
-          break;
+  // IN_APP
+  if (channels.includes('IN_APP')) {
+    // Use queue for batch creation
+    promises.push(queueNotifications({
+      userIds: recipientIds,
+      notification: {
+        type: type || 'SYSTEM',
+        title,
+        message,
+        priority: priority || 'NORMAL',
+        actionUrl,
+        actionLabel
       }
-
-      const users = await prisma.user.findMany({
-        where: whereClause,
-        select: { id: true },
-      });
-
-      targetUserIds = users.map((u) => u.id);
-    }
-
-    if (targetUserIds.length === 0) {
-      return addHeaders(
-        apiResponse.validationError('No users match the target audience', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    // Create notifications
-    const notificationData = targetUserIds.map((uid) => ({
-      userId: uid,
-      type,
-      priority,
-      channel: 'IN_APP' as const,
-      title,
-      message,
-      shortMessage,
-      actionUrl,
-      actionLabel,
-      imageUrl,
-      metadata: metadata as Prisma.InputJsonValue,
-      scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
     }));
-
-    // Batch create (limit to avoid timeouts)
-    const BATCH_SIZE = 1000;
-    let totalCreated = 0;
-
-    for (let i = 0; i < notificationData.length; i += BATCH_SIZE) {
-      const batch = notificationData.slice(i, i + BATCH_SIZE);
-      const result = await prisma.notification.createMany({
-        data: batch,
-        skipDuplicates: true,
-      });
-      totalCreated += result.count;
-    }
-
-    // TODO: Send email/push notifications if channels include them
-    // This would typically be done in a background job
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'ADMIN_ACTION' as AuditAction,
-        category: 'admin',
-        entityType: 'notification',
-        description: `Broadcast notification to ${totalCreated} users`,
-        newValue: {
-          title,
-          targetAudience,
-          userCount: totalCreated,
-          channels,
-        } as Prisma.InputJsonValue,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
-    });
-
-    logger.info('Notification broadcast completed', {
-      totalCreated,
-      targetAudience,
-      channels,
-      adminId: userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.success(
-      {
-        message: `Notification broadcast to ${totalCreated} users`,
-        totalCreated,
-        targetAudience,
-        channels,
-      },
-      { meta: { requestId } }
-    );
-
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST broadcast notification failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Failed to broadcast notification', requestId), requestId);
   }
-}
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+  // EMAIL
+  if (channels.includes('EMAIL')) {
+    // Filter for email enabled (assuming pref exists)
+    const emailRecipients = recipients
+      .filter(u => u.email && (u.notificationPrefs ? (u.notificationPrefs as any).emailEnabled !== false : true))
+      .map(u => u.id); // Queue expects IDs usually if it re-fetches or emails if it sends directly.
+    // queueEmailBroadcast in lib/queue takes `userIds`.
+
+    if (emailRecipients.length > 0) {
+      promises.push(queueEmailBroadcast({
+        userIds: emailRecipients,
+        subject: title,
+        htmlTemplate: `<h1>${title}</h1><p>${message}</p>${actionUrl ? `<a href="${actionUrl}">${actionLabel || 'View'}</a>` : ''}`,
+        variables: {}
+      }));
+    }
+  }
+
+  // PUSH
+  if (channels.includes('PUSH')) {
+    // We don't have a specific queue for PUSH in lib/queue likely suitable for bulk without modification
+    // We will fire and forget the service call
+    // Filter logic usually inside service or we pass all IDs and service filters
+    // pushService.sendToMultipleUsers takes userIds.
+
+    const pushPromise = pushService.sendToMultipleUsers(recipientIds, {
+      title,
+      body: message,
+      url: actionUrl,
+      image: imageUrl
+    }).catch(err => {
+      console.error("Push broadcast failed", err);
+    });
+
+    // We won't await this if we want to return immediately, but Promise.all below awaits queue connects.
+    // We can let push run in background
+    // promises.push(pushPromise); // Uncomment to await
+  }
+
+  await Promise.all(promises);
+
+  // 3. Log
+  if (adminId) {
+    await auditLogService.create({
+      userId: adminId,
+      action: "ADMIN_ACTION" as AuditAction,
+      category: "notification",
+      description: `Broadcast sent: ${title}`,
+      changes: { channels, recipientCount: recipientIds.length, broadcastId } as any
+    });
+  }
+
+  return success({
+    broadcastId,
+    recipientCount: recipientIds.length,
+    channels,
+    status: scheduledFor ? "scheduled" : "queued",
+    scheduledFor: scheduledFor || null
+  });
+});

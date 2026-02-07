@@ -2,6 +2,7 @@
 // Complete achievement types matching Prisma schema
 
 import type { PlatformCategory as PrismaPlatformCategory } from '@prisma/client';
+import { ReactNode } from "react";
 
 // =============================================================================
 // ENUMS & CONSTANTS
@@ -266,7 +267,7 @@ export const RARITY_CONFIG: Record<AchievementRarity, {
 
 /** Tier display configuration */
 export const TIER_CONFIG: Record<AchievementTier, {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   color: string;
   emoji: string;

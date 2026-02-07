@@ -1,264 +1,105 @@
-// =============================================================================
-// admin/email/send-bulk/route.ts
-// =============================================================================
-// Description: Send bulk emails
-// Methods: POST
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 5 requests/minute
-// Tags: admin, email, bulk
-// Generated: 2026-02-02T11:57:44.546251
-// =============================================================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
-import { sendEmail } from '@/lib/email';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { NextRequest } from "next/server";
+import { withErrorHandling } from "@/lib/apiHandler";
+import { success, validationError } from "@/lib/apiResponse";
+import { adminAuth } from "@/middleware/adminAuth";
+import prisma from "@/lib/prisma";
+import auditLogService from "@/services/auditLogService";
+import { queueEmailBroadcast } from "@/lib/queue";
+import { AuditAction, SubscriptionTier } from "@prisma/client";
+import { getToken } from "next-auth/jwt";
 
-const RATE_LIMIT = 5;
+export const POST = withErrorHandling(async (req: NextRequest) => {
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const adminId = token?.sub;
 
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
+  const body = await req.json();
+  const {
+    subject,
+    htmlContent,
+    filters = {},
+    testMode
+  } = body;
 
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
+  if (!subject || !htmlContent) {
+    return validationError("Subject and htmlContent are required");
+  }
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
+  // 1. Determine Recipients
+  let recipients: { id: string, email: string }[] = [];
 
+  if (testMode && adminId) {
+    const admin = await prisma.user.findUnique({ where: { id: adminId } });
+    if (admin && admin.email) {
+      recipients = [{ id: admin.id, email: admin.email }];
+    }
+  } else {
+    // Build filter
+    const where: any = {
+      deletedAt: null,
+      isActive: filters.isActive ?? true, // Default to active only unless specified
+    };
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
+    if (filters.role) where.role = filters.role;
+    if (filters.tier) where.subscription = { tier: filters.tier as SubscriptionTier };
+    if (filters.isVerified !== undefined) where.isVerified = filters.isVerified;
 
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
+    // Only fetch users who haven't disabled emails (assuming notificationPrefs relation)
+    // Complex filtering on related fields might need careful query construction
+    // For now fetching users and their prefs
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
+    const users = await prisma.user.findMany({
+      where,
+      select: { id: true, email: true, notificationPrefs: true }
+    });
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+    // Filter in memory for preferences
+    recipients = users.filter(u =>
+      u.email &&
+      (u.notificationPrefs?.marketingEmails !== false) // Default to true if not set
+    ).map(u => ({ id: u.id, email: u.email! }));
+  }
+
+  if (recipients.length === 0) {
+    return validationError("No recipients match filters");
+  }
+
+  // 2. Queue Job
+  // queueEmailBroadcast expects { userIds, ... }
+  const userIds = recipients.map(r => r.id);
+
+  // Create chunks if too many recipients (Queue handles it but safer to batch here if millions)
+  // For now assuming reasonable size handled by queue processor
+
+  const jobId = await queueEmailBroadcast({
+    userIds,
+    subject: testMode ? `[TEST] ${subject}` : subject,
+    htmlTemplate: htmlContent,
+    variables: {} // variables support if needed
   });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
 
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `admin-email-send-bulk:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Send bulk emails
- * 
- * TODO Implementation Checklist:
-   * - Validate super admin session
-   * - Parse target audience (all users, segment, list)
-   * - Validate email template and variables
-   * - Create bulk email job
-   * - Queue emails in batches (avoid rate limits)
-   * - Track delivery status per recipient
-   * - Create audit log entry
-   * - Return job ID for status tracking
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'CREATE' as AuditAction,
-        category: 'admin',
-        entityType: 'unknown',
-        description: `Created via ${requestId}`,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
+  // 3. Log Action
+  if (adminId) {
+    await auditLogService.create({
+      userId: adminId,
+      action: "ADMIN_ACTION" as AuditAction,
+      category: "email",
+      description: `Triggered bulk email: ${subject}`,
+      changes: {
+        recipientCount: recipients.length,
+        testMode,
+        jobId
+      } as any
     });
-
-    logger.info('POST admin/email/send-bulk completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST admin/email/send-bulk failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
-}
 
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+  return success({
+    jobId,
+    recipientCount: recipients.length,
+    status: "queued",
+    testMode: !!testMode
+  });
+});

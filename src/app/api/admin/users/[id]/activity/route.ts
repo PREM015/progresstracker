@@ -1,258 +1,109 @@
-// =============================================================================
-// admin/users/[id]/activity/route.ts
-// =============================================================================
-// Description: Get user activity log (admin view)
-// Methods: GET
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 50 requests/minute
-// Tags: admin, user, audit
-// Generated: 2026-02-02T11:57:44.532705
-// =============================================================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { NextRequest } from "next/server";
+import { success, notFound, validationError, internalError } from "@/lib/apiResponse";
+import { adminAuth } from "@/middleware/adminAuth";
+import prisma from "@/lib/prisma";
+import auditLogService from "@/services/auditLogService";
+import { AuditAction } from "@prisma/client";
+import { getToken } from "next-auth/jwt";
 
-const RATE_LIMIT = 50;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const querySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  search: z.string().max(200).optional(),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
-});
-
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `admin-users-[id]-activity:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
+export const GET = async (req: NextRequest, { params }: { params: { id: string } }) => { // Updated
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
+    const authRes = await adminAuth(req);
+    if (authRes) return authRes;
 
-/**
- * GET - Get user activity log (admin view)
- * 
- * TODO Implementation Checklist:
-   * - Validate admin session
-   * - Get target user ID from URL params
-   * - Parse pagination and filter params
-   * - Query AuditLog for user's activities
-   * - Include login attempts and session history
-   * - Include IP addresses and locations
-   * - Return comprehensive activity log
- */
-export async function GET(
-  request: NextRequest, { params }: { params: Promise<{ id: string }> }
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
+    const { id } = params;
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type") || "all";
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const skip = (page - 1) * limit;
 
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const adminId = token?.sub;
 
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    const resolvedParams = await params;
-    const { id }} = resolvedParams;
-    const userId = session!.user.id;
-
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      search: searchParams.get('search') || undefined,
-      sortBy: searchParams.get('sortBy') || undefined,
-      sortOrder: searchParams.get('sortOrder') || 'desc',
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, name: true, email: true, username: true }
     });
 
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
+    if (!user) return notFound("User");
+
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+
+    const baseWhere: any = {};
+    if (dateFrom || dateTo) {
+      baseWhere.createdAt = {}; // For logs
+      if (dateFrom) baseWhere.createdAt.gte = new Date(dateFrom);
+      if (dateTo) baseWhere.createdAt.lte = new Date(dateTo);
     }
 
-    const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    const result: any = { user, activity: {} };
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    if (type === "all" || type === "tracker") {
+      const trackerWhere = { ...baseWhere, userId: id, deletedAt: null };
+      if (dateFrom || dateTo) {
+        trackerWhere.date = baseWhere.createdAt; // Tracker uses 'date' usually
+        delete trackerWhere.createdAt;
+      }
 
-    logger.info('GET admin/users/[id]/activity completed', {
-      userId,
-      page,
-      total,
-      requestId,
-      duration: Date.now() - startTime,
-    });
+      result.activity.trackerEntries = await prisma.trackerEntry.findMany({
+        where: trackerWhere,
+        take: type === "all" ? 20 : limit,
+        skip: type === "all" ? 0 : skip,
+        orderBy: { date: "desc" },
+        include: { platform: { select: { name: true } } }
+      });
+    }
 
-    const response = apiResponse.paginated(
-      data,
-      {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      },
-      { meta: { requestId } }
-    );
+    if (type === "all" || type === "audit") {
+      result.activity.auditLogs = await prisma.auditLog.findMany({
+        where: { ...baseWhere, userId: id },
+        take: type === "all" ? 20 : limit,
+        skip: type === "all" ? 0 : skip,
+        orderBy: { createdAt: "desc" }
+      });
+    }
 
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('GET admin/users/[id]/activity failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    if (type === "all" || type === "login") {
+      // Assuming LoginAttempt model exists
+      try {
+        // @ts-ignore: Model might not exist yet
+        result.activity.loginAttempts = await prisma.loginAttempt.findMany({
+          where: { ...baseWhere, userId: id },
+          take: type === "all" ? 10 : limit,
+          skip: type === "all" ? 0 : skip,
+          orderBy: { createdAt: "desc" }
+        });
+      } catch (e) {
+        result.activity.loginAttempts = [];
+      }
+    }
+
+    if (type === "all" || type === "sync") {
+      result.activity.syncLogs = await prisma.syncLog.findMany({
+        where: { ...baseWhere, userId: id },
+        take: type === "all" ? 10 : limit,
+        skip: type === "all" ? 0 : skip,
+        orderBy: { createdAt: "desc" }
+      });
+    }
+
+    // Log access
+    if (adminId) {
+      await auditLogService.create({
+        userId: adminId,
+        action: "READ" as AuditAction,
+        category: "user_activity", // Fixed category enum match
+        description: `Viewed activity for ${user.email}`,
+        entityId: id,
+        entityType: "user"
+      });
+    }
+
+    return success(result);
+  } catch (err: any) {
+    return internalError(err.message);
   }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+};

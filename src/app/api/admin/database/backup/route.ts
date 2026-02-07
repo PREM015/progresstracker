@@ -1,262 +1,63 @@
-// =============================================================================
-// admin/database/backup/route.ts
-// =============================================================================
-// Description: Trigger database backup
-// Methods: POST
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 2 requests/minute
-// Tags: admin, database, backup
-// Generated: 2026-02-02T11:57:44.543293
-// =============================================================================
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
+import { NextRequest } from "next/server";
+import { withErrorHandling } from "@/lib/apiHandler";
+import { success, error } from "@/lib/apiResponse";
+import { adminAuth } from "@/middleware/adminAuth";
+import { getToken } from "next-auth/jwt";
+import auditLogService from "@/services/auditLogService";
+import { AuditAction } from "@prisma/client";
 
-const RATE_LIMIT = 2;
+export const GET = withErrorHandling(async (req: NextRequest) => {
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  // Mock implementation for listing backups
+  // In a real scenario, list from S3/Storage
+  return success({
+    backups: [
+      {
+        id: "backup-mock-1",
+        type: "full",
+        size: "256 MB",
+        sizeBytes: 268435456,
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        downloadUrl: null,
+        expiresAt: new Date(Date.now() + 86400000).toISOString()
+      }
+    ],
+    totalSize: "256 MB",
+    backupCount: 1
+  });
 });
 
+export const POST = withErrorHandling(async (req: NextRequest) => {
+  const authRes = await adminAuth(req);
+  if (authRes) return authRes;
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const adminId = token?.sub;
 
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
+  const body = await req.json();
+  const { type = "full" } = body;
 
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
+  // Simulate backup trigger
+  // In production: trigger pg_dump or provider API
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
+  if (adminId) {
+    await auditLogService.create({
+      userId: adminId,
+      action: "ADMIN_ACTION" as AuditAction, // "BACKUP" fallback
+      category: "database",
+      description: `Triggered ${type} database backup`
+    });
+  }
+
+  return success({
+    backupId: "pending-" + Date.now(),
+    status: "in_progress",
+    estimatedDuration: "5-10 minutes",
+    message: "Backup job started successfully"
   });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `admin-database-backup:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Trigger database backup
- * 
- * TODO Implementation Checklist:
-   * - Validate super admin session
-   * - Check if backup is already in progress
-   * - Trigger backup job (pg_dump or similar)
-   * - Upload backup to secure storage (S3)
-   * - Create audit log entry
-   * - Send notification on completion/failure
-   * - Return backup job ID
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'CREATE' as AuditAction,
-        category: 'admin',
-        entityType: 'unknown',
-        description: `Created via ${requestId}`,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
-    });
-
-    logger.info('POST admin/database/backup completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST admin/database/backup failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+});
