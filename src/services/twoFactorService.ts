@@ -6,6 +6,7 @@ import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
+import { decrypt, encrypt } from '@/lib/encryption';
 
 // =============================================================================
 // TYPES
@@ -83,17 +84,19 @@ export class TwoFactorService {
     // Generate backup codes
     const backupCodes = this.generateBackupCodes();
 
-    // Store pending 2FA setup (encrypt secret in production!)
+    const encryptedSecret = encrypt(secret);
+
+    // Store pending 2FA setup
     await prisma.twoFactorAuth.upsert({
       where: { userId },
       create: {
         userId,
-        secret, // TODO: Encrypt this!
+        secret: encryptedSecret,
         isEnabled: false,
         isPending: true,
       },
       update: {
-        secret,
+        secret: encryptedSecret,
         isEnabled: false,
         isPending: true,
         verifiedAt: null,
@@ -125,9 +128,10 @@ export class TwoFactorService {
     }
 
     // Verify the token
+    const decryptedSecret = decrypt(twoFactor.secret);
     const isValid = authenticator.verify({
       token,
-      secret: twoFactor.secret,
+      secret: decryptedSecret,
     });
 
     if (!isValid) {
@@ -180,9 +184,10 @@ export class TwoFactorService {
       return { success: false, error: '2FA is not enabled' };
     }
 
+    const decryptedSecret = decrypt(twoFactor.secret);
     const isValid = authenticator.verify({
       token,
-      secret: twoFactor.secret,
+      secret: decryptedSecret,
     });
 
     if (isValid) {
