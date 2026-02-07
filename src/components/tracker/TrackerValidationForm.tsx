@@ -9,7 +9,7 @@ interface TrackerValidationFormProps {
 }
 
 export function TrackerValidationForm({ entryId, onValidate, className = '' }: TrackerValidationFormProps) {
-    const [validationNotes, setValidation Notes] = useState('');
+    const [validationNotes, setValidationNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleValidate = async (isValid: boolean) => {

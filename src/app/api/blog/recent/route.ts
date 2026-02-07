@@ -1,7 +1,97 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
 
-// TODO: Implement this route
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { withErrorHandling } from "@/lib/apiHandler";
+
+export const GET = withErrorHandling(async (req: Request) => {
+    const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const excludeIds = searchParams.get("excludeIds")?.split(",") || [];
+
+    const posts = await prisma.blogPost.findMany({
+        where: {
+            status: 'published',
+            publishedAt: { lte: new Date() },
+            id: excludeIds.length ? { notIn: excludeIds } : undefined
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: limit + 1 // Get one more to check hasMore
+    });
+
+    const hasMore = posts.length > limit;
+    const resultPosts = hasMore ? posts.slice(0, limit) : posts;
+
+    const now = new Date();
+    const processedPosts = resultPosts.map(post => {
+        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
+        const readingTime = Math.ceil(wordCount / 200);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { content, ...rest } = post;
+
+        // Check if new (within 7 days)
+        const published = post.publishedAt ? new Date(post.publishedAt) : new Date();
+        const diffTime = Math.abs(now.getTime() - published.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const isNew = diffDays <= 7;
+
+        return {
+            ...rest,
+            authorName: post.authorName,
+            authorAvatar: null, // BlogPost doesn't have authorAvatar field
+            readingTime,
+            isNew
+        };
+    });
+
+    const oldestDate = resultPosts.length > 0 ? resultPosts[resultPosts.length - 1].publishedAt : null;
+
+    return NextResponse.json({
+        success: true,
+        data: {
+            posts: processedPosts,
+            hasMore,
+            oldestDate
+        }
+    });
+});
+
+// HEAD: Quick check for recent posts
+export const HEAD = withErrorHandling(async (req: Request) => {
+    const count = await prisma.blogPost.count({
+        where: {
+            status: 'published',
+            publishedAt: { lte: new Date() }
+        }
+    });
+
+    const latestPost = await prisma.blogPost.findFirst({
+        where: {
+            status: 'published',
+            publishedAt: { lte: new Date() }
+        },
+        orderBy: { publishedAt: 'desc' },
+        select: { publishedAt: true }
+    });
+
+    return new NextResponse(null, {
+        status: 200,
+        headers: {
+            'X-Post-Count': count.toString(),
+            'X-Latest-Post-Date': latestPost?.publishedAt?.toISOString() || '',
+        },
+    });
+});
+
+// OPTIONS: CORS preflight
+export async function OPTIONS(req: Request) {
+    return new NextResponse(null, {
+        status: 200,
+        headers: {
+            'Allow': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Cache-Control': 'public, max-age=600',
+        },
+    });
+}
+

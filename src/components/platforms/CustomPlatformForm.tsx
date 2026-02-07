@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 
 interface CustomPlatformFormProps {
-  onSubmit: (data: CustomPlatform Data) => Promise<void>;
+  onSubmit: (data: CustomPlatformData) => Promise<void>;
   onCancel?: () => void;
   className?: string;
 }

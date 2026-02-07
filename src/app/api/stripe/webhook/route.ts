@@ -90,7 +90,7 @@ function getInvoicePaymentIntentId(invoice: Stripe.Invoice): string | undefined 
  */
 function getInvoiceTaxAmount(invoice: Stripe.Invoice): number {
   const invoiceData = invoice as unknown as Record<string, unknown>;
-  
+
   if (Array.isArray(invoiceData.total_tax_amounts)) {
     return (invoiceData.total_tax_amounts as Array<{ amount?: number }>).reduce(
       (sum, tax) => sum + (tax.amount ?? 0),

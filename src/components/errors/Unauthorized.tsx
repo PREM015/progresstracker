@@ -8,8 +8,8 @@ interface UnauthorizedProps {
 }
 
 export const Unauthorized: React.FC<UnauthorizedProps> = ({
-    message = 'You don't have permission to access this page.',
-  className = '',
+    message = "You don't have permission to access this page.",
+    className = '',
 }) => {
     return (
         <div className={`min-h-screen bg-gray-50 flex items-center justify-center p-8 ${className}`}>

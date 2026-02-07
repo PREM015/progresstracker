@@ -72,20 +72,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -98,14 +98,14 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
-  
+
   return { error: null, session: null, rateLimitResult };
 }
 
@@ -130,7 +130,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   try {
     // TODO: Return appropriate headers for resource
     // Example: X-Total-Count, X-Resource-Status, etc.
-    
+
     const response = new NextResponse(null, { status: 200 });
     return addHeaders(response, requestId);
   } catch (error) {
@@ -164,8 +164,8 @@ export async function POST(
       return addHeaders(error, requestId, rateLimitResult);
     }
     const resolvedParams = await params;
-    const { provider }} = resolvedParams;
-    
+    const { provider } = resolvedParams;
+
 
     // Parse request body
     let body: unknown;
@@ -199,24 +199,24 @@ export async function POST(
     // 4. Create audit log if needed
     // 5. Trigger side effects (notifications, etc.)
     // -------------------------------------------------------------------------
-    
+
     const result = {}; // TODO: Replace with actual creation
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('POST webhooks/external/[provider] completed', {
-      
+
       requestId,
       duration: Date.now() - startTime,
     });

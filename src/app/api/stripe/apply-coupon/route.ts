@@ -1,250 +1,103 @@
-// =============================================================================
-// stripe/apply-coupon/route.ts
-// =============================================================================
-// Description: Apply coupon/promo code
-// Methods: POST
-// Auth Required: True
-// Rate Limit: 20 requests/minute
-// Tags: stripe, coupon, discount
-// Generated: 2026-02-02T11:57:44.612847
-// =============================================================================
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
 import { stripe } from '@/lib/stripe';
+import { z } from 'zod';
+import apiResponse from '@/lib/apiResponse';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-const RATE_LIMIT = 20;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
+const RATE_LIMIT = 5;
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Cache-Control': 'no-store',
 };
 
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+const applyCouponSchema = z.object({
+  couponId: z.string().min(1), // can be promotion code ID or coupon ID
+  type: z.enum(['coupon', 'promotion_code']).optional().default('promotion_code'),
 });
 
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
+function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: any): NextResponse {
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
   response.headers.set('X-Request-ID', requestId);
-  
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `stripe-apply-coupon:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Apply coupon/promo code
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Validate coupon code with Stripe
-   * - Check coupon restrictions (new users, etc.)
-   * - Apply coupon to subscription
-   * - Return discount details and new price
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return addHeaders(apiResponse.unauthorized('Unauthorized', requestId), requestId);
     }
 
-    const validation = bodySchema.safeParse(body);
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `stripe:apply-coupon:${session.user.id}`);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
+    const body = await request.json();
+    const validation = applyCouponSchema.safeParse(body);
 
     if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
+      return addHeaders(apiResponse.validationError('Invalid input', validation.error.errors, requestId), requestId, rateLimitResult);
     }
 
-    const data = validation.data;
+    const { couponId, type } = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('POST stripe/apply-coupon completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: session.user.id }
     });
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
+    if (!subscription?.stripeSubscriptionId || !subscription.stripeCustomerId) {
+      return addHeaders(apiResponse.notFound('No active subscription found', requestId), requestId, rateLimitResult);
+    }
+
+    // Update subscription with coupon
+    // If it's a promotion code, we use promotion_code parameter
+    // If it's a raw coupon, we use coupon parameter
+
+    // BUT subscription update expects 'coupon' or 'promotion_code'
+    // Let's rely on what frontend verified.
+
+    const updateParams: any = {};
+    if (type === 'promotion_code') {
+      updateParams.promotion_code = couponId;
+    } else {
+      updateParams.coupon = couponId;
+    }
+
+    await stripe.subscriptions.update(subscription.stripeSubscriptionId, updateParams);
+
+    logger.info('POST stripe apply coupon completed', { userId: session.user.id, couponId, requestId, duration: Date.now() - startTime });
+
+    return addHeaders(apiResponse.success({ success: true }, { meta: { requestId } }), requestId, rateLimitResult);
+
   } catch (error) {
-    logger.error('POST stripe/apply-coupon failed', { requestId }, error);
+    logger.error('POST stripe apply coupon failed', { requestId }, error);
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }
 
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: SECURITY_HEADERS });
+}

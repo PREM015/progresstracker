@@ -1,340 +1,114 @@
-// src/app/api/newsletter/subscribe/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
-import { nanoid } from "nanoid";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import apiResponse from '@/lib/apiResponse';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
-/**
- * API Route: /api/newsletter/subscribe
- * 
- * @description Subscribe to newsletter (public endpoint - no auth required)
- * @created 2026-01-26
- * @updated 2026-01-27
- */
+const RATE_LIMIT = 10; // Stricter limit for subscription endpoints to prevent spam
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Cache-Control': 'no-store',
+};
 
-// Generate unsubscribe token
-function generateUnsubscribeToken(email: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(`${email}-${process.env.NEWSLETTER_SECRET || "secret"}`)
-    .digest("hex");
+const subscribeSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  topics: z.array(z.string()).optional().default([]),
+  frequency: z.enum(['daily', 'weekly', 'monthly']).optional().default('weekly'),
+});
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-// GET - Check subscription status
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
 
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email parameter is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
-    }
-
-    const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email: email.toLowerCase().trim() },
-      select: {
-        email: true,
-        name: true,
-        topics: true,
-        frequency: true,
-        isActive: true,
-        confirmedAt: true,
-        createdAt: true,
-      },
-    });
-
-    if (!subscriber) {
-      return NextResponse.json({
-        subscribed: false,
-        message: "Email is not subscribed to the newsletter",
-      });
-    }
-
-    logger.info("Newsletter subscription status checked", {
-      email: subscriber.email,
-      isActive: subscriber.isActive,
-    });
-
-    return NextResponse.json({
-      subscribed: true,
-      isActive: subscriber.isActive,
-      data: subscriber,
-    });
-  } catch (error) {
-    logger.error("Error checking newsletter subscription status", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: any): NextResponse {
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
+  response.headers.set('X-Request-ID', requestId);
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
+  return response;
 }
 
-// POST - Subscribe to newsletter
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `newsletter:subscribe:${ip}`);
+
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
+
     const body = await request.json();
-    const { email, name, topics = [], frequency = "weekly" } = body;
+    const validation = subscribeSchema.safeParse(body);
 
-    // Validation
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
+    if (!validation.success) {
+      return addHeaders(apiResponse.validationError('Invalid input', validation.error.errors, requestId), requestId, rateLimitResult);
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
-    }
+    const { email, topics, frequency } = validation.data;
 
-    // Validate frequency
-    const validFrequencies = ["weekly", "monthly"];
-    if (!validFrequencies.includes(frequency)) {
-      return NextResponse.json(
-        { error: "Frequency must be 'weekly' or 'monthly'" },
-        { status: 400 }
-      );
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Check if already subscribed
-    const existing = await prisma.newsletterSubscriber.findUnique({
-      where: { email: normalizedEmail },
+    // Check if subscriber exists
+    const existingSubscriber = await prisma.newsletterSubscriber.findUnique({
+      where: { email },
     });
 
-    if (existing) {
-      // If previously unsubscribed, reactivate
-      if (!existing.isActive) {
-        const reactivated = await prisma.newsletterSubscriber.update({
-          where: { email: normalizedEmail },
+    if (existingSubscriber) {
+      if (existingSubscriber.isActive) {
+        // Idempotent success - already subscribed
+        return addHeaders(apiResponse.success({ message: 'Already subscribed', subscriber: existingSubscriber }, { meta: { requestId } }), requestId, rateLimitResult);
+      } else {
+        // Reactivate
+        const updatedSubscriber = await prisma.newsletterSubscriber.update({
+          where: { id: existingSubscriber.id },
           data: {
             isActive: true,
-            name: name?.trim() || existing.name,
-            topics: topics.length > 0 ? topics : existing.topics,
-            frequency,
-            confirmedAt: new Date(),
+            topics: topics.length > 0 ? topics : existingSubscriber.topics, // Update topics if provided
+            frequency: frequency || existingSubscriber.frequency,
             unsubscribedAt: null,
             unsubscribeReason: null,
-          },
+          }
         });
 
-        logger.info("Newsletter subscription reactivated", {
-          email: reactivated.email,
-        });
-
-        return NextResponse.json({
-          success: true,
-          message: "Successfully resubscribed to the newsletter!",
-          data: {
-            email: reactivated.email,
-            name: reactivated.name,
-            topics: reactivated.topics,
-            frequency: reactivated.frequency,
-          },
-        });
+        logger.info('Newsletter subscriber reactivated', { email, requestId });
+        return addHeaders(apiResponse.success({ message: 'Subscription reactivated', subscriber: updatedSubscriber }, { meta: { requestId } }), requestId, rateLimitResult);
       }
-
-      // Already active subscriber
-      return NextResponse.json(
-        {
-          error: "This email is already subscribed to the newsletter",
-          data: {
-            email: existing.email,
-            topics: existing.topics,
-            frequency: existing.frequency,
-          },
-        },
-        { status: 409 }
-      );
     }
 
-    // Generate unsubscribe token
-    const unsubscribeToken = generateUnsubscribeToken(normalizedEmail);
-
     // Create new subscriber
-    const subscriber = await prisma.newsletterSubscriber.create({
+    const newSubscriber = await prisma.newsletterSubscriber.create({
       data: {
-        email: normalizedEmail,
-        name: name?.trim(),
+        email,
         topics,
         frequency,
         isActive: true,
-        confirmedAt: new Date(), // Auto-confirm (or set to null for double opt-in)
-        unsubscribeToken,
-      },
+        // unsubscribeToken is handled by default(cuid()) in schema but let's be explicit if we wanted customized logic
+        // confirmedAt: null // Pending confirmation flow if implemented
+      }
     });
 
-    logger.info("Newsletter subscription created", {
-      email: subscriber.email,
-      topics: subscriber.topics,
-      frequency: subscriber.frequency,
-    });
+    // TODO: Send confirmation email
+    // await emailService.sendConfirmation(newSubscriber.email, newSubscriber.unsubscribeToken);
 
-    // TODO: Send welcome email
-    // const unsubscribeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/newsletter/unsubscribe?email=${encodeURIComponent(normalizedEmail)}&token=${unsubscribeToken}`;
-    // await sendNewsletterWelcomeEmail(normalizedEmail, unsubscribeUrl);
+    logger.info('New newsletter subscriber created', { email, requestId, duration: Date.now() - startTime });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Successfully subscribed to the newsletter!",
-        data: {
-          email: subscriber.email,
-          name: subscriber.name,
-          topics: subscriber.topics,
-          frequency: subscriber.frequency,
-        },
-      },
-      { status: 201 }
-    );
+    return addHeaders(apiResponse.created(newSubscriber, { requestId }), requestId, rateLimitResult);
+
   } catch (error) {
-    logger.error("Error subscribing to newsletter", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    logger.error('Newsletter subscribe failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }
 
-// PATCH - Update subscription preferences
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { email, name, topics, frequency } = body;
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
-    }
-
-    const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
-
-    if (!subscriber) {
-      return NextResponse.json(
-        { error: "Subscriber not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!subscriber.isActive) {
-      return NextResponse.json(
-        { error: "Subscription is inactive. Please resubscribe." },
-        { status: 400 }
-      );
-    }
-
-    // Validate frequency if provided
-    if (frequency && !["weekly", "monthly"].includes(frequency)) {
-      return NextResponse.json(
-        { error: "Frequency must be 'weekly' or 'monthly'" },
-        { status: 400 }
-      );
-    }
-
-    const updated = await prisma.newsletterSubscriber.update({
-      where: { email: email.toLowerCase().trim() },
-      data: {
-        ...(name !== undefined && { name: name?.trim() }),
-        ...(topics !== undefined && { topics }),
-        ...(frequency !== undefined && { frequency }),
-      },
-    });
-
-    logger.info("Newsletter subscription updated", {
-      email: updated.email,
-      changes: Object.keys(body).filter((key) => key !== "email"),
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Subscription preferences updated successfully!",
-      data: {
-        email: updated.email,
-        name: updated.name,
-        topics: updated.topics,
-        frequency: updated.frequency,
-      },
-    });
-  } catch (error) {
-    logger.error("Error updating newsletter subscription", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE - Unsubscribe from newsletter
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
-    const reason = searchParams.get("reason");
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email parameter is required" },
-        { status: 400 }
-      );
-    }
-
-    const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
-
-    // Always return success to prevent email enumeration
-    const successResponse = {
-      success: true,
-      message: "If the email exists in our newsletter, it has been unsubscribed.",
-    };
-
-    if (!subscriber) {
-      return NextResponse.json(successResponse);
-    }
-
-    await prisma.newsletterSubscriber.update({
-      where: { email: email.toLowerCase().trim() },
-      data: {
-        isActive: false,
-        unsubscribedAt: new Date(),
-        unsubscribeReason: reason || "User request via API",
-      },
-    });
-
-    logger.info("Newsletter unsubscribed via DELETE", {
-      email: subscriber.email,
-      reason,
-    });
-
-    return NextResponse.json(successResponse);
-  } catch (error) {
-    logger.error("Error unsubscribing from newsletter", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: SECURITY_HEADERS });
 }

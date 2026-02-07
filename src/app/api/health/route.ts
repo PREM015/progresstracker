@@ -127,7 +127,7 @@ function addHeaders(
 
 async function checkDatabase(): Promise<ServiceHealth> {
   const startTime = Date.now();
-  
+
   try {
     await prisma.$queryRaw`SELECT 1`;
     const latency = Date.now() - startTime;
@@ -287,13 +287,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Perform health checks in parallel
     const checks: { name: string; status: ServiceStatus; duration: number }[] = [];
-    
+
     const dbCheckStart = Date.now();
     const [databaseHealth, cacheHealth] = await Promise.all([
       checkDatabase(),
       checkCache(),
     ]);
-    
+
     checks.push({
       name: "database",
       status: databaseHealth.status,

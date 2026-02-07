@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 export default function ConnectPlatformPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const platform = searchParams ? .get('platform');
+  const platform = searchParams?.get('platform');
 
   const [platformInfo, setPlatformInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);

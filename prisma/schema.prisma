@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+ 
 }
 
 // ============================================================================
@@ -221,7 +222,7 @@ model User {
   emailVerified DateTime?
   username      String?   @unique
   image         String?
-  password      String? // Hashed password
+  password      String?
 
   // Profile
   bio      String? @db.Text
@@ -256,7 +257,7 @@ model User {
 
   // Admin & Roles
   isAdmin     Boolean  @default(false)
-  role        Role     @default(user) // user, admin
+  role        Role     @default(user)
   permissions String[] @default([])
 
   // Streak Data (denormalized for performance)
@@ -281,7 +282,7 @@ model User {
   timezone          String @default("UTC")
 
   // Metadata
-  signupSource String? // organic, referral, google, etc.
+  signupSource String?
   referralCode String? @unique
   referredBy   String?
 
@@ -291,7 +292,7 @@ model User {
   passwordChangedAt DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  deletedAt         DateTime? // Soft delete
+  deletedAt         DateTime?
 
   // ===== RELATIONS =====
 
@@ -350,7 +351,7 @@ model User {
   supportTickets SupportTicket[]
   ticketReplies  TicketReply[]
 
-  // Reports (sent weekly/monthly)
+  // Reports
   reports Report[]
 
   // Referrals
@@ -359,6 +360,11 @@ model User {
 
   // Feedback
   feedback Feedback[]
+
+  // Blog & Bookmarks
+  bookmarks    Bookmark[]
+  blogComments BlogComment[]
+  blogLikes    BlogPostLike[]
 
   @@index([email])
   @@index([username])
@@ -431,13 +437,12 @@ model ActiveSession {
   id     String @id @default(cuid())
   userId String
 
-  // Session Token
   token String @unique
 
   // Device Information
   userAgent      String? @db.Text
   ipAddress      String?
-  device         String? // Desktop, Mobile, Tablet
+  device         String?
   deviceModel    String?
   browser        String?
   browserVersion String?
@@ -480,18 +485,14 @@ model RefreshToken {
   userId String
 
   token  String @unique
-  family String // Token family for rotation
+  family String
 
-  // Device binding
   deviceId String?
 
-  // Status
   isValid Boolean @default(true)
 
-  // Expiry
   expiresAt DateTime
 
-  // Revocation
   revokedAt       DateTime?
   revokedReason   String?
   replacedByToken String?
@@ -511,12 +512,10 @@ model PasswordReset {
   id     String @id @default(cuid())
   userId String
 
-  // Token should be hashed at application level before storing
   token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
 
-  // Security context
   ipAddress String?
   userAgent String? @db.Text
 
@@ -538,10 +537,8 @@ model EmailVerification {
   expiresAt  DateTime
   verifiedAt DateTime?
 
-  // Type: initial verification or email change
-  type String @default("verification") // verification, change
+  type String @default("verification")
 
-  // Optional: store IP address when verification occurs
   verifiedIp String?
 
   createdAt DateTime @default(now())
@@ -561,11 +558,9 @@ model EmailChangeRequest {
   oldEmail String
   newEmail String
 
-  // Verification tokens
   oldEmailToken String @unique
   newEmailToken String @unique
 
-  // Status
   oldEmailVerified Boolean @default(false)
   newEmailVerified Boolean @default(false)
 
@@ -587,18 +582,14 @@ model TwoFactorAuth {
   id     String @id @default(cuid())
   userId String @unique
 
-  // TOTP Secret - MUST be encrypted at application level
   secret String
 
-  // Status
   isEnabled Boolean @default(false)
-  isPending Boolean @default(true) // Awaiting first verification
+  isPending Boolean @default(true)
 
-  // Verification
   verifiedAt DateTime?
   lastUsedAt DateTime?
 
-  // Recovery
   recoveryEmail String?
   recoveryPhone String?
 
@@ -612,7 +603,6 @@ model BackupCode {
   id     String @id @default(cuid())
   userId String
 
-  // Hashed backup code - MUST be hashed at application level
   code String
 
   usedAt        DateTime?
@@ -628,20 +618,17 @@ model BackupCode {
 
 model LoginAttempt {
   id     String  @id @default(cuid())
-  userId String? // Null if user not found
+  userId String?
 
   email String
 
-  // Result
   success       Boolean
-  failureReason String? // invalid_password, account_locked, 2fa_failed, etc.
+  failureReason String?
 
-  // Context
   ipAddress String?
   userAgent String? @db.Text
   country   String?
 
-  // 2FA
   twoFactorRequired Boolean @default(false)
   twoFactorPassed   Boolean @default(false)
 
@@ -663,55 +650,43 @@ model LoginAttempt {
 model Platform {
   id String @id @default(cuid())
 
-  // Identity
   slug        String  @unique
   name        String
   displayName String?
   description String? @db.Text
 
-  // Classification
   category    PlatformCategory
   subcategory String?
   tags        String[]         @default([])
 
-  // Authentication
   authType     AuthType @default(NONE)
-  oauthConfig  Json? // OAuth configuration if applicable
-  apiKeyConfig Json? // API key configuration if applicable
+  oauthConfig  Json?
+  apiKeyConfig Json?
 
-  // Branding
   icon            String?
   logo            String?
   color           String?
   backgroundColor String?
 
-  // URLs
   website           String?
   apiEndpoint       String?
-  profileUrlPattern String? // e.g., "https://leetcode.com/{username}"
+  profileUrlPattern String?
 
-  // Capabilities
   supportsAutoSync    Boolean @default(false)
   supportsWebhook     Boolean @default(false)
   supportsOAuth       Boolean @default(false)
   supportsApiKey      Boolean @default(false)
   requiresCredentials Boolean @default(false)
 
-  // Sync Configuration
   syncPriority Int @default(0)
-  syncInterval Int @default(1440) // Minutes (default 24 hours)
+  syncInterval Int @default(1440)
 
-  // Rate Limiting
-  rateLimit       Int? // Requests per window
-  rateLimitWindow Int? // Window in seconds
+  rateLimit       Int?
+  rateLimitWindow Int?
 
-  // Data Configuration
-  // dataPoints structure: { "problems_solved": true, "rating": true, "rank": true, ... }
   dataPoints    Json?
-  // scraperConfig structure: { "selectors": {...}, "endpoints": [...], ... }
   scraperConfig Json?
 
-  // Health & Status
   isActive           Boolean @default(true)
   isVerified         Boolean @default(true)
   isBeta             Boolean @default(false)
@@ -719,22 +694,19 @@ model Platform {
   maintenanceMessage String?
 
   lastHealthCheck DateTime?
-  healthStatus    String? // healthy, degraded, down, unknown
+  healthStatus    String?
   healthMessage   String?
 
-  // Stats
   totalUsers      Int   @default(0)
   successRate     Float @default(100)
-  avgSyncDuration Int? // Milliseconds
+  avgSyncDuration Int?
 
-  // Documentation
   setupGuideUrl  String?
   helpArticleUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
   users          UserPlatform[]
   trackerEntries TrackerEntry[]
   syncLogs       SyncLog[]
@@ -751,20 +723,16 @@ model CustomPlatform {
   id     String @id @default(cuid())
   userId String
 
-  // Basic Info
   name        String
   displayName String?
   description String? @db.Text
 
   category PlatformCategory
 
-  // Branding
   icon    String?
   color   String?
   website String?
 
-  // Tracking Configuration
-  // trackingFields structure: { "problems": { "type": "number" }, "notes": { "type": "text" }, ... }
   trackingFields Json?
 
   isActive Boolean @default(true)
@@ -785,52 +753,40 @@ model UserPlatform {
   userId     String
   platformId String
 
-  // Connection Info
   username       String?
   profileUrl     String?
-  externalUserId String? // User ID on the platform
+  externalUserId String?
 
-  // Credentials - MUST be encrypted at application level
   credentials    Json?
   accessToken    String?   @db.Text
   refreshToken   String?   @db.Text
   tokenExpiresAt DateTime?
 
-  // API Key - MUST be encrypted at application level
   apiKey String? @db.Text
 
-  // Status
   isActive   Boolean   @default(true)
   isVerified Boolean   @default(false)
   verifiedAt DateTime?
 
-  // Connection Status
-  connectionStatus String  @default("pending") // pending, connected, disconnected, error
+  connectionStatus String  @default("pending")
   connectionError  String?
 
-  // Sync Status
   syncStatus          SyncStatus @default(IDLE)
   lastSyncedAt        DateTime?
   lastSyncError       String?
-  lastSyncDuration    Int? // Milliseconds
+  lastSyncDuration    Int?
   syncAttempts        Int        @default(0)
   consecutiveFailures Int        @default(0)
   nextSyncAt          DateTime?
 
-  // Cached Stats (for quick display)
-  // cachedStats structure: { "problems_solved": 150, "rating": 1800, ... }
   cachedStats    Json?
   statsUpdatedAt DateTime?
 
-  // Platform-specific data
-  // platformData structure: { "rating": 1800, "rank": "Expert", "contests": 25, ... }
   platformData Json?
 
-  // Preferences
   autoSync     Boolean @default(true)
   syncPriority Int     @default(0)
 
-  // Notification Settings
   notifyOnSync  Boolean @default(false)
   notifyOnError Boolean @default(true)
 
@@ -862,11 +818,9 @@ model TrackerEntry {
 
   date DateTime @db.Date
 
-  // Classification
   category    PlatformCategory?
   subcategory String?
 
-  // Primary Metrics
   problemsSolved    Int @default(0)
   problemsAttempted Int @default(0)
 
@@ -874,7 +828,6 @@ model TrackerEntry {
   mediumProblems Int @default(0)
   hardProblems   Int @default(0)
 
-  // Code & Development
   commits            Int @default(0)
   pullRequests       Int @default(0)
   pullRequestsMerged Int @default(0)
@@ -883,11 +836,9 @@ model TrackerEntry {
   codeReviews        Int @default(0)
   linesOfCode        Int @default(0)
 
-  // Projects
   projectsStarted   Int @default(0)
   projectsCompleted Int @default(0)
 
-  // Learning
   coursesStarted       Int @default(0)
   coursesCompleted     Int @default(0)
   lessonsCompleted     Int @default(0)
@@ -896,41 +847,34 @@ model TrackerEntry {
   quizzesTaken         Int @default(0)
   quizzesPassed        Int @default(0)
 
-  // Reading & Research
   articlesRead       Int @default(0)
   tutorialsCompleted Int @default(0)
   documentationPages Int @default(0)
 
-  // Jobs & Applications
   applicationsSubmitted Int @default(0)
   applicationsViewed    Int @default(0)
   interviewsScheduled   Int @default(0)
   interviewsCompleted   Int @default(0)
   offersReceived        Int @default(0)
 
-  // Competitions & Hackathons
   contestsParticipated Int @default(0)
   contestsCompleted    Int @default(0)
   hackathonsJoined     Int @default(0)
   hackathonsCompleted  Int @default(0)
 
-  // Community
   mentoringSessions Int @default(0)
   helpGiven         Int @default(0)
   helpReceived      Int @default(0)
   postsWritten      Int @default(0)
   commentsWritten   Int @default(0)
 
-  // Time Tracking
-  timeSpent Int @default(0) // Minutes
-  focusTime Int @default(0) // Minutes of focused work
+  timeSpent Int @default(0)
+  focusTime Int @default(0)
 
-  // Quality Metrics
   averageDifficulty Float?
   accuracyRate      Float?
   completionRate    Float?
 
-  // Platform-specific
   rating       Int?
   ratingChange Int?
   rank         Int?
@@ -940,28 +884,22 @@ model TrackerEntry {
   streak       Int?
   xpEarned     Int?
 
-  // Mood & Notes
   mood               String?
-  energyLevel        Int? // 1-5
-  productivityRating Int? // 1-5
+  energyLevel        Int?
+  productivityRating Int?
   notes              String? @db.Text
 
-  // Tags & Categories
   tags      String[] @default([])
   topics    String[] @default([])
-  languages String[] @default([]) // Programming languages used
+  languages String[] @default([])
 
-  // Source & Sync
-  source          String  @default("manual") // manual, sync, import, api
+  source          String  @default("manual")
   syncLogId       String?
   isAutoGenerated Boolean @default(false)
 
-  // Verification
   isVerified Boolean   @default(false)
   verifiedAt DateTime?
 
-  // Custom Fields
-  // customFields structure: { "fieldName": value, ... }
   customFields Json?
 
   createdAt DateTime @default(now())
@@ -973,8 +911,6 @@ model TrackerEntry {
   syncLog        SyncLog?        @relation(fields: [syncLogId], references: [id], onDelete: SetNull)
 
   @@unique([userId, platformId, date])
-  @@unique([userId, date, platformId], name: "userId_date_platformId")
-
   @@index([userId, date])
   @@index([platformId, date])
   @@index([userId, category])
@@ -990,24 +926,18 @@ model DailyStats {
   userId String
   date   DateTime @db.Date
 
-  // Aggregated from all platforms
   totalProblems     Int @default(0)
   totalCommits      Int @default(0)
   totalPullRequests Int @default(0)
   totalTimeSpent    Int @default(0)
   totalPoints       Int @default(0)
 
-  // Platform breakdown
-  // platformBreakdown structure: { "leetcode": { "problems": 5 }, "github": { "commits": 10 }, ... }
   platformBreakdown Json?
-  // categoryBreakdown structure: { "DSA": 15, "GIT": 10, ... }
   categoryBreakdown Json?
 
-  // Streak
   hadActivity Boolean @default(false)
   streakDay   Int?
 
-  // Computed at end of day
   isComplete Boolean   @default(false)
   computedAt DateTime?
 
@@ -1026,21 +956,16 @@ model StreakHistory {
   id     String @id @default(cuid())
   userId String
 
-  // Streak period
   startDate DateTime @db.Date
   endDate   DateTime @db.Date
 
-  // Length
   length Int
 
-  // Status
   isActive  Boolean @default(false)
   isCurrent Boolean @default(false)
 
-  // How it ended
-  endReason String? // natural, broken, freeze_used
+  endReason String?
 
-  // Stats during streak
   totalProblems Int @default(0)
   totalCommits  Int @default(0)
 
@@ -1060,7 +985,6 @@ model PlatformDailyStats {
   platformId String
   date       DateTime @db.Date
 
-  // Aggregate stats
   totalSyncs      Int @default(0)
   successfulSyncs Int @default(0)
   failedSyncs     Int @default(0)
@@ -1088,54 +1012,41 @@ model Goal {
   userId     String
   platformId String?
 
-  // Basic Info
   title       String
   description String? @db.Text
 
-  // Classification
   category     PlatformCategory
   goalType     GoalType         @default(CUSTOM)
   metric       GoalMetric       @default(PROBLEMS_SOLVED)
   customMetric String?
 
-  // Target
   target             Int
-  progress           Int   @default(0)
-  progressPercentage Float @default(0)
-    unit               String?
+  progress           Int     @default(0)
+  progressPercentage Float   @default(0)
+  unit               String?
 
-  // Time Period
   startDate DateTime  @default(now())
   endDate   DateTime?
   deadline  DateTime?
 
-  // Status
   status      GoalStatus @default(ACTIVE)
   completedAt DateTime?
   failedAt    DateTime?
 
-  // Milestones
-  // milestones structure: [{ "value": 25, "reached": true, "reachedAt": "2024-01-15" }, ...]
   milestones Json?
 
-  // Streaks (for streak-type goals)
   currentStreakDays  Int  @default(0)
   requiredStreakDays Int?
 
-  // Sharing
   isPublic  Boolean @default(false)
   shareCode String? @unique
 
-  // Reminders
   reminderEnabled Boolean @default(false)
 
-  // Stats
   daysActive       Int   @default(0)
   avgDailyProgress Float @default(0)
-  // bestDay structure: { "date": "2024-01-15", "progress": 25 }
   bestDay          Json?
 
-  // Color/Icon customization
   color String?
   icon  String?
 
@@ -1160,21 +1071,16 @@ model GoalReminder {
   goalId String
   userId String
 
-  // Schedule
-  frequency String // daily, weekdays, weekly, custom
-  time      String // HH:MM format
+  frequency String
+  time      String
   timezone  String @default("UTC")
 
-  // Custom schedule
-  days Int[] @default([]) // 0-6 for days of week
+  days Int[] @default([])
 
-  // Notification settings
   channel NotificationChannel @default(IN_APP)
 
-  // Status
   isActive Boolean @default(true)
 
-  // Tracking
   lastSentAt DateTime?
   nextSendAt DateTime?
   sendCount  Int       @default(0)
@@ -1194,38 +1100,30 @@ model GoalReminder {
 model GoalTemplate {
   id String @id @default(cuid())
 
-  // Basic Info
   title       String
   description String? @db.Text
 
-  // Classification
   category PlatformCategory
   goalType GoalType
   metric   GoalMetric
 
-  // Target Configuration
   target   Int
-  duration Int // Days
+  duration Int
 
-  // Display
   icon  String?
   color String?
 
-  // Metadata
-  difficulty    String   @default("medium") // easy, medium, hard
+  difficulty    String   @default("medium")
   estimatedTime String?
   tips          String[] @default([])
 
-  // Usage Stats
   timesUsed         Int    @default(0)
   successRate       Float  @default(0)
   avgCompletionTime Float?
 
-  // Status
   isActive   Boolean @default(true)
   isFeatured Boolean @default(false)
 
-  // Ordering
   sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
@@ -1240,46 +1138,34 @@ model GoalTemplate {
 model Achievement {
   id String @id @default(cuid())
 
-  // Identity
   slug        String @unique
   title       String @unique
   description String @db.Text
 
-  // Classification
   category PlatformCategory
-  tier     String           @default("bronze") // bronze, silver, gold, platinum, diamond
+  tier     String           @default("bronze")
 
-  // Display
   icon       String?
   color      String?
   badgeImage String?
 
-  // Points & Rarity
   points   Int    @default(0)
   xpReward Int    @default(0)
-  rarity   String @default("common") // common, uncommon, rare, epic, legendary
+  rarity   String @default("common")
 
-  // Requirements
-  // requirement structure: { "type": "problems_solved", "value": 100, "platform": "leetcode" }
   requirement     Json?
   requirementText String?
 
-  // Thresholds for progress
-  // thresholds structure: [{ "value": 25, "label": "Bronze" }, { "value": 50, "label": "Silver" }, ...]
   thresholds Json?
 
-  // Hidden Achievements
   isHidden Boolean @default(false)
   isSecret Boolean @default(false)
 
-  // Status
   isActive Boolean @default(true)
 
-  // Stats
   totalUnlocked    Int   @default(0)
   unlockPercentage Float @default(0)
 
-  // Ordering
   sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
@@ -1299,19 +1185,15 @@ model UserAchievement {
   userId        String
   achievementId String
 
-  // Progress (for achievements with thresholds)
   progress           Int   @default(0)
   progressPercentage Float @default(0)
   currentThreshold   Int   @default(0)
 
-  // Unlock
   unlockedAt DateTime @default(now())
 
-  // Notification
   notified   Boolean   @default(false)
   notifiedAt DateTime?
 
-  // Display
   isPinned Boolean @default(false)
   isHidden Boolean @default(false)
 
@@ -1335,30 +1217,23 @@ model Notification {
   id     String @id @default(cuid())
   userId String
 
-  // Type & Channel
   type     NotificationType
   channel  NotificationChannel  @default(IN_APP)
   priority NotificationPriority @default(NORMAL)
 
-  // Content
   title        String
   message      String  @db.Text
   shortMessage String?
 
-  // Action
   actionUrl   String?
   actionLabel String?
 
-  // Related Entity
-  entityType String? // goal, achievement, sync, etc.
+  entityType String?
   entityId   String?
 
-  // Rich Content
   imageUrl String?
-  // metadata structure: { "goalId": "...", "progress": 75, ... }
   metadata Json?
 
-  // Status
   isRead Boolean   @default(false)
   readAt DateTime?
 
@@ -1368,16 +1243,13 @@ model Notification {
   isDismissed Boolean   @default(false)
   dismissedAt DateTime?
 
-  // Delivery
   isDelivered   Boolean   @default(false)
   deliveredAt   DateTime?
   deliveryError String?
 
-  // Scheduling
   scheduledFor DateTime?
   sentAt       DateTime?
 
-  // Expiry
   expiresAt DateTime?
 
   createdAt DateTime @default(now())
@@ -1398,22 +1270,18 @@ model PushSubscription {
   id     String @id @default(cuid())
   userId String
 
-  // Web Push Subscription
   endpoint String @unique
   p256dh   String
   auth     String
 
-  // Device Info
   deviceId   String?
   deviceName String?
   userAgent  String? @db.Text
   browser    String?
   os         String?
 
-  // Status
   isActive Boolean @default(true)
 
-  // Stats
   lastUsedAt   DateTime?
   successCount Int       @default(0)
   failureCount Int       @default(0)
@@ -1438,45 +1306,35 @@ model SyncLog {
   platformId     String?
   userPlatformId String?
 
-  // Status
   status SyncStatus
 
-  // Timing
   startedAt   DateTime  @default(now())
   completedAt DateTime?
-  duration    Int? // Milliseconds
+  duration    Int?
 
-  // Results
   itemsFound   Int @default(0)
   itemsCreated Int @default(0)
   itemsUpdated Int @default(0)
   itemsSkipped Int @default(0)
   itemsFailed  Int @default(0)
 
-  // Data Range
   dataFromDate DateTime?
   dataToDate   DateTime?
 
-  // Error Details
   hasError     Boolean @default(false)
   errorCode    String?
   errorMessage String? @db.Text
   errorStack   String? @db.Text
 
-  // Retry Info
   attemptNumber Int       @default(1)
   maxAttempts   Int       @default(3)
   nextRetryAt   DateTime?
 
-  // Trigger Info
-  triggeredBy   String  @default("manual") // manual, scheduled, webhook, system
+  triggeredBy   String  @default("manual")
   triggerSource String?
 
-  // Request Info
   requestId String?
 
-  // Detailed Log
-  // logEntries structure: [{ "timestamp": "...", "level": "info", "message": "..." }, ...]
   logEntries Json?
 
   createdAt DateTime @default(now())
@@ -1503,61 +1361,49 @@ model Subscription {
   id     String @id @default(cuid())
   userId String @unique
 
-  // Stripe IDs
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
   stripePriceId        String?
   stripeProductId      String?
 
-  // Plan Info
   tier            SubscriptionTier   @default(FREE)
   status          SubscriptionStatus @default(ACTIVE)
   billingInterval BillingInterval    @default(MONTHLY)
 
-  // Pricing
-  priceAmount Int? // In cents
+  priceAmount Int?
   currency    String @default("usd")
 
-  // Current Period
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
 
-  // Trial
   trialStart DateTime?
   trialEnd   DateTime?
   trialDays  Int?
 
-  // Cancellation
   cancelAtPeriodEnd Boolean   @default(false)
   cancelAt          DateTime?
   canceledAt        DateTime?
   cancelReason      String?
   cancelFeedback    String?   @db.Text
 
-  // Pause
   pausedAt  DateTime?
   resumesAt DateTime?
 
-  // Usage Limits
   platformLimit        Int @default(5)
-  syncFrequencyMinutes Int @default(1440) // 24 hours
+  syncFrequencyMinutes Int @default(1440)
   exportLimitMonthly   Int @default(3)
   apiRequestsDaily     Int @default(100)
 
-  // Current Usage
   currentPlatformCount Int       @default(0)
   currentExportCount   Int       @default(0)
   usageResetAt         DateTime?
 
-  // Features
   features String[] @default([])
 
-  // Payment Info
   lastPaymentAt     DateTime?
   lastPaymentAmount Int?
   nextPaymentAt     DateTime?
 
-  // Metadata
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -1577,25 +1423,20 @@ model PaymentMethod {
   id     String @id @default(cuid())
   userId String
 
-  // Stripe ID
   stripePaymentMethodId String @unique
 
-  // Card Info
-  type     String // card, bank_account, etc.
-  brand    String? // visa, mastercard, etc.
+  type     String
+  brand    String?
   last4    String?
   expMonth Int?
   expYear  Int?
 
-  // Status
   isDefault Boolean @default(false)
   isValid   Boolean @default(true)
 
-  // Billing Address
   billingName    String?
   billingEmail   String?
   billingPhone   String?
-  // billingAddress structure: { "line1": "...", "city": "...", "country": "...", ... }
   billingAddress Json?
 
   createdAt DateTime @default(now())
@@ -1612,42 +1453,32 @@ model Invoice {
   userId         String
   subscriptionId String?
 
-  // Stripe IDs
   stripeInvoiceId       String? @unique
   stripePaymentIntentId String?
 
-  // Invoice Details
   invoiceNumber String?
 
-  // Amount
-  subtotal   Int // In cents
+  subtotal   Int
   tax        Int    @default(0)
   total      Int
   amountPaid Int    @default(0)
   amountDue  Int
   currency   String @default("usd")
 
-  // Status
-  status String // draft, open, paid, void, uncollectible
+  status String
 
-  // Dates
   invoiceDate DateTime
   dueDate     DateTime?
   paidAt      DateTime?
   voidedAt    DateTime?
 
-  // Line Items
-  // lineItems structure: [{ "description": "...", "amount": 999, "quantity": 1 }, ...]
   lineItems Json?
 
-  // PDF
   invoicePdfUrl    String?
   hostedInvoiceUrl String?
 
-  // Billing Info
   billingReason String?
 
-  // Metadata
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -1669,31 +1500,24 @@ model PaymentEvent {
   userId         String?
   subscriptionId String?
 
-  // Stripe Event
   stripeEventId   String @unique
   stripeEventType String
 
-  // Event Data
-  eventType String // payment_succeeded, payment_failed, etc.
+  eventType String
   status    PaymentStatus
 
-  // Amount
   amount   Int?
   currency String?
 
-  // Error
   failureCode    String?
   failureMessage String?
 
-  // Related Objects
   stripePaymentIntentId String?
   stripeInvoiceId       String?
   stripeChargeId        String?
 
-  // Raw Data
   rawData Json?
 
-  // Processing
   processedAt     DateTime?
   processingError String?
 
@@ -1721,10 +1545,8 @@ model ExportJob {
   id     String @id @default(cuid())
   userId String
 
-  // Job Info
   name String?
 
-  // Configuration
   format       ExportFormat
   dateFrom     DateTime?
   dateTo       DateTime?
@@ -1733,28 +1555,22 @@ model ExportJob {
   includeNotes Boolean            @default(true)
   includeStats Boolean            @default(true)
 
-  // Status
   status   ExportStatus @default(QUEUED)
   progress Int          @default(0)
 
-  // Processing
   startedAt   DateTime?
   completedAt DateTime?
 
-  // Result
   fileUrl      String?
   fileName     String?
-  fileSize     Int? // Bytes
+  fileSize     Int?
   fileMimeType String?
 
-  // Error
   hasError     Boolean @default(false)
   errorMessage String?
 
-  // Expiry
   expiresAt DateTime?
 
-  // Stats
   totalRecords    Int @default(0)
   exportedRecords Int @default(0)
 
@@ -1773,32 +1589,26 @@ model ScheduledExport {
   id     String @id @default(cuid())
   userId String
 
-  // Schedule Info
   name        String
   description String?
 
-  // Schedule
-  frequency  String // daily, weekly, monthly
-  dayOfWeek  Int? // 0-6 for weekly
-  dayOfMonth Int? // 1-31 for monthly
-  time       String // HH:MM format
+  frequency  String
+  dayOfWeek  Int?
+  dayOfMonth Int?
+  time       String
   timezone   String @default("UTC")
 
-  // Export Config
   format            ExportFormat
   platforms         String[]           @default([])
   categories        PlatformCategory[] @default([])
-  relativeDateRange String             @default("last_7_days") // last_7_days, last_30_days, etc.
+  relativeDateRange String             @default("last_7_days")
 
-  // Delivery
-  deliveryMethod String  @default("email") // email, download
+  deliveryMethod String  @default("email")
   emailTo        String?
   emailSubject   String?
 
-  // Status
   isActive Boolean @default(true)
 
-  // Tracking
   lastRunAt     DateTime?
   lastRunStatus String?
   lastRunJobId  String?
@@ -1824,46 +1634,38 @@ model UserSettings {
   id     String @id @default(cuid())
   userId String @unique
 
-  // Appearance
-  theme         String  @default("system") // light, dark, system
+  theme         String  @default("system")
   accentColor   String  @default("blue")
   compactMode   Boolean @default(false)
-  fontSize      String  @default("medium") // small, medium, large
+  fontSize      String  @default("medium")
   reducedMotion Boolean @default(false)
   highContrast  Boolean @default(false)
 
-  // Localization
   language     String @default("en")
   timezone     String @default("UTC")
   dateFormat   String @default("MM/DD/YYYY")
-  timeFormat   String @default("12h") // 12h, 24h
-  weekStartsOn Int    @default(0) // 0=Sunday, 1=Monday
+  timeFormat   String @default("12h")
+  weekStartsOn Int    @default(0)
   numberFormat String @default("en-US")
 
-  // Sync Preferences
   autoSync         Boolean @default(true)
-  syncFrequency    String  @default("daily") // realtime, hourly, daily, manual
+  syncFrequency    String  @default("daily")
   syncOnLogin      Boolean @default(true)
   syncInBackground Boolean @default(true)
 
-  // Privacy
   publicProfile     Boolean @default(false)
   showInLeaderboard Boolean @default(true)
   allowAnalytics    Boolean @default(true)
   allowCookies      Boolean @default(true)
 
-  // Dashboard
-  // dashboardLayout structure: { "widgets": [...], "layout": "grid" }
   dashboardLayout   Json?
   defaultDateRange  String  @default("7d")
   showWelcomeBanner Boolean @default(true)
 
-  // Features
   keyboardShortcuts    Boolean @default(true)
   soundEffects         Boolean @default(false)
   desktopNotifications Boolean @default(true)
 
-  // Data
   dataRetentionDays Int @default(365)
 
   createdAt DateTime @default(now())
@@ -1876,20 +1678,16 @@ model NotificationPreferences {
   id     String @id @default(cuid())
   userId String @unique
 
-  // Global Settings
   enabled Boolean @default(true)
 
-  // Channels
   emailEnabled Boolean @default(true)
   pushEnabled  Boolean @default(false)
   inAppEnabled Boolean @default(true)
   smsEnabled   Boolean @default(false)
 
-  // Email Preferences
   emailAddress  String?
   emailVerified Boolean @default(false)
 
-  // Notification Types
   achievementAlerts Boolean @default(true)
   goalReminders     Boolean @default(true)
   goalCompleted     Boolean @default(true)
@@ -1905,19 +1703,16 @@ model NotificationPreferences {
   communityUpdates  Boolean @default(false)
   marketingEmails   Boolean @default(false)
 
-  // Quiet Hours
   quietHoursEnabled  Boolean @default(false)
   quietHoursStart    String  @default("22:00")
   quietHoursEnd      String  @default("08:00")
   quietHoursTimezone String  @default("UTC")
 
-  // Digest Settings
   digestEnabled   Boolean @default(false)
-  digestFrequency String  @default("daily") // realtime, daily, weekly
+  digestFrequency String  @default("daily")
   digestTime      String  @default("09:00")
-  digestDay       Int     @default(1) // For weekly: 0-6
+  digestDay       Int     @default(1)
 
-  // DND
   dndEnabled Boolean   @default(false)
   dndUntil   DateTime?
 
@@ -1935,32 +1730,24 @@ model ApiKey {
   id     String @id @default(cuid())
   userId String
 
-  // Key Info
   name        String
   description String?
 
-  // Key Value (only prefix stored, full key shown once)
   keyHash   String @unique
-  keyPrefix String // First 8 chars for display
+  keyPrefix String
 
-  // Permissions
-  scopes String[] @default(["read"]) // read, write, delete, admin
+  scopes String[] @default(["read"])
 
-  // Rate Limiting
-  rateLimit       Int @default(100) // Requests per minute
-  rateLimitWindow Int @default(60) // Seconds
+  rateLimit       Int @default(100)
+  rateLimitWindow Int @default(60)
 
-  // IP Restrictions
   allowedIps     String[] @default([])
   allowedOrigins String[] @default([])
 
-  // Status
   isActive Boolean @default(true)
 
-  // Expiry
   expiresAt DateTime?
 
-  // Usage Stats
   lastUsedAt      DateTime?
   lastUsedIp      String?
   usageCount      Int       @default(0)
@@ -1982,40 +1769,31 @@ model AuditLog {
   id     String  @id @default(cuid())
   userId String?
 
-  // Action
   action   AuditAction
-  category String? // auth, user, platform, goal, etc.
+  category String?
 
-  // Entity
-  entityType String? // user, goal, platform, etc.
+  entityType String?
   entityId   String?
 
-  // Details
   description String?
   oldValue    Json?
   newValue    Json?
-  // changes structure: { "field": { "old": "...", "new": "..." }, ... }
   changes     Json?
 
-  // Context
   ipAddress String?
   userAgent String? @db.Text
 
-  // Location
   country String?
   city    String?
 
-  // Request Info
   requestId     String?
   requestPath   String?
   requestMethod String?
 
-  // Status
-  status       String  @default("success") // success, failure
+  status       String  @default("success")
   errorMessage String?
 
-  // Admin
-  performedBy String? // Admin user ID if action by admin
+  performedBy String?
 
   createdAt DateTime @default(now())
 
@@ -2038,35 +1816,24 @@ model Report {
   id     String @id @default(cuid())
   userId String
 
-  // Report Type
-  type String // weekly, monthly, yearly, custom
+  type String
 
-  // Period
   periodStart DateTime
   periodEnd   DateTime
 
-  // Content
   title   String
   summary String? @db.Text
-  // data structure: { "stats": {...}, "charts": [...], "comparisons": {...} }
   data    Json
 
-  // Stats
-  // highlights structure: [{ "metric": "problems_solved", "value": 150, "change": 25 }, ...]
   highlights      Json?
-  // insights structure: [{ "type": "streak", "message": "Your streak is on fire!" }, ...]
   insights        Json?
-  // recommendations structure: [{ "action": "...", "reason": "..." }, ...]
   recommendations Json?
 
-  // Status
-  status String @default("generated") // generating, generated, sent, failed
+  status String @default("generated")
 
-  // Delivery
   sentAt DateTime?
   sentTo String?
 
-  // File
   pdfUrl String?
 
   createdAt DateTime @default(now())
@@ -2087,31 +1854,23 @@ model SupportTicket {
   id     String @id @default(cuid())
   userId String
 
-  // Ticket Info
   ticketNumber String @unique
   subject      String
   description  String @db.Text
 
-  // Classification
-  category String // bug, feature, question, billing, other
+  category String
   priority TicketPriority @default(MEDIUM)
 
-  // Status
   status TicketStatus @default(OPEN)
 
-  // Assignment
   assignedTo String?
 
-  // Resolution
   resolution String?   @db.Text
   resolvedAt DateTime?
 
-  // Metadata
-  // metadata structure: { "browser": "...", "os": "...", "page": "..." }
   metadata    Json?
   attachments String[] @default([])
 
-  // Rating
   satisfactionRating Int?
   feedbackComment    String?
 
@@ -2133,17 +1892,13 @@ model TicketReply {
   ticketId String
   userId   String?
 
-  // Content
   message String @db.Text
 
-  // Type
   isStaffReply Boolean @default(false)
   isAutoReply  Boolean @default(false)
 
-  // Attachments
   attachments String[] @default([])
 
-  // Visibility
   isInternal Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -2160,24 +1915,18 @@ model Feedback {
   id     String  @id @default(cuid())
   userId String?
 
-  // Type
-  type String // bug, feature, improvement, other
+  type String
 
-  // Content
   title   String?
   message String  @db.Text
 
-  // Rating
-  rating Int? // 1-5
+  rating Int?
 
-  // Context
   page      String?
   userAgent String?
 
-  // Status
-  status String @default("new") // new, reviewed, planned, implemented, declined
+  status String @default("new")
 
-  // Response
   response    String?   @db.Text
   respondedAt DateTime?
 
@@ -2201,19 +1950,15 @@ model Waitlist {
   email String  @unique
   name  String?
 
-  // Source
-  source       String? // landing, blog, referral, etc.
+  source       String?
   referralCode String?
 
-  // Status
-  status String @default("waiting") // waiting, invited, joined
+  status String @default("waiting")
 
-  // Invite
   invitedAt  DateTime?
   inviteCode String?
   joinedAt   DateTime?
 
-  // Position
   position Int?
 
   createdAt DateTime @default(now())
@@ -2230,20 +1975,16 @@ model NewsletterSubscriber {
   email String  @unique
   name  String?
 
-  // Preferences
   topics    String[] @default([])
-  frequency String   @default("weekly") // weekly, monthly
+  frequency String   @default("weekly")
 
-  // Status
   isActive          Boolean   @default(true)
   confirmedAt       DateTime?
   unsubscribedAt    DateTime?
   unsubscribeReason String?
 
-  // Token for unsubscribe
   unsubscribeToken String @unique @default(cuid())
 
-  // Stats
   emailsSent    Int @default(0)
   emailsOpened  Int @default(0)
   emailsClicked Int @default(0)
@@ -2266,16 +2007,13 @@ model FeatureFlag {
   name        String
   description String?
 
-  // Status
   isEnabled Boolean @default(false)
 
-  // Targeting
   enabledForAll     Boolean            @default(false)
   enabledUserIds    String[]           @default([])
   enabledTiers      SubscriptionTier[] @default([])
   enabledPercentage Int                @default(0)
 
-  // Metadata
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -2326,48 +2064,87 @@ model MaintenanceWindow {
 }
 
 // ============================================================================
-// BLOG (If needed)
+// BLOG
 // ============================================================================
 
 model BlogPost {
   id String @id @default(cuid())
 
-  // Content
   slug    String  @unique
   title   String
   excerpt String? @db.Text
   content String  @db.Text
 
-  // Media
-  featuredImage String?
-
-  // SEO
-  metaTitle       String?
-  metaDescription String?
-
-  // Classification
-  category String?
-  tags     String[] @default([])
-
-  // Author
   authorId   String?
   authorName String?
 
-  // Status
-  status      String    @default("draft") // draft, published, archived
-  publishedAt DateTime?
+  category String?
+  tags     String[] @default([])
 
-  // Stats
+  featuredImage   String?
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String[] @default([])
+
   viewCount Int @default(0)
   likeCount Int @default(0)
 
+  status      String    @default("draft")
+  publishedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  comments BlogComment[]
+  likes    BlogPostLike[]
 
   @@index([slug])
   @@index([status])
   @@index([publishedAt])
   @@index([category])
+}
+
+model BlogComment {
+  id String @id @default(cuid())
+
+  postId   String
+  authorId String
+  parentId String?
+
+  content String @db.Text
+
+  likes Int @default(0)
+
+  isDeleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post    BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  BlogComment?  @relation("Replies", fields: [parentId], references: [id])
+  replies BlogComment[] @relation("Replies")
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model BlogPostLike {
+  id String @id @default(cuid())
+
+  postId String
+  userId String?
+  ipHash String?
+
+  createdAt DateTime @default(now())
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([postId, userId])
+  @@unique([postId, ipHash])
+  @@index([postId])
 }
 
 // ============================================================================
@@ -2381,14 +2158,10 @@ model ChangelogEntry {
   title       String
   description String @db.Text
 
-  // Type
-  type String // feature, improvement, bugfix, security
+  type String
 
-  // Content
-  // changes structure: [{ "type": "added", "description": "..." }, ...]
   changes Json
 
-  // Status
   isPublished Boolean   @default(false)
   publishedAt DateTime?
 
@@ -2398,4 +2171,24 @@ model ChangelogEntry {
   @@index([version])
   @@index([isPublished])
   @@index([publishedAt])
+}
+
+// ============================================================================
+// BOOKMARK
+// ============================================================================
+
+model Bookmark {
+  id String @id @default(cuid())
+
+  userId     String
+  entityType String
+  entityId   String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId])
+  @@index([entityType])
 }

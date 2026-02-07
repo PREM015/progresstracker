@@ -36,11 +36,8 @@ export const TicketDetail: React.FC<TicketDetailProps> = ({
     <div className={`bg-white border rounded-xl p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold">{ticket.title}</h3>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          ticket.status === 'open' ? 'bg-green-100 text-green-700' : '
-
-bg-gray-100 text-gray-700'
-        }`}>
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${ticket.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+          }`}>
           {ticket.status}
         </span>
       </div>

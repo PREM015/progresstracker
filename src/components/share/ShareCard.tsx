@@ -10,7 +10,7 @@ interface ShareCardProps {
   className?: string;
 }
 
-export const Share Card: React.FC<ShareCardProps> = ({
+export const ShareCard: React.FC<ShareCardProps> = ({
   title,
   description,
   imageUrl,

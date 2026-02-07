@@ -1,141 +1,101 @@
-// src/app/api/newsletter/unsubscribe/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { logger } from "@/lib/logger";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import apiResponse from '@/lib/apiResponse';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
-// Generate unsubscribe token
-function generateUnsubscribeToken(email: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(`${email}-${process.env.NEWSLETTER_SECRET || "secret"}`)
-    .digest("hex");
+const RATE_LIMIT = 10;
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Cache-Control': 'no-store',
+};
+
+const unsubscribeSchema = z.object({
+  email: z.string().email().optional(),
+  token: z.string().optional(),
+  reason: z.string().optional(),
+}).refine(data => data.email || data.token, {
+  message: "Either email or token must be provided",
+});
+
+function generateRequestId(): string {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-// Verify unsubscribe token
-function verifyUnsubscribeToken(email: string, token: string): boolean {
-  const expectedToken = generateUnsubscribeToken(email);
-  return token === expectedToken;
+function getClientIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-// GET /api/newsletter/unsubscribe - Unsubscribe via link
-export async function GET(req: NextRequest) {
+function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: any): NextResponse {
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
+  response.headers.set('X-Request-ID', requestId);
+  if (rateLimitResult) {
+    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
+    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
+  }
+  return response;
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email");
-    const token = searchParams.get("token");
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `newsletter:unsubscribe:${ip}`);
 
-    if (!email || !token) {
-      return NextResponse.json(
-        { error: "Email and token are required" },
-        { status: 400 }
-      );
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
 
-    // Verify token
-    if (!verifyUnsubscribeToken(email, token)) {
-      return NextResponse.json(
-        { error: "Invalid unsubscribe token" },
-        { status: 400 }
-      );
+    const body = await request.json();
+    const validation = unsubscribeSchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(apiResponse.validationError('Invalid input', validation.error.errors, requestId), requestId, rateLimitResult);
     }
+
+    const { email, token, reason } = validation.data;
+
+    const where: any = {};
+    if (token) where.unsubscribeToken = token;
+    else if (email) where.email = email;
 
     const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where,
     });
 
     if (!subscriber) {
-      return NextResponse.json({
-        success: true,
-        message: "You have been unsubscribed from the newsletter.",
-      });
+      // Return success even if not found to prevent email enumeration?
+      // Or 404? 
+      // Standard practice: "If you were subscribed, you have been unsubscribed."
+      // But for API clarity let's say "Subscriber not found" or just success.
+      // Let's return success for security.
+      logger.info('Newsletter unsubscribe for unknown user', { email, token, requestId });
+      return addHeaders(apiResponse.success({ message: 'Unsubscribe processed' }, { meta: { requestId } }), requestId, rateLimitResult);
     }
 
     await prisma.newsletterSubscriber.update({
-      where: { email: email.toLowerCase().trim() },
+      where: { id: subscriber.id },
       data: {
         isActive: false,
         unsubscribedAt: new Date(),
-        unsubscribeReason: "User clicked unsubscribe link",
-      },
+        unsubscribeReason: reason,
+      }
     });
 
-    logger.info("Newsletter unsubscribe", {
-      email: subscriber.email,
-    });
+    logger.info('Newsletter subscriber unsubscribed', { id: subscriber.id, requestId, duration: Date.now() - startTime });
 
-    return NextResponse.json({
-      success: true,
-      message: "You have been successfully unsubscribed from the newsletter.",
-    });
+    return addHeaders(apiResponse.success({ message: 'Unsubscribe successful' }, { meta: { requestId } }), requestId, rateLimitResult);
+
   } catch (error) {
-    logger.error("Error unsubscribing from newsletter", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    logger.error('Newsletter unsubscribe failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }
 
-// POST /api/newsletter/unsubscribe - Unsubscribe via email submission
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { email, reason } = body;
-
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 }
-      );
-    }
-
-    const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
-
-    // Always return success to prevent email enumeration
-    const successResponse = {
-      success: true,
-      message: "If the email exists in our newsletter, it has been unsubscribed.",
-    };
-
-    if (!subscriber) {
-      return NextResponse.json(successResponse);
-    }
-
-    await prisma.newsletterSubscriber.update({
-      where: { email: email.toLowerCase().trim() },
-      data: {
-        isActive: false,
-        unsubscribedAt: new Date(),
-        unsubscribeReason: reason || "User request",
-      },
-    });
-
-    logger.info("Newsletter unsubscribe via POST", {
-      email: subscriber.email,
-      reason,
-    });
-
-    // TODO: Send confirmation email
-    // await sendUnsubscribeConfirmationEmail(subscriber.email);
-
-    return NextResponse.json(successResponse);
-  } catch (error) {
-    logger.error("Error processing unsubscribe request", {}, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: SECURITY_HEADERS });
 }

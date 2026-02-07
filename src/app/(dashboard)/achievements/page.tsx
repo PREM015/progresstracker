@@ -3,15 +3,15 @@
 
 import { useState, useEffect, useCallback, useMemo, useTransition } from 'react';
 import { useSession } from 'next-auth/react';
-import type { 
-  Achievement, 
-  UserAchievement, 
+import type {
+  Achievement,
+  UserAchievement,
   AchievementProgress,
   AchievementStats,
   AchievementNotification,
   AchievementCategory,
   AchievementRarity,
-  AchievementTier 
+  AchievementTier
 } from '@/types/achievement';
 import { RARITY_CONFIG, TIER_CONFIG, CATEGORY_CONFIG } from '@/types/achievement';
 
@@ -97,7 +97,7 @@ export default function AchievementsPage() {
 
       // Create maps for quick lookup
       const userAchievementsMap = new Map<string, UserAchievement>(
-        (userAchievementsData.achievements || []).map((ua: UserAchievement) => [ua visibleachievementId, ua])
+        (userAchievementsData.achievements || []).map((ua: UserAchievement) => [ua.achievementId, ua])
       );
       const progressMap = new Map<string, AchievementProgress>(
         (progressData.progress || []).map((p: AchievementProgress) => [p.achievementId, p])
@@ -164,7 +164,7 @@ export default function AchievementsPage() {
 
     // Sort
     const rarityOrder: AchievementRarity[] = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
-    
+
     switch (filters.sortBy) {
       case 'points':
         result.sort((a, b) => b.achievement.points - a.achievement.points);
@@ -255,7 +255,7 @@ export default function AchievementsPage() {
     });
   }, []);
 
-  const hasActiveFilters = filters.category || filters.rarity || filters.tier || 
+  const hasActiveFilters = filters.category || filters.rarity || filters.tier ||
     filters.status !== 'all' || filters.search || filters.sortBy !== 'default';
 
   // =============================================================================
@@ -413,11 +413,10 @@ export default function AchievementsPage() {
             {/* Filter Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-colors ${
-                showFilters || hasActiveFilters
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-colors ${showFilters || hasActiveFilters
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                }`}
             >
               <FilterIcon className="w-5 h-5" />
               <span>Filters</span>
@@ -453,11 +452,10 @@ export default function AchievementsPage() {
                     <button
                       key={status}
                       onClick={() => setFilters(f => ({ ...f, status }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        filters.status === status
-                          ? 'bg-indigo-500 text-white'
-                          : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.status === status
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                        }`}
                     >
                       {status === 'all' ? '🏆 All' : status === 'unlocked' ? '✅ Unlocked' : '🔒 Locked'}
                     </button>
@@ -473,11 +471,10 @@ export default function AchievementsPage() {
                     <button
                       key={key}
                       onClick={() => setFilters(f => ({ ...f, rarity: f.rarity === key ? null : key }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        filters.rarity === key
-                          ? `${config.bgClass} ${config.textClass}`
-                          : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.rarity === key
+                        ? `${config.bgClass} ${config.textClass}`
+                        : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                        }`}
                     >
                       {config.emoji} {config.label}
                     </button>
@@ -493,11 +490,10 @@ export default function AchievementsPage() {
                     <button
                       key={key}
                       onClick={() => setFilters(f => ({ ...f, category: f.category === key ? null : key }))}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        filters.category === key
-                          ? 'bg-indigo-500 text-white'
-                          : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filters.category === key
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                        }`}
                     >
                       {config.emoji} {config.label}
                     </button>

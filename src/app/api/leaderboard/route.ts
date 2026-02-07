@@ -71,20 +71,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -97,14 +97,14 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
-  
+
   return { error: null, session: null, rateLimitResult };
 }
 
@@ -129,7 +129,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   try {
     // TODO: Return appropriate headers for resource
     // Example: X-Total-Count, X-Resource-Status, etc.
-    
+
     const response = new NextResponse(null, { status: 200 });
     return addHeaders(response, requestId);
   } catch (error) {
@@ -162,11 +162,11 @@ export async function GET(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
-    
+
+
 
     // Parse query parameters
-    const { searchParams } = new URL(request.url);
+    const searchParams = request.nextUrl.searchParams;
     const queryValidation = querySchema.safeParse({
       page: searchParams.get('page'),
       limit: searchParams.get('limit'),
@@ -184,20 +184,64 @@ export async function GET(
     }
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
+    const skip = (page - 1) * limit;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Build where clause
+    const where: Prisma.UserWhereInput = {
+      isActive: true,
+      isPublic: true, // Only show public profiles
+      ...(search && {
+        OR: [
+          { username: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    // Determine sort order
+    let orderBy: Prisma.UserOrderByWithRelationInput = { totalPoints: 'desc' };
+    if (sortBy === 'streak') {
+      orderBy = { currentStreak: sortOrder };
+    } else if (sortBy === 'problems') {
+      orderBy = { totalProblems: sortOrder };
+    } else if (sortBy) {
+      // Allow other valid fields if needed, but default to points
+      orderBy = { totalPoints: sortOrder };
+    }
+
+    // Execute query
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          image: true,
+          totalPoints: true,
+          currentStreak: true,
+          totalProblems: true,
+          rank: true,
+        },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    // Add display rank
+    // Note: This is page-relative rank. For absolute rank, we'd need to trust the 'rank' field or calculate offset.
+    // Using 'rank' field from DB is better if the cron job updates it. 
+    // If 'rank' is null, fallback to calculated.
+    const data = users.map((user, index) => ({
+      ...user,
+      displayRank: user.rank ?? (skip + index + 1),
+    }));
 
     logger.info('GET leaderboard completed', {
-      
       page,
+      limit,
       total,
       requestId,
       duration: Date.now() - startTime,

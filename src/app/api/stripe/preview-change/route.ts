@@ -1,251 +1,113 @@
-// =============================================================================
-// stripe/preview-change/route.ts
-// =============================================================================
-// Description: Preview subscription change
-// Methods: POST
-// Auth Required: True
-// Rate Limit: 30 requests/minute
-// Tags: stripe, subscription, preview
-// Generated: 2026-02-02T11:57:44.613416
-// =============================================================================
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { stripe, getPlanByPriceId } from '@/lib/stripe';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-import { stripe } from '@/lib/stripe';
+import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-const RATE_LIMIT = 30;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
+const RATE_LIMIT = 10;
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Cache-Control': 'no-store',
 };
 
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
-
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Generate unique request ID for tracing
- */
 function generateRequestId(): string {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Extract client IP from request
- */
 function getClientIp(request: NextRequest): string {
   return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
+function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: any): NextResponse {
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
   response.headers.set('X-Request-ID', requestId);
-  
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
   return response;
 }
 
-/**
- * Validate session and check rate limits
- */
-async function validateSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `stripe-preview-change:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Preview subscription change
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse target plan from request
-   * - Calculate proration for upgrade/downgrade
-   * - Get upcoming invoice preview from Stripe
-   * - Show credit/debit amount
-   * - Return preview without applying changes
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return addHeaders(apiResponse.unauthorized('Unauthorized', requestId), requestId);
     }
 
-    const validation = bodySchema.safeParse(body);
+    const { searchParams } = request.nextUrl;
+    const priceId = searchParams.get('priceId');
 
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
+    if (!priceId) {
+      return addHeaders(apiResponse.validationError('Missing priceId', [], requestId), requestId);
     }
 
-    const data = validation.data;
+    const ip = getClientIp(request);
+    const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `stripe:preview-change:${session.user.id}`);
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    if (!rateLimitResult.success) {
+      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+    }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    logger.info('POST stripe/preview-change completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: session.user.id }
     });
 
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
+    if (!subscription?.stripeSubscriptionId || !subscription.stripeCustomerId) {
+      return addHeaders(apiResponse.notFound('No active subscription found', requestId), requestId, rateLimitResult);
+    }
+
+    const stripeSub = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+    const itemId = stripeSub.items.data[0].id;
+
+    // Retrieve upcoming invoice with the hypothetical change
+    const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
+      customer: subscription.stripeCustomerId,
+      subscription: subscription.stripeSubscriptionId,
+      subscription_items: [{
+        id: itemId,
+        price: priceId,
+      }],
+      subscription_proration_behavior: 'always_invoice',
+    });
+
+    const preview = {
+      amountDue: upcomingInvoice.amount_due,
+      subtotal: upcomingInvoice.subtotal,
+      tax: upcomingInvoice.tax,
+      total: upcomingInvoice.total,
+      currency: upcomingInvoice.currency,
+      periodStart: new Date(upcomingInvoice.period_start * 1000),
+      periodEnd: new Date(upcomingInvoice.period_end * 1000),
+      lines: upcomingInvoice.lines.data.map((line: any) => ({
+        description: line.description,
+        amount: line.amount,
+        period: {
+          start: new Date(line.period.start * 1000),
+          end: new Date(line.period.end * 1000),
+        },
+        proration: line.proration,
+      }))
+    };
+
+    logger.info('GET stripe preview change completed', { userId: session.user.id, priceId, requestId, duration: Date.now() - startTime });
+
+    return addHeaders(apiResponse.success(preview, { meta: { requestId } }), requestId, rateLimitResult);
+
   } catch (error) {
-    logger.error('POST stripe/preview-change failed', { requestId }, error);
+    logger.error('GET stripe preview change failed', { requestId }, error);
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }
 
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
-
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: SECURITY_HEADERS });
+}

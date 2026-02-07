@@ -63,6 +63,7 @@
     "graphql-request": "^7.3.5",
     "html2canvas": "^1.4.1",
     "ioredis": "^5.9.2",
+    "isomorphic-dompurify": "^2.36.0",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",

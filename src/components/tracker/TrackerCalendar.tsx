@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'antml:function_calls>
+import React, { useState } from 'react';
 
 interface CalendarDay {
   date: string;

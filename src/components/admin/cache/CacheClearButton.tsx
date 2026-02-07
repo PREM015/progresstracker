@@ -1,5 +1,5 @@
 'use client';
-export function CacheClearButton({ cacheKey }: {cache Key?: string}) {
+export function CacheClearButton({ cacheKey }: { cacheKey?: string }) {
     const handleClear = async () => {
         await fetch('/api/admin/cache/clear', { method: 'POST', body: JSON.stringify({ key: cacheKey }), headers: { 'Content-Type': 'application/json' } });
         alert('Cache cleared');

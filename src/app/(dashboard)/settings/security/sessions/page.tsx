@@ -84,13 +84,13 @@ export default function ActiveSessionsPage() {
                     </div>
                   </div>
 
-                  {!session.is Current && (
-                  <button
-                    onClick={() => revokeSession(session.id)}
-                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
-                  >
-                    Revoke
-                  </button>
+                  {!session.isCurrent && (
+                    <button
+                      onClick={() => revokeSession(session.id)}
+                      className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                    >
+                      Revoke
+                    </button>
                   )}
                 </div>
               </div>
