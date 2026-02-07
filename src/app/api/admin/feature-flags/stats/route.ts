@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // =============================================================================
 // api/admin/feature-flags/stats/route.ts
 // =============================================================================
@@ -54,7 +55,7 @@ const CACHE_TTL = {
 
 async function checkAdminStatsAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user?.id) {
     return { error: apiResponse.unauthorized('Authentication required', requestId) };
   }
@@ -76,7 +77,7 @@ async function checkAdminStatsAuth(request: NextRequest, requestId: string) {
 
 async function getBasicStats(refresh = false) {
   const cacheKey = CACHE_KEYS.BASIC_STATS;
-  
+
   if (!refresh) {
     const cached = await cache.get(cacheKey);
     if (cached) return cached;
@@ -93,30 +94,30 @@ async function getBasicStats(refresh = false) {
   ] = await Promise.all([
     // Total flags
     prisma.featureFlag.count(),
-    
+
     // Enabled flags
     prisma.featureFlag.count({
       where: { isEnabled: true }
     }),
-    
+
     // Flags with specific users
     prisma.featureFlag.count({
       where: {
         enabledUserIds: {
-          not: { equals: [] }
+          isEmpty: false
         }
       }
     }),
-    
+
     // Flags with tier restrictions
     prisma.featureFlag.count({
       where: {
         enabledTiers: {
-          not: { equals: [] }
+          isEmpty: false
         }
       }
     }),
-    
+
     // Flags with percentage rollout
     prisma.featureFlag.count({
       where: {
@@ -125,7 +126,7 @@ async function getBasicStats(refresh = false) {
         }
       }
     }),
-    
+
     // Recent flags (last 7 days)
     prisma.featureFlag.count({
       where: {
@@ -134,12 +135,12 @@ async function getBasicStats(refresh = false) {
         }
       }
     }),
-    
+
     // Flags by tier usage
     prisma.featureFlag.findMany({
       where: {
         enabledTiers: {
-          not: { equals: [] }
+          isEmpty: false
         }
       },
       select: {
@@ -184,7 +185,7 @@ async function getBasicStats(refresh = false) {
 
 async function getUsageStats(period: string, refresh = false) {
   const cacheKey = `${CACHE_KEYS.USAGE_STATS}:${period}`;
-  
+
   if (!refresh) {
     const cached = await cache.get(cacheKey);
     if (cached) return cached;
@@ -193,7 +194,7 @@ async function getUsageStats(period: string, refresh = false) {
   // Calculate date range based on period
   const now = new Date();
   let startDate: Date;
-  
+
   switch (period) {
     case '1h':
       startDate = new Date(now.getTime() - 60 * 60 * 1000);
@@ -234,7 +235,7 @@ async function getUsageStats(period: string, refresh = false) {
         userId: true,
       }
     }),
-    
+
     // Get flags that were modified
     prisma.featureFlag.findMany({
       where: {
@@ -254,7 +255,7 @@ async function getUsageStats(period: string, refresh = false) {
       },
       take: 10
     }),
-    
+
     // Get most frequently modified flags
     prisma.auditLog.groupBy({
       by: ['entityId'],
@@ -285,11 +286,11 @@ async function getUsageStats(period: string, refresh = false) {
   auditLogs.forEach(log => {
     // Count actions
     actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
-    
+
     // Daily activity
     const date = log.createdAt.toISOString().split('T')[0];
     dailyActivity[date] = (dailyActivity[date] || 0) + 1;
-    
+
     // Admin activity
     if (log.userId) {
       adminActivity[log.userId] = (adminActivity[log.userId] || 0) + 1;
@@ -339,7 +340,7 @@ async function getUsageStats(period: string, refresh = false) {
 
 async function getHistoryStats(refresh = false) {
   const cacheKey = CACHE_KEYS.HISTORY_STATS;
-  
+
   if (!refresh) {
     const cached = await cache.get(cacheKey);
     if (cached) return cached;
@@ -386,7 +387,7 @@ async function getHistoryStats(refresh = false) {
 
 async function getUserBreakdownStats(refresh = false) {
   const cacheKey = CACHE_KEYS.USER_BREAKDOWN;
-  
+
   if (!refresh) {
     const cached = await cache.get(cacheKey);
     if (cached) return cached;
@@ -404,7 +405,7 @@ async function getUserBreakdownStats(refresh = false) {
   const tierTargeting = await prisma.featureFlag.findMany({
     where: {
       enabledTiers: {
-        not: { equals: [] }
+        isEmpty: false
       }
     },
     select: {
@@ -415,7 +416,7 @@ async function getUserBreakdownStats(refresh = false) {
 
   // Process tier targeting
   const tierUsage: Record<string, { flags: number; users: number }> = {};
-  
+
   subscriptionStats.forEach(stat => {
     tierUsage[stat.tier] = {
       flags: 0,
@@ -441,7 +442,7 @@ async function getUserBreakdownStats(refresh = false) {
     },
     where: {
       enabledUserIds: {
-        not: { equals: [] }
+        isEmpty: false
       }
     }
   });
@@ -449,7 +450,7 @@ async function getUserBreakdownStats(refresh = false) {
   const totalUserTargetedFlags = await prisma.featureFlag.count({
     where: {
       enabledUserIds: {
-        not: { equals: [] }
+        isEmpty: false
       }
     }
   });
@@ -468,7 +469,7 @@ async function getUserBreakdownStats(refresh = false) {
     },
     userTargeting: {
       flagsWithUserTargeting: totalUserTargetedFlags,
-      averagePercentageRollout: Number(userSpecificStats._avg.enabledPercentage || 0),
+      averagePercentageRollout: Number(userSpecificStats?._avg?.enabledPercentage || 0),
     },
     calculatedAt: new Date().toISOString(),
   };
