@@ -1,87 +1,74 @@
-/**
- * Component: ErrorBoundary
- * Location: components/errors/ErrorBoundary.tsx
- * 
- * Description: React error boundary
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AlertTriangle, RefreshCcw, Home } from 'lucide-react';
+import Link from 'next/link';
 
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface ErrorBoundaryProps {
-  className?: string;
-  // Add component-specific props here
+  children: React.ReactNode;
 }
 
-// ===== COMPONENT =====
-export const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-  // Component logic
-  
-  // Render
-  return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>ErrorBoundary</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
-  );
-};
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
 
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Uncaught error:', error, errorInfo);
+  }
 
-// ===== STYLES =====
-// Add any component-specific styles
+  reset = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
 
-// ===== EXPORTS =====
-export default ErrorBoundary;
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-[400px] w-full items-center justify-center p-4">
+          <Card className="w-full max-w-md border-destructive/50">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                <CardTitle>Something went wrong</CardTitle>
+              </div>
+              <CardDescription>
+                An error occurred while rendering this component.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md bg-muted p-3">
+                <code className="text-xs text-muted-foreground break-all">
+                  {this.state.error?.message || 'Unknown error'}
+                </code>
+              </div>
+            </CardContent>
+            <CardFooter className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => window.location.href = '/'}>
+                <Home className="mr-2 h-4 w-4" />
+                Home
+              </Button>
+              <Button onClick={() => window.location.reload()}>
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Reload
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      );
+    }
 
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+    return this.props.children;
+  }
+}

@@ -1,12 +1,19 @@
-// app/(auth)/reset-password/page.tsx
-import React from 'react';
-import { redirect } from 'next/navigation';
+import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
+import { AuthLayout } from '@/components/layouts/AuthLayout';
+import { MetaTags } from '@/components/seo/MetaTags';
+import { Suspense } from 'react';
 
-export const metadata = {
-  title: 'Reset Password - ProgressTracker',
-};
-
-export default function ResetPasswordRedirectPage() {
-  // This page redirects to forgot-password if accessed directly
-  redirect('/forgot-password');
+export default function ResetPasswordPage() {
+  return (
+    <AuthLayout
+      heading="Reset Password"
+      description="Enter your new password below."
+    >
+      <MetaTags title="Reset Password" description="Set a new password for your account" />
+      {/* Suspense boundary required for useSearchParams */}
+      <Suspense fallback={<div>Loading...</div>}>
+        <ResetPasswordForm />
+      </Suspense>
+    </AuthLayout>
+  );
 }

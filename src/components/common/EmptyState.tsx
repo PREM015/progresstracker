@@ -1,26 +1,66 @@
+import { cn } from '@/lib/utils';
+import { LucideIcon } from 'lucide-react';
+
 interface EmptyStateProps {
-    icon?: string;
+    icon?: LucideIcon;
     title: string;
-    description?: string;
-    action?: {
-        label: string;
-        onClick: () => void;
-    };
+    description: string;
+    action?: React.ReactNode;
+    variant?: 'default' | 'small' | 'error';
+    className?: string;
 }
 
-export default function EmptyState({ icon = "📭", title, description, action }: EmptyStateProps) {
+export function EmptyState({
+    icon: Icon,
+    title,
+    description,
+    action,
+    variant = 'default',
+    className,
+}: EmptyStateProps) {
     return (
-        <div className="text-center py-12">
-            <div className="text-6xl mb-4">{icon}</div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
-            {description && <p className="text-gray-600 mb-4">{description}</p>}
+        <div
+            className={cn(
+                'flex flex-col items-center justify-center text-center p-8 rounded-lg border border-dashed',
+                variant === 'small' ? 'p-4 min-h-[100px]' : 'min-h-[300px]',
+                variant === 'error' ? 'bg-destructive/5 border-destructive/20' : 'bg-muted/10',
+                className
+            )}
+        >
+            <div className={cn(
+                'flex items-center justify-center rounded-full bg-muted',
+                variant === 'small' ? 'h-10 w-10 mb-3' : 'h-16 w-16 mb-4',
+                variant === 'error' && 'bg-destructive/10'
+            )}>
+                {Icon && (
+                    <Icon
+                        className={cn(
+                            variant === 'small' ? 'h-5 w-5' : 'h-8 w-8',
+                            variant === 'error' ? 'text-destructive' : 'text-muted-foreground'
+                        )}
+                    />
+                )}
+            </div>
+
+            <h3 className={cn(
+                'font-semibold tracking-tight',
+                variant === 'small' ? 'text-sm' : 'text-lg',
+                variant === 'error' && 'text-destructive'
+            )}>
+                {title}
+            </h3>
+
+            <p className={cn(
+                'text-muted-foreground mt-1 max-w-sm',
+                variant === 'small' ? 'text-xs' : 'text-sm'
+            )}>
+                {description}
+            </p>
+
             {action && (
-                <button
-                    onClick={action.onClick}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
-                    {action.label}
-                </button>
+                <div className={cn('mt-6', variant === 'small' && 'mt-3')}>
+                    {action}
+                </div>
             )}
         </div>
     );

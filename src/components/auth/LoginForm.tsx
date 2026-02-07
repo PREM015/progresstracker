@@ -1,121 +1,141 @@
 'use client';
 
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { signIn } from 'next-auth/react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { loginSchema, type LoginInput } from '@/lib/validators';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { FormError } from '@/components/forms/FormError';
+import { FormSuccess } from '@/components/forms/FormSuccess';
+import { AuthCard } from './AuthCard';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 
-interface LoginFormProps {
-  onSuccess: () => void;
-  onForgotPassword?: () => void;
-  onSignUp?: () => void;
-  className?: string;
-}
+export function LoginForm() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const urlError = searchParams.get('error') === 'OAuthAccountNotLinked'
+    ? 'Email already in use with different provider!'
+    : '';
 
-export const LoginForm: React.FC<LoginFormProps> = ({
-  onSuccess,
-  onForgotPassword,
-  onSignUp,
-  className = '',
-}) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [error, setError] = React.useState<string | undefined>('');
+  const [success, setSuccess] = React.useState<string | undefined>('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const onSubmit = async (data: LoginInput) => {
+    setError('');
+    setSuccess('');
     setIsLoading(true);
-    setError(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const result = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+        callbackUrl,
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Login failed');
+      if (result?.error) {
+        setError('Invalid credentials');
+      } else {
+        setSuccess('Login successful!');
+        router.refresh();
+        router.push(callbackUrl);
       }
-
-      onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-2xl p-8 ${className}`}>
-      <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Welcome Back</h2>
-      <p className="text-gray-600 mb-8 text-center">Sign in to your account</p>
+    <AuthCard
+      title="Welcome back"
+      description="Enter your email to sign in to your account"
+      footerLabel="Don't have an account?"
+      footerLink="/register"
+      footerLinkText="Sign up"
+      showSocial
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {urlError && <FormError message={urlError} variant="block" />}
+        {error && <FormError message={error} variant="block" />}
+        {success && <FormSuccess message={success} variant="block" />}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            placeholder="you@example.com"
+            placeholder="name@example.com"
+            disabled={isLoading}
+            {...register('email')}
           />
+          {errors.email && <FormError message={errors.email.message} />}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            placeholder="••••••••"
-          />
-        </div>
-
-        {onForgotPassword && (
-          <div className="text-right">
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-sm text-indigo-600 hover:text-indigo-700"
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-primary hover:underline"
             >
               Forgot password?
-            </button>
+            </Link>
           </div>
-        )}
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              disabled={isLoading}
+              {...register('password')}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              onClick={() => setShowPassword((prev) => !prev)}
+              disabled={isLoading}
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="sr-only">
+                {showPassword ? 'Hide password' : 'Show password'}
+              </span>
+            </Button>
+          </div>
+          {errors.password && <FormError message={errors.password.message} />}
+        </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
-        >
-          {isLoading ? 'Signing in...' : 'Sign In'}
-        </button>
-      </div>
-
-      {onSignUp && (
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Don't have an account?{' '}
-          <button
-            type="button"
-            onClick={onSignUp}
-            className="text-indigo-600 hover:text-indigo-700 font-medium"
-          >
-            Sign up
-          </button>
-        </p>
-      )}
-    </form>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Sign In
+        </Button>
+      </form>
+    </AuthCard>
   );
-};
-
-export default LoginForm;
+}

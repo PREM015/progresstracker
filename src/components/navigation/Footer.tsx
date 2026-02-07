@@ -1,69 +1,71 @@
-'use client';
+import Link from 'next/link';
+import { Github, Twitter, Linkedin } from 'lucide-react';
 
-import React from 'react';
-
-interface FooterProps {
-  className?: string;
-}
-
-export const Footer: React.FC<FooterProps> = ({
-  className = '',
-}) => {
-  const sections = [
-    {
-      title: 'Product',
-      links: [{ label: 'Features', href: '/features' }, { label: 'Pricing', href: '/pricing' }, { label: 'FAQ', href: '/faq' }],
-    },
-    {
-      title: 'Company',
-      links: [{ label: 'About', href: '/about' }, { label: 'Blog', href: '/blog' }, { label: 'Careers', href: '/careers' }],
-    },
-    {
-      title: 'Support',
-      links: [{ label: 'Help Center', href: '/help' }, { label: 'Contact', href: '/contact' }, { label: 'Status', href: '/status' }],
-    },
-    {
-      title: 'Legal',
-      links: [{ label: 'Privacy', href: '/privacy' }, { label: 'Terms', href: '/terms' }, { label: 'Security', href: '/security' }],
-    },
-  ];
+export function Footer() {
+  const currentYear = new Date().getFullYear();
 
   return (
-    <footer className={`bg-gray-900 text-white py-16 ${className}`}>
-      <div className="container mx-auto px-6">
-        <div className="grid md:grid-cols-5 gap-8 mb-12">
-          <div>
-            <div className="text-2xl font-bold mb-4">Progress Tracker</div>
-            <p className="text-gray-400 text-sm">Track your progress, achieve your goals</p>
+    <footer className="border-t bg-muted/40">
+      <div className="container py-10 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold flex items-center gap-2">
+              <span className="bg-primary text-primary-foreground p-1 rounded-md text-sm">PT</span>
+              ProgressTracker
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              Track your coding journey across platforms. Gain insights, set goals, and improve daily.
+            </p>
+            <div className="flex gap-4">
+              <Link href="https://github.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                <Github className="h-5 w-5" />
+                <span className="sr-only">GitHub</span>
+              </Link>
+              <Link href="https://twitter.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                <Twitter className="h-5 w-5" />
+                <span className="sr-only">Twitter</span>
+              </Link>
+              <Link href="https://linkedin.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                <Linkedin className="h-5 w-5" />
+                <span className="sr-only">LinkedIn</span>
+              </Link>
+            </div>
           </div>
 
-          {sections.map((section) => (
-            <div key={section.title}>
-              <h4 className="font-bold mb-4">{section.title}</h4>
-              <ul className="space-y-2">
-                {section.links.map((link) => (
-                  <li key={link.label}>
-                    <a href={link.href} className="text-gray-400 hover:text-white text-sm">
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div>
+            <h4 className="font-semibold mb-4">Product</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/features" className="text-muted-foreground hover:text-foreground">Features</Link></li>
+              <li><Link href="/pricing" className="text-muted-foreground hover:text-foreground">Pricing</Link></li>
+              <li><Link href="/changelog" className="text-muted-foreground hover:text-foreground">Changelog</Link></li>
+              <li><Link href="/roadmap" className="text-muted-foreground hover:text-foreground">Roadmap</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-4">Resources</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/blog" className="text-muted-foreground hover:text-foreground">Blog</Link></li>
+              <li><Link href="/docs" className="text-muted-foreground hover:text-foreground">Documentation</Link></li>
+              <li><Link href="/community" className="text-muted-foreground hover:text-foreground">Community</Link></li>
+              <li><Link href="/help" className="text-muted-foreground hover:text-foreground">Help Center</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-4">Legal</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/privacy" className="text-muted-foreground hover:text-foreground">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="text-muted-foreground hover:text-foreground">Terms of Service</Link></li>
+              <li><Link href="/cookies" className="text-muted-foreground hover:text-foreground">Cookie Policy</Link></li>
+            </ul>
+          </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-8 flex items-center justify-between text-sm text-gray-400">
-          <div>© 2024 Progress Tracker. All rights reserved.</div>
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-white">Twitter</a>
-            <a href="#" className="hover:text-white">GitHub</a>
-            <a href="#" className="hover:text-white">LinkedIn</a>
-          </div>
+        <div className="border-t mt-10 pt-6 text-center text-sm text-muted-foreground">
+          <p>&copy; {currentYear} ProgressTracker. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
-};
-
-export default Footer;
+}

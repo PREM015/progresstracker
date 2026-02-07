@@ -1,85 +1,41 @@
-'use client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PlusCircle, PlayCircle, BarChart3, Settings } from 'lucide-react';
+import Link from 'next/link';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-
-interface QuickAction {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-  action: () => void;
-}
-
-interface QuickActionsProps {
-  className?: string;
-}
-
-export const QuickActions: React.FC<QuickActionsProps> = ({
-  className = '',
-}) => {
-  const router = useRouter();
-
-  const actions: QuickAction[] = [
-    {
-      id: 'add-entry',
-      title: 'Add Entry',
-      description: 'Log a new tracker entry',
-      icon: '➕',
-      color: 'from-blue-500 to-cyan-500',
-      action: () => router.push('/tracker/new'),
-    },
-    {
-      id: 'create-goal',
-      title: 'Create Goal',
-      description: 'Set a new goal',
-      icon: '🎯',
-      color: 'from-purple-500 to-pink-500',
-      action: () => router.push('/goals/new'),
-    },
-    {
-      id: 'sync-platforms',
-      title: 'Sync Platforms',
-      description: 'Sync all connected platforms',
-      icon: '🔄',
-      color: 'from-green-500 to-emerald-500',
-      action: async () => {
-        await fetch('/api/sync/trigger-all', { method: 'POST' });
-      },
-    },
-    {
-      id: 'view-analytics',
-      title: 'View Analytics',
-      description: 'Check your progress',
-      icon: '📊',
-      color: 'from-orange-500 to-red-500',
-      action: () => router.push('/analytics'),
-    },
-  ];
-
+export function QuickActions() {
   return (
-    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {actions.map((action) => (
-          <button
-            key={action.id}
-            onClick={action.action}
-            className={`relative overflow-hidden bg-gradient-to-br ${action.color} text-white rounded-xl p-6 hover:scale-105 transition-transform group`}
-          >
-            <div className="relative z-10">
-              <div className="text-4xl mb-3">{action.icon}</div>
-              <div className="font-bold mb-1">{action.title}</div>
-              <div className="text-xs opacity-90">{action.description}</div>
-            </div>
-            <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity" />
-          </button>
-        ))}
-      </div>
-    </div>
+    <Card className="col-span-4 md:col-span-2 lg:col-span-1">
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+        <CardDescription>Common tasks and shortcuts</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        <Button asChild className="w-full justify-start" size="lg">
+          <Link href="/tracker/new">
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Log New Problem
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="w-full justify-start" size="lg">
+          <Link href="/goals/new">
+            <PlayCircle className="mr-2 h-5 w-5" />
+            Set New Goal
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="w-full justify-start" size="lg">
+          <Link href="/reports">
+            <BarChart3 className="mr-2 h-5 w-5" />
+            View Reports
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" className="w-full justify-start" size="lg">
+          <Link href="/settings">
+            <Settings className="mr-2 h-5 w-5" />
+            Settings
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
-};
-
-export default QuickActions;
+}

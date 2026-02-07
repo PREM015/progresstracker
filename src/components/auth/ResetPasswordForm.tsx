@@ -1,104 +1,128 @@
 'use client';
 
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { FormError } from '@/components/forms/FormError';
+import { FormSuccess } from '@/components/forms/FormSuccess';
+import { AuthCard } from './AuthCard';
+import { Loader2 } from 'lucide-react';
+import axios from 'axios';
 
-interface ResetPasswordFormProps {
-  token: string;
-  onSuccess: () => void;
-  className?: string;
-}
-
-export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({
-  token,
-  onSuccess,
-  className = '',
-}) => {
-  const [formData, setFormData] = useState({
-    password: '',
-    confirmPassword: '',
+const resetPasswordSchema = z
+  .object({
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+export function ResetPasswordForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | undefined>('');
+  const [success, setSuccess] = React.useState<string | undefined>('');
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResetPasswordInput>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const onSubmit = async (data: ResetPasswordInput) => {
+    if (!token) {
+      setError('Missing reset token');
       return;
     }
 
+    setError('');
+    setSuccess('');
     setIsLoading(true);
-    setError(null);
 
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password: formData.password }),
+      await axios.post('/api/auth/reset-password', {
+        token,
+        password: data.password,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Reset failed');
-      }
-
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setSuccess('Password reset successfully! Redirecting to login...');
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!token) {
+    return (
+      <AuthCard title="Invalid Link" description="This password reset link is invalid or has expired.">
+        <FormError message="Missing reset token" variant="block" />
+        <Button className="w-full mt-4" onClick={() => router.push('/forgot-password')}>
+          Request new link
+        </Button>
+      </AuthCard>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-2xl p-8 max-w-md mx-auto ${className}`}>
-      <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Set New Password</h2>
-      <p className="text-gray-600 mb-8 text-center">Enter your new password below</p>
+    <AuthCard
+      title="Reset Password"
+      description="Enter your new password below."
+      footerLabel="Remember your password?"
+      footerLink="/login"
+      footerLinkText="Back to login"
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {error && <FormError message={error} variant="block" />}
+        {success && <FormSuccess message={success} variant="block" />}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="password">New Password</Label>
+          <Input
+            id="password"
             type="password"
-            value={formData.password}
-            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            required
-            minLength={8}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            placeholder="••••••••"
+            disabled={isLoading}
+            {...register('password')}
           />
-          <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+          {errors.password && <FormError message={errors.password.message} />}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
             type="password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            placeholder="••••••••"
+            disabled={isLoading}
+            {...register('confirmPassword')}
           />
+          {errors.confirmPassword && <FormError message={errors.confirmPassword.message} />}
         </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
-        >
-          {isLoading ? 'Resetting Password...' : 'Reset Password'}
-        </button>
-      </div>
-    </form>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Reset Password
+        </Button>
+      </form>
+    </AuthCard>
   );
-};
-
-export default ResetPasswordForm;
+}

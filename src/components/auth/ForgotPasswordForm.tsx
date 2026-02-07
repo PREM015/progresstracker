@@ -1,93 +1,86 @@
 'use client';
 
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { FormError } from '@/components/forms/FormError';
+import { FormSuccess } from '@/components/forms/FormSuccess';
+import { AuthCard } from './AuthCard';
+import { Loader2 } from 'lucide-react';
+import axios from 'axios';
 
-interface ForgotPasswordFormProps {
-  onSuccess: () => void;
-  onBackToLogin?: () => void;
-  className?: string;
-}
+// Schema specific for this form
+const forgotPasswordSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
 
-export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
-  onSuccess,
-  onBackToLogin,
-  className = '',
-}) => {
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+export function ForgotPasswordForm() {
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | undefined>('');
+  const [success, setSuccess] = React.useState<string | undefined>('');
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ForgotPasswordInput>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: '',
+    },
+  });
+
+  const onSubmit = async (data: ForgotPasswordInput) => {
+    setError('');
+    setSuccess('');
     setIsLoading(true);
-    setError(null);
 
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Request failed');
-      }
-
-      onSuccess();
+      await axios.post('/api/auth/forgot-password', data);
+      setSuccess('If an account exists with this email, you will receive a password reset link.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      // Don't reveal if email exists or not for security, but handle generic errors
+      setSuccess('If an account exists with this email, you will receive a password reset link.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`bg-white border border-gray-200 rounded-2xl p-8 max-w-md mx-auto ${className}`}>
-      <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">Reset Password</h2>
-      <p className="text-gray-600 mb-8 text-center">
-        Enter your email and we'll send you a link to reset your password
-      </p>
+    <AuthCard
+      title="Forgot Password"
+      description="Enter your email address and we'll send you a link to reset your password."
+      footerLabel="Remember your password?"
+      footerLink="/login"
+      footerLinkText="Back to login"
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {error && <FormError message={error} variant="block" />}
+        {success && <FormSuccess message={success} variant="block" />}
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-600 text-sm">{error}</p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
             type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            placeholder="you@example.com"
+            placeholder="name@example.com"
+            disabled={isLoading}
+            {...register('email')}
           />
+          {errors.email && <FormError message={errors.email.message} />}
         </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
-        >
-          {isLoading ? 'Sending...' : 'Send Reset Link'}
-        </button>
-      </div>
-
-      {onBackToLogin && (
-        <button
-          type="button"
-          onClick={onBackToLogin}
-          className="w-full mt-4 text-sm text-gray-600 hover:text-gray-800"
-        >
-          ← Back to login
-        </button>
-      )}
-    </form>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Send Reset Link
+        </Button>
+      </form>
+    </AuthCard>
   );
-};
-
-export default ForgotPasswordForm;
+}

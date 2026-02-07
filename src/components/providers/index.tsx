@@ -1,29 +1,20 @@
-// ============================================================================
-// FILE: components/providers/index.tsx
-// PURPOSE: Wrap app with all necessary providers
-// ============================================================================
+'use client';
 
-"use client";
+import React from 'react';
+import { QueryProvider } from './QueryProvider';
+import { ThemeProvider } from './ThemeProvider';
+import { AuthProvider } from './AuthProvider';
+import { Session } from 'next-auth';
 
-import { ThemeProvider } from "next-themes";
-import { SessionProvider } from "next-auth/react";
-import { Toaster } from "@/components/ui/sonner";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+interface ProvidersProps {
+  children: React.ReactNode;
+  session?: Session | null;
+}
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 60 * 1000, // 1 minute
-        refetchOnWindowFocus: false,
-      },
-    },
-  }));
-
+export function Providers({ children, session }: ProvidersProps) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider>
+    <QueryProvider>
+      <AuthProvider session={session}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -31,9 +22,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           disableTransitionOnChange
         >
           {children}
-          <Toaster />
         </ThemeProvider>
-      </SessionProvider>
-    </QueryClientProvider>
+      </AuthProvider>
+    </QueryProvider>
   );
 }

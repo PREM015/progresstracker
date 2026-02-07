@@ -1,11 +1,11 @@
 // src/lib/queue.ts
-import Bull, {  Job } from 'bull';
+import Bull, { Job } from 'bull';
 import { logger } from './logger';
 import { prisma } from './prisma';
 import { generateAndSaveReport } from './pdf-generator';
 import { broadcastEmail } from './email-admin';
 import { syncPlatformData } from './sync-platform';
-/* eslint-disable @typescript-eslint/no-unused-vars */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Redis connection
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -186,6 +186,9 @@ queues.sync.process(10, async (job: Job<SyncJobData>) => {
         userPlatformId,
         status: 'IN_PROGRESS',
         triggeredBy,
+        itemsCreated: 0,
+        itemsUpdated: 0,
+        itemsFound: 0,
       },
     });
 
@@ -273,25 +276,8 @@ queues.notifications.process(10, async (job: Job<NotificationJobData>) => {
 // HELPER FUNCTIONS
 // =============================================================================
 
-// Placeholder sync function (implement actual platform sync logic)
-async function syncPlatformData(
-  userId: string,
-  platformId: string,
-  userPlatformId: string
-) {
-  // This would contain actual platform-specific sync logic
-  // For now, just a placeholder
-  logger.info('Syncing platform data', { userId, platformId });
+// Local syncPlatformData removed in favor of imported version used in queues.sync.process
 
-  return {
-    success: true,
-    duration: 1000,
-    itemsFound: 10,
-    itemsCreated: 5,
-    itemsUpdated: 3,
-    error: null,
-  };
-}
 
 // =============================================================================
 // JOB ENQUEUERS

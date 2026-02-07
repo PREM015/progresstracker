@@ -8,8 +8,8 @@ import FAQ from "@/components/landing/FAQ";
 import CTASection from "@/components/landing/CTASection";
 import Platforms from "@/components/landing/Platforms";
 import Newsletter from "@/components/landing/Newsletter";
-import Navbar from "@/components/navigation/Navbar";
-import Footer from "@/components/navigation/Footer";
+import { Navbar } from "@/components/navigation/Navbar";
+import { Footer } from "@/components/navigation/Footer";
 
 export default function HomePage() {
   return (

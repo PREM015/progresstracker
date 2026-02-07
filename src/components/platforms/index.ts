@@ -15,3 +15,4 @@ export { CustomPlatformForm } from './CustomPlatformForm';
 export { CustomPlatformList } from './CustomPlatformList';
 export { PlatformCategories } from './PlatformCategories';
 export { PlatformSearch } from './PlatformSearch';
+export { ConnectionModal } from './ConnectionModal';

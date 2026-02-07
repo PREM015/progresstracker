@@ -1,166 +1,70 @@
-'use client';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-import React from 'react';
-
-interface Platform {
+export interface PlatformConfig {
   id: string;
   name: string;
-  slug: string;
-  icon?: string;
-  color?: string;
-  category: string;
+  description: string;
+  icon?: React.ReactNode;
   isConnected: boolean;
-  lastSyncedAt?: string;
-  stats?: {
-    problemsSolved?: number;
-    commits?: number;
-    points?: number;
-  };
+  lastSynced?: Date;
+  status: 'connected' | 'disconnected' | 'error';
 }
 
 interface PlatformCardProps {
-  platform: Platform;
-  className?: string;
-  onConnect?: (id: string) => void;
-  onDisconnect?: (id: string) => void;
-  onViewDetails?: (id: string) => void;
+  platform: PlatformConfig;
+  onConnect: (id: string) => void;
+  onDisconnect: (id: string) => void;
+  onSync: (id: string) => void;
 }
 
-export const PlatformCard: React.FC<PlatformCardProps> = ({
-  platform,
-  className = '',
-  onConnect,
-  onDisconnect,
-  onViewDetails,
-}) => {
-  const formatLastSync = (date?: string) => {
-    if (!date) return 'Never';
-    const diffMs = new Date().getTime() - new Date(date).getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays}d ago`;
-  };
-
+export function PlatformCard({ platform, onConnect, onDisconnect, onSync }: PlatformCardProps) {
   return (
-    <div
-      className={`bg-white border-2 ${platform.isConnected ? 'border-green-200' : 'border-gray-200'
-        } rounded-xl p-6 hover:shadow-lg transition-all ${className}`}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
+    <Card className={cn("transition-all hover:shadow-md", platform.isConnected ? "border-primary/50" : "")}>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
         <div className="flex items-center gap-3">
-          {platform.icon ? (
-            <img
-              src={platform.icon}
-              alt={platform.name}
-              className="w-12 h-12 rounded-lg"
-            />
-          ) : (
-            <div
-              className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
-              style={{ backgroundColor: platform.color || '#6366F1' }}
-            >
-              {platform.name.charAt(0)}
-            </div>
-          )}
+          {platform.icon && <div className="p-2 bg-muted rounded-md">{platform.icon}</div>}
           <div>
-            <h3 className="text-lg font-bold text-gray-900">{platform.name}</h3>
-            <p className="text-xs text-gray-500">{platform.category}</p>
+            <CardTitle className="text-base">{platform.name}</CardTitle>
+            <CardDescription className="text-xs mt-1">{platform.description}</CardDescription>
           </div>
         </div>
-
-        {/* Connection Status */}
-        {platform.isConnected && (
-          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-            ✓ Connected
-          </span>
+        {platform.isConnected ? (
+          <Badge variant="default" className="bg-green-500 hover:bg-green-600">Connected</Badge>
+        ) : (
+          <Badge variant="outline">Not Connected</Badge>
         )}
-      </div>
-
-      {/* Stats */}
-      {platform.isConnected && platform.stats && (
-        <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-          {platform.stats.problemsSolved !== undefined && (
-            <div className="text-center">
-              <div className="text-sm font-bold text-gray-900">
-                {platform.stats.problemsSolved}
-              </div>
-              <div className="text-xs text-gray-500">Problems</div>
+      </CardHeader>
+      <CardContent>
+        <div className="text-xs text-muted-foreground mt-2">
+          {platform.isConnected && platform.lastSynced ? (
+            <div className="flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+              Last synced: {platform.lastSynced.toLocaleDateString()}
             </div>
-          )}
-          {platform.stats.commits !== undefined && (
-            <div className="text-center">
-              <div className="text-sm font-bold text-gray-900">
-                {platform.stats.commits}
-              </div>
-              <div className="text-xs text-gray-500">Commits</div>
+          ) : platform.status === 'error' ? (
+            <div className="flex items-center gap-1 text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              Sync Error
             </div>
-          )}
-          {platform.stats.points !== undefined && (
-            <div className="text-center">
-              <div className="text-sm font-bold text-gray-900">
-                {platform.stats.points}
-              </div>
-              <div className="text-xs text-gray-500">Points</div>
-            </div>
+          ) : (
+            <div className="h-4"></div> // Spacer
           )}
         </div>
-      )}
-
-      {/* Last Synced */}
-      {platform.isConnected && (
-        <div className="text-xs text-gray-500 mb-4">
-          Last synced: {formatLastSync(platform.lastSyncedAt)}
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2">
+      </CardContent>
+      <CardFooter className="flex justify-between">
         {platform.isConnected ? (
           <>
-            {onViewDetails && (
-              <button
-                onClick={() => onViewDetails(platform.id)}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-              >
-                View Details
-              </button>
-            )}
-            {onDisconnect && (
-              <button
-                onClick={() => onDisconnect(platform.id)}
-                className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 text-sm font-medium"
-              >
-                Disconnect
-              </button>
-            )}
+            <Button variant="outline" size="sm" onClick={() => onDisconnect(platform.id)}>Disconnect</Button>
+            <Button variant="secondary" size="sm" onClick={() => onSync(platform.id)}>Sync Now</Button>
           </>
         ) : (
-          <>
-            {onConnect && (
-              <button
-                onClick={() => onConnect(platform.id)}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
-              >
-                Connect
-              </button>
-            )}
-            {onViewDetails && (
-              <button
-                onClick={() => onViewDetails(platform.id)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
-              >
-                Learn More
-              </button>
-            )}
-          </>
+          <Button className="w-full" size="sm" onClick={() => onConnect(platform.id)}>Connect</Button>
         )}
-      </div>
-    </div>
+      </CardFooter>
+    </Card>
   );
-};
-
-export default PlatformCard;
+}

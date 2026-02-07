@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
- 
+
 }
 
 // ============================================================================
@@ -65,6 +65,7 @@ enum NotificationType {
   SECURITY_ALERT
   BILLING_ALERT
   WELCOME
+  REFERRAL
   CUSTOM
 }
 
@@ -192,6 +193,9 @@ enum AuditAction {
   TWO_FACTOR_DISABLE
   ACCOUNT_DELETE
   ADMIN_ACTION
+  WEBHOOK_TRIGGER
+  SHARE_CREATE
+  SHARE_ACCESS
 }
 
 enum TicketStatus {
@@ -207,6 +211,76 @@ enum TicketPriority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum ShareEntityType {
+  PROFILE
+  ACHIEVEMENT
+  GOAL
+  REPORT
+  STATS
+  STREAK
+  ACTIVITY
+}
+
+enum WebhookEventType {
+  ENTRY_CREATED
+  ENTRY_UPDATED
+  ENTRY_DELETED
+  GOAL_CREATED
+  GOAL_COMPLETED
+  GOAL_FAILED
+  ACHIEVEMENT_UNLOCKED
+  STREAK_MILESTONE
+  STREAK_BROKEN
+  SYNC_COMPLETED
+  SYNC_FAILED
+  SUBSCRIPTION_CHANGED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
+enum ReferralRewardType {
+  CREDITS
+  SUBSCRIPTION_DAYS
+  DISCOUNT_PERCENTAGE
+  DISCOUNT_FIXED
+  CASH
+}
+
+enum ReferralRewardStatus {
+  PENDING
+  EARNED
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum CouponDuration {
+  ONCE
+  REPEATING
+  FOREVER
+}
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum EmailLogStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+  COMPLAINED
 }
 
 // ============================================================================
@@ -286,6 +360,11 @@ model User {
   referralCode String? @unique
   referredBy   String?
 
+  // Onboarding
+  onboardingCompleted   Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  onboardingStep        Int       @default(0)
+
   // Timestamps
   lastLoginAt       DateTime?
   lastActiveAt      DateTime?
@@ -318,19 +397,21 @@ model User {
   streakHistory  StreakHistory[]
 
   // Goals & Achievements
-  goals         Goal[]
-  goalReminders GoalReminder[]
-  achievements  UserAchievement[]
+  goals           Goal[]
+  goalReminders   GoalReminder[]
+  goalHistories   GoalHistory[]
+  achievements    UserAchievement[]
 
   // Notifications
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
 
   // Billing
-  subscription   Subscription?
-  invoices       Invoice[]
-  paymentMethods PaymentMethod[]
-  paymentEvents  PaymentEvent[]
+  subscription       Subscription?
+  invoices           Invoice[]
+  paymentMethods     PaymentMethod[]
+  paymentEvents      PaymentEvent[]
+  couponRedemptions  CouponRedemption[]
 
   // Export
   exportJobs       ExportJob[]
@@ -346,6 +427,7 @@ model User {
   // API & Security
   apiKeys   ApiKey[]
   auditLogs AuditLog[]
+  webhooks  Webhook[]
 
   // Support
   supportTickets SupportTicket[]
@@ -355,8 +437,10 @@ model User {
   reports Report[]
 
   // Referrals
-  referrals User[] @relation("Referrals")
-  referrer  User?  @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
+  referrals        User[]           @relation("Referrals")
+  referrer         User?            @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
+  referrerRewards  ReferralReward[] @relation("ReferrerRewards")
+  referredRewards  ReferralReward[] @relation("ReferredRewards")
 
   // Feedback
   feedback Feedback[]
@@ -365,6 +449,10 @@ model User {
   bookmarks    Bookmark[]
   blogComments BlogComment[]
   blogLikes    BlogPostLike[]
+
+  // Share Links
+  shareLinks   ShareLink[]
+  shareViews   ShareViewLog[]
 
   @@index([email])
   @@index([username])
@@ -377,6 +465,7 @@ model User {
   @@index([lastActiveAt])
   @@index([referralCode])
   @@index([referredBy])
+  @@index([deletedAt])
 }
 
 model Account {
@@ -735,7 +824,8 @@ model CustomPlatform {
 
   trackingFields Json?
 
-  isActive Boolean @default(true)
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -746,6 +836,8 @@ model CustomPlatform {
   @@unique([userId, name])
   @@index([userId])
   @@index([category])
+  @@index([isActive])
+  @@index([deletedAt])
 }
 
 model UserPlatform {
@@ -902,6 +994,8 @@ model TrackerEntry {
 
   customFields Json?
 
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -915,10 +1009,12 @@ model TrackerEntry {
   @@index([platformId, date])
   @@index([userId, category])
   @@index([userId, category, date])
+  @@index([userId, platformId, date])
   @@index([source])
   @@index([date])
   @@index([customPlatformId])
   @@index([syncLogId])
+  @@index([deletedAt])
 }
 
 model DailyStats {
@@ -1050,12 +1146,15 @@ model Goal {
   color String?
   icon  String?
 
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform  Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
   reminders GoalReminder[]
+  history   GoalHistory[]
 
   @@index([userId])
   @@index([userId, status])
@@ -1064,6 +1163,8 @@ model Goal {
   @@index([shareCode])
   @@index([status])
   @@index([platformId])
+  @@index([isPublic, status])
+  @@index([deletedAt])
 }
 
 model GoalReminder {
@@ -1133,6 +1234,31 @@ model GoalTemplate {
   @@index([isActive])
   @@index([isFeatured])
   @@index([difficulty])
+}
+
+model GoalHistory {
+  id     String @id @default(cuid())
+  goalId String
+  userId String
+
+  // Snapshot of goal at change time
+  data       Json
+  changeType String // 'created', 'updated', 'status_changed', 'progress_updated', 'completed', 'failed'
+  changedBy  String?
+
+  // Previous values for specific field changes
+  previousStatus   String?
+  previousProgress Int?
+
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([userId])
+  @@index([changeType])
+  @@index([createdAt])
 }
 
 model Achievement {
@@ -1207,6 +1333,7 @@ model UserAchievement {
   @@index([achievementId])
   @@index([unlockedAt])
   @@index([isPinned])
+  @@index([notified])
 }
 
 // ============================================================================
@@ -1404,6 +1531,9 @@ model Subscription {
   lastPaymentAmount Int?
   nextPaymentAt     DateTime?
 
+  // Applied coupon
+  appliedCouponId String?
+
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -1412,11 +1542,13 @@ model Subscription {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   invoices      Invoice[]
   paymentEvents PaymentEvent[]
+  appliedCoupon Coupon?        @relation(fields: [appliedCouponId], references: [id], onDelete: SetNull)
 
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([status])
   @@index([tier])
+  @@index([appliedCouponId])
 }
 
 model PaymentMethod {
@@ -1479,6 +1611,10 @@ model Invoice {
 
   billingReason String?
 
+  // Discount applied
+  discountAmount Int?
+  couponId       String?
+
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -1535,6 +1671,131 @@ model PaymentEvent {
   @@index([eventType])
   @@index([status])
   @@index([createdAt])
+}
+
+model Coupon {
+  id String @id @default(cuid())
+
+  code        String @unique
+  name        String
+  description String?
+
+  // Discount configuration
+  discountType  CouponDiscountType
+  discountValue Int // Percentage (0-100) or amount in cents
+  currency      String             @default("usd")
+
+  // Applicability
+  applicableTiers SubscriptionTier[] @default([])
+  applicablePlans String[]           @default([]) // Stripe price IDs
+
+  // Duration
+  duration       CouponDuration @default(ONCE)
+  durationMonths Int?
+
+  // Limits
+  maxRedemptions        Int? // Total max redemptions
+  maxRedemptionsPerUser Int  @default(1)
+  currentRedemptions    Int  @default(0)
+
+  // Validity period
+  validFrom  DateTime @default(now())
+  validUntil DateTime?
+
+  // Minimum requirements
+  minimumAmount Int? // Minimum order amount in cents
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Stripe integration
+  stripeCouponId String? @unique
+
+  // Tracking
+  createdBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  redemptions   CouponRedemption[]
+  subscriptions Subscription[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([validFrom, validUntil])
+  @@index([stripeCouponId])
+}
+
+model CouponRedemption {
+  id       String @id @default(cuid())
+  couponId String
+  userId   String
+
+  // Order/subscription info
+  subscriptionId String?
+  invoiceId      String?
+
+  // Discount applied
+  discountAmount Int
+  currency       String
+
+  redeemedAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId, subscriptionId])
+  @@index([couponId])
+  @@index([userId])
+  @@index([redeemedAt])
+}
+
+// ============================================================================
+// REFERRAL SYSTEM
+// ============================================================================
+
+model ReferralReward {
+  id String @id @default(cuid())
+
+  // Referrer (who shared the code)
+  referrerId String
+
+  // Referred user
+  referredId String
+
+  // Reward details
+  type   String               @default("signup") // 'signup', 'subscription', 'milestone'
+  status ReferralRewardStatus @default(PENDING)
+
+  // Reward value
+  rewardType     ReferralRewardType
+  rewardValue    Int // Amount of credits, days, percentage, or cents
+  rewardCurrency String?
+
+  // Conditions
+  qualifyingAction String? // What action triggered the reward
+  qualifiedAt      DateTime?
+
+  // Payout (for cash rewards)
+  paidAt        DateTime?
+  paymentMethod String?
+  paymentRef    String?
+
+  // Expiry
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  referrer User @relation("ReferrerRewards", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("ReferredRewards", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@unique([referrerId, referredId, type])
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
 }
 
 // ============================================================================
@@ -1809,6 +2070,284 @@ model AuditLog {
 }
 
 // ============================================================================
+// WEBHOOKS
+// ============================================================================
+
+model Webhook {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String
+  description String?
+
+  // Webhook configuration
+  url        String
+  secret     String
+  httpMethod String @default("POST")
+  headers    Json?
+
+  // Events to trigger
+  events WebhookEventType[] @default([])
+
+  // Filtering
+  filters Json? // e.g., { platformId: 'xxx', category: 'DSA' }
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Retry configuration
+  maxRetries   Int @default(3)
+  retryDelayMs Int @default(1000)
+  timeoutMs    Int @default(30000)
+
+  // Stats
+  successCount    Int       @default(0)
+  failureCount    Int       @default(0)
+  lastTriggeredAt DateTime?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+
+  // Error tracking
+  consecutiveFailures Int       @default(0)
+  lastError           String?
+  disabledAt          DateTime?
+  disabledReason      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id        String @id @default(cuid())
+  webhookId String
+
+  // Event info
+  event   WebhookEventType
+  payload Json
+
+  // Request details
+  requestUrl     String
+  requestHeaders Json?
+  requestBody    String? @db.Text
+
+  // Response
+  status         WebhookDeliveryStatus @default(PENDING)
+  responseCode   Int?
+  responseBody   String?               @db.Text
+  responseTimeMs Int?
+
+  // Error handling
+  errorMessage  String?
+  attemptNumber Int       @default(1)
+  nextRetryAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([nextRetryAt])
+}
+
+// ============================================================================
+// SHARE & EMBED
+// ============================================================================
+
+model ShareLink {
+  id     String @id @default(cuid())
+  userId String
+
+  code String @unique
+
+  // What's being shared
+  entityType ShareEntityType
+  entityId   String?
+
+  // Share configuration
+  title       String?
+  description String?
+
+  // Visibility settings
+  isPublic      Boolean  @default(true)
+  requiresAuth  Boolean  @default(false)
+  allowedEmails String[] @default([])
+
+  // Access control
+  password  String?
+  expiresAt DateTime?
+  maxViews  Int?
+
+  // Analytics
+  viewCount       Int       @default(0)
+  uniqueViewCount Int       @default(0)
+  lastViewedAt    DateTime?
+
+  // Embed settings
+  allowEmbed   Boolean @default(true)
+  embedTheme   String  @default("auto") // 'light', 'dark', 'auto'
+  embedSize    String  @default("medium") // 'small', 'medium', 'large'
+  showBranding Boolean @default(true)
+  customStyles Json?
+
+  // Status
+  isActive     Boolean   @default(true)
+  revokedAt    DateTime?
+  revokeReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  viewLogs ShareViewLog[]
+
+  @@index([userId])
+  @@index([code])
+  @@index([entityType, entityId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model ShareViewLog {
+  id          String @id @default(cuid())
+  shareLinkId String
+
+  // Viewer info
+  viewerUserId String?
+  ipHash       String?
+  userAgent    String? @db.Text
+
+  // Location
+  country String?
+  city    String?
+
+  // Referrer
+  referrer String?
+
+  // Embed info
+  isEmbed   Boolean @default(false)
+  embedHost String?
+
+  createdAt DateTime @default(now())
+
+  shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  viewer    User?     @relation(fields: [viewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([shareLinkId])
+  @@index([viewerUserId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// EMAIL TEMPLATES & LOGS
+// ============================================================================
+
+model EmailTemplate {
+  id String @id @default(cuid())
+
+  slug        String @unique
+  name        String
+  description String?
+
+  // Template content
+  subject     String
+  htmlContent String @db.Text
+  textContent String? @db.Text
+
+  // Template variables
+  variables   String[] @default([]) // e.g., ['userName', 'resetLink']
+  defaultData Json?
+
+  // Categorization
+  category String // 'auth', 'notification', 'marketing', 'transactional', 'report'
+
+  // Status
+  isActive Boolean @default(true)
+  isSystem Boolean @default(false) // System templates can't be deleted
+
+  // Version control
+  version         Int    @default(1)
+  previousVersion String?
+
+  // Usage stats
+  sentCount  Int       @default(0)
+  lastSentAt DateTime?
+
+  // Preview
+  previewData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  emailLogs EmailLog[]
+
+  @@index([slug])
+  @@index([category])
+  @@index([isActive])
+}
+
+model EmailLog {
+  id String @id @default(cuid())
+
+  templateId String?
+  userId     String?
+
+  // Email details
+  to           String
+  cc           String[] @default([])
+  bcc          String[] @default([])
+  subject      String
+  templateSlug String?
+
+  // Status
+  status EmailLogStatus @default(QUEUED)
+
+  // Provider info
+  provider   String? // 'resend', 'sendgrid', etc.
+  providerId String? // External message ID
+
+  // Tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+  failedAt    DateTime?
+
+  // Engagement
+  openCount  Int @default(0)
+  clickCount Int @default(0)
+
+  // Error handling
+  errorCode    String?
+  errorMessage String?
+  retryCount   Int       @default(0)
+  nextRetryAt  DateTime?
+
+  // Metadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([templateId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([to])
+  @@index([providerId])
+}
+
+// ============================================================================
 // REPORTS
 // ============================================================================
 
@@ -1874,6 +2413,11 @@ model SupportTicket {
   satisfactionRating Int?
   feedbackComment    String?
 
+  // SLA tracking
+  firstResponseAt  DateTime?
+  firstResponseSla Int? // minutes
+  resolutionSla    Int? // minutes
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1885,6 +2429,7 @@ model SupportTicket {
   @@index([priority])
   @@index([ticketNumber])
   @@index([createdAt])
+  @@index([assignedTo])
 }
 
 model TicketReply {
@@ -1922,13 +2467,15 @@ model Feedback {
 
   rating Int?
 
-  page      String?
-  userAgent String?
+  page       String?
+  userAgent  String?
+  screenshot String? // URL to screenshot
 
   status String @default("new")
 
   response    String?   @db.Text
   respondedAt DateTime?
+  respondedBy String?
 
   createdAt DateTime @default(now())
 
@@ -1938,6 +2485,81 @@ model Feedback {
   @@index([type])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============================================================================
+// KNOWLEDGE BASE
+// ============================================================================
+
+model KnowledgeBaseCategory {
+  id String @id @default(cuid())
+
+  slug        String  @unique
+  name        String
+  description String?
+  icon        String?
+
+  parentId String?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   KnowledgeBaseCategory?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
+  children KnowledgeBaseCategory[] @relation("SubCategories")
+  articles KnowledgeBaseArticle[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([slug])
+}
+
+model KnowledgeBaseArticle {
+  id String @id @default(cuid())
+
+  slug    String @unique
+  title   String
+  excerpt String? @db.Text
+  content String  @db.Text
+
+  categoryId String
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+
+  // Status
+  status      String    @default("draft") // 'draft', 'published', 'archived'
+  publishedAt DateTime?
+
+  // Engagement
+  viewCount  Int @default(0)
+  helpfulYes Int @default(0)
+  helpfulNo  Int @default(0)
+
+  // Related
+  relatedArticleIds String[] @default([])
+  tags              String[] @default([])
+
+  // Featured
+  isFeatured Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  // Author
+  authorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category KnowledgeBaseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([slug])
+  @@index([isFeatured])
+  @@index([publishedAt])
 }
 
 // ============================================================================
@@ -1952,14 +2574,17 @@ model Waitlist {
 
   source       String?
   referralCode String?
+  referredById String?
 
   status String @default("waiting")
 
   invitedAt  DateTime?
-  inviteCode String?
+  inviteCode String?   @unique
   joinedAt   DateTime?
 
   position Int?
+
+  metadata Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1967,6 +2592,8 @@ model Waitlist {
   @@index([email])
   @@index([status])
   @@index([createdAt])
+  @@index([inviteCode])
+  @@index([position])
 }
 
 model NewsletterSubscriber {
@@ -1984,16 +2611,22 @@ model NewsletterSubscriber {
   unsubscribeReason String?
 
   unsubscribeToken String @unique @default(cuid())
+  confirmToken     String? @unique
 
   emailsSent    Int @default(0)
   emailsOpened  Int @default(0)
   emailsClicked Int @default(0)
+
+  source   String?
+  metadata Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
   @@index([isActive])
+  @@index([unsubscribeToken])
+  @@index([confirmToken])
 }
 
 // ============================================================================
@@ -2014,6 +2647,9 @@ model FeatureFlag {
   enabledTiers      SubscriptionTier[] @default([])
   enabledPercentage Int                @default(0)
 
+  // Targeting rules
+  rules Json?
+
   metadata Json?
 
   createdAt DateTime @default(now())
@@ -2032,13 +2668,16 @@ model SystemSettings {
   description String?
   category    String?
 
-  isPublic Boolean @default(false)
+  isPublic  Boolean @default(false)
+  isSecret  Boolean @default(false)
+  encrypted Boolean @default(false)
 
   updatedAt DateTime @updatedAt
   updatedBy String?
 
   @@index([key])
   @@index([category])
+  @@index([isPublic])
 }
 
 model MaintenanceWindow {
@@ -2052,6 +2691,10 @@ model MaintenanceWindow {
 
   isActive         Boolean  @default(false)
   affectedServices String[] @default([])
+  severity         String   @default("partial") // 'full', 'partial', 'degraded'
+
+  allowedIps    String[] @default([])
+  bypassSecrets String[] @default([])
 
   createdBy String?
 
@@ -2086,11 +2729,21 @@ model BlogPost {
   metaDescription String?
   metaKeywords    String[] @default([])
 
-  viewCount Int @default(0)
-  likeCount Int @default(0)
+  viewCount    Int @default(0)
+  likeCount    Int @default(0)
+  commentCount Int @default(0)
+  shareCount   Int @default(0)
 
   status      String    @default("draft")
   publishedAt DateTime?
+
+  isFeatured       Boolean @default(false)
+  allowComments    Boolean @default(true)
+  showTableOfContents Boolean @default(true)
+
+  // Reading time
+  readingTimeMinutes Int?
+  wordCount          Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2102,6 +2755,7 @@ model BlogPost {
   @@index([status])
   @@index([publishedAt])
   @@index([category])
+  @@index([isFeatured])
 }
 
 model BlogComment {
@@ -2115,19 +2769,22 @@ model BlogComment {
 
   likes Int @default(0)
 
-  isDeleted Boolean @default(false)
+  isApproved Boolean @default(true)
+  isDeleted  Boolean @default(false)
+  isPinned   Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   post    BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  parent  BlogComment?  @relation("Replies", fields: [parentId], references: [id])
+  parent  BlogComment?  @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
   replies BlogComment[] @relation("Replies")
 
   @@index([postId])
   @@index([authorId])
   @@index([parentId])
+  @@index([isApproved])
 }
 
 model BlogPostLike {
@@ -2158,12 +2815,23 @@ model ChangelogEntry {
   title       String
   description String @db.Text
 
-  type String
+  type String // 'feature', 'improvement', 'bugfix', 'security', 'deprecation'
 
   changes Json
 
+  // Links
+  pullRequestUrl String?
+  issueUrl       String?
+  docsUrl        String?
+
+  // Media
+  imageUrl String?
+  videoUrl String?
+
   isPublished Boolean   @default(false)
   publishedAt DateTime?
+  isBreaking  Boolean   @default(false)
+  isFeatured  Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2171,6 +2839,7 @@ model ChangelogEntry {
   @@index([version])
   @@index([isPublished])
   @@index([publishedAt])
+  @@index([type])
 }
 
 // ============================================================================
@@ -2183,6 +2852,9 @@ model Bookmark {
   userId     String
   entityType String
   entityId   String
+
+  title String?
+  notes String?
 
   createdAt DateTime @default(now())
 

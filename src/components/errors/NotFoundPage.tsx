@@ -1,87 +1,32 @@
-/**
- * Component: NotFoundPage
- * Location: components/errors/NotFoundPage.tsx
- * 
- * Description: 404 page
- */
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { FileQuestion, ArrowLeft, Search } from 'lucide-react';
+import { EmptyState } from '@/components/common/EmptyState';
 
-'use client';
-
-import React, { useState, useEffect } from 'react';
-
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface NotFoundPageProps {
-  className?: string;
-  // Add component-specific props here
-}
-
-// ===== COMPONENT =====
-export const NotFoundPage: React.FC<NotFoundPageProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
-
-  // Component logic
-  
-  // Render
+export function NotFoundPage() {
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>NotFoundPage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className="flex min-h-[60vh] flex-col items-center justify-center">
+      <EmptyState
+        icon={FileQuestion}
+        title="Page Not Found"
+        description="Sorry, we couldn't find the page you're looking for. It might have been moved or deleted."
+        className="max-w-md border-none bg-transparent shadow-none"
+        action={
+          <div className="flex gap-4">
+            <Button variant="outline" asChild>
+              <Link href="/">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back fo Home
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard">
+                Go to Dashboard
+              </Link>
+            </Button>
+          </div>
+        }
+      />
     </div>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default NotFoundPage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - No direct API connections
- *  * - No direct model references
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}
