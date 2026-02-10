@@ -1,67 +1,95 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Permission, PermissionInput } from '@/hooks/useAdminAccess';
 
-export function PermissionForm({ permission, onSave }: any) {
-    const [formData, setFormData] = useState({
-        key: permission?.key || '',
-        name: permission?.name || '',
-        description: permission?.description || '',
+interface PermissionFormProps {
+    permission?: Permission | null;
+    onSubmit: (data: PermissionInput) => Promise<void>;
+    onCancel: () => void;
+    isSubmitting?: boolean;
+}
+
+export function PermissionForm({ permission, onSubmit, onCancel, isSubmitting = false }: PermissionFormProps) {
+    const [formData, setFormData] = useState<PermissionInput>({
+        key: '',
+        name: '',
+        description: '',
     });
-    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        if (permission) {
+            setFormData({
+                key: permission.key,
+                name: permission.name,
+                description: permission.description || '',
+            });
+        }
+    }, [permission]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSaving(true);
         try {
-            const url = permission ? `/api/admin/permissions/${permission.id}` : '/api/admin/permissions';
-            const res = await fetch(url, {
-                method: permission ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-            if (!res.ok) throw new Error('Failed to save');
-            alert('Permission saved!');
-            onSave?.();
-        } catch (err: any) {
-            alert('Error: ' + err.message);
-        } finally {
-            setSaving(false);
+            await onSubmit(formData);
+        } catch (err) {
+            console.error(err);
         }
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-                type="text"
-                placeholder="Key (e.g., users.create)"
-                value={formData.key}
-                onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-                required
-                className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white"
-            />
-            <input
-                type="text"
-                placeholder="Name (e.g., Create Users)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-                className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white"
-            />
-            <textarea
-                placeholder="Description (optional)"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white"
-            />
-            <button
-                type="submit"
-                disabled={saving}
-                className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
-            >
-                {saving ? 'Saving...' : 'Save Permission'}
-            </button>
+            <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Key</label>
+                <input
+                    type="text"
+                    placeholder="Key (e.g., users.create)"
+                    value={formData.key}
+                    onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Name</label>
+                <input
+                    type="text"
+                    placeholder="Name (e.g., Create Users)"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Description</label>
+                <textarea
+                    placeholder="Description (optional)"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-indigo-500"
+                />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {isSubmitting ? 'Saving...' : permission ? 'Update Permission' : 'Create Permission'}
+                </button>
+            </div>
         </form>
     );
 }

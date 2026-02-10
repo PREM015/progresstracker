@@ -1,6 +1,11 @@
+// ============================================================================
+// FILE: src/components/common/Card.tsx
+// PURPOSE: Enhanced card component with variants and interactive states
+// ============================================================================
+
+import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
-import React from 'react';
 
 // CARD VARIANTS:
 const cardVariants = cva(
@@ -32,7 +37,7 @@ const cardVariants = cva(
 interface CardProps
     extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof cardVariants> {
-    as?: any;
+    as?: 'div' | 'article' | 'section';
 }
 
 // COMPONENT:

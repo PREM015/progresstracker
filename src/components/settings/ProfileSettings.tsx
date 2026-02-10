@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@/hooks/useUser';
+import { toast } from 'sonner';
 
 interface ProfileSettingsProps {
   className?: string;
@@ -18,6 +20,7 @@ interface ProfileData {
 export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   className = '',
 }) => {
+  const { user, isLoading } = useUser();
   const [formData, setFormData] = useState<ProfileData>({
     name: '',
     email: '',
@@ -28,18 +31,49 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   });
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        bio: user.bio || '',
+        location: user.location || '',
+        website: user.website || '',
+        company: user.company || '',
+      });
+    }
+  }, [user]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await fetch('/api/user/profile', {
+      const res = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
+
+      if (!res.ok) throw new Error('Failed to update profile');
+
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      toast.error('Failed to update profile');
+      console.error(error);
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return <div className={`p-6 bg-white border rounded-xl space-y-4 ${className}`}>
+      <div className="h-8 w-1/3 bg-gray-100 animate-pulse rounded" />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="h-10 bg-gray-100 animate-pulse rounded" />
+        <div className="h-10 bg-gray-100 animate-pulse rounded" />
+      </div>
+      <div className="h-24 bg-gray-100 animate-pulse rounded" />
+    </div>;
+  }
 
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>

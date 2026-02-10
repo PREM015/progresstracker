@@ -1,61 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface AuditLog {
-    id: string;
-    action: string;
-    category: string;
-    description: string | null;
-    userId: string | null;
-    user: {
-        name: string | null;
-        email: string | null;
-    } | null;
-    metadata: any;
-    ipAddress: string | null;
-    userAgent: string | null;
-    createdAt: string;
-}
+import { useState } from 'react';
+import { useAdminAuditLogs } from '@/hooks/useAdminLogs';
 
 export function AuditLogsList() {
-    const [logs, setLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [filters, setFilters] = useState({
         action: '',
         category: '',
         userId: '',
     });
     const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
 
-    useEffect(() => {
-        fetchLogs();
-    }, [filters, page]);
+    const { logs, pagination, isLoading: loading, error } = useAdminAuditLogs({
+        ...filters,
+        page,
+        limit: 50
+    });
 
-    const fetchLogs = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (filters.action) params.append('action', filters.action);
-            if (filters.category) params.append('category', filters.category);
-            if (filters.userId) params.append('userId', filters.userId);
-            params.append('page', String(page));
-            params.append('limit', '50');
-
-            const res = await fetch(`/api/admin/audit-logs?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch logs');
-            const data = await res.json();
-            setLogs(data.logs || []);
-            setTotal(data.total || 0);
-            setError(null);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const total = pagination?.total || 0;
 
     const getActionColor = (action: string) => {
         if (action.includes('CREATE')) return 'text-green-400';
@@ -141,7 +103,7 @@ export function AuditLogsList() {
                             ) : error ? (
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-red-400">
-                                        {error}
+                                        {(error as any)?.message || 'Error loading logs'}
                                     </td>
                                 </tr>
                             ) : logs.length === 0 ? (

@@ -1,30 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminReports } from '@/hooks/useAdminReports';
 
 export function ReportsList() {
-    const [reports, setReports] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchReports();
-    }, []);
-
-    const fetchReports = async () => {
-        try {
-            const res = await fetch('/api/admin/reports');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setReports(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { reports, isLoading: loading, error } = useAdminReports();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading reports...</div>;
+    }
+
+    if (error) {
+        return (
+            <div className="p-8 text-center text-red-500">
+                Error loading reports: {(error as any)?.message || 'Unknown error'}
+            </div>
+        );
     }
 
     return (

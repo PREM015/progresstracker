@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE: lib/sanitize.ts
+// FILE: src/lib/sanitize.ts
 // PURPOSE: Input sanitization utilities
 // ============================================================================
 
@@ -147,8 +147,8 @@ export function sanitizeHtml(html: string, options: SanitizeOptions = {}): strin
   } = options;
 
   // Truncate if maxLength is specified
-  let content = maxLength && html.length > maxLength 
-    ? html.substring(0, maxLength) 
+  let content = maxLength && html.length > maxLength
+    ? html.substring(0, maxLength)
     : html;
 
   // Configure DOMPurify
@@ -277,7 +277,7 @@ export function sanitizeEmail(email: string): string {
  * ```
  */
 export function sanitizeUrl(
-  url: string, 
+  url: string,
   options: UrlSanitizeOptions = {}
 ): string | null {
   if (!url || typeof url !== 'string') {
@@ -313,10 +313,10 @@ export function sanitizeUrl(
     // Check domain if whitelist provided
     if (allowedDomains && allowedDomains.length > 0) {
       const hostname = parsedUrl.hostname.toLowerCase();
-      const isAllowed = allowedDomains.some(domain => 
+      const isAllowed = allowedDomains.some(domain =>
         hostname === domain || hostname.endsWith(`.${domain}`)
       );
-      
+
       if (!isAllowed) {
         return null;
       }
@@ -759,8 +759,8 @@ export function sanitizeObject<T extends Record<string, unknown>>(
         typeof item === 'string'
           ? sanitizer(item)
           : typeof item === 'object' && item !== null
-          ? sanitizeObject(item as Record<string, unknown>, sanitizer)
-          : item
+            ? sanitizeObject(item as Record<string, unknown>, sanitizer)
+            : item
       ) as T[Extract<keyof T, string>];
     }
   }
@@ -772,7 +772,7 @@ export function sanitizeObject<T extends Record<string, unknown>>(
 // EXPORTS
 // ============================================================================
 
-const sanitize ={
+const sanitize = {
   // Core functions
   sanitizeHtml,
   sanitizeText,
@@ -780,25 +780,25 @@ const sanitize ={
   sanitizeUrl,
   sanitizeUsername,
   sanitizeFilename,
-  
+
   // HTML manipulation
   stripHtmlTags,
   escapeHtml,
   unescapeHtml,
   removeScripts,
-  
+
   // Specialized
   sanitizeJson,
   sanitizeSearchQuery,
   sanitizeSlug,
   sanitizePhone,
   sanitizeMarkdown,
-  
+
   // Validation
   containsXss,
   containsSqlInjection,
   sanitizeObject,
-  
+
   // Constants
   DEFAULT_ALLOWED_TAGS,
   DEFAULT_ALLOWED_ATTRIBUTES,

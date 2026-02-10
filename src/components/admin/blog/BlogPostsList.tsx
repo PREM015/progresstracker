@@ -1,61 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface BlogPost {
-    id: string;
-    title: string;
-    slug: string;
-    excerpt: string | null;
-    content: string;
-    status: string;
-    category: string | null;
-    tags: string[];
-    viewCount: number;
-    publishedAt: string | null;
-    author: {
-        name: string | null;
-        email: string | null;
-    };
-    createdAt: string;
-    updatedAt: string;
-}
+import { useState } from 'react';
+import { useAdminContent, BlogPost } from '@/hooks/useAdminContent';
 
 export function BlogPostsList() {
-    const [posts, setPosts] = useState<BlogPost[]>([]);
-    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
+    const { posts, isLoading: loading, deletePost } = useAdminContent(filter);
 
-    useEffect(() => {
-        fetchPosts();
-    }, [filter]);
-
-    const fetchPosts = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (filter !== 'all') params.append('status', filter.toUpperCase());
-
-            const res = await fetch(`/api/admin/blog?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch posts');
-            const data = await res.json();
-            setPosts(data.posts || data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const deletePost = async (id: string, title: string) => {
+    const handleDeletePost = async (id: string, title: string) => {
         if (!confirm(`Delete "${title}"?`)) return;
 
         try {
-            const res = await fetch(`/api/admin/blog/${id}`, {
-                method: 'DELETE',
-            });
-            if (!res.ok) throw new Error('Failed to delete post');
-            fetchPosts();
+            await deletePost(id);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
@@ -68,8 +24,8 @@ export function BlogPostsList() {
                     <button
                         onClick={() => setFilter('all')}
                         className={`px-4 py-2 rounded-lg transition-colors ${filter === 'all'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                             }`}
                     >
                         All
@@ -77,8 +33,8 @@ export function BlogPostsList() {
                     <button
                         onClick={() => setFilter('published')}
                         className={`px-4 py-2 rounded-lg transition-colors ${filter === 'published'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                             }`}
                     >
                         Published
@@ -86,8 +42,8 @@ export function BlogPostsList() {
                     <button
                         onClick={() => setFilter('draft')}
                         className={`px-4 py-2 rounded-lg transition-colors ${filter === 'draft'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                             }`}
                     >
                         Drafts
@@ -119,10 +75,10 @@ export function BlogPostsList() {
                                     <div className="flex items-center gap-3 mb-2">
                                         <h3 className="text-lg font-semibold text-white">{post.title}</h3>
                                         <span className={`px-2 py-1 rounded text-xs font-medium ${post.status === 'PUBLISHED'
-                                                ? 'bg-green-500/20 text-green-400'
-                                                : post.status === 'DRAFT'
-                                                    ? 'bg-yellow-500/20 text-yellow-400'
-                                                    : 'bg-zinc-700 text-zinc-300'
+                                            ? 'bg-green-500/20 text-green-400'
+                                            : post.status === 'DRAFT'
+                                                ? 'bg-yellow-500/20 text-yellow-400'
+                                                : 'bg-zinc-700 text-zinc-300'
                                             }`}>
                                             {post.status}
                                         </span>
@@ -168,7 +124,7 @@ export function BlogPostsList() {
                                         Edit
                                     </a>
                                     <button
-                                        onClick={() => deletePost(post.id, post.title)}
+                                        onClick={() => handleDeletePost(post.id, post.title)}
                                         className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors"
                                     >
                                         Delete

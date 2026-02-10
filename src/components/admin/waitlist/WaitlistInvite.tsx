@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useAdminGrowth } from '@/hooks/useAdminGrowth';
 
 export function WaitlistInvite() {
+    const { sendInvites, isSendingInvites: sending } = useAdminGrowth();
     const [emails, setEmails] = useState('');
-    const [sending, setSending] = useState(false);
 
-    const sendInvites = async () => {
+    const handleSend = async () => {
         const emailList = emails.split('\n').filter(e => e.trim());
 
         if (emailList.length === 0) {
@@ -16,21 +17,12 @@ export function WaitlistInvite() {
 
         if (!confirm(`Send invites to ${emailList.length} email(s)?`)) return;
 
-        setSending(true);
         try {
-            const res = await fetch('/api/admin/waitlist/invite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ emails: emailList }),
-            });
-
-            if (!res.ok) throw new Error('Failed to send invites');
+            await sendInvites(emailList);
             alert('Invites sent successfully!');
             setEmails('');
         } catch (err: any) {
             alert('Error: ' + err.message);
-        } finally {
-            setSending(false);
         }
     };
 
@@ -53,7 +45,7 @@ export function WaitlistInvite() {
                 </div>
 
                 <button
-                    onClick={sendInvites}
+                    onClick={handleSend}
                     disabled={sending || !emails.trim()}
                     className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
                 >

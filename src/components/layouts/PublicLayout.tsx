@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/layouts/PublicLayout.tsx
+// PURPOSE: Layout for public pages (landing, about, etc.)
+// ============================================================================
+
 import { Navbar } from '@/components/navigation/Navbar';
 import { Footer } from '@/components/navigation/Footer';
 

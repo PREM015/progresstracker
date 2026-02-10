@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/seo/MetaTags.tsx
+// PURPOSE: SEO meta tags component for dynamic pages
+// ============================================================================
+
 import Head from 'next/head';
 
 // PROPS:

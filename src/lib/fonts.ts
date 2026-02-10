@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/lib/fonts.ts
+// PURPOSE: Font configuration using next/font
+// ============================================================================
+
 import { Inter, JetBrains_Mono } from 'next/font/google';
 
 // PRIMARY FONT (Sans-serif for UI):

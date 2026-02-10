@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAdminBilling } from '@/hooks/useAdminBilling';
 
 interface BillingStats {
     totalRevenue: number;
@@ -14,31 +15,8 @@ interface BillingStats {
 }
 
 export function BillingDashboard() {
-    const [data, setData] = useState<BillingStats | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
-
-    useEffect(() => {
-        fetchBillingData();
-    }, [period]);
-
-    const fetchBillingData = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const res = await fetch(`/api/admin/billing?period=${period}`);
-            if (!res.ok) throw new Error('Failed to fetch billing data');
-
-            const billingData = await res.json();
-            setData(billingData);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { stats: data, isLoading: loading, error } = useAdminBilling(period);
 
     if (loading) {
         return (
@@ -53,9 +31,9 @@ export function BillingDashboard() {
     if (error || !data) {
         return (
             <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p className="text-red-600">{error || 'No billing data available'}</p>
+                <p className="text-red-600">{(error as any)?.message || 'No billing data available'}</p>
                 <button
-                    onClick={fetchBillingData}
+                    onClick={() => window.location.reload()}
                     className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
                 >
                     Try again
@@ -84,8 +62,8 @@ export function BillingDashboard() {
                             key={p}
                             onClick={() => setPeriod(p)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${period === p
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
                             {p.charAt(0).toUpperCase() + p.slice(1)}

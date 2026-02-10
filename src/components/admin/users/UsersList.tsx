@@ -1,73 +1,46 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-interface User {
-    id: string;
-    name: string | null;
-    email: string | null;
-    username: string | null;
-    image: string | null;
-    isActive: boolean;
-    isBanned: boolean;
-    isAdmin: boolean;
-    role: string;
-    currentStreak: number;
-    totalPoints: number;
-    tier: string | null;
-    lastActiveAt: Date | null;
-    createdAt: Date;
-}
+import { useAdminUsers, AdminUser, AdminUserFilters } from '@/hooks/useAdmin';
+import { useDebounce } from '@/hooks';
+import { sanitizeSearchQuery } from '@/lib/sanitize';
 
 interface UsersListProps {
     initialFilters?: any;
 }
 
 export function UsersList({ initialFilters = {} }: UsersListProps) {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<AdminUserFilters>({
         search: '',
-        role: '',
+        role: undefined,
         tier: '',
-        isActive: undefined as boolean | undefined,
-        isBanned: undefined as boolean | undefined,
+        status: undefined,
+        page: 1,
+        limit: 20,
     });
-    const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
-    const [totalPages, setTotalPages] = useState(1);
 
+    const [localSearch, setLocalSearch] = useState('');
+    const debouncedSearch = useDebounce(localSearch, 500);
+
+    const {
+        users,
+        total,
+        isLoading,
+        error,
+        banUser,
+        unbanUser,
+        deleteUser,
+        verifyUser,
+        impersonateUser
+    } = useAdminUsers(filters);
+
+    const totalPages = Math.ceil(total / (filters.limit || 20));
+
+    // Sync debounced search with filters
     useEffect(() => {
-        fetchUsers();
-    }, [filters, page]);
-
-    const fetchUsers = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (filters.search) params.append('search', filters.search);
-            if (filters.role) params.append('role', filters.role);
-            if (filters.tier) params.append('tier', filters.tier);
-            if (filters.isActive !== undefined) params.append('isActive', String(filters.isActive));
-            if (filters.isBanned !== undefined) params.append('isBanned', String(filters.isBanned));
-            params.append('page', String(page));
-            params.append('limit', '20');
-
-            const res = await fetch(`/api/admin/users?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch users');
-
-            const data = await res.json();
-            setUsers(data.users || []);
-            setTotal(data.total || 0);
-            setTotalPages(data.totalPages || 1);
-            setError(null);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+        const sanitized = sanitizeSearchQuery(debouncedSearch);
+        setFilters(prev => ({ ...prev, search: sanitized, page: 1 }));
+    }, [debouncedSearch]);
 
     const handleBanUser = async (userId: string, name: string) => {
         if (!confirm(`Ban user ${name}?`)) return;
@@ -75,13 +48,7 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
         if (!reason) return;
 
         try {
-            const res = await fetch(`/api/admin/users/${userId}/ban`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason }),
-            });
-            if (!res.ok) throw new Error('Failed to ban user');
-            fetchUsers();
+            await banUser(userId, reason);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
@@ -89,11 +56,7 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
 
     const handleUnbanUser = async (userId: string) => {
         try {
-            const res = await fetch(`/api/admin/users/${userId}/unban`, {
-                method: 'POST',
-            });
-            if (!res.ok) throw new Error('Failed to unban user');
-            fetchUsers();
+            await unbanUser(userId);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
@@ -101,16 +64,40 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
 
     const handleDeleteUser = async (userId: string, name: string) => {
         if (!confirm(`Delete user ${name}? This cannot be undone.`)) return;
-
         try {
-            const res = await fetch(`/api/admin/users/${userId}`, {
-                method: 'DELETE',
-            });
-            if (!res.ok) throw new Error('Failed to delete user');
-            fetchUsers();
+            await deleteUser(userId);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
+    };
+
+    const handleVerifyUser = async (userId: string) => {
+        try {
+            await verifyUser(userId);
+        } catch (err: any) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    const handleImpersonateUser = async (userId: string, name: string) => {
+        if (!confirm(`Impersonate ${name}? You will be logged in as them.`)) return;
+        const reason = prompt('Impersonation reason:');
+        if (!reason) return;
+
+        try {
+            const { token } = await impersonateUser(userId, reason);
+            if (token) {
+                // In a real app, you might use signIn from next-auth here
+                // await signIn('credentials', { token, callbackUrl: '/dashboard' });
+                window.location.href = `/api/auth/signin?token=${token}`; // Simplified for now
+            }
+        } catch (err: any) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    const updateFilter = (key: string, value: any) => {
+        setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
     };
 
     return (
@@ -121,25 +108,24 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                     <input
                         type="text"
                         placeholder="Search users..."
-                        value={filters.search}
-                        onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                        value={localSearch}
+                        onChange={(e) => setLocalSearch(e.target.value)}
                         className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
                     />
 
                     <select
-                        value={filters.role}
-                        onChange={(e) => setFilters({ ...filters, role: e.target.value })}
+                        value={filters.role || ''}
+                        onChange={(e) => updateFilter('role', e.target.value || undefined)}
                         className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                     >
                         <option value="">All Roles</option>
-                        <option value="USER">User</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="MODERATOR">Moderator</option>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
                     </select>
 
                     <select
-                        value={filters.tier}
-                        onChange={(e) => setFilters({ ...filters, tier: e.target.value })}
+                        value={filters.tier || ''}
+                        onChange={(e) => updateFilter('tier', e.target.value)}
                         className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-indigo-500"
                     >
                         <option value="">All Tiers</option>
@@ -150,7 +136,17 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                     </select>
 
                     <button
-                        onClick={() => setFilters({ search: '', role: '', tier: '', isActive: undefined, isBanned: undefined })}
+                        onClick={() => {
+                            setFilters({
+                                search: '',
+                                role: undefined,
+                                tier: '',
+                                status: undefined,
+                                page: 1,
+                                limit: 20
+                            });
+                            setLocalSearch('');
+                        }}
                         className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
                     >
                         Clear Filters
@@ -161,8 +157,8 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                     <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={filters.isActive === true}
-                            onChange={(e) => setFilters({ ...filters, isActive: e.target.checked ? true : undefined })}
+                            checked={filters.status === 'active'}
+                            onChange={(e) => updateFilter('status', e.target.checked ? 'active' : undefined)}
                             className="w-4 h-4"
                         />
                         Active Only
@@ -170,8 +166,8 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                     <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
                         <input
                             type="checkbox"
-                            checked={filters.isBanned === true}
-                            onChange={(e) => setFilters({ ...filters, isBanned: e.target.checked ? true : undefined })}
+                            checked={filters.status === 'banned'}
+                            onChange={(e) => updateFilter('status', e.target.checked ? 'banned' : undefined)}
                             className="w-4 h-4"
                         />
                         Banned Only
@@ -194,7 +190,7 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {loading ? (
+                            {isLoading ? (
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-zinc-500">
                                         Loading...
@@ -203,7 +199,7 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                             ) : error ? (
                                 <tr>
                                     <td colSpan={6} className="p-8 text-center text-red-400">
-                                        {error}
+                                        Error loading users: {error instanceof Error ? error.message : 'Unknown error'}
                                     </td>
                                 </tr>
                             ) : users.length === 0 ? (
@@ -242,21 +238,21 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${user.isAdmin ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-300'
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-green-500/20 text-green-400' : 'bg-zinc-700 text-zinc-300'
                                                 }`}>
                                                 {user.role}
                                             </span>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${user.tier === 'FREE' ? 'bg-zinc-700 text-zinc-300' : 'bg-blue-500/20 text-blue-400'
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${user.subscription?.tier === 'FREE' ? 'bg-zinc-700 text-zinc-300' : 'bg-blue-500/20 text-blue-400'
                                                 }`}>
-                                                {user.tier || 'FREE'}
+                                                {user.subscription?.tier || 'FREE'}
                                             </span>
                                         </td>
                                         <td className="p-4">
                                             <div className="space-y-1 text-sm">
-                                                <div className="text-zinc-400">🔥 {user.currentStreak} day streak</div>
-                                                <div className="text-zinc-400">🏆 {user.totalPoints} pts</div>
+                                                <div className="text-zinc-400">🔥 {user.stats?.streak || 0} day streak</div>
+                                                <div className="text-zinc-400">📝 {user.stats?.entries || 0} entries</div>
                                             </div>
                                         </td>
                                         <td className="p-4">
@@ -282,6 +278,24 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                                                 >
                                                     View
                                                 </a>
+
+                                                {!user.isVerified && (
+                                                    <button
+                                                        onClick={() => handleVerifyUser(user.id)}
+                                                        className="px-3 py-1.5 text-sm bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition-colors"
+                                                    >
+                                                        Verify
+                                                    </button>
+                                                )}
+
+                                                <button
+                                                    onClick={() => handleImpersonateUser(user.id, user.name || 'User')}
+                                                    className="px-3 py-1.5 text-sm bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 rounded-lg transition-colors"
+                                                    title="Impersonate"
+                                                >
+                                                    Login As
+                                                </button>
+
                                                 {user.isBanned ? (
                                                     <button
                                                         onClick={() => handleUnbanUser(user.id)}
@@ -320,18 +334,18 @@ export function UsersList({ initialFilters = {} }: UsersListProps) {
                         </div>
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1}
+                                onClick={() => setFilters(prev => ({ ...prev, page: Math.max(1, (prev.page || 1) - 1) }))}
+                                disabled={filters.page === 1}
                                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Previous
                             </button>
                             <span className="text-sm text-zinc-400">
-                                Page {page} of {totalPages}
+                                Page {filters.page} of {totalPages}
                             </span>
                             <button
-                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                disabled={page === totalPages}
+                                onClick={() => setFilters(prev => ({ ...prev, page: Math.min(totalPages, (prev.page || 1) + 1) }))}
+                                disabled={filters.page === totalPages}
                                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Next

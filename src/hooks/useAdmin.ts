@@ -54,7 +54,7 @@ interface AdminDashboardStats {
   };
 }
 
-interface AdminUser {
+export interface AdminUser {
   id: string;
   name: string | null;
   email: string | null;
@@ -77,7 +77,7 @@ interface AdminUser {
   };
 }
 
-interface AdminUserFilters {
+export interface AdminUserFilters {
   search?: string;
   role?: 'user' | 'admin';
   status?: 'active' | 'inactive' | 'banned';
@@ -282,6 +282,31 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
     [impersonateMutation]
   );
 
+  // ==========================================================================
+  // DELETE USER
+  // ==========================================================================
+  const deleteMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiClient.delete(`/admin/users/${userId}`);
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
+    },
+  });
+
+  const deleteUser = useCallback(
+    async (userId: string) => {
+      return deleteMutation.mutateAsync(userId);
+    },
+    [deleteMutation]
+  );
+
   return useMemo(() => ({
     users: usersQuery.data?.users ?? [],
     total: usersQuery.data?.total ?? 0,
@@ -294,6 +319,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
     verifyUser,
     resetUserPassword,
     impersonateUser,
+    deleteUser,
     refetch: usersQuery.refetch,
 
     // Mutation states
@@ -302,6 +328,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
     isVerifying: verifyMutation.isPending,
     isResettingPassword: resetPasswordMutation.isPending,
     isImpersonating: impersonateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   }), [
     usersQuery.data,
     usersQuery.isLoading,
@@ -312,11 +339,13 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
     verifyUser,
     resetUserPassword,
     impersonateUser,
+    deleteUser,
     banMutation.isPending,
     unbanMutation.isPending,
     verifyMutation.isPending,
     resetPasswordMutation.isPending,
     impersonateMutation.isPending,
+    deleteMutation.isPending,
   ]);
 }
 

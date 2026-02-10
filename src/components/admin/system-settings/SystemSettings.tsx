@@ -1,40 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface SystemSetting {
-    id: string;
-    key: string;
-    value: string;
-    description: string | null;
-    type: string;
-    isPublic: boolean;
-    updatedAt: string;
-}
+import { useState } from 'react';
+import { useAdminSystem, SystemSetting } from '@/hooks/useAdminSystem';
 
 export function SystemSettings() {
-    const [settings, setSettings] = useState<SystemSetting[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { settings, isLoading: loading, updateSetting } = useAdminSystem();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
-
-    useEffect(() => {
-        fetchSettings();
-    }, []);
-
-    const fetchSettings = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('/api/admin/system-settings');
-            if (!res.ok) throw new Error('Failed to fetch settings');
-            const data = await res.json();
-            setSettings(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const startEdit = (setting: SystemSetting) => {
         setEditingId(setting.id);
@@ -48,13 +20,7 @@ export function SystemSettings() {
 
     const saveSetting = async (key: string) => {
         try {
-            const res = await fetch(`/api/admin/system-settings/${key}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: editValue }),
-            });
-            if (!res.ok) throw new Error('Failed to update setting');
-            fetchSettings();
+            await updateSetting(key, editValue);
             setEditingId(null);
             setEditValue('');
         } catch (err: any) {

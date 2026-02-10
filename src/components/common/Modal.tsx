@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/common/Modal.tsx
+// PURPOSE: Generic modal wrapper with consistent styling and behavior
+// ============================================================================
+
 'use client';
 
 import * as React from 'react';

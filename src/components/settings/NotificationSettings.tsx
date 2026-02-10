@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { toast } from 'sonner';
 
 interface NotificationSettingsProps {
   className?: string;
@@ -9,7 +11,8 @@ interface NotificationSettingsProps {
 export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
   className = '',
 }) => {
-  const [settings, setSettings] = useState({
+  const { preferences, updatePreferences, isLoadingPreferences } = useNotifications();
+  const [localPrefs, setLocalPrefs] = useState({
     email: true,
     push: false,
     goals: true,
@@ -17,6 +20,42 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
     sync: false,
     weekly: true,
   });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (preferences) {
+      setLocalPrefs({
+        email: preferences.email ?? true,
+        push: preferences.push ?? false,
+        goals: preferences.goals ?? true,
+        achievements: preferences.achievements ?? true,
+        sync: preferences.sync ?? false,
+        weekly: preferences.weekly ?? true,
+      });
+    }
+  }, [preferences]);
+
+
+  const handleSave = async () => {
+    if (!updatePreferences) return;
+    setIsSaving(true);
+    try {
+      await updatePreferences(localPrefs);
+      toast.success('Notification preferences updated');
+    } catch (error) {
+      toast.error('Failed to update preferences');
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoadingPreferences) {
+    return <div className={`p-6 bg-white border rounded-xl space-y-4 ${className}`}>
+      <div className="h-8 w-1/3 bg-gray-100 animate-pulse rounded" />
+      <div className="h-64 bg-gray-100 animate-pulse rounded" />
+    </div>;
+  }
 
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
@@ -28,8 +67,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           <label className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.email}
-              onChange={(e) => setSettings({ ...settings, email: e.target.checked })}
+              checked={localPrefs.email}
+              onChange={(e) => setLocalPrefs({ ...localPrefs, email: e.target.checked })}
               className="w-5 h-5"
             />
             <div>
@@ -40,8 +79,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           <label className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.push}
-              onChange={(e) => setSettings({ ...settings, push: e.target.checked })}
+              checked={localPrefs.push}
+              onChange={(e) => setLocalPrefs({ ...localPrefs, push: e.target.checked })}
               className="w-5 h-5"
             />
             <div>
@@ -62,8 +101,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
             <label key={item.key} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
               <input
                 type="checkbox"
-                checked={settings[item.key as keyof typeof settings]}
-                onChange={(e) => setSettings({ ...settings, [item.key]: e.target.checked })}
+                checked={localPrefs[item.key as keyof typeof localPrefs]}
+                onChange={(e) => setLocalPrefs({ ...localPrefs, [item.key]: e.target.checked })}
                 className="w-5 h-5"
               />
               <div>
@@ -74,8 +113,12 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           ))}
         </div>
 
-        <button className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Save Preferences
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {isSaving ? 'Saving...' : 'Save Preferences'}
         </button>
       </div>
     </div>

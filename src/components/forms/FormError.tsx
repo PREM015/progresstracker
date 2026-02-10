@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/forms/FormError.tsx
+// PURPOSE: Form error message display component
+// ============================================================================
+
 import { AlertCircle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

@@ -1,19 +1,17 @@
-'use client';
-
 import { useState } from 'react';
+import { useAdminSync } from '@/hooks/useAdminSync';
 
 type SyncType = 'all' | 'platform' | 'user' | 'failed';
 
 export function SyncControl() {
+  const { triggerSync, isSyncing: loading } = useAdminSync();
   const [type, setType] = useState<SyncType>('all');
   const [platformId, setPlatformId] = useState('');
   const [userId, setUserId] = useState('');
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const triggerSync = async () => {
-    setLoading(true);
+  const handleTriggerSync = async () => {
     setMessage(null);
     setError(null);
     try {
@@ -21,18 +19,10 @@ export function SyncControl() {
       if (type === 'platform') body.platformId = platformId.trim();
       if (type === 'user') body.userId = userId.trim();
 
-      const res = await fetch('/api/admin/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Failed to trigger sync');
-      setMessage(json?.message || 'Sync queued');
+      const res = await triggerSync(body);
+      setMessage(res.data?.message || 'Sync queued');
     } catch (err: any) {
       setError(err.message || 'Failed to trigger sync');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -70,7 +60,7 @@ export function SyncControl() {
       )}
 
       <button
-        onClick={triggerSync}
+        onClick={handleTriggerSync}
         disabled={loading || (type === 'platform' && !platformId.trim()) || (type === 'user' && !userId.trim())}
         className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
       >

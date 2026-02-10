@@ -10,21 +10,19 @@ import {
   Trophy,
   Activity,
   Settings,
-  Users,
   BarChart2,
   ListTodo,
   Layers,
   ChevronLeft,
   ChevronRight,
-  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useSidebar } from '@/hooks/useSidebar'; // Assuming hook exists, or inline state
-// Using inline state for now if hook not present in plan
+import { useSidebar } from '@/hooks/useSidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DASHBOARD_ROUTES, SETTINGS_ROUTES, PUBLIC_ROUTES } from '@/constants/routes';
 
 interface SidebarProps {
-  className?: string;
+  className?: string; // Additional classes for styling
 }
 
 export function Sidebar({ className }: SidebarProps) {
@@ -36,29 +34,29 @@ export function Sidebar({ className }: SidebarProps) {
     {
       group: 'Overview',
       items: [
-        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { href: '/tracker', label: 'Tracker', icon: Activity },
-        { href: '/goals', label: 'Goals', icon: Target },
+        { href: DASHBOARD_ROUTES.HOME, label: 'Dashboard', icon: LayoutDashboard },
+        { href: DASHBOARD_ROUTES.TRACKER, label: 'Tracker', icon: Activity },
+        { href: DASHBOARD_ROUTES.GOALS, label: 'Goals', icon: Target },
       ],
     },
     {
       group: 'Community',
       items: [
-        { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
-        { href: '/achievements', label: 'Achievements', icon: Layers },
+        { href: DASHBOARD_ROUTES.LEADERBOARD, label: 'Leaderboard', icon: Trophy },
+        { href: DASHBOARD_ROUTES.ACHIEVEMENTS, label: 'Achievements', icon: Layers },
       ],
     },
     {
       group: 'Analytics',
       items: [
-        { href: '/analytics', label: 'Analytics', icon: BarChart2 },
-        { href: '/reports', label: 'Reports', icon: ListTodo },
+        { href: DASHBOARD_ROUTES.ANALYTICS, label: 'Analytics', icon: BarChart2 },
+        { href: DASHBOARD_ROUTES.REPORTS, label: 'Reports', icon: ListTodo },
       ],
     },
     {
       group: 'Settings',
       items: [
-        { href: '/settings', label: 'Settings', icon: Settings },
+        { href: SETTINGS_ROUTES.ACCOUNT, label: 'Settings', icon: Settings },
       ],
     },
   ];

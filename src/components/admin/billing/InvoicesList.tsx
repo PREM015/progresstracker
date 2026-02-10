@@ -14,33 +14,11 @@ interface Invoice {
     description?: string;
 }
 
+import { useAdminInvoices } from '@/hooks/useAdminBilling';
+
 export function InvoicesList() {
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'PAID' | 'PENDING' | 'FAILED'>('all');
-
-    useEffect(() => {
-        fetchInvoices();
-    }, [filter]);
-
-    const fetchInvoices = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const params = filter !== 'all' ? `?status=${filter}` : '';
-            const res = await fetch(`/api/admin/billing/invoices${params}`);
-            if (!res.ok) throw new Error('Failed to fetch invoices');
-
-            const data = await res.json();
-            setInvoices(data || []);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { invoices, isLoading: loading, error } = useAdminInvoices(filter);
 
     const getStatusColor = (status: string) => {
         const colors = {
@@ -66,9 +44,9 @@ export function InvoicesList() {
     if (error) {
         return (
             <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p className="text-red-600">{error}</p>
+                <p className="text-red-600">{(error as any)?.message || 'Error loading invoices'}</p>
                 <button
-                    onClick={fetchInvoices}
+                    onClick={() => window.location.reload()}
                     className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
                 >
                     Try again
@@ -87,8 +65,8 @@ export function InvoicesList() {
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                                    ? 'bg-indigo-100 text-indigo-700'
-                                    : 'text-gray-600 hover:bg-gray-100'
+                                ? 'bg-indigo-100 text-indigo-700'
+                                : 'text-gray-600 hover:bg-gray-100'
                                 }`}
                         >
                             {f === 'all' ? 'All Invoices' : f}

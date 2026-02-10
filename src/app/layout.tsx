@@ -1,19 +1,10 @@
-// app/layout.tsx
-import SessionProvider from '@/components/providers/SessionProvider';
-import './globals.css';
+import { RootLayout } from '@/components/layouts/RootLayout';
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <SessionProvider>
-          {children}
-        </SessionProvider>
-      </body>
-    </html>
-  );
+export const metadata = {
+  title: 'Progress Tracker',
+  description: 'Track your coding journey',
+};
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <RootLayout>{children}</RootLayout>;
 }

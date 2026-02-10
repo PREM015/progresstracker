@@ -1,56 +1,28 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-
-interface GoalStats {
-  totalGoals: number;
-  activeGoals: number;
-  completedGoals: number;
-  completionRate: number;
-  averageProgress: number;
-  dueThisWeek: number;
-  overdue: number;
-}
+import React from 'react';
+import { useGoals } from '@/hooks/useGoals';
+import { FilterState } from './GoalFilters';
+import { GoalStatus } from '@/types/goal';
 
 interface GoalsListProps {
   userId: string;
+  filters: FilterState;
   className?: string;
 }
 
 export const GoalsList: React.FC<GoalsListProps> = ({
   userId,
+  filters,
   className = '',
 }) => {
-  const [goals, setGoals] = useState<any[]>([]);
-  const [stats, setStats] = useState<GoalStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  // Cast filters to match useGoals expectation or ensure FilterState aligns
+  const { goals, stats, isLoading, error, refetch } = useGoals({
+    ...filters,
+    status: filters.status as GoalStatus | undefined,
+  });
 
-  useEffect(() => {
-    fetchGoals();
-  }, [userId, filter]);
-
-  const fetchGoals = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({ filter });
-      const res = await fetch(`/api/goals?${params}`);
-      if (!res.ok) throw new Error('Failed to fetch goals');
-
-      const data = await res.json();
-      setGoals(data.goals || []);
-      setStats(data.stats || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className={`space-y-4 ${className}`}>
         {Array.from({ length: 3 }).map((_, i) => (
@@ -63,9 +35,9 @@ export const GoalsList: React.FC<GoalsListProps> = ({
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-600">{error}</p>
+        <p className="text-red-600">{(error as Error).message}</p>
         <button
-          onClick={fetchGoals}
+          onClick={() => refetch()}
           className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
         >
           Try again
@@ -80,15 +52,15 @@ export const GoalsList: React.FC<GoalsListProps> = ({
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-gray-900">{stats.totalGoals}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-sm text-gray-600">Total Goals</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.activeGoals}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.active}</div>
             <div className="text-sm text-gray-600">Active</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.completedGoals}</div>
+            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
             <div className="text-sm text-gray-600">Completed</div>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -97,22 +69,6 @@ export const GoalsList: React.FC<GoalsListProps> = ({
           </div>
         </div>
       )}
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-4">
-        {(['all', 'active', 'completed'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === f
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
 
       {/* Goals List */}
       <div className="space-y-4">
@@ -132,21 +88,21 @@ export const GoalsList: React.FC<GoalsListProps> = ({
               <div className="flex items-start justify-between mb-3">
                 <h3 className="text-lg font-bold text-gray-900">{goal.title}</h3>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${goal.status === 'completed'
-                    ? 'bg-green-100 text-green-700'
-                    : goal.status === 'active'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-700'
+                  ? 'bg-green-100 text-green-700'
+                  : goal.status === 'active'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-700'
                   }`}>
-                  {goal.status}
+                  {GOAL_STATUS_CONFIG[goal.status]?.label || goal.status}
                 </span>
               </div>
               {goal.description && (
                 <p className="text-sm text-gray-600 mb-4">{goal.description}</p>
               )}
               <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span>Target: {goal.targetValue}</span>
+                <span>Target: {goal.target} {goal.unit}</span>
                 <span>•</span>
-                <span>Progress: {goal.currentValue}</span>
+                <span>Progress: {goal.progress}</span>
                 {goal.deadline && (
                   <>
                     <span>•</span>
@@ -161,5 +117,8 @@ export const GoalsList: React.FC<GoalsListProps> = ({
     </div>
   );
 };
+
+// Import config for labels
+import { GOAL_STATUS_CONFIG } from '@/types/goal';
 
 export default GoalsList;

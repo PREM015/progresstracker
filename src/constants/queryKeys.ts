@@ -1,3 +1,7 @@
+// ============================================================================
+// FILE: src/constants/queryKeys.ts
+// PURPOSE: React Query key factory for consistent cache management
+// ============================================================================
 
 export const queryKeys = {
     // User
@@ -104,5 +108,32 @@ export const queryKeys = {
         all: ['blog'] as const,
         posts: (filters?: unknown) => [...queryKeys.blog.all, 'posts', filters] as const,
         post: (slug: string) => [...queryKeys.blog.all, 'post', slug] as const,
-    }
+        categories: () => [...queryKeys.blog.all, 'categories'] as const,
+    },
+};
+
+// INVALIDATION HELPERS:
+export const invalidateKeys = {
+    // After creating tracker entry
+    afterTrackerEntry: () => [
+        queryKeys.tracker.all,
+        queryKeys.streak.all,
+        queryKeys.analytics.all,
+        queryKeys.user.stats(),
+    ],
+
+    // After updating goal
+    afterGoalUpdate: (goalId: string) => [
+        queryKeys.goals.list(),
+        queryKeys.goals.detail(goalId),
+        queryKeys.goals.stats(),
+    ],
+
+    // After platform sync
+    afterPlatformSync: (platformId: string) => [
+        queryKeys.platforms.detail(platformId),
+        queryKeys.platforms.stats(platformId),
+        queryKeys.sync.history(platformId),
+        queryKeys.tracker.all,
+    ],
 };

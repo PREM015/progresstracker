@@ -7,6 +7,7 @@ import { broadcastEmail } from './email-admin';
 import { syncPlatformData } from './sync-platform';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Redis connection
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 
@@ -99,6 +100,16 @@ export interface NotificationJobData {
   };
 }
 
+export interface ExportJobData {
+  userId: string;
+  exportJobId: string;
+  format: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  platforms?: string[];
+  categories?: string[];
+}
+
 // =============================================================================
 // QUEUE PROCESSORS
 // =============================================================================
@@ -110,10 +121,8 @@ queues.reports.process(5, async (job: Job<ReportJobData>) => {
   try {
     const { userId, reportType, periodStart, periodEnd } = job.data;
 
-    // Update progress
     await job.progress(10);
 
-    // Generate report
     const result = await generateAndSaveReport(
       userId,
       new Date(periodStart),
@@ -123,7 +132,6 @@ queues.reports.process(5, async (job: Job<ReportJobData>) => {
 
     await job.progress(90);
 
-    // Update report status
     await prisma.report.update({
       where: { id: result.reportId },
       data: {
@@ -169,7 +177,7 @@ queues.emails.process(3, async (job: Job<EmailJobData>) => {
   }
 });
 
-// Sync Processor
+// Sync Processor - Uses imported syncPlatformData from sync-platform.ts
 queues.sync.process(10, async (job: Job<SyncJobData>) => {
   logger.info('Processing sync job', { jobId: job.id, platformId: job.data.platformId });
 
@@ -194,7 +202,7 @@ queues.sync.process(10, async (job: Job<SyncJobData>) => {
 
     await job.progress(20);
 
-    // Perform actual sync (this would call platform-specific sync logic)
+    // Perform actual sync using imported function
     const syncResult = await syncPlatformData(userId, platformId, userPlatformId);
 
     await job.progress(80);
@@ -273,13 +281,6 @@ queues.notifications.process(10, async (job: Job<NotificationJobData>) => {
 });
 
 // =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-// Local syncPlatformData removed in favor of imported version used in queues.sync.process
-
-
-// =============================================================================
 // JOB ENQUEUERS
 // =============================================================================
 
@@ -319,6 +320,16 @@ export async function queueNotifications(data: NotificationJobData) {
   });
 
   logger.info('Notification job queued', { jobId: job.id, recipients: data.userIds.length });
+
+  return job.id;
+}
+
+export async function queueExport(data: ExportJobData) {
+  const job = await queues.exports.add(data, {
+    priority: 2,
+  });
+
+  logger.info('Export job queued', { jobId: job.id, exportJobId: data.exportJobId });
 
   return job.id;
 }
@@ -380,6 +391,52 @@ export async function getJobStatus(queueName: string, jobId: string) {
   };
 }
 
+export async function retryFailedJob(queueName: string, jobId: string) {
+  const queue = queues[queueName as keyof typeof queues];
+  if (!queue) {
+    throw new Error(`Queue ${queueName} not found`);
+  }
+
+  const job = await queue.getJob(jobId);
+  if (!job) {
+    throw new Error(`Job ${jobId} not found`);
+  }
+
+  await job.retry();
+  logger.info('Job retry queued', { queueName, jobId });
+
+  return { success: true };
+}
+
+export async function removeJob(queueName: string, jobId: string) {
+  const queue = queues[queueName as keyof typeof queues];
+  if (!queue) {
+    throw new Error(`Queue ${queueName} not found`);
+  }
+
+  const job = await queue.getJob(jobId);
+  if (!job) {
+    throw new Error(`Job ${jobId} not found`);
+  }
+
+  await job.remove();
+  logger.info('Job removed', { queueName, jobId });
+
+  return { success: true };
+}
+
+export async function cleanQueue(queueName: string, status: 'completed' | 'failed', olderThanMs: number = 86400000) {
+  const queue = queues[queueName as keyof typeof queues];
+  if (!queue) {
+    throw new Error(`Queue ${queueName} not found`);
+  }
+
+  const removed = await queue.clean(olderThanMs, status);
+  logger.info('Queue cleaned', { queueName, status, removed: removed.length });
+
+  return { removed: removed.length };
+}
+
 // =============================================================================
 // GRACEFUL SHUTDOWN
 // =============================================================================
@@ -392,5 +449,8 @@ export async function closeQueues() {
   logger.info('All queues closed');
 }
 
-process.on('SIGTERM', closeQueues);
-process.on('SIGINT', closeQueues);
+// Handle process signals
+if (typeof process !== 'undefined') {
+  process.on('SIGTERM', closeQueues);
+  process.on('SIGINT', closeQueues);
+}

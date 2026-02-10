@@ -1,35 +1,7 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-
-interface Stats {
-  total: number;
-  waiting: number;
-  invited: number;
-  joined: number;
-}
+import { useAdminGrowth } from '@/hooks/useAdminGrowth';
 
 export function WaitlistStats() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch('/api/admin/waitlist');
-        const json = await res.json();
-        if (!res.ok) throw new Error(json?.error || 'Failed to fetch waitlist');
-        setStats(json?.data?.stats || null);
-      } catch (err) {
-        console.error(err);
-        setStats(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
+  const { stats, isLoadingStats: loading } = useAdminGrowth();
 
   if (loading) {
     return (
@@ -54,15 +26,15 @@ export function WaitlistStats() {
       </div>
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
         <div className="text-xs text-zinc-500">Waiting</div>
-        <div className="text-2xl font-bold text-yellow-400">{stats?.waiting || 0}</div>
+        <div className="text-2xl font-bold text-yellow-400">{stats?.pending || 0}</div>
       </div>
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-        <div className="text-xs text-zinc-500">Invited</div>
-        <div className="text-2xl font-bold text-blue-400">{stats?.invited || 0}</div>
+        <div className="text-xs text-zinc-500">Approved</div>
+        <div className="text-2xl font-bold text-blue-400">{stats?.approved || 0}</div>
       </div>
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-        <div className="text-xs text-zinc-500">Joined</div>
-        <div className="text-2xl font-bold text-green-400">{stats?.joined || 0}</div>
+        <div className="text-xs text-zinc-500">Conversion</div>
+        <div className="text-2xl font-bold text-green-400">{stats?.conversionRate || 0}%</div>
       </div>
     </div>
   );

@@ -1,69 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface FeatureFlag {
-    id: string;
-    key: string;
-    name: string;
-    description: string | null;
-    isEnabled: boolean;
-    rolloutPercentage: number;
-    rolloutStrategy: string;
-    enabledTiers: string[];
-    enabledUserIds: string[];
-    createdAt: string;
-    updatedAt: string;
-}
+import { useState } from 'react';
+import { useAdminFeatures } from '@/hooks/useAdminFeatures';
 
 export function FeatureFlagsList() {
-    const [flags, setFlags] = useState<FeatureFlag[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { flags, isLoading: loading, error, toggleFlag, deleteFlag } = useAdminFeatures();
     const [showCreateModal, setShowCreateModal] = useState(false);
 
-    useEffect(() => {
-        fetchFlags();
-    }, []);
-
-    const fetchFlags = async () => {
-        setLoading(true);
+    const handleToggleFlag = async (key: string, isEnabled: boolean) => {
         try {
-            const res = await fetch('/api/admin/feature-flags');
-            if (!res.ok) throw new Error('Failed to fetch feature flags');
-            const data = await res.json();
-            setFlags(data || []);
-            setError(null);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const toggleFlag = async (key: string, isEnabled: boolean) => {
-        try {
-            const res = await fetch(`/api/admin/feature-flags/${key}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isEnabled: !isEnabled }),
-            });
-            if (!res.ok) throw new Error('Failed to toggle flag');
-            fetchFlags();
+            await toggleFlag(key, !isEnabled);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
     };
 
-    const deleteFlag = async (key: string) => {
+    const handleDeleteFlag = async (key: string) => {
         if (!confirm(`Delete feature flag ${key}?`)) return;
 
         try {
-            const res = await fetch(`/api/admin/feature-flags/${key}`, {
-                method: 'DELETE',
-            });
-            if (!res.ok) throw new Error('Failed to delete flag');
-            fetchFlags();
+            await deleteFlag(key);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
@@ -91,7 +47,7 @@ export function FeatureFlagsList() {
 
             {error && (
                 <div className="bg-red-900/20 border border-red-800 rounded-xl p-4 text-red-400">
-                    {error}
+                    Error loading feature flags: {(error as any)?.message || 'Unknown error'}
                 </div>
             )}
 
@@ -106,7 +62,7 @@ export function FeatureFlagsList() {
                                         {flag.key}
                                     </span>
                                     <button
-                                        onClick={() => toggleFlag(flag.key, flag.isEnabled)}
+                                        onClick={() => handleToggleFlag(flag.key, flag.isEnabled)}
                                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${flag.isEnabled ? 'bg-indigo-600' : 'bg-zinc-700'
                                             }`}
                                     >
@@ -148,7 +104,7 @@ export function FeatureFlagsList() {
                             </div>
 
                             <button
-                                onClick={() => deleteFlag(flag.key)}
+                                onClick={() => handleDeleteFlag(flag.key)}
                                 className="ml-4 p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

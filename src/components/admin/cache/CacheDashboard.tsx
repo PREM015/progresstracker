@@ -1,11 +1,11 @@
-'use client';
-import { useState, useEffect } from 'react';
+import { useAdminMaintenance } from '@/hooks/useAdminMaintenance';
 
 export function CacheDashboard() {
-    const [stats, setStats] = useState<any>(null);
-    useEffect(() => {
-        fetch('/api/admin/cache/stats').then(r => r.json()).then(d => setStats(d));
-    }, []);
+    const { cacheStats: stats, isLoadingCacheStats: loading } = useAdminMaintenance();
+
+    if (loading) {
+        return <div className="text-center text-zinc-500">Loading stats...</div>;
+    }
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

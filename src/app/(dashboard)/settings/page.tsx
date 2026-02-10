@@ -13,26 +13,24 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Settings</h1>
+    <div className="space-y-6">
+      <h1 className="text-4xl font-bold mb-8">Settings</h1>
 
-        <div className="grid lg:grid-cols-4 gap-6">
-          <div>
-            <SettingsNavigation
-              currentSection={activeSection}
-              onSectionChange={setActiveSection}
-            />
-          </div>
+      <div className="grid lg:grid-cols-4 gap-6">
+        <div>
+          <SettingsNavigation
+            currentSection={activeSection}
+            onSectionChange={setActiveSection}
+          />
+        </div>
 
-          <div className="lg:col-span-3">
-            {activeSection === "profile" && <ProfileSettings />}
-            {activeSection === "account" && <AccountSettings />}
-            {activeSection === "security" && <SecuritySettings />}
-            {activeSection === "notifications" && <NotificationSettings />}
-            {activeSection === "privacy" && <PrivacySettings />}
-            {activeSection === "appearance" && <AppearanceSettings />}
-          </div>
+        <div className="lg:col-span-3">
+          {activeSection === "profile" && <ProfileSettings />}
+          {activeSection === "account" && <AccountSettings />}
+          {activeSection === "security" && <SecuritySettings />}
+          {activeSection === "notifications" && <NotificationSettings />}
+          {activeSection === "privacy" && <PrivacySettings />}
+          {activeSection === "appearance" && <AppearanceSettings />}
         </div>
       </div>
     </div>

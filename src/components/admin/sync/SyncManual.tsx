@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { useAdminSync } from '@/hooks/useAdminSync';
 
 export function SyncManual({ platformId }: { platformId?: string }) {
-    const [syncing, setSyncing] = useState(false);
+    const { triggerSync, isSyncing: syncing } = useAdminSync();
     const [selectedPlatform, setSelectedPlatform] = useState(platformId || '');
 
-    const triggerSync = async () => {
+    const handleTriggerSync = async () => {
         if (!selectedPlatform && !platformId) {
             alert('Please select a platform');
             return;
@@ -14,21 +15,19 @@ export function SyncManual({ platformId }: { platformId?: string }) {
 
         if (!confirm('Trigger manual sync?')) return;
 
-        setSyncing(true);
         try {
-            const res = await fetch('/api/admin/sync/trigger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ platformId: platformId || selectedPlatform }),
-            });
-
-            if (!res.ok) throw new Error('Failed to trigger sync');
-            const data = await res.json();
-            alert(`Sync triggered! Job ID: ${data.jobId}`);
+            // Note: SyncManual originally used { platformId } body.
+            // SyncControl uses { type, platformId }.
+            // I should verify if triggerSync supports generic object body.
+            // In hook: mutationFn: (data: any) => post(..., data).
+            // So I can pass { platformId: ... } directly if allowed by API.
+            // Or use { type: 'platform', platformId: ... } if I want to align with SyncControl pattern
+            // but the original SyncManual just sent { platformId }.
+            // I will send what original sent to be safe unless API unified.
+            const res = await triggerSync({ platformId: platformId || selectedPlatform });
+            alert(`Sync triggered! Job ID: ${res.data?.jobId}`);
         } catch (err: any) {
             alert('Error: ' + err.message);
-        } finally {
-            setSyncing(false);
         }
     };
 
@@ -52,7 +51,7 @@ export function SyncManual({ platformId }: { platformId?: string }) {
             )}
 
             <button
-                onClick={triggerSync}
+                onClick={handleTriggerSync}
                 disabled={syncing}
                 className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
             >

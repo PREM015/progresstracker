@@ -1,48 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useAdminAnalytics, TimeFrame } from '@/hooks/useAdminAnalytics';
 
-interface AnalyticsData {
-    users: number;
-    usersGrowth: number;
-    activeUsers: number;
-    activeRate: number;
-    revenue: number;
-    revenueGrowth: number;
-    newSignups: number;
-    signupsGrowth: number;
-    retentionRate: number;
-    avgSessionDuration: number;
-    topPlatforms: Array<{ name: string; users: number }>;
-    topFeatures: Array<{ name: string; usage: number }>;
+interface MetricCardProps {
+    title: string;
+    value: string;
+    change?: number;
+    subtitle?: string;
+    icon: string;
+}
+
+function MetricCard({ title, value, change, subtitle, icon }: MetricCardProps) {
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-600">{title}</span>
+                <span className="text-2xl">{icon}</span>
+            </div>
+            <div className="text-3xl font-bold text-gray-900">{value}</div>
+            {change !== undefined && (
+                <div className={`text-sm mt-1 ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% this period
+                </div>
+            )}
+            {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
+        </div>
+    );
 }
 
 export function AdminAnalyticsDashboard() {
-    const [data, setData] = useState<AnalyticsData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [timeFrame, setTimeFrame] = useState<'7d' | '30d' | '90d'>('30d');
-
-    useEffect(() => {
-        fetchAnalytics();
-    }, [timeFrame]);
-
-    const fetchAnalytics = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const res = await fetch(`/api/admin/analytics?timeFrame=${timeFrame}`);
-            if (!res.ok) throw new Error('Failed to fetch analytics');
-
-            const analyticsData = await res.json();
-            setData(analyticsData);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const [timeFrame, setTimeFrame] = useState<TimeFrame>('30d');
+    const { data, isLoading: loading, error, refetch } = useAdminAnalytics(timeFrame);
 
     if (loading) {
         return (
@@ -63,9 +52,9 @@ export function AdminAnalyticsDashboard() {
     if (error || !data) {
         return (
             <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                <p className="text-red-600">{error || 'No analytics data available'}</p>
+                <p className="text-red-600">{(error as any)?.message || 'No analytics data available'}</p>
                 <button
-                    onClick={fetchAnalytics}
+                    onClick={() => refetch()}
                     className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
                 >
                     Try again
@@ -85,8 +74,8 @@ export function AdminAnalyticsDashboard() {
                             key={tf}
                             onClick={() => setTimeFrame(tf)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${timeFrame === tf
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
                         >
                             Last {tf}
@@ -147,7 +136,7 @@ export function AdminAnalyticsDashboard() {
                 <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl p-6 text-white">
                     <div className="text-sm font-medium opacity-90 mb-2">Refresh Analytics</div>
                     <button
-                        onClick={fetchAnalytics}
+                        onClick={() => refetch()}
                         className="w-full mt-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
                     >
                         Refresh Data
@@ -189,32 +178,6 @@ export function AdminAnalyticsDashboard() {
                     </div>
                 </div>
             </div>
-        </div>
-    );
-}
-
-interface MetricCardProps {
-    title: string;
-    value: string;
-    change?: number;
-    subtitle?: string;
-    icon: string;
-}
-
-function MetricCard({ title, value, change, subtitle, icon }: MetricCardProps) {
-    return (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">{title}</span>
-                <span className="text-2xl">{icon}</span>
-            </div>
-            <div className="text-3xl font-bold text-gray-900">{value}</div>
-            {change !== undefined && (
-                <div className={`text-sm mt-1 ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {change >= 0 ? '↑' : '↓'} {Math.abs(change)}% this period
-                </div>
-            )}
-            {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
         </div>
     );
 }

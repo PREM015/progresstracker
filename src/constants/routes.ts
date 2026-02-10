@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/constants/routes.ts
+// PURPOSE: Centralized route definitions for the application
+// ============================================================================
+
 // AUTH ROUTES:
 export const AUTH_ROUTES = {
     LOGIN: '/login',
@@ -102,7 +107,6 @@ export const API_ROUTES = {
     PLATFORMS: '/api/platforms',
     PLATFORMS_CONNECT: '/api/platforms/connect',
     PLATFORMS_SYNC: '/api/sync',
-
 } as const;
 
 // ROUTE HELPERS:

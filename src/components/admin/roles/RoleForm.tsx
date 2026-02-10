@@ -1,86 +1,59 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Role, RoleInput, Permission } from '@/hooks/useAdminAccess';
 
-export function RoleForm({ roleId, onSave }: { roleId?: string; onSave?: () => void }) {
-    const [formData, setFormData] = useState({
+interface RoleFormProps {
+    role?: Role | null;
+    availablePermissions: Permission[];
+    onSubmit: (data: RoleInput) => Promise<void>;
+    onCancel: () => void;
+    isSubmitting?: boolean;
+}
+
+export function RoleForm({ role, availablePermissions, onSubmit, onCancel, isSubmitting = false }: RoleFormProps) {
+    const [formData, setFormData] = useState<RoleInput>({
         name: '',
         description: '',
-        permissions: [] as string[],
+        permissionIds: [],
     });
-    const [availablePermissions, setAvailablePermissions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        fetchData();
-    }, [roleId]);
-
-    const fetchData = async () => {
-        try {
-            // Fetch available permissions
-            const permsRes = await fetch('/api/admin/permissions');
-            const perms = await permsRes.json();
-            setAvailablePermissions(perms || []);
-
-            // If editing, fetch role data
-            if (roleId) {
-                const roleRes = await fetch(`/api/admin/roles/${roleId}`);
-                const role = await roleRes.json();
-                setFormData({
-                    name: role.name,
-                    description: role.description,
-                    permissions: role.permissions.map((p: any) => p.id),
-                });
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
+        if (role) {
+            setFormData({
+                name: role.name,
+                description: role.description || '',
+                permissionIds: role.permissions.map((p) => p.id),
+            });
+        } else {
+            setFormData({
+                name: '',
+                description: '',
+                permissionIds: [],
+            });
         }
-    };
+    }, [role]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSaving(true);
-
         try {
-            const url = roleId ? `/api/admin/roles/${roleId}` : '/api/admin/roles';
-            const res = await fetch(url, {
-                method: roleId ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-
-            if (!res.ok) throw new Error('Failed to save');
-            alert(`Role ${roleId ? 'updated' : 'created'} successfully!`);
-            onSave?.();
-        } catch (err: any) {
-            alert('Error: ' + err.message);
-        } finally {
-            setSaving(false);
+            await onSubmit(formData);
+        } catch (err) {
+            console.error(err);
         }
     };
 
     const togglePermission = (permId: string) => {
         setFormData(prev => ({
             ...prev,
-            permissions: prev.permissions.includes(permId)
-                ? prev.permissions.filter(id => id !== permId)
-                : [...prev.permissions, permId]
+            permissionIds: prev.permissionIds.includes(permId)
+                ? prev.permissionIds.filter(id => id !== permId)
+                : [...prev.permissionIds, permId]
         }));
     };
 
-    if (loading) {
-        return <div className="p-8 text-center text-zinc-500">Loading...</div>;
-    }
-
     return (
-        <form onSubmit={handleSubmit} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 space-y-6">
-            <h3 className="text-lg font-semibold text-white">
-                {roleId ? 'Edit Role' : 'Create New Role'}
-            </h3>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
             <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-2">Role Name</label>
                 <input
@@ -104,14 +77,14 @@ export function RoleForm({ roleId, onSave }: { roleId?: string; onSave?: () => v
 
             <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-3">Permissions</label>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                     {availablePermissions.map(perm => (
                         <label key={perm.id} className="flex items-center gap-3 p-3 bg-zinc-950 rounded-lg hover:bg-zinc-800 cursor-pointer">
                             <input
                                 type="checkbox"
-                                checked={formData.permissions.includes(perm.id)}
+                                checked={formData.permissionIds.includes(perm.id)}
                                 onChange={() => togglePermission(perm.id)}
-                                className="w-4 h-4"
+                                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-indigo-500"
                             />
                             <div className="flex-1">
                                 <div className="text-white text-sm">{perm.name}</div>
@@ -121,16 +94,29 @@ export function RoleForm({ roleId, onSave }: { roleId?: string; onSave?: () => v
                             </div>
                         </label>
                     ))}
+                    {availablePermissions.length === 0 && (
+                        <p className="text-zinc-500 text-sm">No permissions available.</p>
+                    )}
                 </div>
             </div>
 
-            <button
-                type="submit"
-                disabled={saving}
-                className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
-            >
-                {saving ? 'Saving...' : (roleId ? 'Update Role' : 'Create Role')}
-            </button>
+            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {isSubmitting ? 'Saving...' : role ? 'Update Role' : 'Create Role'}
+                </button>
+            </div>
         </form>
     );
 }

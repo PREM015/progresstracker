@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -24,11 +24,31 @@ export async function GET(
       );
     }
 
-    // TODO: Implement GET logic
+    const userId = session.user.id;
+    const now = new Date();
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const [total, thisWeek, today] = await Promise.all([
+      prisma.trackerEntry.count({ where: { userId } }),
+      prisma.trackerEntry.count({
+        where: {
+          userId,
+          date: { gte: startOfWeek }
+        }
+      }),
+      prisma.trackerEntry.count({
+        where: {
+          userId,
+          date: { gte: startOfDay }
+        }
+      }),
+    ]);
 
     return NextResponse.json({
-      success: true,
-      data: {},
+      total,
+      thisWeek,
+      today,
     });
   } catch (error) {
     console.error('[TRACKER_STATS_GET]', error);
@@ -43,7 +63,7 @@ export async function GET(
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },

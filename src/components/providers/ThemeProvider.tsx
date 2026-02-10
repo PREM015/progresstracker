@@ -1,8 +1,12 @@
+// ============================================================================
+// FILE: src/components/providers/ThemeProvider.tsx
+// PURPOSE: Theme provider wrapper using next-themes
+// ============================================================================
+
 'use client';
 
-import * as React from 'react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
-import { type ThemeProviderProps } from 'next-themes/dist/types';
+import { type ThemeProviderProps } from 'next-themes';
 
 // PROVIDER COMPONENT:
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {

@@ -1,4 +1,7 @@
-// Theme configuration with CSS variables and color palettes
+// ============================================================================
+// FILE: src/styles/themes.ts
+// PURPOSE: Theme configuration with CSS variables and color palettes
+// ============================================================================
 
 export const themes = {
     light: {
@@ -42,35 +45,10 @@ export const themes = {
         colors: {
             background: 'hsl(222.2 84% 4.9%)',
             foreground: 'hsl(210 40% 98%)',
-            card: 'hsl(222.2 84% 4.9%)', // Adjusted to match background for dark mode usually
-            cardForeground: 'hsl(210 40% 98%)',
-            popover: 'hsl(222.2 84% 4.9%)',
-            popoverForeground: 'hsl(210 40% 98%)',
-            primary: 'hsl(217.2 91.2% 59.8%)',
-            primaryForeground: 'hsl(222.2 47.4% 11.2%)',
-            secondary: 'hsl(217.2 32.6% 17.5%)',
-            secondaryForeground: 'hsl(210 40% 98%)',
-            muted: 'hsl(217.2 32.6% 17.5%)',
-            mutedForeground: 'hsl(215 20.2% 65.1%)',
-            accent: 'hsl(217.2 32.6% 17.5%)',
-            accentForeground: 'hsl(210 40% 98%)',
-            destructive: 'hsl(0 62.8% 30.6%)',
-            destructiveForeground: 'hsl(210 40% 98%)',
-            border: 'hsl(217.2 32.6% 17.5%)',
-            input: 'hsl(217.2 32.6% 17.5%)',
-            ring: 'hsl(224.3 76.3% 48%)',
-            // Custom colors for the app
-            success: 'hsl(142.1 70.6% 45.3%)',
-            warning: 'hsl(47.9 95.8% 53.1%)',
-            info: 'hsl(199.4 95.5% 53.8%)',
-            // Platform-specific colors
-            github: 'hsl(0 0% 98%)',
-            leetcode: 'hsl(36 100% 50%)',
-            codeforces: 'hsl(210 100% 56%)',
-            // Streak colors
-            streakActive: 'hsl(142.1 70.6% 45.3%)',
-            streakAtRisk: 'hsl(47.9 95.8% 53.1%)',
-            streakBroken: 'hsl(0 62.8% 30.6%)',
+            // Add other dark mode colors relative to light mode if needed, 
+            // typically shadcn uses CSS variables that flip automatically
+            // so this object might be used for specific JS-driven theme logic
+            // or to override defaults.
         },
     },
 };

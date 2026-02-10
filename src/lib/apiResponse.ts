@@ -70,7 +70,7 @@ export function success<T>(
     meta: {
       ...meta,
       timestamp: new Date().toISOString(),
-      ...(message ? { message } : {}), 
+      ...(message ? { message } : {}),
     },
   };
 
@@ -339,4 +339,6 @@ const apiResponse = {
   withErrorHandler,
 };
 
+export { ApiError as apiError } from './apiError';
+export { apiResponse };
 export default apiResponse;

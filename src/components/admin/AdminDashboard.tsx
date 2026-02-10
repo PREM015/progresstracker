@@ -1,52 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface DashboardStats {
-    users: {
-        total: number;
-        active: number;
-        newToday: number;
-        newThisWeek: number;
-    };
-    platforms: {
-        total: number;
-        active: number;
-    };
-    goals: {
-        total: number;
-        completed: number;
-    };
-    subscriptions: {
-        total: number;
-        active: number;
-        revenue: number;
-    };
-}
+import { useAdmin } from '@/hooks/useAdmin';
 
 export function AdminDashboard() {
-    const [stats, setStats] = useState<DashboardStats | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { stats, isLoading, error } = useAdmin();
 
-    useEffect(() => {
-        fetchStats();
-    }, []);
-
-    const fetchStats = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('/api/admin/dashboard/stats');
-            if (!res.ok) throw new Error('Failed to fetch stats');
-            const data = await res.json();
-            setStats(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(8)].map((_, i) => (
@@ -57,6 +16,15 @@ export function AdminDashboard() {
                         </div>
                     </div>
                 ))}
+            </div>
+        );
+    }
+
+    if (error || !stats) {
+        return (
+            <div className="text-center p-12 text-red-400">
+                <p>Failed to load dashboard stats</p>
+                <p className="text-sm mt-2 opacity-75">{error?.message || 'Unknown error'}</p>
             </div>
         );
     }
@@ -78,7 +46,7 @@ export function AdminDashboard() {
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">Total Users</div>
                                 <div className="text-3xl font-bold text-white">
-                                    {(stats?.users.total || 0).toLocaleString()}
+                                    {(stats.users.total || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div className="p-3 bg-indigo-500/10 rounded-lg">
@@ -94,7 +62,7 @@ export function AdminDashboard() {
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">Active Users</div>
                                 <div className="text-3xl font-bold text-white">
-                                    {(stats?.users.active || 0).toLocaleString()}
+                                    {(stats.users.active || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div className="p-3 bg-green-500/10 rounded-lg">
@@ -105,12 +73,13 @@ export function AdminDashboard() {
                         </div>
                     </div>
 
+                    {/* New Today and This Week are not in the hook response currently, keeping placeholders or removing */}
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                         <div className="flex items-start justify-between">
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">New Today</div>
                                 <div className="text-3xl font-bold text-white">
-                                    +{(stats?.users.newToday || 0).toLocaleString()}
+                                    -- {/* Not available in hook yet */}
                                 </div>
                             </div>
                             <div className="p-3 bg-blue-500/10 rounded-lg">
@@ -126,7 +95,7 @@ export function AdminDashboard() {
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">New This Week</div>
                                 <div className="text-3xl font-bold text-white">
-                                    +{(stats?.users.newThisWeek || 0).toLocaleString()}
+                                    -- {/* Not available in hook yet */}
                                 </div>
                             </div>
                             <div className="p-3 bg-purple-500/10 rounded-lg">
@@ -139,36 +108,41 @@ export function AdminDashboard() {
                 </div>
             </div>
 
-            {/* Platform & Goals */}
+            {/* Platform & Activity */}
             <div>
-                <h2 className="text-xl font-semibold text-white mb-4">Platform & Engagement</h2>
+                <h2 className="text-xl font-semibold text-white mb-4">Platform & Activity</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                         <div className="text-sm text-zinc-500 mb-2">Total Platforms</div>
-                        <div className="text-3xl font-bold text-white">{stats?.platforms.total || 0}</div>
-                        <div className="text-xs text-zinc-600 mt-2">{stats?.platforms.active || 0} active</div>
+                        <div className="text-3xl font-bold text-white">{stats.platforms.total || 0}</div>
+                        <div className="text-xs text-zinc-600 mt-2">{stats.platforms.activeConnections || 0} active connections</div>
                     </div>
 
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                        <div className="text-sm text-zinc-500 mb-2">Total Goals</div>
+                        <div className="text-sm text-zinc-500 mb-2">Total Activity</div>
                         <div className="text-3xl font-bold text-white">
-                            {(stats?.goals.total || 0).toLocaleString()}
+                            {(stats.activity.totalEntriesInPeriod || 0).toLocaleString()}
                         </div>
-                        <div className="text-xs text-green-500 mt-2">{stats?.goals.completed || 0} completed</div>
+                        <div className="text-xs text-zinc-600 mt-2">entries in period</div>
                     </div>
 
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                         <div className="text-sm text-zinc-500 mb-2">Active Subscriptions</div>
                         <div className="text-3xl font-bold text-white">
-                            {(stats?.subscriptions.active || 0).toLocaleString()}
+                            {(
+                                (stats.subscriptions.free || 0) +
+                                (stats.subscriptions.starter || 0) +
+                                (stats.subscriptions.pro || 0) +
+                                (stats.subscriptions.enterprise || 0)
+                            ).toLocaleString()}
                         </div>
-                        <div className="text-xs text-zinc-600 mt-2">of {stats?.subscriptions.total || 0} total</div>
+                        <div className="text-xs text-zinc-600 mt-2">total across all tiers</div>
                     </div>
 
                     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                         <div className="text-sm text-zinc-500 mb-2">Monthly Revenue</div>
                         <div className="text-3xl font-bold text-white">
-                            ${(stats?.subscriptions.revenue || 0).toLocaleString()}
+                            ${(stats.subscriptions.mrr || 0).toLocaleString()}
                         </div>
                         <div className="text-xs text-green-500 mt-2">MRR</div>
                     </div>
@@ -215,5 +189,3 @@ export function AdminDashboard() {
         </div>
     );
 }
-
-export default AdminDashboard;

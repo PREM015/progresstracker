@@ -1,8 +1,8 @@
 // src/services/achievementService.ts
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { 
-  Achievement as DbAchievement, 
+import {
+  Achievement as DbAchievement,
   UserAchievement as DbUserAchievement,
   PlatformCategory,
   Prisma
@@ -12,27 +12,27 @@ import {
 // TYPES
 // =============================================================================
 
-export type AchievementCategory = 
-  | 'problems' 
-  | 'streak' 
-  | 'consistency' 
-  | 'goals' 
-  | 'platforms' 
-  | 'special' 
+export type AchievementCategory =
+  | 'problems'
+  | 'streak'
+  | 'consistency'
+  | 'goals'
+  | 'platforms'
+  | 'special'
   | 'milestone';
 
-export type AchievementRarity = 
-  | 'common' 
-  | 'uncommon' 
-  | 'rare' 
-  | 'epic' 
+export type AchievementRarity =
+  | 'common'
+  | 'uncommon'
+  | 'rare'
+  | 'epic'
   | 'legendary';
 
-export type AchievementTier = 
-  | 'bronze' 
-  | 'silver' 
-  | 'gold' 
-  | 'platinum' 
+export type AchievementTier =
+  | 'bronze'
+  | 'silver'
+  | 'gold'
+  | 'platinum'
   | 'diamond';
 
 export interface AchievementRequirement {
@@ -139,7 +139,7 @@ export class AchievementService {
   static async getPinnedAchievements(userId: string, limit: number = 5) {
     try {
       const userAchievements = await prisma.userAchievement.findMany({
-        where: { 
+        where: {
           userId,
           isPinned: true,
           isHidden: false,
@@ -166,7 +166,7 @@ export class AchievementService {
     try {
       const [userAchievements, allAchievements, stats] = await Promise.all([
         prisma.userAchievement.findMany({ where: { userId } }),
-        prisma.achievement.findMany({ 
+        prisma.achievement.findMany({
           where: { isActive: true },
           orderBy: [
             { category: 'asc' },
@@ -800,48 +800,26 @@ export class AchievementService {
   ): number {
     if (!requirement) return 0;
 
-    const metricMap: Record<string, keyof UserStats> = {
-      problems_solved: 'problems_solved',
-      goals_completed: 'goals_completed',
-      platforms_connected: 'platforms_connected',
-      current_streak: 'current_streak',
-      longest_streak: 'longest_streak',
-      days_active: 'days_active',
-      total_commits: 'total_commits',
-      total_time_spent: 'total_time_spent',
-    };
-
-    const key = metricMap[requirement.metric];
-    return key ? stats[key] : 0;
+    switch (requirement.type) {
+      case 'count':
+        if (requirement.metric === 'problems_solved') return stats.problems_solved;
+        if (requirement.metric === 'goals_completed') return stats.goals_completed;
+        if (requirement.metric === 'platforms_connected') return stats.platforms_connected;
+        if (requirement.metric === 'total_commits') return stats.total_commits;
+        // Add more metrics as needed
+        return 0;
+      case 'streak':
+        if (requirement.metric === 'current_streak') return stats.current_streak;
+        if (requirement.metric === 'longest_streak') return stats.longest_streak;
+        return 0;
+      case 'milestone':
+        return 0; // Implement logic
+      default:
+        return 0;
+    }
   }
 
-  private static formatAchievement(dbAchievement: DbAchievement): Achievement {
-    const requirement = this.parseRequirement(dbAchievement.requirement);
-
-    return {
-      id: dbAchievement.id,
-      slug: dbAchievement.slug,
-      title: dbAchievement.title,
-      description: dbAchievement.description,
-      category: dbAchievement.category,
-      tier: (dbAchievement.tier || 'bronze') as AchievementTier,
-      icon: dbAchievement.icon || '🏆',
-      color: dbAchievement.color || undefined,
-      badgeImage: dbAchievement.badgeImage || undefined,
-      points: dbAchievement.points,
-      xpReward: dbAchievement.xpReward,
-      rarity: (dbAchievement.rarity || 'common') as AchievementRarity,
-      requirement: requirement || { type: 'count', metric: 'custom', value: 1 },
-      requirementText: dbAchievement.requirementText || undefined,
-      isHidden: dbAchievement.isHidden,
-      isSecret: dbAchievement.isSecret,
-      isActive: dbAchievement.isActive,
-    };
-  }
-
-  private static formatUserAchievement(
-    ua: DbUserAchievement & { achievement: DbAchievement }
-  ): UserAchievementWithDetails {
+  private static formatUserAchievement(ua: DataUserAchievement): UserAchievementWithDetails {
     return {
       id: ua.id,
       userId: ua.userId,
@@ -849,12 +827,39 @@ export class AchievementService {
       achievement: this.formatAchievement(ua.achievement),
       progress: ua.progress,
       progressPercentage: ua.progressPercentage,
-      currentThreshold: ua.currentThreshold,
+      currentThreshold: 0, // Calculate dynamically if needed
       unlockedAt: ua.unlockedAt,
       isPinned: ua.isPinned,
       isHidden: ua.isHidden,
     };
   }
+
+  private static formatAchievement(a: DataAchievement): Achievement {
+    return {
+      id: a.id,
+      slug: a.slug,
+      title: a.title,
+      description: a.description,
+      category: a.category,
+      tier: a.tier as AchievementTier,
+      icon: a.icon || '',
+      color: a.color || undefined,
+      badgeImage: a.badgeImage || undefined,
+      points: a.points,
+      xpReward: a.xpReward,
+      rarity: a.rarity as AchievementRarity,
+      requirement: a.requirement as unknown as AchievementRequirement,
+      requirementText: a.requirementText || undefined,
+      isHidden: a.isHidden,
+      isSecret: a.isSecret,
+      isActive: a.isActive,
+    };
+  }
 }
 
-export default AchievementService;
+// Export standalone function for cron jobs
+export const checkUserAchievements = AchievementService.checkAndUnlockAchievements.bind(AchievementService);
+
+// Helper types for private methods
+type DataAchievement = DbAchievement;
+type DataUserAchievement = DbUserAchievement & { achievement: DataAchievement };

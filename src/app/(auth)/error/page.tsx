@@ -1,3 +1,4 @@
+'use client';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthLayout } from '@/components/layouts/AuthLayout';
 import { MetaTags } from '@/components/seo/MetaTags';
@@ -5,18 +6,6 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
 import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-
-function ErrorContent() {
-    // This hook needs to be inside a component wrapper or Suspense
-    // But since this is a server component by default (unless 'use client'), 
-    // we should make this a client component or handle search params safely.
-    // Let's make a client component wrapper for the content.
-    return <AuthErrorContent />;
-}
-
-// Client component for content
-'use client';
 import { useSearchParams as useClientSearchParams } from 'next/navigation';
 
 function AuthErrorContent() {
@@ -61,7 +50,7 @@ export default function ErrorPage() {
         >
             <MetaTags title="Auth Error" description="Authentication error occurred" />
             <Suspense fallback={<div>Loading...</div>}>
-                <ErrorContent />
+                <AuthErrorContent />
             </Suspense>
         </AuthLayout>
     );

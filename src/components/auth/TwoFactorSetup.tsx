@@ -1,26 +1,54 @@
-// components/auth/TwoFactorVerify.tsx
+// components/auth/TwoFactorSetup.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
 import apiClient from '@/lib/apiClient';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { FormError } from '@/components/forms/FormError';
+import { FormSuccess } from '@/components/forms/FormSuccess';
+import { Loader2 } from 'lucide-react';
 
-export default function TwoFactorVerify() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
-
-  const [code, setCode] = useState('');
+export function TwoFactorSetup() {
+  const [loading, setLoading] = useState(true);
+  const [setupData, setSetupData] = useState<{
+    secret: string;
+    qrCodeUrl: string;
+    backupCodes: string[];
+  } | null>(null);
+  const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [step, setStep] = useState<'setup' | 'verify' | 'complete'>('setup');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchSetupData();
+  }, []);
+
+  const fetchSetupData = async () => {
+    try {
+      const response = await apiClient.post('/auth/2fa/setup');
+
+      if (response.error) {
+        setError(response.error);
+      } else {
+        setSetupData(response.data);
+      }
+    } catch (err) {
+      console.error('2FA setup error:', err);
+      setError('Failed to initialize 2FA setup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!code || (useBackupCode ? code.length < 8 : code.length !== 6)) {
-      setError('Please enter a valid code');
+    if (!verificationCode || verificationCode.length !== 6) {
+      setError('Please enter a valid 6-digit code');
       return;
     }
 
@@ -28,15 +56,13 @@ export default function TwoFactorVerify() {
 
     try {
       const response = await apiClient.post('/auth/2fa/verify', {
-        code,
-        method: useBackupCode ? 'backup_code' : 'totp',
+        code: verificationCode,
       });
 
       if (response.error) {
         setError(response.error);
       } else {
-        router.push(callbackUrl);
-        router.refresh();
+        setStep('complete');
       }
     } catch (err) {
       console.error('2FA verification error:', err);
@@ -46,69 +72,133 @@ export default function TwoFactorVerify() {
     }
   };
 
+  if (loading && !setupData) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (step === 'complete') {
+    return (
+      <div className="text-center py-8">
+        <FormSuccess message="2FA Enabled Successfully!" variant="block" className="mb-6" />
+
+        <p className="text-muted-foreground mb-6">
+          Your account is now protected with two-factor authentication
+        </p>
+
+        {setupData?.backupCodes && (
+          <div className="mb-6 p-4 bg-muted rounded-lg border">
+            <p className="text-sm font-medium mb-3">
+              <strong>Save your backup codes!</strong> You can use these to access your account if you lose your authenticator device.
+            </p>
+            <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+              {setupData.backupCodes.map((code, i) => (
+                <div key={i} className="p-2 bg-background rounded border">
+                  {code}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <Button
+          onClick={() => window.location.href = '/settings/security'}
+          className="w-full sm:w-auto"
+        >
+          Go to Security Settings
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-        </div>
+    <div className="space-y-6">
+      {error && <FormError message={error} variant="block" />}
+
+      {step === 'setup' && setupData && (
+        <>
+          <div className="text-center space-y-4">
+            <h3 className="text-lg font-semibold">Scan QR Code</h3>
+
+            <div className="inline-block p-4 bg-white rounded-lg border shadow-sm">
+              <Image
+                src={setupData.qrCodeUrl}
+                alt="2FA QR Code"
+                width={200}
+                height={200}
+              />
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
+            </p>
+          </div>
+
+          <div className="p-4 bg-muted rounded-lg border">
+            <p className="text-xs text-muted-foreground mb-2">
+              Can't scan? Enter this code manually:
+            </p>
+            <p className="font-mono text-sm break-all font-medium">
+              {setupData.secret}
+            </p>
+          </div>
+
+          <Button
+            onClick={() => setStep('verify')}
+            className="w-full"
+          >
+            I've Scanned the Code
+          </Button>
+        </>
       )}
 
-      <div>
-        <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          {useBackupCode ? 'Backup Code' : 'Authentication Code'}
-        </label>
-        <input
-          id="code"
-          type="text"
-          value={code}
-          onChange={(e) => {
-            const value = useBackupCode 
-              ? e.target.value.toUpperCase()
-              : e.target.value.replace(/\D/g, '').slice(0, 6);
-            setCode(value);
-            setError('');
-          }}
-          className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent transition-all outline-none text-center text-2xl tracking-widest font-mono"
-          placeholder={useBackupCode ? 'XXXX-XXXX-XXXX' : '000000'}
-          maxLength={useBackupCode ? 14 : 6}
-          autoComplete="off"
-          autoFocus
-        />
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-          {useBackupCode 
-            ? 'Enter one of your backup codes' 
-            : 'Enter the 6-digit code from your authenticator app'
-          }
-        </p>
-      </div>
+      {step === 'verify' && (
+        <form onSubmit={handleVerify} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="code">Enter Verification Code</Label>
+            <Input
+              id="code"
+              type="text"
+              value={verificationCode}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setVerificationCode(value);
+                setError('');
+              }}
+              className="text-center text-2xl tracking-widest font-mono"
+              placeholder="000000"
+              maxLength={6}
+              autoComplete="off"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter the 6-digit code from your authenticator app
+            </p>
+          </div>
 
-      <button
-        type="submit"
-        disabled={loading || !code}
-        className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-blue-500/30"
-      >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            Verifying...
-          </span>
-        ) : (
-          'Verify'
-        )}
-      </button>
+          <div className="space-y-2">
+            <Button
+              type="submit"
+              disabled={loading || verificationCode.length !== 6}
+              className="w-full"
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Verify & Enable 2FA
+            </Button>
 
-      <button
-        type="button"
-        onClick={() => {
-          setUseBackupCode(!useBackupCode);
-          setCode('');
-          setError('');
-        }}
-        className="w-full px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-      >
-        {useBackupCode ? '← Use authenticator app' : 'Use backup code instead'}
-      </button>
-    </form>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setStep('setup')}
+              className="w-full"
+            >
+              ← Back to QR Code
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }

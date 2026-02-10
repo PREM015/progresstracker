@@ -62,6 +62,8 @@ const querySchema = z.object({
   search: z.string().max(200).optional(),
   sortBy: z.enum(['createdAt', 'updatedAt', 'deadline', 'progress', 'title']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
   includeArchived: z.coerce.boolean().default(false),
 });
 
@@ -276,6 +278,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       sortBy,
       sortOrder,
       includeArchived,
+      startDate,
+      endDate,
     } = queryValidation.data;
 
     // Build where clause
@@ -304,6 +308,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+    }
+
+    if (startDate) {
+      where.createdAt = { ...where.createdAt as Prisma.DateTimeFilter, gte: new Date(startDate) };
+    }
+
+    if (endDate) {
+      where.createdAt = { ...where.createdAt as Prisma.DateTimeFilter, lte: new Date(endDate) };
     }
 
     // Execute query with pagination
@@ -653,7 +665,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     const response = apiResponse.success(
       { updated: result.count, ids },
-      {  message: `${result.count} goals updated successfully` }
+      { message: `${result.count} goals updated successfully` }
     );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
@@ -776,7 +788,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     const response = apiResponse.success(
       { deleted: result.count, ids: existingGoals.map((g) => g.id) },
-      {  message: `${result.count} goals deleted successfully` }
+      { message: `${result.count} goals deleted successfully` }
     );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {

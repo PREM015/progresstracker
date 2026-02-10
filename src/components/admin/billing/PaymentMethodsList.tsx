@@ -1,18 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminPaymentMethods } from '@/hooks/useAdminBilling';
 
 export function PaymentMethodsList() {
-    const [methods, setMethods] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { methods, isLoading: loading } = useAdminPaymentMethods();
 
-    useEffect(() => {
-        fetch('/api/admin/billing/payment-methods')
-            .then(res => res.json())
-            .then(data => setMethods(data || []))
-            .finally(() => setLoading(false));
-    }, []);
-
+    // TODO: Add Loading UI
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading payment methods...</div>;
     }

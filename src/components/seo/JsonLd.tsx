@@ -1,4 +1,7 @@
-'use client'; // Required for using simple-jsonld or similar if needed, but implementing manually here
+// ============================================================================
+// FILE: src/components/seo/JsonLd.tsx
+// PURPOSE: Structured data (JSON-LD) for SEO
+// ============================================================================
 
 import Script from 'next/script';
 

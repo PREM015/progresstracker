@@ -28,11 +28,11 @@ export const queryKeys = {
   // ===== TRACKER =====
   tracker: {
     all: ['tracker'] as const,
-    entries: (filters?: Record<string, unknown>) => 
+    entries: (filters?: Record<string, unknown>) =>
       [...queryKeys.tracker.all, 'entries', filters] as const,
     entry: (id: string) => [...queryKeys.tracker.all, 'entry', id] as const,
     daily: (date: string) => [...queryKeys.tracker.all, 'daily', date] as const,
-    range: (start: string, end: string) => 
+    range: (start: string, end: string) =>
       [...queryKeys.tracker.all, 'range', start, end] as const,
     stats: (period?: string) => [...queryKeys.tracker.all, 'stats', period] as const,
     heatmap: (year?: number) => [...queryKeys.tracker.all, 'heatmap', year] as const,
@@ -56,7 +56,7 @@ export const queryKeys = {
   // ===== GOALS =====
   goals: {
     all: ['goals'] as const,
-    list: (filters?: Record<string, unknown>) => 
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.goals.all, 'list', filters] as const,
     active: () => [...queryKeys.goals.all, 'active'] as const,
     completed: () => [...queryKeys.goals.all, 'completed'] as const,
@@ -91,7 +91,7 @@ export const queryKeys = {
   // ===== NOTIFICATIONS =====
   notifications: {
     all: ['notifications'] as const,
-    list: (filters?: Record<string, unknown>) => 
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.notifications.all, 'list', filters] as const,
     unread: () => [...queryKeys.notifications.all, 'unread'] as const,
     unreadCount: () => [...queryKeys.notifications.all, 'unreadCount'] as const,
@@ -162,7 +162,7 @@ export const queryKeys = {
   // ===== SEARCH =====
   search: {
     all: ['search'] as const,
-    results: (query: string, filters?: Record<string, unknown>) => 
+    results: (query: string, filters?: Record<string, unknown>) =>
       [...queryKeys.search.all, 'results', query, filters] as const,
     suggestions: (query: string) => [...queryKeys.search.all, 'suggestions', query] as const,
     recent: () => [...queryKeys.search.all, 'recent'] as const,
@@ -172,19 +172,86 @@ export const queryKeys = {
   admin: {
     all: ['admin'] as const,
     dashboard: () => [...queryKeys.admin.all, 'dashboard'] as const,
-    users: (filters?: Record<string, unknown>) => 
+    users: (filters?: Record<string, unknown>) =>
       [...queryKeys.admin.all, 'users', filters] as const,
     user: (id: string) => [...queryKeys.admin.all, 'user', id] as const,
     platforms: () => [...queryKeys.admin.all, 'platforms'] as const,
     stats: () => [...queryKeys.admin.all, 'stats'] as const,
-    auditLogs: (filters?: Record<string, unknown>) => 
+    auditLogs: (filters?: Record<string, unknown>) =>
       [...queryKeys.admin.all, 'auditLogs', filters] as const,
+    system: () => [...queryKeys.admin.all, 'system'] as const,
+    blog: (filter?: string) => [...queryKeys.admin.all, 'blog', filter] as const,
+    analytics: (timeFrame?: string) => [...queryKeys.admin.all, 'analytics', timeFrame] as const,
+    reports: () => [...queryKeys.admin.all, 'reports'] as const,
+    tickets: (filters?: Record<string, unknown>) => [...queryKeys.admin.all, 'tickets', filters] as const,
+    feedback: () => [...queryKeys.admin.all, 'feedback'] as const,
+    billing: {
+      stats: (period?: string) => [...queryKeys.admin.all, 'billing', 'stats', period] as const,
+      subscriptions: () => [...queryKeys.admin.all, 'billing', 'subscriptions'] as const,
+      invoices: (status?: string) => [...queryKeys.admin.all, 'billing', 'invoices', status] as const,
+      paymentMethods: () => [...queryKeys.admin.all, 'billing', 'paymentMethods'] as const,
+    },
+    communication: {
+      newsletters: () => [...queryKeys.admin.all, 'communication', 'newsletters'] as const,
+      templates: () => [...queryKeys.admin.all, 'communication', 'templates'] as const,
+      template: (id: string) => [...queryKeys.admin.all, 'communication', 'templates', id] as const,
+      emailStats: () => [...queryKeys.admin.all, 'communication', 'email', 'stats'] as const,
+    },
+    logs: {
+      audit: (filters?: Record<string, unknown>) => [...queryKeys.admin.all, 'logs', 'audit', filters] as const,
+      system: (filters?: Record<string, unknown>) => [...queryKeys.admin.all, 'logs', 'system', filters] as const,
+    },
+    gamification: {
+      achievements: () => [...queryKeys.admin.all, 'gamification', 'achievements'] as const,
+      stats: () => [...queryKeys.admin.all, 'gamification', 'stats'] as const,
+    },
+    templates: {
+      goals: () => [...queryKeys.admin.all, 'templates', 'goals'] as const,
+    },
+    access: {
+      all: ['access'] as const,
+      roles: () => [...queryKeys.admin.all, 'access', 'roles'] as const,
+      permissions: () => [...queryKeys.admin.all, 'access', 'permissions'] as const,
+    },
+    maintenance: {
+      windows: () => [...queryKeys.admin.all, 'maintenance', 'windows'] as const,
+    },
+    cache: {
+      stats: () => [...queryKeys.admin.all, 'cache', 'stats'] as const,
+    },
+    database: {
+      backups: () => [...queryKeys.admin.all, 'database', 'backups'] as const,
+      stats: () => [...queryKeys.admin.all, 'database', 'stats'] as const,
+    },
+    changelog: {
+      list: () => [...queryKeys.admin.all, 'changelog', 'list'] as const,
+    },
+    growth: {
+      waitlist: (filters?: Record<string, unknown>) => [...queryKeys.admin.all, 'growth', 'waitlist', filters] as const,
+      stats: () => [...queryKeys.admin.all, 'growth', 'stats'] as const,
+    },
+    features: {
+      list: () => [...queryKeys.admin.all, 'features', 'list'] as const,
+      details: (id: string) => [...queryKeys.admin.all, 'features', 'details', id] as const,
+    },
+    sync: {
+      stats: () => [...queryKeys.admin.all, 'sync', 'stats'] as const,
+      logs: () => [...queryKeys.admin.all, 'sync', 'logs'] as const,
+      config: () => [...queryKeys.admin.all, 'sync', 'config'] as const,
+    },
+    metrics: {
+      dashboard: () => [...queryKeys.admin.all, 'metrics', 'dashboard'] as const,
+      api: () => [...queryKeys.admin.all, 'metrics', 'api'] as const,
+      system: () => [...queryKeys.admin.all, 'metrics', 'system'] as const,
+      users: () => [...queryKeys.admin.all, 'metrics', 'users'] as const,
+      performance: () => [...queryKeys.admin.all, 'metrics', 'performance'] as const,
+    },
   },
 
   // ===== ACTIVITY =====
   activity: {
     all: ['activity'] as const,
-    feed: (filters?: Record<string, unknown>) => 
+    feed: (filters?: Record<string, unknown>) =>
       [...queryKeys.activity.all, 'feed', filters] as const,
     recent: (limit?: number) => [...queryKeys.activity.all, 'recent', limit] as const,
   },

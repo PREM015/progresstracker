@@ -1,8 +1,14 @@
+// ============================================================================
+// FILE: src/components/common/Tabs.tsx
+// PURPOSE: Generic tabs component with variants and optional persistence
+// ============================================================================
+
 'use client';
 
 import * as React from 'react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
+import { useLocalStorage } from '@/hooks/utils/useLocalStorage';
 
 // VARIANT TYPES:
 type TabsVariant = 'default' | 'pills' | 'underline' | 'boxed';
@@ -13,12 +19,51 @@ const TabsContext = React.createContext<{ variant: TabsVariant }>({ variant: 'de
 // ROOT COMPONENT:
 interface TabsProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Root> {
     variant?: TabsVariant;
+    storageKey?: string; // If provided, persists active tab to localStorage
 }
 
-export function Tabs({ variant = 'default', className, ...props }: TabsProps) {
+export function Tabs({
+    variant = 'default',
+    storageKey,
+    defaultValue,
+    onValueChange,
+    className,
+    ...props
+}: TabsProps) {
+    // Use localStorage hook if storageKey is provided
+    // We need to handle the case where defaultValue is provided but storage might override it
+    // or vice versa.
+
+    // Note: We can't conditionally use the hook, so we always use it 
+    // but ignore the result if storageKey is undefined.
+    // Using a dummy key if undefined to prevent errors, but we won't use the value.
+    const [storedValue, setStoredValue] = useLocalStorage<string>(
+        storageKey || 'temp-tabs-key',
+        defaultValue || ''
+    );
+
+    const isControlled = props.value !== undefined;
+
+    // If storageKey is provided and not controlled, use stored value
+    const effectiveValue = (storageKey && !isControlled) ? storedValue : props.value;
+    const effectiveDefaultValue = (storageKey && !isControlled) ? undefined : defaultValue;
+
+    const handleValueChange = (value: string) => {
+        if (storageKey) {
+            setStoredValue(value);
+        }
+        onValueChange?.(value);
+    };
+
     return (
         <TabsContext.Provider value={{ variant }}>
-            <TabsPrimitive.Root className={cn('w-full', className)} {...props} />
+            <TabsPrimitive.Root
+                className={cn('w-full', className)}
+                value={effectiveValue}
+                defaultValue={effectiveDefaultValue}
+                onValueChange={handleValueChange}
+                {...props}
+            />
         </TabsContext.Provider>
     );
 }

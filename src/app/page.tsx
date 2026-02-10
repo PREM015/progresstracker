@@ -8,13 +8,11 @@ import FAQ from "@/components/landing/FAQ";
 import CTASection from "@/components/landing/CTASection";
 import Platforms from "@/components/landing/Platforms";
 import Newsletter from "@/components/landing/Newsletter";
-import { Navbar } from "@/components/navigation/Navbar";
-import { Footer } from "@/components/navigation/Footer";
+import { PublicLayout } from "@/components/layouts/PublicLayout";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      <Navbar />
+    <PublicLayout>
       <Hero />
       <Features />
       <HowItWorks />
@@ -25,7 +23,6 @@ export default function HomePage() {
       <FAQ />
       <Newsletter />
       <CTASection />
-      <Footer />
-    </div>
+    </PublicLayout>
   );
 }

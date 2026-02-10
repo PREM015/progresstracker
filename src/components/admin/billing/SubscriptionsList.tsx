@@ -1,11 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useAdminSubscriptions } from '@/hooks/useAdminSubscriptions';
 
 export function SubscriptionsList() {
-    const [subs, setSubs] = useState<any[]>([]);
-    useEffect(() => {
-        fetch('/api/admin/billing/subscriptions').then(r => r.json()).then(d => setSubs(d || []));
-    }, []);
+    const { subscriptions: subs, isLoading: loading } = useAdminSubscriptions();
+
+    if (loading) {
+        return <div className="text-center text-zinc-500">Loading subscriptions...</div>;
+    }
 
     return (
         <div className="space-y-4">

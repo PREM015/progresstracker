@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/common/Avatar.tsx
+// PURPOSE: User avatar component with fallback and status indicator
+// ============================================================================
+
 'use client';
 
 import * as React from 'react';

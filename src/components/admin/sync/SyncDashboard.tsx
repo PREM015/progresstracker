@@ -1,29 +1,7 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useAdminSync } from '@/hooks/useAdminSync';
 
 export function SyncDashboard() {
-    const [syncData, setSyncData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchSyncData();
-        const interval = setInterval(fetchSyncData, 10000); // Refresh every 10s
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchSyncData = async () => {
-        try {
-            const res = await fetch('/api/admin/sync/status');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setSyncData(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { status: syncData, isLoadingStatus: loading } = useAdminSync();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading sync status...</div>;
@@ -56,12 +34,12 @@ export function SyncDashboard() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Platform Sync Status</h3>
                 <div className="space-y-3">
-                    {syncData?.platformStatus?.map((platform: any) => (
+                    {syncData?.platformStatus?.map((platform) => (
                         <div key={platform.id} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg">
                             <div className="flex items-center gap-3">
                                 <div className={`w-2 h-2 rounded-full ${platform.status === 'ACTIVE' ? 'bg-green-400' :
-                                        platform.status === 'SYNCING' ? 'bg-blue-400 animate-pulse' :
-                                            'bg-yellow-400'
+                                    platform.status === 'SYNCING' ? 'bg-blue-400 animate-pulse' :
+                                        'bg-yellow-400'
                                     }`} />
                                 <span className="text-white font-medium">{platform.name}</span>
                             </div>

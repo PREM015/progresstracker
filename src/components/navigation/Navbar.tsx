@@ -17,8 +17,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { PUBLIC_ROUTES, DASHBOARD_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from '@/constants/routes';
 
-export function Navbar() {
+interface NavbarProps {
+  variant?: 'default' | 'dashboard';
+  className?: string;
+}
+
+export function Navbar({ variant = 'default', className }: NavbarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { setTheme, theme } = useTheme();
@@ -29,11 +35,11 @@ export function Navbar() {
   };
 
   const navLinks = [
-    { href: '/', label: 'Home', public: true },
-    { href: '/features', label: 'Features', public: true },
-    { href: '/pricing', label: 'Pricing', public: true },
-    { href: '/dashboard', label: 'Dashboard', public: false },
-    { href: '/blog', label: 'Blog', public: true },
+    { href: PUBLIC_ROUTES.HOME, label: 'Home', public: true },
+    { href: PUBLIC_ROUTES.FEATURES, label: 'Features', public: true },
+    { href: PUBLIC_ROUTES.PRICING, label: 'Pricing', public: true },
+    { href: DASHBOARD_ROUTES.HOME, label: 'Dashboard', public: false },
+    { href: PUBLIC_ROUTES.BLOG, label: 'Blog', public: true },
   ];
 
   const filteredLinks = navLinks.filter(
@@ -41,30 +47,38 @@ export function Navbar() {
   );
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
-      <div className="container flex h-16 items-center justify-between">
+    <nav
+      className={cn(
+        "border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40",
+        variant === 'dashboard' && "px-4 md:px-6",
+        className
+      )}
+    >
+      <div className={cn("flex h-16 items-center justify-between", variant === 'default' && "container")}>
         <div className="flex items-center gap-6">
           <Link href="/" className="font-bold text-xl flex items-center gap-2">
             <span className="bg-primary text-primary-foreground p-1 rounded-md">PT</span>
             <span>ProgressTracker</span>
           </Link>
 
-          <div className="hidden md:flex gap-6">
-            {filteredLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  'text-sm font-medium transition-colors hover:text-primary',
-                  pathname === link.href
-                    ? 'text-foreground'
-                    : 'text-muted-foreground'
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
+          {variant === 'default' && (
+            <div className="hidden md:flex gap-6">
+              {filteredLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    'text-sm font-medium transition-colors hover:text-primary',
+                    pathname === link.href
+                      ? 'text-foreground'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -86,7 +100,7 @@ export function Navbar() {
                   <Avatar
                     src={session.user?.image || undefined}
                     alt={session.user?.name || 'User'}
-                    fallback={session.user?.name}
+                    fallback={session.user?.name || '?'}
                     size="sm"
                   />
                 </Button>
@@ -96,26 +110,26 @@ export function Navbar() {
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{session.user?.name}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {session.user?.email}
+                      {session.user?.email || ''}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard">
+                  <Link href={DASHBOARD_ROUTES.HOME}>
                     <User className="mr-2 h-4 w-4" />
                     Dashboard
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/settings">
+                  <Link href={SETTINGS_ROUTES.ACCOUNT}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </Link>
                 </DropdownMenuItem>
                 {/* Check for admin role if applicable */}
                 <DropdownMenuItem asChild>
-                  <Link href="/admin">
+                  <Link href={ADMIN_ROUTES.DASHBOARD}>
                     <Shield className="mr-2 h-4 w-4" />
                     Admin
                   </Link>
@@ -172,10 +186,10 @@ export function Navbar() {
           <div className="border-t pt-4">
             {!session && (
               <div className="flex flex-col gap-2">
-                <Button w-full variant="outline" asChild>
+                <Button className="w-full" variant="outline" asChild>
                   <Link href="/login">Log in</Link>
                 </Button>
-                <Button w-full asChild>
+                <Button className="w-full" asChild>
                   <Link href="/register">Sign up</Link>
                 </Button>
               </div>

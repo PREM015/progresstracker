@@ -28,8 +28,84 @@ export abstract class BaseScraper {
   protected useProxy: boolean = false;
   protected requiresAuth: boolean = false;
 
-  // Abstract method - must be implemented by each scraper
+  // ==========================================================================
+  // ABSTRACT METHODS - Must be implemented by each scraper
+  // ==========================================================================
+
+  /**
+   * Fetch raw data from the platform
+   * This is the main method each scraper must implement
+   */
   abstract fetchData(credentials: ScraperCredentials): Promise<ScraperResult>;
+
+  // ==========================================================================
+  // PUBLIC METHODS - Can be overridden if needed
+  // ==========================================================================
+
+  /**
+   * Main scrape method - calls fetchData internally
+   * Can be overridden by subclasses for custom behavior
+   */
+  async scrape(credentials: ScraperCredentials): Promise<ScraperResult> {
+    try {
+      // Validate required credentials
+      if (this.requiresAuth) {
+        this.validateCredentials(credentials, ['username']);
+      }
+
+      // Call the platform-specific fetchData
+      return await this.fetchData(credentials);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
+   * Parse and normalize scraped data
+   * Override this in subclasses for custom parsing
+   */
+  async parseData(result: ScraperResult): Promise<Record<string, unknown>> {
+    if (!result.success || !result.entries) {
+      return {};
+    }
+
+    // Aggregate data from entries
+    let totalProblems = 0;
+    let easyProblems = 0;
+    let mediumProblems = 0;
+    let hardProblems = 0;
+    let commits = 0;
+    let pullRequests = 0;
+    let timeSpent = 0;
+
+    for (const entry of result.entries) {
+      totalProblems += entry.problems || 0;
+      easyProblems += entry.easy || 0;
+      mediumProblems += entry.medium || 0;
+      hardProblems += entry.hard || 0;
+      commits += entry.commits || 0;
+      pullRequests += entry.pullRequests || 0;
+      timeSpent += entry.timeSpent || 0;
+    }
+
+    return {
+      problemsSolved: totalProblems,
+      problemsAttempted: totalProblems,
+      easyProblems,
+      mediumProblems,
+      hardProblems,
+      commits,
+      pullRequests,
+      timeSpent,
+      rating: result.metadata?.rating,
+      rank: result.metadata?.rank,
+      streak: result.metadata?.streak,
+      points: result.metadata?.points,
+      totalSubmissions: result.metadata?.totalSubmissions,
+      acceptedSubmissions: result.metadata?.acceptedSubmissions,
+      ...result.metadata,
+    };
+  }
 
   /**
    * Get scraper capabilities
@@ -59,6 +135,10 @@ export abstract class BaseScraper {
       rateLimitManager.configure(this.platformSlug, config.rateLimit);
     }
   }
+
+  // ==========================================================================
+  // PROTECTED METHODS - Available to subclasses
+  // ==========================================================================
 
   /**
    * HTTP request with retry logic and rate limiting

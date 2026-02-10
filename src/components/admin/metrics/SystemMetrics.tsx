@@ -1,17 +1,7 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useAdminMetrics } from '@/hooks/useAdminMetrics';
 
 export function SystemMetrics() {
-    const [metrics, setMetrics] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetch('/api/admin/metrics/system')
-            .then(res => res.json())
-            .then(data => setMetrics(data))
-            .finally(() => setLoading(false));
-    }, []);
+    const { system: metrics, isLoadingSystem: loading } = useAdminMetrics();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading system metrics...</div>;

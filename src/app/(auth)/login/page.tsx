@@ -4,10 +4,7 @@ import { MetaTags } from '@/components/seo/MetaTags';
 
 export default function LoginPage() {
   return (
-    <AuthLayout
-      heading="Welcome back"
-      description="Enter your email to sign in to your account"
-    >
+    <AuthLayout>
       <MetaTags title="Login" description="Sign in to your Progress Tracker account" />
       <LoginForm />
     </AuthLayout>

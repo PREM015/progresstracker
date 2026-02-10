@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useSettings } from '@/hooks/useSettings';
+import { toast } from 'sonner';
 
 interface AppearanceSettingsProps {
   className?: string;
@@ -9,8 +11,17 @@ interface AppearanceSettingsProps {
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   className = '',
 }) => {
-  const [theme, setTheme] = useState<'light' | 'dark' | 'auto'>('light');
-  const [fontSize, setFontSize] = useState('medium');
+  const { settings, theme, updateSettings, isUpdating } = useSettings();
+  const fontSize = settings?.fontSize;
+
+  const handleUpdate = async (key: string, value: any) => {
+    try {
+      await updateSettings({ [key]: value });
+      toast.success('Settings updated');
+    } catch (error) {
+      toast.error('Failed to update settings');
+    }
+  };
 
   return (
     <div className={`bg-white border rounded-xl p-6 ${className}`}>
@@ -20,14 +31,14 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
         <div>
           <label className="block font-medium mb-3">Theme</label>
           <div className="grid grid-cols-3 gap-3">
-            {(['light', 'dark', 'auto'] as const).map((t) => (
+            {(['light', 'dark', 'system'] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => setTheme(t)}
-                className={`p-4 border-2 rounded-lg capitalize ${theme === t ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200'
-                  }`}
+                onClick={() => handleUpdate('theme', t)}
+                disabled={isUpdating}
+                className={`p-4 border-2 rounded-lg capitalize ${theme === t ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200'} ${isUpdating ? 'opacity-50' : ''}`}
               >
-                {t === 'light' && '☀️'} {t === 'dark' && '🌙'} {t === 'auto' && '⚙️'} {t}
+                {t === 'light' && '☀️'} {t === 'dark' && '🌙'} {t === 'system' && '⚙️'} {t}
               </button>
             ))}
           </div>
@@ -36,8 +47,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
         <div>
           <label className="block font-medium mb-3">Font Size</label>
           <select
-            value={fontSize}
-            onChange={(e) => setFontSize(e.target.value)}
+            value={fontSize || 'medium'}
+            onChange={(e) => handleUpdate('fontSize', e.target.value)}
+            disabled={isUpdating}
             className="w-full px-4 py-2 border rounded-lg"
           >
             <option value="small">Small</option>
@@ -46,9 +58,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
           </select>
         </div>
 
-        <button className="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-          Save Preferences
-        </button>
+        {/* Note: Save is automatic on change for these, or we can add a manual save if preferred. 
+            The hook supports immediate update. 
+        */}
       </div>
     </div>
   );

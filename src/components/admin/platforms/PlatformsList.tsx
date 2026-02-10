@@ -1,52 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface Platform {
-    id: string;
-    name: string;
-    category: string;
-    isActive: boolean;
-    syncStatus: string;
-    lastSyncAt: string | null;
-    _count: {
-        userPlatforms: number;
-    };
-}
+import { useAdminPlatforms } from '@/hooks/useAdminPlatforms';
 
 export function PlatformsList() {
-    const [platforms, setPlatforms] = useState<Platform[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const { platforms, isLoading: loading, error, togglePlatform } = useAdminPlatforms();
 
-    useEffect(() => {
-        fetchPlatforms();
-    }, []);
-
-    const fetchPlatforms = async () => {
-        setLoading(true);
+    const handleTogglePlatform = async (platformId: string, isActive: boolean) => {
         try {
-            const res = await fetch('/api/admin/platforms');
-            if (!res.ok) throw new Error('Failed to fetch platforms');
-            const data = await res.json();
-            setPlatforms(data.platforms || []);
-            setError(null);
-        } catch (err: any) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const togglePlatform = async (platformId: string, isActive: boolean) => {
-        try {
-            const res = await fetch(`/api/admin/platforms/${platformId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isActive: !isActive }),
-            });
-            if (!res.ok) throw new Error('Failed to update platform');
-            fetchPlatforms();
+            await togglePlatform(platformId, !isActive);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
@@ -63,13 +24,8 @@ export function PlatformsList() {
     if (error) {
         return (
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-                <div className="text-red-400">{error}</div>
-                <button
-                    onClick={fetchPlatforms}
-                    className="mt-4 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
-                >
-                    Retry
-                </button>
+                <div className="text-red-400">Error loading platforms</div>
+                <div className="text-sm text-zinc-500 mt-2">{(error as any)?.message || 'Unknown error'}</div>
             </div>
         );
     }
@@ -84,10 +40,10 @@ export function PlatformsList() {
                             <p className="text-sm text-zinc-500">{platform.category}</p>
                         </div>
                         <button
-                            onClick={() => togglePlatform(platform.id, platform.isActive)}
+                            onClick={() => handleTogglePlatform(platform.id, platform.isActive)}
                             className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${platform.isActive
-                                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                                    : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'
+                                ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                                : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'
                                 }`}
                         >
                             {platform.isActive ? 'Active' : 'Inactive'}
@@ -97,7 +53,7 @@ export function PlatformsList() {
                     <div className="space-y-3">
                         <div className="flex justify-between text-sm">
                             <span className="text-zinc-500">Connected Users</span>
-                            <span className="text-white font-medium">{platform._count.userPlatforms}</span>
+                            <span className="text-white font-medium">{platform._count?.userPlatforms ?? 0}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-zinc-500">Sync Status</span>

@@ -1,57 +1,27 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface Newsletter {
-    id: string;
-    email: string;
-    isActive: boolean;
-    isConfirmed: boolean;
-    topics: string[];
-    subscribedAt: string;
-    unsubscribedAt: string | null;
-}
-
-interface NewsletterStats {
-    total: number;
-    active: number;
-    confirmed: number;
-    unconfirmed: number;
-}
+import { useState } from 'react';
+import { useAdminNewsletters } from '@/hooks/useAdminCommunication';
 
 export function NewsletterList() {
-    const [subscribers, setSubscribers] = useState<Newsletter[]>([]);
-    const [stats, setStats] = useState<NewsletterStats | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { newsletters: subscribers, isLoading: loading, error, refetch } = useAdminNewsletters();
     const [page, setPage] = useState(1);
 
-    useEffect(() => {
-        fetchData();
-    }, [page]);
+    // Stats would ideally come from the same hook or a separate stats hook
+    // For now, we'll derive some stats from the list if possible, or Mock it if the API doesn't return stats with the list.
+    // The previous implementation fetched both list and stats.
+    // Let's assume the hook returns the list.
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [subsRes, statsRes] = await Promise.all([
-                fetch(`/api/admin/newsletter?page=${page}&limit=50`),
-                fetch('/api/admin/newsletter/stats'),
-            ]);
-
-            if (subsRes.ok) {
-                const subsData = await subsRes.json();
-                setSubscribers(subsData.subscribers || subsData || []);
-            }
-
-            if (statsRes.ok) {
-                const statsData = await statsRes.json();
-                setStats(statsData);
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+    const stats = {
+        total: subscribers.length,
+        active: subscribers.filter(s => s.status === 'ACTIVE' || s.isActive).length,
+        confirmed: subscribers.filter(s => s.status === 'CONFIRMED' || s.isConfirmed).length,
+        unconfirmed: subscribers.filter(s => !s.isConfirmed).length,
     };
+
+    if (error) {
+        return <div className="text-red-500">{(error as any)?.message || 'Error loading newsletters'}</div>;
+    }
 
     const unsubscribe = async (id: string, email: string) => {
         if (!confirm(`Unsubscribe ${email}?`)) return;
@@ -61,7 +31,7 @@ export function NewsletterList() {
                 method: 'POST',
             });
             if (!res.ok) throw new Error('Failed to unsubscribe');
-            fetchData();
+            refetch();
         } catch (err: any) {
             alert('Error: ' + err.message);
         }

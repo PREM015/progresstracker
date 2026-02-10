@@ -1,30 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAdminSync } from '@/hooks/useAdminSync';
 
 export function SyncSchedule() {
+    const { schedule: savedSchedule, saveSchedule, isSavingSchedule: saving } = useAdminSync();
     const [schedule, setSchedule] = useState({
         enabled: true,
         interval: '1h',
         platforms: [] as string[],
     });
-    const [saving, setSaving] = useState(false);
 
-    const saveSchedule = async () => {
-        setSaving(true);
+    useEffect(() => {
+        if (savedSchedule) {
+            setSchedule(savedSchedule);
+        }
+    }, [savedSchedule]);
+
+    const handleSaveSchedule = async () => {
         try {
-            const res = await fetch('/api/admin/sync/schedule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(schedule),
-            });
-
-            if (!res.ok) throw new Error('Failed to save');
+            await saveSchedule(schedule);
             alert('Sync schedule updated!');
         } catch (err: any) {
             alert('Error: ' + err.message);
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -62,7 +60,7 @@ export function SyncSchedule() {
                 </div>
 
                 <button
-                    onClick={saveSchedule}
+                    onClick={handleSaveSchedule}
                     disabled={saving}
                     className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50"
                 >

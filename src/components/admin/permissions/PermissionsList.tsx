@@ -1,30 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminPermissions, Permission } from '@/hooks/useAdminAccess';
 
-export function PermissionsList() {
-    const [permissions, setPermissions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+interface PermissionsListProps {
+    onEdit?: (permission: Permission) => void;
+}
 
-    useEffect(() => {
-        fetchPermissions();
-    }, []);
-
-    const fetchPermissions = async () => {
-        try {
-            const res = await fetch('/api/admin/permissions');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setPermissions(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+export function PermissionsList({ onEdit }: PermissionsListProps) {
+    const { permissions, isLoading: loading, error } = useAdminPermissions();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading permissions...</div>;
+    }
+    if (error) {
+        return <div className="p-8 text-center text-red-500">Error loading permissions</div>;
     }
 
     return (
@@ -45,7 +34,10 @@ export function PermissionsList() {
                             <td className="p-4 text-zinc-400 font-mono text-sm">{perm.key}</td>
                             <td className="p-4 text-zinc-400 text-sm">{perm.description || '-'}</td>
                             <td className="p-4">
-                                <button className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-sm">
+                                <button
+                                    onClick={() => onEdit?.(perm)}
+                                    className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded text-sm"
+                                >
                                     Edit
                                 </button>
                             </td>

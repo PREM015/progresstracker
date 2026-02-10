@@ -1,7 +1,7 @@
 // ===== FILE: src/types/platform.ts =====
 // Complete platform types matching Prisma schema
 
-import type { 
+import type {
   PlatformCategory as PrismaPlatformCategory,
   AuthType as PrismaAuthType,
   SyncStatus as PrismaSyncStatus,
@@ -14,13 +14,13 @@ import type {
 /**
  * Config category IDs (lowercase for config files)
  */
-export type PlatformCategoryId = 
-  | 'dsa' 
-  | 'job' 
-  | 'hackathon' 
-  | 'git' 
-  | 'learning' 
-  | 'opensource' 
+export type PlatformCategoryId =
+  | 'dsa'
+  | 'job'
+  | 'hackathon'
+  | 'git'
+  | 'learning'
+  | 'opensource'
   | 'company'
   | 'design'
   | 'data_science'
@@ -41,6 +41,8 @@ export const CategoryMap: Record<PlatformCategoryId, PrismaPlatformCategory> = {
   data_science: 'DATA_SCIENCE',
   other: 'OTHER',
 } as const;
+
+export const CATEGORY_MAP = CategoryMap;
 
 /**
  * Reverse map: Prisma enum to config category
@@ -91,14 +93,14 @@ export const ReverseAuthTypeMap: Record<PrismaAuthType, AuthType> = {
 /**
  * Sync status type
  */
-export type SyncStatus = 
-  | 'idle' 
-  | 'pending' 
-  | 'in_progress' 
-  | 'success' 
-  | 'partial' 
-  | 'failed' 
-  | 'cancelled' 
+export type SyncStatus =
+  | 'idle'
+  | 'pending'
+  | 'in_progress'
+  | 'success'
+  | 'partial'
+  | 'failed'
+  | 'cancelled'
   | 'rate_limited';
 
 /**
@@ -636,8 +638,8 @@ export function configToDbPlatform(config: Platform): Omit<DbPlatform, 'createdA
 export function dbToConfigPlatform(db: DbPlatform): Platform {
   const dataPoints = db.dataPoints
     ? Object.entries(db.dataPoints)
-        .filter(([, enabled]) => enabled)
-        .map(([key]) => key)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key)
     : [];
 
   return {

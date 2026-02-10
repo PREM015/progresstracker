@@ -4,10 +4,7 @@ import { MetaTags } from '@/components/seo/MetaTags';
 
 export default function RegisterPage() {
   return (
-    <AuthLayout
-      heading="Create an account"
-      description="Enter your email below to create your account"
-    >
+    <AuthLayout>
       <MetaTags title="Register" description="Create a new Progress Tracker account" />
       <RegisterForm />
     </AuthLayout>

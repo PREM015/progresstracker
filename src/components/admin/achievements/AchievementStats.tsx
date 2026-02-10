@@ -1,19 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminAchievementStats } from '@/hooks/useAdminGamification';
 
 export function AchievementStats() {
-    const [stats, setStats] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { stats, isLoading: loading } = useAdminAchievementStats();
 
-    useEffect(() => {
-        fetch('/api/admin/achievements/stats')
-            .then(res => res.json())
-            .then(data => setStats(data))
-            .finally(() => setLoading(false));
-    }, []);
-
-    if (loading) return <div className="p-8 text-center text-zinc-500">Loading...</div>;
+    if (loading) return <div className="p-8 text-center text-zinc-500">Loading stats...</div>;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

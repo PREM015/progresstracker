@@ -1,41 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminRoles, Role } from '@/hooks/useAdminAccess';
 
-export function RolesList() {
-    const [roles, setRoles] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+interface RolesListProps {
+    onEdit: (role: Role) => void;
+}
 
-    useEffect(() => {
-        fetchRoles();
-    }, []);
+export function RolesList({ onEdit }: RolesListProps) {
+    const { roles, isLoading: loading, error, deleteRole } = useAdminRoles();
 
-    const fetchRoles = async () => {
-        try {
-            const res = await fetch('/api/admin/roles');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setRoles(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const deleteRole = async (id: string) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Delete this role?')) return;
         try {
-            await fetch(`/api/admin/roles/${id}`, { method: 'DELETE' });
-            fetchRoles();
+            await deleteRole(id);
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
     };
 
-    if (loading) {
-        return <div className="p-8 text-center text-zinc-500">Loading roles...</div>;
-    }
+    if (loading) return <div className="p-8 text-center text-zinc-500">Loading roles...</div>;
+    if (error) return <div className="p-8 text-center text-red-500">Error loading roles</div>;
 
     return (
         <div className="space-y-4">
@@ -69,15 +53,15 @@ export function RolesList() {
                     </div>
 
                     <div className="flex gap-2">
-                        <a
-                            href={`/admin/roles/${role.id}`}
+                        <button
+                            onClick={() => onEdit(role)}
                             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm"
                         >
                             Edit
-                        </a>
+                        </button>
                         {!role.isSystem && (
                             <button
-                                onClick={() => deleteRole(role.id)}
+                                onClick={() => handleDelete(role.id)}
                                 className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm"
                             >
                                 Delete

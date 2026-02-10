@@ -1,44 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useAdminPermissionMatrix } from '@/hooks/useAdminAccess';
 
 export function PermissionMatrix() {
-    const [matrix, setMatrix] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const { matrix, isLoading, togglePermission } = useAdminPermissionMatrix();
 
-    useEffect(() => {
-        fetchMatrix();
-    }, []);
+    if (isLoading) {
+        return <div className="p-8 text-center text-zinc-500">Loading matrix...</div>;
+    }
 
-    const fetchMatrix = async () => {
+    const handleToggle = async (roleId: string, permissionId: string, has: boolean) => {
         try {
-            const res = await fetch('/api/admin/permissions/matrix');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setMatrix(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const togglePermission = async (roleId: string, permissionId: string, has: boolean) => {
-        try {
-            await fetch(`/api/admin/roles/${roleId}/permissions`, {
-                method: has ? 'DELETE' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ permissionId }),
-            });
-            fetchMatrix();
+            await togglePermission({ roleId, permissionId, hasPermission: has });
         } catch (err: any) {
             alert('Error: ' + err.message);
         }
     };
-
-    if (loading) {
-        return <div className="p-8 text-center text-zinc-500">Loading matrix...</div>;
-    }
 
     return (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 overflow-x-auto">
@@ -63,15 +40,15 @@ export function PermissionMatrix() {
                             <td className="p-3 text-white text-sm sticky left-0 bg-zinc-900">
                                 {perm.name}
                             </td>
-                            {matrix.roles.map((role: any) => {
+                            {matrix?.roles?.map((role: any) => {
                                 const hasPermission = role.permissions?.some((p: any) => p.id === perm.id);
                                 return (
                                     <td key={role.id} className="p-3 text-center">
                                         <input
                                             type="checkbox"
                                             checked={hasPermission}
-                                            onChange={() => togglePermission(role.id, perm.id, hasPermission)}
-                                            className="w-4 h-4 cursor-pointer"
+                                            onChange={() => handleToggle(role.id, perm.id, hasPermission)}
+                                            className="w-4 h-4 cursor-pointer rounded border-zinc-700 bg-zinc-900 text-indigo-600 focus:ring-indigo-500"
                                         />
                                     </td>
                                 );

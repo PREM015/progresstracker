@@ -300,4 +300,5 @@ function CheckCircleIcon({ className }: { className?: string }) {
   );
 }
 
+export const AchievementModal = AchievementDetails;
 export default AchievementDetails;

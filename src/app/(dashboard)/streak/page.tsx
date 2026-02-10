@@ -1,34 +1,33 @@
-// ============================================================================
-// FILE: app/(dashboard)/streak/page.tsx
-// PURPOSE: Dedicated streak page showing all streak information
-// ============================================================================
+"use client";
 
-// REFERENCE FILES TO LOOK AT:
-// -----------------------------------------------------------------------------
-// 1. app/(dashboard)/dashboard/page.tsx - Dashboard page pattern
-// 2. app/(dashboard)/analytics/page.tsx - Analytics page layout
-// 3. app/(dashboard)/achievements/page.tsx - Achievements page layout
-// 4. app/(dashboard)/goals/page.tsx - Goals page layout
-// 5. components/streak/StreakCard.tsx - Streak card component
-// 6. components/streak/StreakCalendar.tsx - Streak calendar
-// 7. components/streak/StreakStats.tsx - Streak statistics
-// 8. components/streak/StreakMilestone.tsx - Milestones display
-// 9. components/streak/StreakHistory.tsx - Streak history
-// 10. components/dashboard/StreakDisplay.tsx - Existing streak display
-// 11. app/api/streak/route.ts - Streak API
-// 12. services/streakService.ts - Streak service
-// 13. types/streak.ts - Streak types
-// -----------------------------------------------------------------------------
+import { StreakStats } from "@/components/streak";
 
-// PAGE STRUCTURE:
-// - Header with current streak prominently displayed
-// - Streak calendar (GitHub-style contribution graph)
-// - Milestones section
-// - Quick stats cards
-// - Streak freeze management
-// - Link to history page
+export default function StreakPage() {
+    // Mock data for now, would fetch from API
+    const streakData = {
+        currentStreak: 5,
+        longestStreak: 12,
+        totalActiveDays: 45
+    };
 
-// FEATURES:
-// - Server component with initial data fetch
-// - Client components for interactive elements
-// - Metadata for SEO
+    return (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-3xl font-bold tracking-tight">Streak</h2>
+                <p className="text-muted-foreground">Keep your momentum going!</p>
+            </div>
+
+            <StreakStats
+                currentStreak={streakData.currentStreak}
+                longestStreak={streakData.longestStreak}
+                totalActiveDays={streakData.totalActiveDays}
+            />
+
+            <div className="bg-white p-8 rounded-xl border border-dashed border-gray-300 text-center">
+                <span className="text-4xl mb-4 block">📅</span>
+                <h3 className="text-lg font-medium text-gray-900">Streak Calendar</h3>
+                <p className="text-gray-500 mt-2">Activity history visualization coming soon</p>
+            </div>
+        </div>
+    );
+}

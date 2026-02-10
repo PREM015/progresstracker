@@ -32,30 +32,28 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold">Analytics</h1>
-          <ExportAnalytics />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-4xl font-bold">Analytics</h1>
+        <ExportAnalytics />
+      </div>
+
+      <div className="space-y-6">
+        <AnalyticsFilters onFilterChange={() => { }} />
+        <OverviewStats />
+        <AnalyticsDashboard userId={userId} />
+
+        <div className="grid lg:grid-cols-2 gap-6">
+          <TrendCharts />
+          <PlatformComparison />
+          <CategoryBreakdown />
+          <TimeSpentAnalysis />
         </div>
 
-        <div className="space-y-6">
-          <AnalyticsFilters onFilterChange={() => { }} />
-          <OverviewStats />
-          <AnalyticsDashboard userId={userId} />
-
-          <div className="grid lg:grid-cols-2 gap-6">
-            <TrendCharts />
-            <PlatformComparison />
-            <CategoryBreakdown />
-            <TimeSpentAnalysis />
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-6">
-            <ProductivityScore />
-            <PredictionsCard />
-            <InsightsCard insights={insights} />
-          </div>
+        <div className="grid lg:grid-cols-3 gap-6">
+          <ProductivityScore />
+          <PredictionsCard />
+          <InsightsCard insights={insights} />
         </div>
       </div>
     </div>

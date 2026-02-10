@@ -1,6 +1,11 @@
+// ============================================================================
+// FILE: src/components/forms/FormSuccess.tsx
+// PURPOSE: Form success message display component
+// ============================================================================
+
+import React from 'react';
 import { CheckCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import React from 'react';
 
 // PROPS:
 interface FormSuccessProps {

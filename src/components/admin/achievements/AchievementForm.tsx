@@ -1,32 +1,49 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Achievement, AchievementInput } from '@/hooks/useAdminGamification';
 
-export function AchievementForm({ achievement, onSave }: any) {
-    const [formData, setFormData] = useState({
-        title: achievement?.title || '',
-        description: achievement?.description || '',
-        icon: achievement?.icon || '🏆',
-        points: achievement?.points || 100,
-        rarity: achievement?.rarity || 'COMMON',
-        category: achievement?.category || 'GENERAL',
-        requirementType: achievement?.requirementType || 'COUNT',
-        requirementValue: achievement?.requirementValue || 1,
+interface AchievementFormProps {
+    achievement?: Achievement | null;
+    onSubmit: (data: AchievementInput) => Promise<void>;
+    onCancel: () => void;
+    isSubmitting?: boolean;
+}
+
+export function AchievementForm({ achievement, onSubmit, onCancel, isSubmitting = false }: AchievementFormProps) {
+    const [formData, setFormData] = useState<AchievementInput>({
+        title: '',
+        description: '',
+        icon: '🏆',
+        points: 100,
+        rarity: 'COMMON',
+        category: 'GENERAL',
+        requirementType: 'COUNT',
+        requirementValue: 1,
     });
+
+    useEffect(() => {
+        if (achievement) {
+            setFormData({
+                title: achievement.title,
+                description: achievement.description,
+                icon: achievement.icon,
+                points: achievement.points,
+                rarity: achievement.rarity,
+                category: achievement.category,
+                requirementType: achievement.requirementType,
+                requirementValue: achievement.requirementValue,
+            });
+        }
+    }, [achievement]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const url = achievement ? `/api/admin/achievements/${achievement.id}` : '/api/admin/achievements';
-            const res = await fetch(url, {
-                method: achievement ? 'PATCH' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-            if (!res.ok) throw new Error('Failed to save');
-            onSave?.();
+            await onSubmit(formData);
         } catch (err: any) {
-            alert('Error: ' + err.message);
+            // Error handling should be done by parent or hook
+            console.error(err);
         }
     };
 
@@ -57,12 +74,17 @@ export function AchievementForm({ achievement, onSave }: any) {
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Icon</label>
-                    <input
-                        type="text"
-                        value={formData.icon}
-                        onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                        className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
-                    />
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={formData.icon}
+                            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                            className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
+                        />
+                        <div className="flex items-center justify-center w-10 h-10 bg-zinc-800 rounded-lg text-2xl">
+                            {formData.icon}
+                        </div>
+                    </div>
                 </div>
 
                 <div>
@@ -71,7 +93,7 @@ export function AchievementForm({ achievement, onSave }: any) {
                         type="number"
                         required
                         value={formData.points}
-                        onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, points: parseInt(e.target.value) || 0 })}
                         className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
                     />
                 </div>
@@ -82,7 +104,7 @@ export function AchievementForm({ achievement, onSave }: any) {
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Rarity</label>
                     <select
                         value={formData.rarity}
-                        onChange={(e) => setFormData({ ...formData, rarity: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, rarity: e.target.value as any })}
                         className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
                     >
                         <option value="COMMON">Common</option>
@@ -96,7 +118,7 @@ export function AchievementForm({ achievement, onSave }: any) {
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Category</label>
                     <select
                         value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                         className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
                     >
                         <option value="GENERAL">General</option>
@@ -107,12 +129,48 @@ export function AchievementForm({ achievement, onSave }: any) {
                 </div>
             </div>
 
-            <button
-                type="submit"
-                className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-            >
-                {achievement ? 'Update' : 'Create'} Achievement
-            </button>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Requirement Type</label>
+                    <select
+                        value={formData.requirementType}
+                        onChange={(e) => setFormData({ ...formData, requirementType: e.target.value as any })}
+                        className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
+                    >
+                        <option value="COUNT">Count</option>
+                        <option value="TIME">Time</option>
+                        <option value="CUSTOM">Custom</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Requirement Value</label>
+                    <input
+                        type="number"
+                        required
+                        value={formData.requirementValue}
+                        onChange={(e) => setFormData({ ...formData, requirementValue: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-white focus:border-indigo-500 focus:outline-none"
+                    />
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {isSubmitting ? 'Saving...' : achievement ? 'Update Achievement' : 'Create Achievement'}
+                </button>
+            </div>
         </form>
     );
 }

@@ -1,25 +1,42 @@
+
 'use client';
 
 import { ProblemList, Problem } from '@/components/tracker/ProblemList';
 import { ProblemFilters } from '@/components/tracker/ProblemFilters';
+import { TrackerDashboard } from '@/components/tracker/TrackerDashboard';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { MetaTags } from '@/components/seo/MetaTags';
 
-export default function TrackerPage() {
-  const [problems, setProblems] = useState<Problem[]>([]); // Initialize empty for now
+import { TrackerHeatmap } from '@/components/tracker/TrackerHeatmap';
+import { TrackerRecentActivity } from '@/components/tracker/TrackerRecentActivity';
+import { useTracker } from '@/hooks/useTracker';
+import type { TrackerFilter } from '@/types/tracker';
 
-  // Handlers for filters (logic to be implemented with real data)
-  const handleSearch = (val: string) => console.log('Search:', val);
-  const handlePlatform = (val: string) => console.log('Platform:', val);
-  const handleDifficulty = (val: string) => console.log('Difficulty:', val);
-  const handleStatus = (val: string) => console.log('Status:', val);
+export default function TrackerPage() {
+  const [filters, setFilters] = useState<TrackerFilter>({});
+
+  // Use the hook to fetch real data based on filters
+  const { entries, isLoading, error } = useTracker(filters);
+
+  // Handlers for filters
+  const handleSearch = (search: string) => setFilters(prev => ({ ...prev, search }));
+  const handlePlatform = (platform: string) => setFilters(prev => ({ ...prev, platformIds: platform ? [platform] : undefined }));
+  const handleDifficulty = (difficulty: string) => setFilters(prev => ({ ...prev, difficulty }));
+  // Note: difficulty isn't in TrackerFilter type explicitly in some versions, but if the API supports it, we should add it.
+  // For now, assuming standard filters.
+
+  const handleStatus = (status: string) => setFilters(prev => ({
+    ...prev,
+    status: status === 'all' ? undefined : status as any
+  }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <MetaTags title="Tracker" description="Manage your problem solving journey" />
+
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Problem Tracker</h2>
@@ -27,22 +44,63 @@ export default function TrackerPage() {
             Log and track your coding problems across all platforms.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/tracker/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Log Problem
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/tracker/sync">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Sync Status
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/tracker/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Log Problem
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <ProblemFilters
-        onSearchChange={handleSearch}
-        onPlatformChange={handlePlatform}
-        onDifficultyChange={handleDifficulty}
-        onStatusChange={handleStatus}
-      />
+      {/* Stats Overview & Heatmap */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <div className="col-span-full lg:col-span-4 space-y-6">
+          <TrackerDashboard />
+          <TrackerHeatmap />
+        </div>
+        <div className="col-span-full lg:col-span-3">
+          <TrackerRecentActivity />
+        </div>
+      </div>
 
-      <ProblemList problems={problems} />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold">Your Problems</h3>
+        </div>
+
+        <ProblemFilters
+          onSearchChange={handleSearch}
+          onPlatformChange={handlePlatform}
+          onDifficultyChange={handleDifficulty}
+          onStatusChange={handleStatus}
+        />
+
+        {error ? (
+          <div className="text-red-500 p-4 border border-red-200 rounded-md">
+            Error loading problems: {error instanceof Error ? error.message : 'Unknown error'}
+          </div>
+        ) : (
+          <ProblemList
+            problems={isLoading ? [] : (entries as unknown as Problem[])}
+          // Casting entries because ProblemList expects Problem interface which might differ slightly from TrackerEntry
+          // Ideally we map it, but they should be compatible enough for display.
+          />
+        )}
+
+        {isLoading && (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-md" />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

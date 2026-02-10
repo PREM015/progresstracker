@@ -1,89 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface MaintenanceWindow {
-    id: string;
-    title: string;
-    description: string | null;
-    startTime: string;
-    endTime: string;
-    isActive: boolean;
-    createdAt: string;
-}
+import { useState } from 'react';
+import { useAdminMaintenance, MaintenanceInput } from '@/hooks/useAdminMaintenance';
 
 export function MaintenanceList() {
-    const [windows, setWindows] = useState<MaintenanceWindow[]>([]);
-    const [loading, setLoading] = useState(true);
+    const {
+        maintenanceWindows: windows,
+        isLoadingMaintenance: loading,
+        createMaintenanceWindow,
+        deleteMaintenanceWindow,
+        toggleMaintenanceWindow,
+        isCreatingMaintenance
+    } = useAdminMaintenance();
+
     const [showForm, setShowForm] = useState(false);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<MaintenanceInput>({
         title: '',
         description: '',
         startTime: '',
         endTime: '',
     });
 
-    useEffect(() => {
-        fetchWindows();
-    }, []);
-
-    const fetchWindows = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('/api/admin/maintenance');
-            if (!res.ok) throw new Error('Failed to fetch maintenance windows');
-            const data = await res.json();
-            setWindows(data || []);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const createWindow = async (e: React.FormEvent) => {
+    const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-
         try {
-            const res = await fetch('/api/admin/maintenance', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-            if (!res.ok) throw new Error('Failed to create maintenance window');
-
+            await createMaintenanceWindow(formData);
             setFormData({ title: '', description: '', startTime: '', endTime: '' });
             setShowForm(false);
-            fetchWindows();
         } catch (err: any) {
-            alert('Error: ' + err.message);
+            console.error(err);
         }
     };
 
-    const deleteWindow = async (id: string) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Delete this maintenance window?')) return;
-
         try {
-            const res = await fetch(`/api/admin/maintenance/${id}`, {
-                method: 'DELETE',
-            });
-            if (!res.ok) throw new Error('Failed to delete window');
-            fetchWindows();
+            await deleteMaintenanceWindow(id);
         } catch (err: any) {
-            alert('Error: ' + err.message);
+            console.error(err);
         }
     };
 
-    const toggleWindow = async (id: string, isActive: boolean) => {
+    const handleToggle = async (id: string, isActive: boolean) => {
         try {
-            const endpoint = isActive ? 'deactivate' : 'activate';
-            const res = await fetch(`/api/admin/maintenance/${id}/${endpoint}`, {
-                method: 'POST',
-            });
-            if (!res.ok) throw new Error('Failed to toggle window');
-            fetchWindows();
+            await toggleMaintenanceWindow({ id, isActive });
         } catch (err: any) {
-            alert('Error: ' + err.message);
+            console.error(err);
         }
     };
 
@@ -100,7 +62,7 @@ export function MaintenanceList() {
             </div>
 
             {showForm && (
-                <form onSubmit={createWindow} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <form onSubmit={handleCreate} className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-zinc-400 mb-2">Title</label>
@@ -149,9 +111,10 @@ export function MaintenanceList() {
 
                         <button
                             type="submit"
-                            className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                            disabled={isCreatingMaintenance}
+                            className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
                         >
-                            Create Maintenance Window
+                            {isCreatingMaintenance ? 'Creating...' : 'Create Maintenance Window'}
                         </button>
                     </div>
                 </form>
@@ -201,16 +164,16 @@ export function MaintenanceList() {
 
                                 <div className="flex items-center gap-2 ml-4">
                                     <button
-                                        onClick={() => toggleWindow(window.id, window.isActive)}
+                                        onClick={() => handleToggle(window.id, window.isActive)}
                                         className={`px-4 py-2 rounded-lg transition-colors ${window.isActive
-                                                ? 'bg-zinc-800 hover:bg-zinc-700 text-white'
-                                                : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+                                            ? 'bg-zinc-800 hover:bg-zinc-700 text-white'
+                                            : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
                                             }`}
                                     >
                                         {window.isActive ? 'Deactivate' : 'Activate'}
                                     </button>
                                     <button
-                                        onClick={() => deleteWindow(window.id)}
+                                        onClick={() => handleDelete(window.id)}
                                         className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                                     >
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDebounce } from '@/hooks';
+import { sanitizeSearchQuery } from '@/lib/sanitize';
 
 interface GoalFiltersProps {
   onFilterChange: (filters: FilterState) => void;
   className?: string;
 }
 
-interface FilterState {
+export interface FilterState {
   status?: string;
   category?: string;
-  priority?: string;
   dateRange?: string;
   search?: string;
 }
@@ -21,6 +22,25 @@ export const GoalFilters: React.FC<GoalFiltersProps> = ({
 }) => {
   const [filters, setFilters] = useState<FilterState>({});
   const [isExpanded, setIsExpanded] = useState(false);
+  const [localSearch, setLocalSearch] = useState('');
+  const debouncedSearch = useDebounce(localSearch, 500);
+
+  // Sync debounced search with parent filters
+  useEffect(() => {
+    const sanitizedSearch = sanitizeSearchQuery(debouncedSearch);
+    if (sanitizedSearch !== filters.search) {
+      const newFilters = { ...filters, search: sanitizedSearch || undefined };
+      setFilters(newFilters);
+      onFilterChange(newFilters);
+    }
+  }, [debouncedSearch, onFilterChange]);
+
+  // Update local state when filters change externally
+  useEffect(() => {
+    if (filters.search !== undefined && filters.search !== localSearch) {
+      setLocalSearch(filters.search);
+    }
+  }, [filters.search]);
 
   const updateFilter = (key: keyof FilterState, value: string) => {
     const newFilters = { ...filters, [key]: value || undefined };
@@ -30,6 +50,7 @@ export const GoalFilters: React.FC<GoalFiltersProps> = ({
 
   const clearFilters = () => {
     setFilters({});
+    setLocalSearch('');
     onFilterChange({});
   };
 
@@ -60,8 +81,8 @@ export const GoalFilters: React.FC<GoalFiltersProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
             <input
               type="text"
-              value={filters.search || ''}
-              onChange={(e) => updateFilter('search', e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               placeholder="Search goals..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
@@ -99,20 +120,7 @@ export const GoalFilters: React.FC<GoalFiltersProps> = ({
             </select>
           </div>
 
-          {/* Priority */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-            <select
-              value={filters.priority || ''}
-              onChange={(e) => updateFilter('priority', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All Priorities</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
+
 
           {/* Date Range */}
           <div>

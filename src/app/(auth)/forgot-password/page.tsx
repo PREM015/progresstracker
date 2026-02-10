@@ -4,10 +4,7 @@ import { MetaTags } from '@/components/seo/MetaTags';
 
 export default function ForgotPasswordPage() {
   return (
-    <AuthLayout
-      heading="Forgot Password"
-      description="Enter your email address and we'll send you a link to reset your password."
-    >
+    <AuthLayout>
       <MetaTags title="Forgot Password" description="Reset your password" />
       <ForgotPasswordForm />
     </AuthLayout>

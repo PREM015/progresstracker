@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/providers/AuthProvider.tsx
+// PURPOSE: NextAuth session provider wrapper
+// ============================================================================
+
 'use client';
 
 import { SessionProvider } from 'next-auth/react';

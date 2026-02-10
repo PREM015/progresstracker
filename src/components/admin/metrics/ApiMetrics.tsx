@@ -1,17 +1,7 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useAdminMetrics } from '@/hooks/useAdminMetrics';
 
 export function ApiMetrics() {
-    const [metrics, setMetrics] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetch('/api/admin/metrics/api')
-            .then(res => res.json())
-            .then(data => setMetrics(data))
-            .finally(() => setLoading(false));
-    }, []);
+    const { api: metrics, isLoadingApi: loading } = useAdminMetrics();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading API metrics...</div>;
@@ -37,7 +27,7 @@ export function ApiMetrics() {
 
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
                 <div className="p-4 border-b border-zinc-800">
-                    <h3 className="text-white font-sem ibold">Top Endpoints</h3>
+                    <h3 className="text-white font-semibold">Top Endpoints</h3>
                 </div>
                 <table className="w-full">
                     <thead>
@@ -48,7 +38,7 @@ export function ApiMetrics() {
                         </tr>
                     </thead>
                     <tbody>
-                        {metrics?.topEndpoints?.map((endpoint: any, i: number) => (
+                        {metrics?.topEndpoints?.map((endpoint, i) => (
                             <tr key={i} className="border-b border-zinc-800">
                                 <td className="p-3 text-white font-mono text-sm">{endpoint.path}</td>
                                 <td className="p-3 text-zinc-400">{endpoint.count}</td>

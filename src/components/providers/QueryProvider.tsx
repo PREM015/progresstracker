@@ -1,3 +1,8 @@
+// ============================================================================
+// FILE: src/components/providers/QueryProvider.tsx
+// PURPOSE: React Query (TanStack Query) provider with configuration
+// ============================================================================
+
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

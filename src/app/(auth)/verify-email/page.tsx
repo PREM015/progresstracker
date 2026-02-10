@@ -1,29 +1,32 @@
-import { AuthCard } from '@/components/auth/AuthCard';
+'use client';
+
+import { VerifyEmailForm } from '@/components/auth/VerifyEmailForm';
 import { AuthLayout } from '@/components/layouts/AuthLayout';
 import { MetaTags } from '@/components/seo/MetaTags';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 
 export default function VerifyEmailPage() {
+  const searchParams = useSearchParams();
+  const email = searchParams.get('email') || 'user@example.com';
+
+  const handleVerify = async (code: string) => {
+    console.log('Verifying code:', code);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  };
+
+  const handleResend = async () => {
+    console.log('Resending code to:', email);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  };
+
   return (
-    <AuthLayout
-      heading="Verify your email"
-      description="We've sent you a verification link to your email address."
-    >
+    <AuthLayout>
       <MetaTags title="Verify Email" description="Verify your email address" />
-      <AuthCard
-        title="Check your inbox"
-        description="Click the link in the email we sent to verify your account."
-      >
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground text-center">
-            Didn't receive the email? Check your spam folder or try logging in to resend.
-          </p>
-          <Button asChild variant="outline" className="w-full">
-            <Link href="/login">Back to Login</Link>
-          </Button>
-        </div>
-      </AuthCard>
+      <VerifyEmailForm
+        email={email}
+        onVerify={handleVerify}
+        onResend={handleResend}
+      />
     </AuthLayout>
   );
 }

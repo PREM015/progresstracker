@@ -1,4 +1,4 @@
-import { SystemSettings } from '@/components/admin';
+import { SystemSettingsList } from '@/components/admin';
 
 export default function SystemSettingsPage() {
   return (
@@ -8,7 +8,7 @@ export default function SystemSettingsPage() {
         <p className="text-zinc-400">Configure system-wide settings</p>
       </div>
 
-      <SystemSettings />
+      <SystemSettingsList />
     </div>
   );
 }

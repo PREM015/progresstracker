@@ -1,29 +1,7 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useAdminMetrics } from '@/hooks/useAdminMetrics';
 
 export function MetricsDashboard() {
-    const [metrics, setMetrics] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetchMetrics();
-        const interval = setInterval(fetchMetrics, 30000); // Refresh every 30s
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchMetrics = async () => {
-        try {
-            const res = await fetch('/api/admin/metrics/dashboard');
-            if (!res.ok) throw new Error('Failed to fetch');
-            const data = await res.json();
-            setMetrics(data);
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { dashboard: metrics, isLoadingDashboard: loading } = useAdminMetrics();
 
     if (loading) {
         return <div className="p-8 text-center text-zinc-500">Loading metrics...</div>;
