@@ -47,8 +47,18 @@ export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
     const fetchScore = async () => {
       try {
         const res = await fetch('/api/analytics/productivity?days=30');
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch productivity score: ${res.status}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from API");
+        }
+
         const json = (await res.json()) as ApiSuccess<ProductivityResponse>;
-        if (!res.ok || !json?.success) throw new Error('Failed to fetch productivity score');
+        if (!json?.success) throw new Error('API reported failure');
 
         const overall = json.data?.score || 0;
         const breakdown = json.data?.scoreBreakdown || {
@@ -105,8 +115,8 @@ export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
         <div className="text-sm text-gray-600 flex items-center justify-center gap-2">
           <span>Overall Score</span>
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${scoreData.trend === 'improving' ? 'bg-green-100 text-green-700' :
-              scoreData.trend === 'stable' ? 'bg-gray-100 text-gray-700' :
-                'bg-red-100 text-red-700'
+            scoreData.trend === 'stable' ? 'bg-gray-100 text-gray-700' :
+              'bg-red-100 text-red-700'
             }`}
           >
             {scoreData.trend === 'improving' && 'Improving'}
@@ -126,7 +136,7 @@ export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className={`h-2 rounded-full ${value >= 80 ? 'bg-green-500' :
-                    value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                  value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                   }`}
                 style={{ width: `${value}%` }}
               />

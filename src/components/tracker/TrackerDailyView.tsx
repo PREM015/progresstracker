@@ -1,6 +1,5 @@
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 import type { TrackerEntry } from '@/types/tracker';
 import { formatTimeSpent, getActivitySummary, MOOD_CONFIG } from '@/types/tracker';
 
@@ -13,9 +12,15 @@ interface TrackerDailyViewProps {
 }
 
 export function TrackerDailyView({ date, userId, onEdit, onDelete, className = '' }: TrackerDailyViewProps) {
-    const [entries, setEntries] = useState<TrackerEntry[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const filters = useMemo(() => {
+        const startDate = new Date(date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(date);
+        endDate.setHours(23, 59, 59, 999);
+        return { startDate, endDate, limit: 100 };
+    }, [date]);
+
+    const { entries, isLoading, error } = useTracker(filters);
 
     const formattedDate = useMemo(() => {
         return date.toLocaleDateString('en-US', {
@@ -26,38 +31,6 @@ export function TrackerDailyView({ date, userId, onEdit, onDelete, className = '
         });
     }, [date]);
 
-    useEffect(() => {
-        fetchDailyEntries();
-    }, [date]);
-
-    const fetchDailyEntries = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const startDate = new Date(date);
-            startDate.setHours(0, 0, 0, 0);
-            const endDate = new Date(date);
-            endDate.setHours(23, 59, 59, 999);
-
-            const params = new URLSearchParams({
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                limit: '100',
-            });
-
-            const res = await fetch(`/api/tracker?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch entries');
-
-            const data = await res.json();
-            setEntries(data.data || []);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const dailyTotals = useMemo(() => {
         return entries.reduce((acc, entry) => ({
             problems: acc.problems + entry.problemsSolved,
@@ -67,7 +40,7 @@ export function TrackerDailyView({ date, userId, onEdit, onDelete, className = '
         }), { problems: 0, commits: 0, time: 0, points: 0 });
     }, [entries]);
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className={`animate-pulse space-y-4 ${className}`}>
                 <div className="h-24 bg-gray-100 rounded-xl"></div>
@@ -80,13 +53,7 @@ export function TrackerDailyView({ date, userId, onEdit, onDelete, className = '
     if (error) {
         return (
             <div className={`bg-red-50 border border-red-200 rounded-xl p-6 ${className}`}>
-                <p className="text-red-600">{error}</p>
-                <button
-                    onClick={fetchDailyEntries}
-                    className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
-                >
-                    Try again
-                </button>
+                <p className="text-red-600">Failed to load entries</p>
             </div>
         );
     }

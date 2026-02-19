@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import apiClient from '@/lib/apiClient';
+import { AdminGrowthService } from '@/services/api/admin/growth.service';
 import { queryKeys } from './keys';
 
 export interface WaitlistEntry {
@@ -36,15 +36,14 @@ export function useAdminGrowth() {
     const waitlistQuery = useQuery({
         queryKey: queryKeys.admin.growth.waitlist(filters),
         queryFn: async () => {
-            const params = new URLSearchParams();
-            params.set('page', String(filters.page));
-            params.set('limit', String(filters.limit));
-            if (filters.status) params.set('status', filters.status);
-            if (filters.search) params.set('search', filters.search);
+            const params: Record<string, string> = {
+                page: String(filters.page),
+                limit: String(filters.limit),
+            };
+            if (filters.status) params.status = filters.status;
+            if (filters.search) params.search = filters.search;
 
-            const response = await apiClient.get<{ entries: WaitlistEntry[], pagination: any }>(`/admin/waitlist?${params.toString()}`);
-            if (response.error) return { entries: [], pagination: {} };
-            return response.data || { entries: [], pagination: {} };
+            return AdminGrowthService.getWaitlist(params);
         },
         enabled: isAdmin,
         placeholderData: keepPreviousData,
@@ -53,16 +52,14 @@ export function useAdminGrowth() {
     const waitlistStatsQuery = useQuery({
         queryKey: queryKeys.admin.growth.stats(),
         queryFn: async () => {
-            const response = await apiClient.get<WaitlistStats>('/admin/waitlist/stats');
-            if (response.error) return null;
-            return response.data;
+            return AdminGrowthService.getStats();
         },
         enabled: isAdmin,
     });
 
     const updateStatusMutation = useMutation({
         mutationFn: async ({ id, status }: { id: string; status: string }) => {
-            return await apiClient.put<void>(`/admin/waitlist/${id}`, { status });
+            return AdminGrowthService.updateStatus(id, status);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.growth.waitlist() });
@@ -72,7 +69,7 @@ export function useAdminGrowth() {
 
     const sendInvitesMutation = useMutation({
         mutationFn: async (emails: string[]) => {
-            return await apiClient.post<void>('/admin/waitlist/invite', { emails });
+            return AdminGrowthService.sendInvites(emails);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.growth.waitlist() });
@@ -82,10 +79,7 @@ export function useAdminGrowth() {
 
     const deleteWaitlistMutation = useMutation({
         mutationFn: async (id: string) => {
-            // Using query param as seen in WaitlistTable
-            // However, apiClient delete signature I updated earlier supports body but not params object directly in simplified call
-            // I'll construct the url manually
-            return await apiClient.delete<void>(`/admin/waitlist?ids=${id}`);
+            return AdminGrowthService.deleteEntries(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.growth.waitlist() });

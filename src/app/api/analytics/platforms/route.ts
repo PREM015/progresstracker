@@ -57,7 +57,7 @@ type NumericSortKey = 'problems' | 'commits' | 'time' | 'entries';
 // =============================================================================
 
 const querySchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).default(30),
+  days: z.coerce.number().int().min(1).max(3650).default(30),
   platformId: z.string().optional(),
   sortBy: z.enum(['problems', 'commits', 'time', 'entries', 'name']).default('problems'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
@@ -190,11 +190,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
       days: searchParams.get('days') || '30',
-      platformId: searchParams.get('platformId'),
+      platformId: searchParams.get('platformId') || undefined,
       sortBy: searchParams.get('sortBy') || 'problems',
       sortOrder: searchParams.get('sortOrder') || 'desc',
-      includeTimeline: searchParams.get('includeTimeline'),
-      includeInactive: searchParams.get('includeInactive'),
+      includeTimeline: searchParams.get('includeTimeline') || undefined,
+      includeInactive: searchParams.get('includeInactive') || undefined,
     });
 
     if (!queryValidation.success) {
@@ -399,22 +399,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Sort - using type-safe approach
     const sortBy = params.sortBy;
     const sortOrder = params.sortOrder;
-    
+
     platformStats.sort((a, b) => {
       if (sortBy === 'name') {
         // String comparison for name
-        return sortOrder === 'desc' 
-          ? b.name.localeCompare(a.name) 
+        return sortOrder === 'desc'
+          ? b.name.localeCompare(a.name)
           : a.name.localeCompare(b.name);
       }
-      
+
       // Numeric comparison for stats fields
       if (isNumericSortKey(sortBy)) {
         const aVal = getStatValue(a.stats, sortBy);
         const bVal = getStatValue(b.stats, sortBy);
         return sortOrder === 'desc' ? bVal - aVal : aVal - bVal;
       }
-      
+
       return 0;
     });
 

@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { ScraperFactory } from './scrapers';
 import { nanoid } from 'nanoid';
-import { SyncStatus,  Prisma } from '@prisma/client';
+import { SyncStatus, Prisma } from '@prisma/client';
 
 // =============================================================================
 // TYPES
@@ -102,17 +102,17 @@ export class SyncService {
   ): Promise<SyncJobResult> {
     const jobId = nanoid();
     const startTime = Date.now();
-    const { 
-      platformIds, 
-      force = false, 
-      triggeredBy = 'manual' 
+    const {
+      platformIds,
+      force = false,
+      triggeredBy = 'manual'
     } = options;
 
-    logger.info(`Starting sync job ${jobId} for user ${userId}`, { 
-      userId, 
-      jobId, 
-      platformIds, 
-      force 
+    logger.info(`Starting sync job ${jobId} for user ${userId}`, {
+      userId,
+      jobId,
+      platformIds,
+      force
     });
 
     // Get user's connected platforms
@@ -137,7 +137,7 @@ export class SyncService {
 
     const userPlatforms = await prisma.userPlatform.findMany({
       where: whereClause,
-      include: { 
+      include: {
         platform: true,
         user: {
           select: { id: true, email: true }
@@ -170,7 +170,7 @@ export class SyncService {
     // Process platforms sequentially to avoid rate limiting
     for (const userPlatform of userPlatforms) {
       const platformSlug = userPlatform.platform.slug;
-      
+
       // Check if scraper is available and working
       if (!ScraperFactory.hasScraper(platformSlug)) {
         logger.debug(`No scraper for platform ${platformSlug}, skipping`);
@@ -217,13 +217,13 @@ export class SyncService {
 
       try {
         const result = await this.syncPlatform(
-          userId, 
+          userId,
           userPlatform.platformId,
           { triggeredBy }
         );
-        
+
         results.push(result);
-        
+
         if (result.success) {
           successCount++;
         } else {
@@ -232,7 +232,7 @@ export class SyncService {
       } catch (error) {
         failCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         results.push({
           platformId: userPlatform.platformId,
           platformSlug,
@@ -246,7 +246,7 @@ export class SyncService {
           error: errorMessage,
         });
 
-        logger.error(`Failed to sync ${platformSlug}`, { userId, platformSlug }, 
+        logger.error(`Failed to sync ${platformSlug}`, { userId, platformSlug },
           error instanceof Error ? error : new Error(errorMessage)
         );
       }
@@ -325,8 +325,8 @@ export class SyncService {
 
     try {
       // Get scraper
-      const scraper = ScraperFactory.getScraper(platformSlug);
-      
+      const scraper = await ScraperFactory.getOrLoadScraper(platformSlug);
+
       if (!scraper) {
         throw new Error(`No scraper available for ${platform.name}`);
       }
@@ -337,7 +337,7 @@ export class SyncService {
 
       // Build credentials
       let token = extractToken(userPlatform.credentials);
-      
+
       // Try access token if no token in credentials
       if (!token && userPlatform.accessToken) {
         token = userPlatform.accessToken;
@@ -385,7 +385,7 @@ export class SyncService {
 
       for (const entry of entries) {
         const normalizedDate = normalizeDate(entry.date);
-        
+
         // Check for existing entry
         const existingEntry = await prisma.trackerEntry.findFirst({
           where: {
@@ -397,7 +397,7 @@ export class SyncService {
 
         if (existingEntry) {
           // Check if there's actually new data
-          const hasChanges = 
+          const hasChanges =
             (entry.problems ?? 0) !== existingEntry.problemsSolved ||
             (entry.commits ?? 0) !== existingEntry.commits ||
             (entry.pullRequests ?? 0) !== existingEntry.pullRequests;
@@ -547,7 +547,7 @@ export class SyncService {
       // Update platform stats
       await this.updatePlatformStats(platformId, false);
 
-      logger.error(`Platform sync failed`, { userId, platformSlug }, 
+      logger.error(`Platform sync failed`, { userId, platformSlug },
         error instanceof Error ? error : new Error(errorMessage)
       );
 
@@ -579,15 +579,15 @@ export class SyncService {
         where: { userId },
         orderBy: { createdAt: 'desc' },
         take: 10,
-        include: { 
-          platform: { 
-            select: { name: true, icon: true, slug: true } 
-          } 
+        include: {
+          platform: {
+            select: { name: true, icon: true, slug: true }
+          }
         },
       }),
       prisma.userPlatform.count({
-        where: { 
-          userId, 
+        where: {
+          userId,
           syncStatus: SyncStatus.IN_PROGRESS,
         },
       }),
@@ -611,11 +611,11 @@ export class SyncService {
 
     // Calculate overall health
     const totalPlatforms = platforms.length;
-    const healthyPlatforms = platforms.filter(p => 
-      p.syncStatus === SyncStatus.SUCCESS && 
+    const healthyPlatforms = platforms.filter(p =>
+      p.syncStatus === SyncStatus.SUCCESS &&
       p.consecutiveFailures === 0
     ).length;
-    const failingPlatforms = platforms.filter(p => 
+    const failingPlatforms = platforms.filter(p =>
       p.consecutiveFailures >= 3
     ).length;
 
@@ -638,8 +638,8 @@ export class SyncService {
         total: totalPlatforms,
         healthy: healthyPlatforms,
         failing: failingPlatforms,
-        percentage: totalPlatforms > 0 
-          ? Math.round((healthyPlatforms / totalPlatforms) * 100) 
+        percentage: totalPlatforms > 0
+          ? Math.round((healthyPlatforms / totalPlatforms) * 100)
           : 100,
       },
     };
@@ -655,11 +655,11 @@ export class SyncService {
     const { platformId, status, limit = 20, offset = 0 } = options;
 
     const where: Prisma.SyncLogWhereInput = { userId };
-    
+
     if (platformId) {
       where.platformId = platformId;
     }
-    
+
     if (status) {
       where.status = status;
     }
@@ -670,10 +670,10 @@ export class SyncService {
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
-        include: { 
-          platform: { 
-            select: { name: true, icon: true, slug: true } 
-          } 
+        include: {
+          platform: {
+            select: { name: true, icon: true, slug: true }
+          }
         },
       }),
       prisma.syncLog.count({ where }),
@@ -694,7 +694,7 @@ export class SyncService {
    * Update platform-level statistics after sync
    */
   private static async updatePlatformStats(
-    platformId: string, 
+    platformId: string,
     success: boolean
   ): Promise<void> {
     const today = new Date();
@@ -724,7 +724,7 @@ export class SyncService {
 
     // Update platform success rate (last 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
+
     const stats = await prisma.syncLog.aggregate({
       where: {
         platformId,
@@ -741,13 +741,13 @@ export class SyncService {
       },
     });
 
-    const successRate = stats._count.id > 0 
-      ? (successStats / stats._count.id) * 100 
+    const successRate = stats._count.id > 0
+      ? (successStats / stats._count.id) * 100
       : 100;
 
     await prisma.platform.update({
       where: { id: platformId },
-      data: { 
+      data: {
         successRate: Math.round(successRate * 100) / 100,
       },
     });

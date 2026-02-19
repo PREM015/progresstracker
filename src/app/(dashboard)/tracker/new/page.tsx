@@ -3,22 +3,35 @@
 import { ProblemForm } from '@/components/tracker/ProblemForm';
 import { MetaTags } from '@/components/seo/MetaTags';
 import { Button } from '@/components/ui/button';
+import { PlatformCategory } from '@prisma/client';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTracker } from '@/hooks/useTracker';
+import { useState } from 'react';
 
 export default function NewProblemPage() {
     const router = useRouter();
+    const { createEntry } = useTracker();
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = async (data: any) => {
-        // Here we would call the API to save the problem
-        console.log('Submitting:', data);
-
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Redirect back to tracker
-        router.push('/tracker');
+        setIsSubmitting(true);
+        try {
+            await createEntry({
+                platformId: data.platform,
+                problemsSolved: data.status === 'solved' ? 1 : 0,
+                timeSpent: data.timeSpent || 0,
+                notes: `[${data.title}] ${data.notes || ''}`,
+                date: new Date(),
+                category: PlatformCategory.DSA, // Corrected category
+            });
+            router.push('/tracker');
+        } catch (error) {
+            console.error('Failed to create problem:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (

@@ -598,6 +598,11 @@ class StripeService {
    */
   async canAddPlatform(userId: string): Promise<boolean> {
     try {
+      // Bypass limit in development for testing
+      if (process.env.NODE_ENV === 'development') {
+        return true;
+      }
+
       const subscription = await this.getOrCreateSubscription(userId);
 
       if (subscription.platformLimit === -1) {
@@ -801,10 +806,10 @@ class StripeService {
           lineItems: serializeLineItems(
             Array.isArray(data.lineItems)
               ? (data.lineItems as Array<{
-                  description: string;
-                  amount: number;
-                  quantity: number;
-                }>)
+                description: string;
+                amount: number;
+                quantity: number;
+              }>)
               : undefined
           ),
           invoicePdfUrl: data.invoicePdfUrl,

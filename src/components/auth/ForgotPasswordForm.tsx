@@ -11,7 +11,7 @@ import { FormError } from '@/components/forms/FormError';
 import { FormSuccess } from '@/components/forms/FormSuccess';
 import { AuthCard } from './AuthCard';
 import { Loader2 } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '@/lib/apiClient';
 
 // Schema specific for this form
 const forgotPasswordSchema = z.object({
@@ -42,7 +42,7 @@ export function ForgotPasswordForm() {
     setIsLoading(true);
 
     try {
-      await axios.post('/api/auth/forgot-password', data);
+      await apiClient.post('/auth/forgot-password', data);
       setSuccess('If an account exists with this email, you will receive a password reset link.');
     } catch (err) {
       // Don't reveal if email exists or not for security, but handle generic errors
@@ -59,6 +59,7 @@ export function ForgotPasswordForm() {
       footerLabel="Remember your password?"
       footerLink="/login"
       footerLinkText="Back to login"
+      showSocial={false}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {error && <FormError message={error} variant="block" />}

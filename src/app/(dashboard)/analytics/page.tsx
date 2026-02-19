@@ -1,7 +1,6 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
 import AnalyticsFilters from "@/components/analytics/AnalyticsFilters";
 import OverviewStats from "@/components/analytics/OverviewStats";
 import TrendCharts from "@/components/analytics/TrendCharts";
@@ -12,50 +11,63 @@ import ProductivityScore from "@/components/analytics/ProductivityScore";
 import PredictionsCard from "@/components/analytics/PredictionsCard";
 import InsightsCard from "@/components/analytics/InsightsCard";
 import ExportAnalytics from "@/components/analytics/ExportAnalytics";
+import { BentoGrid, BentoGridItem } from "@/components/ui/BentoGrid";
+import { MetaTags } from "@/components/seo/MetaTags";
+
 
 export default function AnalyticsPage() {
   const { data: session } = useSession();
   const userId = session?.user?.id || "";
 
-  // Sample insights data
-  const insights = [
-    {
-      type: "success" as const,
-      title: "Great Progress!",
-      message: "You've completed 25% more problems this month compared to last month.",
-    },
-    {
-      type: "info" as const,
-      title: "Streak Opportunity",
-      message: "You're 2 days away from your longest streak. Keep it up!",
-    },
-  ];
-
   return (
     <div className="space-y-6">
+      <MetaTags title="Analytics" description="Visualize your coding journey." />
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-4xl font-bold">Analytics</h1>
+        <div>
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Analytics</h1>
+          <p className="text-gray-400 mt-2">Deep dive into your performance metrics.</p>
+        </div>
         <ExportAnalytics />
       </div>
 
-      <div className="space-y-6">
-        <AnalyticsFilters onFilterChange={() => { }} />
-        <OverviewStats />
-        <AnalyticsDashboard userId={userId} />
+      <AnalyticsFilters onFilterChange={() => { }} />
+      <OverviewStats />
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          <TrendCharts />
-          <PlatformComparison />
-          <CategoryBreakdown />
-          <TimeSpentAnalysis />
-        </div>
+      <BentoGrid className="md:auto-rows-[20rem]">
+        {/* Row 1: Trends & Distribution */}
+        <BentoGridItem
+          className="md:col-span-2"
+          header={<TrendCharts />}
+        />
+        <BentoGridItem
+          className="md:col-span-1"
+          header={<CategoryBreakdown />}
+        />
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <ProductivityScore />
-          <PredictionsCard />
-          <InsightsCard insights={insights} />
-        </div>
-      </div>
+        {/* Row 2: Platform & Time */}
+        <BentoGridItem
+          className="md:col-span-1"
+          header={<PlatformComparison />}
+        />
+        <BentoGridItem
+          className="md:col-span-2"
+          header={<TimeSpentAnalysis />}
+        />
+
+        {/* Row 3: Insights & AI */}
+        <BentoGridItem
+          className="md:col-span-1"
+          header={<ProductivityScore />}
+        />
+        <BentoGridItem
+          className="md:col-span-1"
+          header={<PredictionsCard />}
+        />
+        <BentoGridItem
+          className="md:col-span-1"
+          header={<InsightsCard />}
+        />
+      </BentoGrid>
     </div>
   );
 }

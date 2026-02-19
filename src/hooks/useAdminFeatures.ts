@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminFeaturesService } from '@/services/api/admin/features.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -48,17 +48,7 @@ export function useAdminFeatures() {
     const flagsQuery = useQuery({
         queryKey: queryKeys.admin.features.list(),
         queryFn: async (): Promise<FeatureFlag[]> => {
-            const response = await apiClient.get<any>('/admin/feature-flags');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.flags && Array.isArray(payload.flags)) return payload.flags;
-
-            return [];
+            return AdminFeaturesService.getFlags();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -69,9 +59,7 @@ export function useAdminFeatures() {
     // ==========================================================================
     const createMutation = useMutation({
         mutationFn: async (data: Partial<FeatureFlag>) => {
-            const response = await apiClient.post<FeatureFlag>('/admin/feature-flags', data);
-            if (response.error) throw new Error(response.error);
-            return response.data;
+            return AdminFeaturesService.createFlag(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.features.list() });
@@ -83,10 +71,7 @@ export function useAdminFeatures() {
     // ==========================================================================
     const updateMutation = useMutation({
         mutationFn: async ({ key, data }: { key: string; data: Partial<FeatureFlag> }) => {
-            // Note: API seems to Identify by KEY based on existing code (`/admin/feature-flags/${key}`)
-            const response = await apiClient.patch<FeatureFlag>(`/admin/feature-flags/${key}`, data);
-            if (response.error) throw new Error(response.error);
-            return response.data;
+            return AdminFeaturesService.updateFlag(key, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.features.list() });
@@ -98,13 +83,7 @@ export function useAdminFeatures() {
     // ==========================================================================
     const toggleMutation = useMutation({
         mutationFn: async ({ key, isEnabled }: { key: string; isEnabled: boolean }) => {
-            const response = await apiClient.patch(`/admin/feature-flags/${key}`, { isEnabled });
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            return response.data;
+            return AdminFeaturesService.updateFlag(key, { isEnabled });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.features.list() });
@@ -123,13 +102,7 @@ export function useAdminFeatures() {
     // ==========================================================================
     const deleteMutation = useMutation({
         mutationFn: async (key: string) => {
-            const response = await apiClient.delete(`/admin/feature-flags/${key}`);
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            return response.data;
+            return AdminFeaturesService.deleteFlag(key);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.features.list() });

@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminPlatformsService } from '@/services/api/admin/platforms.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -43,19 +43,7 @@ export function useAdminPlatforms() {
     const platformsQuery = useQuery({
         queryKey: queryKeys.admin.system(), // Using system key as platforms are system-wide config
         queryFn: async (): Promise<Platform[]> => {
-            const response = await apiClient.get<any>('/admin/platforms');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.platforms && Array.isArray(payload.platforms)) return payload.platforms;
-            if (payload && payload.data && Array.isArray(payload.data)) return payload.data;
-
-            return [];
+            return AdminPlatformsService.getPlatforms() as any;
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -66,13 +54,7 @@ export function useAdminPlatforms() {
     // ==========================================================================
     const toggleMutation = useMutation({
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            const response = await apiClient.patch(`/admin/platforms/${id}`, { isActive });
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            return response.data;
+            return AdminPlatformsService.togglePlatform(id, isActive);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.system() });

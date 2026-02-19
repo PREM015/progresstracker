@@ -1,95 +1,33 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
+import { cn } from '@/lib/utils';
+import { ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 
-interface StatsCard {
+export interface StatsCardData {
   id: string;
   label: string;
   value: string | number;
-  change: number;
-  trend: 'up' | 'down' | 'flat';
+  change?: number;
+  trend?: 'up' | 'down' | 'flat';
+  icon?: React.ReactNode;
 }
 
 interface StatsCardsProps {
+  stats: StatsCardData[];
   className?: string;
+  isLoading?: boolean;
 }
 
-interface ApiSuccess<T> {
-  success: true;
-  data: T;
-}
-
-interface DashboardWidget {
-  id: string;
-  title: string;
-  value: string | number;
-  change: number;
-}
-
-export const StatsCards: React.FC<StatsCardsProps> = ({ className = '' }) => {
-  const [stats, setStats] = useState<StatsCard[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchStats = async () => {
-      try {
-        const res = await fetch('/api/dashboard/overview');
-        const json = (await res.json()) as ApiSuccess<DashboardWidget[]>;
-        if (!res.ok || !json?.success) {
-          throw new Error('Failed to fetch dashboard stats');
-        }
-
-        const mapped = (json.data || []).map((item) => ({
-          id: item.id,
-          label: item.title,
-          value: item.value,
-          change: Number(item.change) || 0,
-          trend: item.change > 0 ? 'up' : item.change < 0 ? 'down' : 'flat',
-        }));
-
-        if (isMounted) {
-          setStats(mapped);
-        }
-      } catch (error) {
-        console.error('Failed to load dashboard stats:', error);
-        if (isMounted) {
-          setStats([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchStats();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const initials = useMemo(() => {
-    const map: Record<string, string> = {};
-    stats.forEach((stat) => {
-      const parts = stat.label.split(' ').filter(Boolean);
-      map[stat.id] = parts.length >= 2
-        ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-        : (parts[0]?.slice(0, 2).toUpperCase() || 'ST');
-    });
-    return map;
-  }, [stats]);
-
-  if (loading) {
+export function StatsCards({ stats = [], className, isLoading = false }: StatsCardsProps) {
+  if (isLoading) {
     return (
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
+      <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6", className)}>
         {[0, 1, 2, 3].map((idx) => (
-          <div key={idx} className="bg-white border border-gray-200 rounded-xl p-6 animate-pulse">
-            <div className="h-10 w-10 bg-gray-100 rounded-lg mb-4" />
-            <div className="h-6 bg-gray-100 rounded w-2/3 mb-2" />
-            <div className="h-4 bg-gray-100 rounded w-1/2" />
+          <div key={idx} className="bg-white border border-zinc-200 rounded-xl p-6 animate-pulse">
+            <div className="h-10 w-10 bg-zinc-100 rounded-lg mb-4" />
+            <div className="h-6 bg-zinc-100 rounded w-2/3 mb-2" />
+            <div className="h-4 bg-zinc-100 rounded w-1/2" />
           </div>
         ))}
       </div>
@@ -97,35 +35,42 @@ export const StatsCards: React.FC<StatsCardsProps> = ({ className = '' }) => {
   }
 
   if (!stats.length) {
-    return (
-      <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
-        <div className="text-sm text-gray-600">No stats available yet.</div>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
+    <div className={cn("grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6", className)}>
       {stats.map((stat) => (
-        <div key={stat.id} className="bg-white border border-gray-200 rounded-xl p-6">
+        <div key={stat.id} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center text-sm font-semibold">
-              {initials[stat.id] || 'ST'}
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              {stat.icon ? stat.icon : (
+                <span className="text-sm font-semibold">
+                  {stat.label.substring(0, 2).toUpperCase()}
+                </span>
+              )}
             </div>
-            {stat.change !== 0 && (
-              <span className={`text-sm font-bold ${stat.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                {stat.trend === 'up' ? 'UP' : 'DOWN'} {Math.abs(stat.change)}%
-              </span>
+            {stat.change !== undefined && (
+              <div className={cn(
+                "flex items-center text-sm font-bold gap-0.5",
+                stat.trend === 'up' ? "text-emerald-600 dark:text-emerald-400" :
+                  stat.trend === 'down' ? "text-red-600 dark:text-red-400" : "text-zinc-500"
+              )}>
+                {stat.trend === 'up' && <ArrowUpRight className="w-4 h-4" />}
+                {stat.trend === 'down' && <ArrowDownRight className="w-4 h-4" />}
+                {stat.trend === 'flat' && <Minus className="w-4 h-4" />}
+                {Math.abs(stat.change)}%
+              </div>
             )}
           </div>
-          <div className="text-3xl font-bold text-gray-900 mb-1">
+          <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-1">
             {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
           </div>
-          <div className="text-sm text-gray-600">{stat.label}</div>
+          <div className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">{stat.label}</div>
         </div>
       ))}
     </div>
   );
-};
+}
 
 export default StatsCards;

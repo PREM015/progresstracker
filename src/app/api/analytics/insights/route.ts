@@ -170,8 +170,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
       days: searchParams.get('days') || '30',
-      categories: searchParams.get('categories'),
-      includeRecommendations: searchParams.get('includeRecommendations'),
+      categories: searchParams.get('categories') || undefined,
+      includeRecommendations: searchParams.get('includeRecommendations') || undefined,
       limit: searchParams.get('limit') || '20',
     });
 

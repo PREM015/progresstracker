@@ -20,8 +20,11 @@ export const TrackerImport: React.FC<TrackerImportProps> = ({
     const formData = new FormData();
     formData.append('file', file);
     try {
-      await fetch('/api/tracker/import', { method: 'POST', body: formData });
+      const res = await fetch('/api/tracker/import', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Import failed');
       onSuccess();
+    } catch (error) {
+      console.error('Import error:', error);
     } finally {
       setImporting(false);
     }

@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-
-interface HeatmapData {
-  date: string;
-  count: number;
-}
+import { useTracker } from '@/hooks/useTracker';
+import { GlassCard } from '@/components/ui/GlassCard';
+import React, { useState } from 'react';
+// @ts-ignore
+import CalendarHeatmap from 'react-calendar-heatmap';
+import 'react-calendar-heatmap/dist/styles.css';
+import { Tooltip } from 'react-tooltip';
+import { subDays, parseISO, format } from 'date-fns';
+import { EmptyState } from '@/components/common/EmptyState';
+import { Calendar } from 'lucide-react';
 
 interface TrackerHeatmapProps {
   className?: string;
@@ -14,52 +18,70 @@ interface TrackerHeatmapProps {
 export const TrackerHeatmap: React.FC<TrackerHeatmapProps> = ({
   className = '',
 }) => {
-  const [data, setData] = useState<HeatmapData[]>([]);
+  const { heatmap, isLoadingHeatmap } = useTracker();
 
-  useEffect(() => {
-    fetch('/api/tracker/heatmap')
-      .then(r => r.json())
-      .then(data => setData(data));
-  }, []);
+  // Stabilize dates for hydration - MUST be before any conditional returns
+  const [endDate] = useState(() => new Date());
+  const [startDate] = useState(() => subDays(new Date(), 365));
 
-  const getColor = (count: number) => {
-    if (count === 0) return 'bg-gray-100';
-    if (count < 3) return 'bg-green-200';
-    if (count < 6) return 'bg-green-400';
-    if (count < 10) return 'bg-green-600';
-    return 'bg-green-800';
-  };
-
-  const weeks = [];
-  for (let w = 0; w < 12; w++) {
-    const days = [];
-    for (let d = 0; d < 7; d++) {
-      const date = new Date();
-      date.setDate(date.getDate() - (11 - w) * 7 - (6 - d));
-      const dateStr = date.toISOString().split('T')[0];
-      const dayData = data.find(d => d.date === dateStr);
-      days.push({ date: dateStr, count: dayData?.count || 0 });
-    }
-    weeks.push(days);
+  if (isLoadingHeatmap) {
+    return <div className="h-48 animate-pulse bg-zinc-100 dark:bg-zinc-800 rounded-xl" />;
   }
 
+  // Transform data for react-calendar-heatmap
+  const values = heatmap.map((d: { date: string, count: number }) => ({
+    date: d.date,
+    count: d.count,
+  }));
+
+  const getClassForValue = (value: any) => {
+    if (!value || value.count === 0) {
+      return 'color-empty';
+    }
+    if (value.count < 3) return 'color-scale-1'; // Light green
+    if (value.count < 6) return 'color-scale-2'; // Medium green
+    if (value.count < 9) return 'color-scale-3'; // Dark green
+    return 'color-scale-4'; // Very dark green
+  };
+
   return (
-    <div className={`bg-white border rounded-xl p-6 ${className}`}>
-      <h3 className="text-lg font-bold mb-4">Activity Heatmap</h3>
-      <div className="flex gap-1">
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-1">
-            {week.map((day, di) => (
-              <div
-                key={di}
-                className={`w-3 h-3 rounded-sm ${getColor(day.count)}`}
-                title={`${day.date}: ${day.count}`}
-              />
-            ))}
-          </div>
-        ))}
+    <GlassCard className={`p-6 ${className} flex flex-col gap-4`}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-white">Activity Heatmap</h3>
+        <span className="text-sm text-zinc-400">Last 365 days</span>
       </div>
-    </div>
+
+      <div className="w-full overflow-x-auto">
+        <div className="min-w-[600px]">
+          {/* Styles moved to globals.css to prevent hydration mismatch */}
+
+          <CalendarHeatmap
+            startDate={startDate}
+            endDate={endDate}
+            values={values}
+            classForValue={getClassForValue}
+            tooltipDataAttrs={(value: any) => {
+              if (!value || !value.date) return {};
+              return {
+                'data-tooltip-id': 'heatmap-tooltip',
+                'data-tooltip-content': `${value.date}: ${value.count} entries`,
+              };
+            }}
+            showWeekdayLabels
+          />
+          <Tooltip id="heatmap-tooltip" style={{ backgroundColor: '#18181b', color: '#fff', borderRadius: '8px' }} />
+        </div>
+      </div>
+
+      {values.length === 0 && (
+        <EmptyState
+          title="No activity yet"
+          description="Start logging problems to fill up your heatmap!"
+          icon={Calendar}
+          className="py-4 opacity-50"
+        />
+      )}
+    </GlassCard>
   );
 };
 

@@ -151,8 +151,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const queryValidation = querySchema.safeParse({
       days: searchParams.get('days') || '30',
       groupBy: searchParams.get('groupBy') || 'day',
-      platformId: searchParams.get('platformId'),
-      includeBreakdown: searchParams.get('includeBreakdown'),
+      platformId: searchParams.get('platformId') || undefined,
+      includeBreakdown: searchParams.get('includeBreakdown') || undefined,
     });
 
     if (!queryValidation.success) {

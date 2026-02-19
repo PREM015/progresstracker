@@ -8,7 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminTemplatesService } from '@/services/api/admin/templates.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -40,17 +40,7 @@ export function useAdminGoalTemplates() {
     const query = useQuery({
         queryKey: queryKeys.admin.templates.goals(),
         queryFn: async (): Promise<GoalTemplate[]> => {
-            const response = await apiClient.get<any>('/admin/goal-templates');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.templates && Array.isArray(payload.templates)) return payload.templates;
-
-            return [];
+            return AdminTemplatesService.getGoalTemplates() as any;
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -58,7 +48,7 @@ export function useAdminGoalTemplates() {
 
     const createMutation = useMutation({
         mutationFn: async (data: GoalTemplateInput) => {
-            return await apiClient.post<GoalTemplate>('/admin/goal-templates', data);
+            return AdminTemplatesService.createGoalTemplate(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates.goals() });
@@ -67,7 +57,7 @@ export function useAdminGoalTemplates() {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: Partial<GoalTemplateInput> }) => {
-            return await apiClient.patch<GoalTemplate>(`/admin/goal-templates/${id}`, data);
+            return AdminTemplatesService.updateGoalTemplate(id, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates.goals() });
@@ -76,7 +66,7 @@ export function useAdminGoalTemplates() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/goal-templates/${id}`);
+            return AdminTemplatesService.deleteGoalTemplate(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.templates.goals() });
@@ -103,9 +93,7 @@ export function useAdminGoalTemplate(id: string) {
     const query = useQuery({
         queryKey: [...queryKeys.admin.templates.goals(), id],
         queryFn: async (): Promise<GoalTemplate | null> => {
-            const response = await apiClient.get<any>(`/admin/goal-templates/${id}`);
-            if (response.error) return null;
-            return response.data;
+            return AdminTemplatesService.getGoalTemplate(id) as any;
         },
         enabled: isAdmin && !!id,
         staleTime: 5 * 60 * 1000,
@@ -125,9 +113,7 @@ export function useAdminTemplateStats() {
     const query = useQuery({
         queryKey: [...queryKeys.admin.templates.goals(), 'stats'],
         queryFn: async () => {
-            const response = await apiClient.get<any>('/admin/goal-templates/stats');
-            if (response.error) return null;
-            return response.data;
+            return AdminTemplatesService.getTemplateStats();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,

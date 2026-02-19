@@ -18,27 +18,27 @@ export type AccountStatus = 'active' | 'inactive' | 'banned' | 'suspended' | 'de
 /** Main User interface */
 export interface User {
   id: string;
-  
+
   // Basic Info
   name?: string;
   email?: string;
   emailVerified?: Date;
   username?: string;
   image?: string;
-  
+
   // Profile
   bio?: string;
   location?: string;
   website?: string;
   company?: string;
   jobTitle?: string;
-  
+
   // Social Links
   githubUsername?: string;
   linkedinUrl?: string;
   twitterHandle?: string;
   discordUsername?: string;
-  
+
   // Visibility Settings
   isPublic: boolean;
   showEmail: boolean;
@@ -48,7 +48,7 @@ export interface User {
   showGoals: boolean;
   showPlatforms: boolean;
   showStreak: boolean;
-  
+
   // Account Status
   isActive: boolean;
   isVerified: boolean;
@@ -56,13 +56,13 @@ export interface User {
   banReason?: string;
   bannedAt?: Date;
   bannedBy?: string;
-  
+
   // Admin & Roles
   isAdmin: boolean;
- 
+
   role: UserRole;
   permissions: string[];
-  
+
   // Streak Data
   currentStreak: number;
   longestStreak: number;
@@ -70,7 +70,7 @@ export interface User {
   streakStartDate?: Date;
   streakFreezeCount: number;
   streakFreezeUsedAt?: Date;
-  
+
   // Stats
   totalProblems: number;
   totalCommits: number;
@@ -79,16 +79,16 @@ export interface User {
   totalAchievements: number;
   totalPoints: number;
   rank?: number;
-  
+
   // Preferences
   preferredLanguage: string;
   timezone: string;
-  
+
   // Metadata
   signupSource?: string;
   referralCode?: string;
   referredBy?: string;
-  
+
   // Timestamps
   lastLoginAt?: Date;
   lastActiveAt?: Date;
@@ -109,12 +109,12 @@ export interface UserProfile {
   website?: string;
   company?: string;
   jobTitle?: string;
-  
+
   // Social (if showEmail is true)
   githubUsername?: string;
   linkedinUrl?: string;
   twitterHandle?: string;
-  
+
   // Stats (if visible)
   currentStreak?: number;
   longestStreak?: number;
@@ -123,7 +123,7 @@ export interface UserProfile {
   totalAchievements?: number;
   totalPoints?: number;
   rank?: number;
-  
+
   // Achievements (if showAchievements is true)
   pinnedAchievements?: Array<{
     id: string;
@@ -132,14 +132,14 @@ export interface UserProfile {
     rarity: string;
     unlockedAt: Date;
   }>;
-  
+
   // Activity (if showActivity is true)
   recentActivity?: Array<{
     date: Date;
     type: string;
     value: number;
   }>;
-  
+
   // Platforms (if showPlatforms is true)
   connectedPlatforms?: Array<{
     slug: string;
@@ -147,7 +147,7 @@ export interface UserProfile {
     icon?: string;
     profileUrl?: string;
   }>;
-  
+
   // Timestamps
   memberSince: Date;
   lastActive?: Date;
@@ -158,7 +158,7 @@ export interface UserSession {
   id: string;
   userId: string;
   token: string;
-  
+
   // Device Info
   userAgent?: string;
   ipAddress?: string;
@@ -168,21 +168,21 @@ export interface UserSession {
   browserVersion?: string;
   os?: string;
   osVersion?: string;
-  
+
   // Location
   country?: string;
   countryCode?: string;
   city?: string;
   region?: string;
-  
+
   // Status
   isValid: boolean;
   isCurrent: boolean;
-  
+
   // Activity
   lastActiveAt: Date;
   expiresAt: Date;
-  
+
   createdAt: Date;
 }
 
@@ -376,7 +376,7 @@ export const ROLE_CONFIG: Record<UserRole, {
     color: '#8B5CF6',
     permissions: ['read:all', 'write:all', 'manage:users', 'manage:content'],
   },
- 
+
 };
 
 /** Account status configuration */
@@ -415,7 +415,7 @@ export function getUserInitials(user: User | UserProfile): string {
 
 /** Check if user is admin */
 export function isAdmin(user: User): boolean {
-  return user.isAdmin ||  user.role === 'admin';;
+  return user.isAdmin || user.role === 'admin';;
 }
 
 /** Get account status */
@@ -431,7 +431,7 @@ export function getMemberDuration(createdAt: Date): string {
   const now = new Date();
   const diff = now.getTime() - new Date(createdAt).getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  
+
   if (days < 30) return `${days} days`;
   if (days < 365) return `${Math.floor(days / 30)} months`;
   return `${Math.floor(days / 365)} years`;
@@ -452,42 +452,83 @@ export function isValidUsername(username: string): { valid: boolean; error?: str
 export function validatePassword(password: string): { valid: boolean; strength: number; errors: string[] } {
   const errors: string[] = [];
   let strength = 0;
-  
+
   if (password.length < 8) {
     errors.push('Password must be at least 8 characters');
   } else {
     strength += 1;
   }
-  
+
   if (!/[a-z]/.test(password)) {
     errors.push('Password must contain a lowercase letter');
   } else {
     strength += 1;
   }
-  
+
   if (!/[A-Z]/.test(password)) {
     errors.push('Password must contain an uppercase letter');
   } else {
     strength += 1;
   }
-  
+
   if (!/[0-9]/.test(password)) {
     errors.push('Password must contain a number');
   } else {
     strength += 1;
   }
-  
+
   if (!/[^a-zA-Z0-9]/.test(password)) {
     errors.push('Password should contain a special character');
   } else {
     strength += 1;
   }
-  
+
   return {
     valid: errors.length === 0,
     strength: Math.min(5, strength),
     errors,
   };
+}
+
+
+// =============================================================================
+// SETTINGS TYPES
+// =============================================================================
+
+/** User settings interface */
+export interface UserSettings {
+  language: string;
+  theme: 'light' | 'dark' | 'system';
+  timezone: string;
+
+  // Privacy
+  isPublic: boolean;
+  showEmail: boolean;
+  showLocation: boolean;
+
+  // Notifications
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  marketingEmails: boolean;
+
+  // Weekly Report
+  weeklyReport: boolean;
+  weeklyReportDay: number; // 0-6
+  weeklyReportTime: string; // HH:MM
+}
+
+/** Webhook definitions */
+export interface Webhook {
+  id: string;
+  userId: string;
+  name: string;
+  url: string;
+  events: string[];
+  isActive: boolean;
+  secret: string;
+  lastTriggeredAt?: Date;
+  failureCount: number;
+  createdAt: Date;
 }
 
 export default User;

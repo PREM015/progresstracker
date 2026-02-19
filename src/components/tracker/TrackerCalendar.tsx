@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTracker } from '@/hooks/useTracker';
+import type { TrackerEntry } from '@/types/tracker';
 
 interface CalendarDay {
   date: string;
@@ -16,24 +18,43 @@ export const TrackerCalendar: React.FC<TrackerCalendarProps> = ({
   className = '',
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const startOfMonth = useMemo(() => new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1), [currentMonth]);
+  const endOfMonth = useMemo(() => new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0, 23, 59, 59, 999), [currentMonth]);
+
+  const { entries, isLoading } = useTracker({
+    startDate: startOfMonth,
+    endDate: endOfMonth,
+    limit: 1000,
+  });
+
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
 
-  const getDaysInMonth = () => {
+  const days = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const days: CalendarDay[] = [];
+    const dayList: CalendarDay[] = [];
+
+    const entryMap = new Map<string, TrackerEntry[]>();
+    entries?.forEach(entry => {
+      const dateStr = new Date(entry.date).toISOString().split('T')[0];
+      if (!entryMap.has(dateStr)) entryMap.set(dateStr, []);
+      entryMap.get(dateStr)?.push(entry);
+    });
 
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push({
-        date: new Date(year, month, d).toISOString().split('T')[0],
-        count: Math.floor(Math.random() * 5),
-        entries: [],
+      const date = new Date(year, month, d);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayEntries = entryMap.get(dateStr) || [];
+      dayList.push({
+        date: dateStr,
+        count: dayEntries.length,
+        entries: dayEntries,
       });
     }
-    return days;
-  };
+    return dayList;
+  }, [currentMonth, entries]);
 
   return (
     <div className={`bg-white border rounded-xl p-6 ${className}`}>
@@ -53,7 +74,7 @@ export const TrackerCalendar: React.FC<TrackerCalendarProps> = ({
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="text-center text-sm font-medium text-gray-600">{day}</div>
         ))}
-        {getDaysInMonth().map((day, idx) => (
+        {days.map((day, idx) => (
           <button
             key={idx}
             onClick={() => setSelectedDay(day)}

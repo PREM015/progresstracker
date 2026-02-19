@@ -79,7 +79,7 @@ export function AdminDashboard() {
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">New Today</div>
                                 <div className="text-3xl font-bold text-white">
-                                    -- {/* Not available in hook yet */}
+                                    {(stats.users.newToday || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div className="p-3 bg-blue-500/10 rounded-lg">
@@ -95,7 +95,7 @@ export function AdminDashboard() {
                             <div>
                                 <div className="text-sm text-zinc-500 mb-2">New This Week</div>
                                 <div className="text-3xl font-bold text-white">
-                                    -- {/* Not available in hook yet */}
+                                    {(stats.users.newThisWeek || 0).toLocaleString()}
                                 </div>
                             </div>
                             <div className="p-3 bg-purple-500/10 rounded-lg">

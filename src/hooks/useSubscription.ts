@@ -8,18 +8,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { SubscriptionService } from '@/services/api/subscription.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 type SubscriptionTier = 'FREE' | 'STARTER' | 'PRO' | 'TEAM' | 'ENTERPRISE';
 type SubscriptionStatus = 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELLED' | 'PAUSED';
@@ -124,17 +118,7 @@ export function useSubscription() {
   // ==========================================================================
   const subscriptionQuery = useQuery({
     queryKey: queryKeys.subscription.current(),
-    queryFn: async (): Promise<Subscription> => {
-      const response = await apiClient.get<ApiResponse<{ subscription: Subscription }>>(
-        '/stripe/subscription'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch subscription');
-      }
-
-      return response.data.data!.subscription;
-    },
+    queryFn: () => SubscriptionService.getCurrent(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -144,17 +128,7 @@ export function useSubscription() {
   // ==========================================================================
   const plansQuery = useQuery({
     queryKey: queryKeys.subscription.plans(),
-    queryFn: async (): Promise<Plan[]> => {
-      const response = await apiClient.get<ApiResponse<{ plans: Plan[] }>>(
-        '/stripe/plans'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch plans');
-      }
-
-      return response.data.data!.plans;
-    },
+    queryFn: () => SubscriptionService.getPlans(),
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 
@@ -163,17 +137,7 @@ export function useSubscription() {
   // ==========================================================================
   const invoicesQuery = useQuery({
     queryKey: queryKeys.subscription.invoices(),
-    queryFn: async (): Promise<Invoice[]> => {
-      const response = await apiClient.get<ApiResponse<{ invoices: Invoice[] }>>(
-        '/stripe/invoices'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch invoices');
-      }
-
-      return response.data.data!.invoices;
-    },
+    queryFn: () => SubscriptionService.getInvoices(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -183,17 +147,7 @@ export function useSubscription() {
   // ==========================================================================
   const paymentMethodsQuery = useQuery({
     queryKey: queryKeys.subscription.paymentMethods(),
-    queryFn: async (): Promise<PaymentMethod[]> => {
-      const response = await apiClient.get<ApiResponse<{ methods: PaymentMethod[] }>>(
-        '/stripe/payment-methods'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch payment methods');
-      }
-
-      return response.data.data!.methods;
-    },
+    queryFn: () => SubscriptionService.getPaymentMethods(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -203,17 +157,7 @@ export function useSubscription() {
   // ==========================================================================
   const usageQuery = useQuery({
     queryKey: queryKeys.subscription.usage(),
-    queryFn: async (): Promise<UsageData> => {
-      const response = await apiClient.get<ApiResponse<{ usage: UsageData }>>(
-        '/stripe/usage'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch usage');
-      }
-
-      return response.data.data!.usage;
-    },
+    queryFn: () => SubscriptionService.getUsage(),
     enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000,
   });
@@ -223,26 +167,8 @@ export function useSubscription() {
   // ==========================================================================
   const checkoutMutation = useMutation({
     mutationKey: ['subscription', 'checkout'],
-    mutationFn: async ({
-      priceId,
-      successUrl,
-      cancelUrl
-    }: {
-      priceId: string;
-      successUrl?: string;
-      cancelUrl?: string;
-    }): Promise<{ url: string }> => {
-      const response = await apiClient.post<ApiResponse<{ url: string }>>(
-        '/stripe/create-checkout',
-        { priceId, successUrl, cancelUrl }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create checkout');
-      }
-
-      return response.data.data!;
-    },
+    mutationFn: ({ priceId, successUrl, cancelUrl }: { priceId: string; successUrl?: string; cancelUrl?: string }) =>
+      SubscriptionService.createCheckout(priceId, successUrl, cancelUrl),
   });
 
   const createCheckout = useCallback(
@@ -263,17 +189,7 @@ export function useSubscription() {
   // ==========================================================================
   const portalMutation = useMutation({
     mutationKey: ['subscription', 'portal'],
-    mutationFn: async (): Promise<{ url: string }> => {
-      const response = await apiClient.post<ApiResponse<{ url: string }>>(
-        '/stripe/customer-portal'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to open portal');
-      }
-
-      return response.data.data!;
-    },
+    mutationFn: () => SubscriptionService.openCustomerPortal(),
   });
 
   const openCustomerPortal = useCallback(async () => {
@@ -286,18 +202,7 @@ export function useSubscription() {
   // ==========================================================================
   const cancelMutation = useMutation({
     mutationKey: ['subscription', 'cancel'],
-    mutationFn: async (reason?: string): Promise<Subscription> => {
-      const response = await apiClient.post<ApiResponse<{ subscription: Subscription }>>(
-        '/stripe/cancel',
-        { reason }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to cancel subscription');
-      }
-
-      return response.data.data!.subscription;
-    },
+    mutationFn: (reason?: string) => SubscriptionService.cancel(reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.subscription.current() });
     },
@@ -315,17 +220,7 @@ export function useSubscription() {
   // ==========================================================================
   const resumeMutation = useMutation({
     mutationKey: ['subscription', 'resume'],
-    mutationFn: async (): Promise<Subscription> => {
-      const response = await apiClient.post<ApiResponse<{ subscription: Subscription }>>(
-        '/stripe/resume'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to resume subscription');
-      }
-
-      return response.data.data!.subscription;
-    },
+    mutationFn: () => SubscriptionService.resume(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.subscription.current() });
     },

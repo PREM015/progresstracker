@@ -8,7 +8,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { useMemo } from 'react';
+import { AdminAnalyticsService } from '@/services/api/admin/analytics.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -46,27 +47,18 @@ export function useAdminAnalytics(timeFrame: TimeFrame = '30d') {
     const analyticsQuery = useQuery({
         queryKey: queryKeys.admin.analytics(timeFrame),
         queryFn: async (): Promise<AnalyticsData | null> => {
-            const response = await apiClient.get<any>('/admin/analytics', { timeFrame });
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            const payload = response.data;
-            if (payload && (payload.users !== undefined || payload.stats)) return payload.stats || payload;
-
-            return null;
+            return AdminAnalyticsService.getAnalytics(timeFrame);
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
     });
 
-    return {
+    return useMemo(() => ({
         data: analyticsQuery.data ?? null,
         isLoading: analyticsQuery.isLoading,
         error: analyticsQuery.error,
         refetch: analyticsQuery.refetch,
-    };
+    }), [analyticsQuery.data, analyticsQuery.isLoading, analyticsQuery.error, analyticsQuery.refetch]);
 }
 
 export default useAdminAnalytics;

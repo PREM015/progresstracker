@@ -1,6 +1,5 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 import type { TrackerEntry } from '@/types/tracker';
 import { formatTimeSpent } from '@/types/tracker';
 
@@ -19,42 +18,19 @@ interface TrendData {
 }
 
 export function TrackerTrends({ userId, period = 'month', className = '' }: TrackerTrendsProps) {
-    const [trends, setTrends] = useState<TrendData[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [selectedMetric, setSelectedMetric] = useState<'problems' | 'commits' | 'time' | 'points'>('problems');
 
-    useEffect(() => {
-        fetchTrendData();
+    const filters = useMemo(() => {
+        const { start, end } = getPeriodDates(period);
+        return { startDate: start, endDate: end, limit: 1000 };
     }, [period]);
 
-    const fetchTrendData = async () => {
-        setLoading(true);
-        setError(null);
+    const { entries, isLoading, error } = useTracker(filters);
 
-        try {
-            const { start, end } = getPeriodDates(period);
-            const params = new URLSearchParams({
-                startDate: start.toISOString(),
-                endDate: end.toISOString(),
-                limit: '1000',
-            });
-
-            const res = await fetch(`/api/tracker?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch trend data');
-
-            const data = await res.json();
-            const entries: TrackerEntry[] = data.data || [];
-
-            // Group by date
-            const grouped = groupByDate(entries);
-            setTrends(grouped);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const trends = useMemo(() => {
+        if (!entries) return [];
+        return groupByDate(entries);
+    }, [entries]);
 
     const groupByDate = (entries: TrackerEntry[]): TrendData[] => {
         const map = new Map<string, TrendData>();
@@ -78,7 +54,7 @@ export function TrackerTrends({ userId, period = 'month', className = '' }: Trac
         return Math.max(...trends.map(t => t[selectedMetric]), 1);
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className={`animate-pulse ${className}`}>
                 <div className="h-80 bg-gray-100 rounded-xl"></div>
@@ -89,7 +65,7 @@ export function TrackerTrends({ userId, period = 'month', className = '' }: Trac
     if (error) {
         return (
             <div className={`bg-red-50 border border-red-200 rounded-xl p-6 ${className}`}>
-                <p className="text-red-600">{error}</p>
+                <p className="text-red-600">Failed to load trend data</p>
             </div>
         );
     }
@@ -188,8 +164,8 @@ function MetricButton({ label, isActive, onClick }: { label: string; isActive: b
         <button
             onClick={onClick}
             className={`px-3 py-1 text-sm rounded-lg transition-colors ${isActive
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
         >
             {label}

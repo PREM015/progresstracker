@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import apiClient from '@/lib/apiClient';
+import { AdminChangelogService } from '@/services/api/admin/changelog.service';
 import { queryKeys } from './keys';
 
 export interface ChangelogEntry {
@@ -26,16 +26,14 @@ export function useAdminChangelog() {
     const changelogQuery = useQuery({
         queryKey: queryKeys.admin.changelog.list(),
         queryFn: async () => {
-            const response = await apiClient.get<ChangelogEntry[]>('/admin/changelog');
-            if (response.error) return [];
-            return response.data || [];
+            return AdminChangelogService.getEntries();
         },
         enabled: isAdmin,
     });
 
     const createChangelogMutation = useMutation({
         mutationFn: async (data: ChangelogInput) => {
-            return await apiClient.post<ChangelogEntry>('/admin/changelog', data);
+            return AdminChangelogService.createEntry(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.changelog.list() });
@@ -44,7 +42,7 @@ export function useAdminChangelog() {
 
     const updateChangelogMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: ChangelogInput }) => {
-            return await apiClient.patch<ChangelogEntry>(`/admin/changelog/${id}`, data);
+            return AdminChangelogService.updateEntry(id, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.changelog.list() });
@@ -53,7 +51,7 @@ export function useAdminChangelog() {
 
     const deleteChangelogMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/changelog/${id}`);
+            return AdminChangelogService.deleteEntry(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.changelog.list() });
@@ -62,7 +60,7 @@ export function useAdminChangelog() {
 
     const publishChangelogMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.post<void>(`/admin/changelog/${id}/publish`);
+            return AdminChangelogService.publishEntry(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.changelog.list() });

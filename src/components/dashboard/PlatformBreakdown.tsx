@@ -1,8 +1,10 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { EmptyState } from '@/components/common/EmptyState';
 import { BarChart3 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface PlatformStat {
     platform: string;
@@ -12,23 +14,33 @@ interface PlatformStat {
 
 interface PlatformBreakdownProps {
     data?: PlatformStat[];
+    className?: string;
 }
 
-const defaultColors = ['#fca5a5', '#86efac', '#93c5fd', '#c4b5fd', '#cbd5e1'];
+// Professional, distinct colors for platforms
+const defaultColors = [
+    'bg-indigo-500',
+    'bg-emerald-500',
+    'bg-amber-500',
+    'bg-rose-500',
+    'bg-sky-500'
+];
 
-export function PlatformBreakdown({ data = [] }: PlatformBreakdownProps) {
-    const max = Math.max(...data.map(d => d.count), 1); // Prevent division by zero
+export function PlatformBreakdown({ data = [], className }: PlatformBreakdownProps) {
+    const max = Math.max(...data.map(d => d.count), 1);
 
     return (
-        <Card className="col-span-4 md:col-span-2 lg:col-span-1 w-full">
-            <CardHeader>
-                <CardTitle>Platform Breakdown</CardTitle>
-                <CardDescription>Where you solve the most</CardDescription>
+        <Card className={cn("border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm", className)}>
+            <CardHeader className="pb-4">
+                <CardTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Platform Activity</CardTitle>
+                <CardDescription className="text-zinc-500 dark:text-zinc-400">
+                    Distribution of your problem solving.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 {data.length === 0 ? (
                     <EmptyState
-                        title="No data yet"
+                        title="No data available"
                         description="Solve problems to see breakdown"
                         variant="small"
                         icon={BarChart3}
@@ -36,18 +48,20 @@ export function PlatformBreakdown({ data = [] }: PlatformBreakdownProps) {
                 ) : (
                     <div className="space-y-4">
                         {data.map((item, index) => (
-                            <div key={item.platform} className="space-y-1">
+                            <div key={item.platform} className="space-y-1.5 group">
                                 <div className="flex items-center justify-between text-sm">
-                                    <span className="font-medium">{item.platform}</span>
-                                    <span className="text-muted-foreground">{item.count}</span>
+                                    <span className="font-medium text-zinc-700 dark:text-zinc-300">{item.platform}</span>
+                                    <span className="text-zinc-500 dark:text-zinc-400 font-mono">{item.count}</span>
                                 </div>
-                                <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full transition-all duration-500 ease-out"
-                                        style={{
-                                            width: `${(item.count / max) * 100}%`,
-                                            backgroundColor: item.color || defaultColors[index % defaultColors.length]
-                                        }}
+                                <div className="h-2 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${(item.count / max) * 100}%` }}
+                                        transition={{ duration: 0.8, ease: "easeOut", delay: index * 0.1 }}
+                                        className={cn(
+                                            "h-full rounded-full transition-all duration-300",
+                                            item.color || defaultColors[index % defaultColors.length]
+                                        )}
                                     />
                                 </div>
                             </div>

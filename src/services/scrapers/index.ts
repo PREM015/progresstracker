@@ -11,27 +11,113 @@ import { logger } from '@/lib/logger';
 // DYNAMIC SCRAPER LOADER
 // =============================================================================
 
+const SCRAPER_IMPORTS: Record<string, () => Promise<any>> = {
+  // DSA
+  'leetcode': () => import('./leetcodeScraper'),
+  'codeforces': () => import('./codeforcesScraper'),
+  'codechef': () => import('./codechefScraper'),
+  'hackerrank': () => import('./hackerrankScraper'),
+  'hackerearth': () => import('./hackerearthScraper'),
+  'atcoder': () => import('./atcoderScraper'),
+  'geeksforgeeks': () => import('./geeksforgeeksScraper'),
+  'interviewbit': () => import('./interviewbitScraper'),
+  'codewars': () => import('./codewarsScraper'),
+  'exercism': () => import('./exercismScraper'),
+  'topcoder': () => import('./topcoderScraper'),
+  'spoj': () => import('./spojScraper'),
+  'projecteuler': () => import('./projecteulerScraper'),
+  'binarysearch': () => import('./binarysearchScraper'),
+  'algoexpert': () => import('./algoexpertScraper'),
+  'codingame': () => import('./codinGameScraper'),
+
+  // Git
+  'github': () => import('./githubScraper'),
+  'gitlab': () => import('./gitlabScraper'),
+  'bitbucket': () => import('./bitbucketScraper'),
+  'sourceforge': () => import('./sourceforgeScraper'),
+
+  // Learning
+  'freecodecamp': () => import('./freecodecampScraper'),
+  'codecademy': () => import('./codecademyScraper'),
+  'coursera': () => import('./courseraScaper'),
+  'udemy': () => import('./udemyScraper'),
+  'udacity': () => import('./udacityScraper'),
+  'edx': () => import('./edxScraper'),
+  'khanacademy': () => import('./khanacademyScraper'),
+  'pluralsight': () => import('./pluralsightScraper'),
+  'skillshare': () => import('./skillshareScraper'),
+  'linkedinlearning': () => import('./linkedinlearningScraper'),
+  'datacamp': () => import('./datacampScraper'),
+  'scrimba': () => import('./scrimbaScraper'),
+
+  // Data Science
+  'kaggle': () => import('./kaggleScraper'),
+
+  // Job
+  'linkedin': () => import('./linkedinScraper'),
+  'indeed': () => import('./indeedScraper'),
+  'glassdoor': () => import('./glassdoorScraper'),
+  'naukri': () => import('./naukriScraper'),
+  'monster': () => import('./monsterScraper'),
+  'dice': () => import('./diceScraper'),
+  'ziprecruiter': () => import('./ziprecruiterScraper'),
+  'simplyhired': () => import('./simplyhiredScraper'),
+  'hired': () => import('./hiredScraper'),
+  'wellfound': () => import('./wellfoundScraper'),
+  'angellist': () => import('./angellistScraper'),
+  'instahyre': () => import('./instahyreScraper'),
+  'internshala': () => import('./internshalaScaper'),
+  'unstop': () => import('./unstopScraper'),
+
+  // Hackathon
+  'devpost': () => import('./devpostScraper'),
+  'mlh': () => import('./mlhScraper'),
+  'hackathoncom': () => import('./hackathoncomScraper'),
+  'devfolio': () => import('./devfolioScraper'),
+
+  // Open Source
+  'gssoc': () => import('./gssocScraper'),
+  'hacktoberfest': () => import('./hacktoberfestScraper'),
+  'outreachy': () => import('./outreachyScraper'),
+  'lfx': () => import('./lfxScraper'),
+  'kwoc': () => import('./kwocScraper'),
+  'swoc': () => import('./swocScraper'),
+
+  // Company
+  'google': () => import('./googleScraper'),
+  'meta': () => import('./metaScraper'),
+  'amazon': () => import('./amazonScraper'),
+  'microsoft': () => import('./microsoftScraper'),
+  'apple': () => import('./appleScraper'),
+  'ibm': () => import('./ibmScraper'),
+
+  // Design
+  'dribbble': () => import('./dribbbleScraper'),
+  'behance': () => import('./behanceScraper'),
+  'producthunt': () => import('./producthuntScraper'),
+};
+
 type ScraperModule = { default?: new () => BaseScraper } | { [key: string]: new () => BaseScraper };
 
 /**
  * Safely import a scraper module
  */
 async function loadScraper(
-  slug: string, 
-  modulePath: string, 
+  slug: string,
+  modulePath: string,
   className: string
 ): Promise<BaseScraper | null> {
   try {
     const importedModule = await import(modulePath) as ScraperModule;
-    const ScraperClass = (importedModule as Record<string, new () => BaseScraper>)[className] || 
-                         (importedModule as { default: new () => BaseScraper }).default;
+    const ScraperClass = (importedModule as Record<string, new () => BaseScraper>)[className] ||
+      (importedModule as { default: new () => BaseScraper }).default;
     if (ScraperClass) {
       return new ScraperClass();
     }
     return null;
   } catch (error) {
     logger.debug(`Scraper not found for ${slug}: ${modulePath}`);
-     console.error(error);
+    console.error(error);
     return null;
   }
 }
@@ -184,49 +270,69 @@ class ScraperFactoryClass {
   private initialized: boolean = false;
 
 
-private async loadScraperDynamic(slug: string): Promise<BaseScraper | null> {
-  const normalizedSlug = slug.toLowerCase();
-  const def = PLATFORM_DEFINITIONS.find(p => p.slug === normalizedSlug);
-  if (!def) return null;
+  private async loadScraperDynamic(slug: string): Promise<BaseScraper | null> {
+    const normalizedSlug = slug.toLowerCase();
+    const def = PLATFORM_DEFINITIONS.find(p => p.slug === normalizedSlug);
+    if (!def) return null;
 
-  try {
-    const importedModule = await import(def.modulePath);
-    const ScraperClass =
-      (importedModule as any)[def.className] ||
-      (importedModule as any).default;
+    try {
+      console.log(`[ScraperFactory] Attempting to load ${slug} from ${def.modulePath}`);
 
-    if (!ScraperClass) return null;
+      const loader = SCRAPER_IMPORTS[normalizedSlug];
+      if (!loader) {
+        console.error(`[ScraperFactory] No loader defined for ${slug}`);
+        return null;
+      }
 
-    const scraper = new ScraperClass();
-    this.scrapers.set(def.slug, scraper);
+      const importedModule = await loader();
+      const ScraperClass =
+        (importedModule as any)[def.className] ||
+        (importedModule as any).default;
 
-    const info = this.platformInfo.get(def.slug);
-    if (info) info.isImplemented = true;
+      if (!ScraperClass) {
+        console.error(`[ScraperFactory] Scraper class not found in module for ${slug}`);
+        return null;
+      }
 
-    return scraper;
-  } catch (err) {
-    logger.debug(`Dynamic scraper load failed for ${slug}: ${def.modulePath}`);
-      console.error(err);
-    return null;
+      console.log(`[ScraperFactory] Successfully loaded class for ${slug}`);
+      const scraper = new ScraperClass();
+      this.scrapers.set(def.slug, scraper);
+
+      const info = this.platformInfo.get(def.slug);
+      if (info) info.isImplemented = true;
+
+      return scraper;
+    } catch (err) {
+      logger.debug(`Dynamic scraper load failed for ${slug}: ${def.modulePath}`);
+      console.error(`[ScraperFactory] Load error for ${slug}:`, err);
+      return null;
+    }
   }
-}
-// Add inside ScraperFactoryClass
+  // Add inside ScraperFactoryClass
 
-async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
-  const normalizedSlug = slug.toLowerCase();
+  async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
+    const normalizedSlug = slug.toLowerCase();
+    console.log(`[ScraperFactory] getOrLoadScraper called for ${normalizedSlug}`);
 
-  const existing = this.scrapers.get(normalizedSlug);
-  if (existing && !(existing instanceof StubScraper)) {
-    return existing;
+    const existing = this.scrapers.get(normalizedSlug);
+    if (existing && !(existing instanceof StubScraper)) {
+      console.log(`[ScraperFactory] Found existing scraper for ${normalizedSlug}`);
+      return existing;
+    }
+
+    console.log(`[ScraperFactory] Existing scraper for ${normalizedSlug} is stub or missing. Trying dynamic load.`);
+
+    // Try dynamic load
+    const loaded = await this.loadScraperDynamic(normalizedSlug);
+    if (loaded) {
+      console.log(`[ScraperFactory] Dynamic load successful for ${normalizedSlug}`);
+      return loaded;
+    }
+
+    // fallback: return stub if present
+    console.log(`[ScraperFactory] Dynamic load failed for ${normalizedSlug}, falling back to stub.`);
+    return this.scrapers.get(normalizedSlug) || null;
   }
-
-  // Try dynamic load
-  const loaded = await this.loadScraperDynamic(normalizedSlug);
-  if (loaded) return loaded;
-
-  // fallback: return stub if present
-  return this.scrapers.get(normalizedSlug) || null;
-}
 
 
   // Auth requirement sets
@@ -256,7 +362,7 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
 
       // Initialize with stub scraper
       this.scrapers.set(def.slug, new StubScraper(def.name, def.slug));
-      
+
       this.scraperStatus.set(def.slug, {
         isWorking: def.isExpectedWorking,
         lastChecked: null,
@@ -276,7 +382,7 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
     // Load actual scrapers synchronously using require
     this.loadScrapersSync();
     this.initialized = true;
-    
+
     logger.info(`ScraperFactory initialized with ${this.scrapers.size} scrapers (${this.workingScrapers.size} working)`);
   }
 
@@ -286,15 +392,15 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
   private loadScrapersSync(): void {
     for (const def of PLATFORM_DEFINITIONS) {
       try {
-    
+
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const scraperModule = require(def.modulePath);
         const ScraperClass = scraperModule[def.className] || scraperModule.default;
-        
+
         if (ScraperClass) {
           const scraper = new ScraperClass();
           this.scrapers.set(def.slug, scraper);
-          
+
           const info = this.platformInfo.get(def.slug);
           if (info) {
             info.isImplemented = true;
@@ -354,7 +460,7 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
   updateStatus(slug: string, success: boolean, error?: string, responseTime?: number): void {
     const normalizedSlug = slug.toLowerCase();
     const status = this.scraperStatus.get(normalizedSlug);
-    
+
     if (!status) return;
 
     status.lastChecked = new Date();
@@ -364,7 +470,7 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
       status.totalSuccesses++;
       status.errorCount = 0;
       status.lastError = null;
-      
+
       if (responseTime !== undefined) {
         status.avgResponseTime = status.avgResponseTime === null
           ? responseTime
@@ -377,22 +483,39 @@ async getOrLoadScraper(slug: string): Promise<BaseScraper | null> {
       if (status.errorCount >= 5) {
         this.workingScrapers.delete(normalizedSlug);
         status.isWorking = false;
-        
+
         const info = this.platformInfo.get(normalizedSlug);
         if (info) info.isWorking = false;
-        
+
         logger.warn(`Scraper ${slug} marked as not working after ${status.errorCount} consecutive errors`);
       }
     }
 
-    status.successRate = status.totalAttempts > 0 
-      ? (status.totalSuccesses / status.totalAttempts) * 100 
+    status.successRate = status.totalAttempts > 0
+      ? (status.totalSuccesses / status.totalAttempts) * 100
       : 100;
+  }
+
+  /**
+   * Explicitly report a likely structural change on the platform
+   */
+  reportStructuralChange(slug: string, detail: string): void {
+    const normalizedSlug = slug.toLowerCase();
+    logger.error(`[ScraperFactory] Structural change detected for ${slug}: ${detail}`);
+
+    this.updateStatus(normalizedSlug, false, `Structural Change: ${detail}`);
+
+    // Potentially trigger an automated alert or flag for developer review
+    const status = this.scraperStatus.get(normalizedSlug);
+    if (status) {
+      status.isWorking = false; // Immediately mark as not working if structure changed
+      this.workingScrapers.delete(normalizedSlug);
+    }
   }
 
   getCapabilities(slug: string): ScraperCapabilities {
     const normalizedSlug = slug.toLowerCase();
-    
+
     return {
       hasAutoSync: this.hasScraper(normalizedSlug) && this.isScraperWorking(normalizedSlug),
       requiresOAuth: this.requiresOAuth(normalizedSlug),
@@ -454,10 +577,10 @@ export const ScraperFactory = new ScraperFactoryClass();
 
 export { BaseScraper } from './baseScraper';
 export { StubScraper } from './stubScraper';
-export type { 
-  ScraperCredentials, 
-  ScraperResult, 
-  ScraperEntry, 
+export type {
+  ScraperCredentials,
+  ScraperResult,
+  ScraperEntry,
   ScraperMetadata,
 } from './types';
 export type { ScraperStatus, PlatformInfo, ScraperCapabilities };

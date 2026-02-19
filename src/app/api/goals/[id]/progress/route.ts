@@ -54,7 +54,7 @@ const RATE_LIMIT = 60;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS, HEAD',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, OPTIONS, HEAD',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
 };
 
@@ -184,10 +184,10 @@ export async function HEAD(
 
     const goal = await prisma.goal.findFirst({
       where: { id, userId },
-      select: { 
-        id: true, 
-        progress: true, 
-        target: true, 
+      select: {
+        id: true,
+        progress: true,
+        target: true,
         progressPercentage: true,
         status: true,
       },
@@ -282,7 +282,7 @@ export async function GET(
       if (daysLeft > 0 && remaining > 0) {
         requiredPerDay = remaining / daysLeft;
         onTrack = avgPerDay >= requiredPerDay;
-        
+
         if (avgPerDay > 0) {
           const daysNeeded = remaining / avgPerDay;
           projectedCompletion = new Date(now.getTime() + daysNeeded * 24 * 60 * 60 * 1000);
@@ -319,7 +319,7 @@ export async function GET(
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.success(progressInfo, { });
+    const response = apiResponse.success(progressInfo, {});
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('GET /api/goals/[id]/progress failed', { requestId }, error);
@@ -525,7 +525,7 @@ export async function POST(
           newlyReachedMilestones,
         },
       },
-      {  }
+      {}
     );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
@@ -704,6 +704,17 @@ export async function PUT(
     const response = apiResponse.internalError('Failed to set progress', requestId);
     return addHeaders(response, requestId);
   }
+}
+
+// =============================================================================
+// PATCH - Update Progress (Alias to PUT)
+// =============================================================================
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext
+): Promise<NextResponse> {
+  return PUT(request, context);
 }
 
 // =============================================================================

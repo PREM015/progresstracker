@@ -70,25 +70,25 @@ export interface Report {
 export interface ReportData {
   // Summary stats
   stats: ReportStats;
-  
+
   // Charts data
   charts?: ReportChart[];
-  
+
   // Comparisons with previous period
   comparisons?: ReportComparison;
-  
+
   // Platform breakdown
   platforms?: PlatformBreakdown[];
-  
+
   // Category breakdown
   categories?: CategoryBreakdown[];
-  
+
   // Daily activity
   dailyActivity?: DailyActivity[];
-  
+
   // Goals progress
   goals?: GoalProgress[];
-  
+
   // Achievements
   achievements?: AchievementSummary[];
 }
@@ -101,37 +101,37 @@ export interface ReportStats {
   mediumProblems: number;
   hardProblems: number;
   problemsChange?: number;
-  
+
   // Code
   totalCommits: number;
   totalPullRequests: number;
   totalCodeReviews: number;
   commitsChange?: number;
-  
+
   // Time
   totalTimeSpent: number; // minutes
   avgTimePerDay: number;
   timeChange?: number;
-  
+
   // Points & Rating
   totalPoints: number;
   pointsEarned: number;
   pointsChange?: number;
-  
+
   // Streak
   currentStreak: number;
   longestStreak: number;
   streakChange?: number;
-  
+
   // Activity
   activeDays: number;
   totalDays: number;
   activityRate: number;
-  
+
   // Learning
   coursesCompleted: number;
   certificationsEarned: number;
-  
+
   // Jobs
   applicationsSubmitted: number;
   interviewsCompleted: number;
@@ -377,17 +377,17 @@ export function getReportStatusConfig(status: ReportStatus) {
 /** Generate report title */
 export function generateReportTitle(type: ReportType, periodStart: Date, periodEnd: Date): string {
   const typeConfig = REPORT_TYPE_CONFIG[type];
-  const startStr = new Date(periodStart).toLocaleDateString('en-US', { 
-    month: 'short', 
+  const startStr = new Date(periodStart).toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
-  const endStr = new Date(periodEnd).toLocaleDateString('en-US', { 
-    month: 'short', 
+  const endStr = new Date(periodEnd).toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
-  
+
   return `${typeConfig.label}: ${startStr} - ${endStr}`;
 }
 
@@ -397,13 +397,13 @@ export function calculateHighlights(
   previous?: ReportStats
 ): ReportHighlight[] {
   const highlights: ReportHighlight[] = [];
-  
+
   const addHighlight = (metric: string, currentVal: number, previousVal?: number) => {
     const change = previousVal !== undefined ? currentVal - previousVal : 0;
     const changePercentage = previousVal ? ((change / previousVal) * 100) : 0;
-    const trend: 'up' | 'down' | 'stable' = 
+    const trend: 'up' | 'down' | 'stable' =
       change > 0 ? 'up' : change < 0 ? 'down' : 'stable';
-    
+
     highlights.push({
       metric,
       value: currentVal,
@@ -413,19 +413,19 @@ export function calculateHighlights(
       isPositive: change >= 0,
     });
   };
-  
+
   addHighlight('Problems Solved', current.totalProblems, previous?.totalProblems);
   addHighlight('Commits', current.totalCommits, previous?.totalCommits);
   addHighlight('Time Spent', current.totalTimeSpent, previous?.totalTimeSpent);
   addHighlight('Current Streak', current.currentStreak, previous?.currentStreak);
-  
+
   return highlights.sort((a, b) => Math.abs(b.changePercentage) - Math.abs(a.changePercentage));
 }
 
 /** Generate insights */
 export function generateInsights(stats: ReportStats): ReportInsight[] {
   const insights: ReportInsight[] = [];
-  
+
   // Streak insights
   if (stats.currentStreak >= 7) {
     insights.push({
@@ -436,7 +436,7 @@ export function generateInsights(stats: ReportStats): ReportInsight[] {
       color: '#EF4444',
     });
   }
-  
+
   // Improvement insights
   if (stats.problemsChange && stats.problemsChange > 10) {
     insights.push({
@@ -447,7 +447,7 @@ export function generateInsights(stats: ReportStats): ReportInsight[] {
       color: '#10B981',
     });
   }
-  
+
   // Milestone insights
   if (stats.totalProblems >= 100 && stats.totalProblems < 110) {
     insights.push({
@@ -458,7 +458,7 @@ export function generateInsights(stats: ReportStats): ReportInsight[] {
       color: '#F59E0B',
     });
   }
-  
+
   // Warning insights
   if (stats.currentStreak === 0 && stats.activeDays < 3) {
     insights.push({
@@ -469,14 +469,14 @@ export function generateInsights(stats: ReportStats): ReportInsight[] {
       color: '#F59E0B',
     });
   }
-  
+
   return insights;
 }
 
 /** Generate recommendations */
 export function generateRecommendations(stats: ReportStats): ReportRecommendation[] {
   const recommendations: ReportRecommendation[] = [];
-  
+
   // Consistency recommendation
   if (stats.activityRate < 50) {
     recommendations.push({
@@ -486,7 +486,7 @@ export function generateRecommendations(stats: ReportStats): ReportRecommendatio
       category: 'consistency',
     });
   }
-  
+
   // Difficulty recommendation
   if (stats.hardProblems === 0 && stats.mediumProblems > 10) {
     recommendations.push({
@@ -496,7 +496,7 @@ export function generateRecommendations(stats: ReportStats): ReportRecommendatio
       category: 'difficulty',
     });
   }
-  
+
   // Time recommendation
   if (stats.avgTimePerDay < 30) {
     recommendations.push({
@@ -506,7 +506,7 @@ export function generateRecommendations(stats: ReportStats): ReportRecommendatio
       category: 'time',
     });
   }
-  
+
   return recommendations;
 }
 
@@ -514,17 +514,17 @@ export function generateRecommendations(stats: ReportStats): ReportRecommendatio
 export function formatPeriodString(periodStart: Date, periodEnd: Date): string {
   const start = new Date(periodStart);
   const end = new Date(periodEnd);
-  
+
   const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
   const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
   const startDay = start.getDate();
   const endDay = end.getDate();
   const year = end.getFullYear();
-  
+
   if (startMonth === endMonth) {
     return `${startMonth} ${startDay}-${endDay}, ${year}`;
   }
-  
+
   return `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
 }
 
@@ -536,12 +536,12 @@ export function calculateComparison(
   const calculateChange = (currentVal: number, previousVal: number) => {
     const absolute = currentVal - previousVal;
     const percentage = previousVal > 0 ? ((absolute / previousVal) * 100) : 0;
-    const trend: 'up' | 'down' | 'stable' = 
+    const trend: 'up' | 'down' | 'stable' =
       Math.abs(percentage) < 1 ? 'stable' : absolute > 0 ? 'up' : 'down';
-    
+
     return { absolute, percentage: Math.round(percentage * 10) / 10, trend };
   };
-  
+
   return {
     currentPeriod: current,
     previousPeriod: previous,
@@ -556,30 +556,44 @@ export function calculateComparison(
 }
 
 /** Validate report period */
-export function validateReportPeriod(start: Date, end: Date): { 
-  valid: boolean; 
-  errors: string[] 
+export function validateReportPeriod(start: Date, end: Date): {
+  valid: boolean;
+  errors: string[]
 } {
   const errors: string[] = [];
-  
+
   if (start >= end) {
     errors.push('End date must be after start date');
   }
-  
+
   const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays > 365) {
     errors.push('Report period cannot exceed 365 days');
   }
-  
+
   if (diffDays < 1) {
     errors.push('Report period must be at least 1 day');
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
   };
+}
+
+
+/** Export history item */
+export interface ExportHistoryItem {
+  id: string;
+  userId: string;
+  type: string;
+  format: string;
+  status: 'pending' | 'completed' | 'failed';
+  url?: string;
+  size?: number; // bytes
+  createdAt: Date;
+  completedAt?: Date;
 }
 
 export default Report;

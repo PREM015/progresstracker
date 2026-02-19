@@ -15,6 +15,7 @@ export default function GoalsPage() {
   const [showForm, setShowForm] = useState(false);
   const [filters, setFilters] = useState<FilterState>({});
   const [initialFormData, setInitialFormData] = useState<any>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleTemplateSelect = (template: any) => {
     setInitialFormData({
@@ -22,7 +23,23 @@ export default function GoalsPage() {
       description: template.description,
       category: template.category,
       targetValue: template.targetValue,
-      deadline: new Date(Date.now() + template.suggestedDeadlineDays * 86400000).toISOString().split('T')[0],
+      deadline: new Date(Date.now() + (template.estimatedDays || 7) * 86400000).toISOString().split('T')[0],
+      unit: template.unit || 'units',
+    });
+    setShowForm(true);
+  };
+
+  const handleEditGoal = (goal: any) => {
+    setInitialFormData({
+      id: goal.id, // Ensure ID is passed if CreateGoalForm supports it, or handle separately
+      title: goal.title,
+      description: goal.description,
+      targetValue: goal.target,
+      currentValue: goal.progress, // or goal.currentValue if available
+      deadline: goal.deadline ? new Date(goal.deadline).toISOString().split('T')[0] : '',
+      category: goal.category,
+      unit: goal.unit,
+      priority: 'medium', // Default as it might be missing
     });
     setShowForm(true);
   };
@@ -46,11 +63,11 @@ export default function GoalsPage() {
         <div className="lg:col-span-2 space-y-6">
           {showForm && (
             <GoalForm
+              goalId={initialFormData?.id}
               initialData={initialFormData || undefined}
               onSuccess={() => {
                 setShowForm(false);
-                // Trigger refresh if needed, or rely on GoalsList effect if dependence changes (maybe add a refresh trigger prop later)
-                // For now just close form
+                setRefreshTrigger(prev => prev + 1);
               }}
               onCancel={() => setShowForm(false)}
             />
@@ -60,7 +77,11 @@ export default function GoalsPage() {
             onFilterChange={setFilters}
           />
 
-          <GoalsList userId={userId} filters={filters} />
+          <GoalsList
+            userId={userId}
+            filters={filters}
+            onEdit={handleEditGoal}
+          />
         </div>
 
         <div className="space-y-6">

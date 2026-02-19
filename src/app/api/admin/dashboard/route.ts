@@ -31,12 +31,21 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     prevPeriodStart.setDate(now.getDate() - 14);
   }
 
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
+  weekStart.setHours(0, 0, 0, 0);
+
   // 3. Parallel Queries
   const [
     totalUsers,
     activeUsers,
     newUsers,
     prevNewUsers,
+    newToday,
+    newThisWeek,
     platformsTotal,
     activeConnections,
     recentEvents,
@@ -50,6 +59,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     prisma.user.count({ where: { deletedAt: null, lastActiveAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } } }),
     prisma.user.count({ where: { createdAt: { gte: startDate }, deletedAt: null } }),
     prisma.user.count({ where: { createdAt: { gte: prevPeriodStart, lt: startDate }, deletedAt: null } }),
+    prisma.user.count({ where: { createdAt: { gte: todayStart }, deletedAt: null } }),
+    prisma.user.count({ where: { createdAt: { gte: weekStart }, deletedAt: null } }),
     prisma.platform.count(),
     prisma.userPlatform.count({ where: { isActive: true } }),
     auditLogService.getLogs({ limit: 10 }),
@@ -104,6 +115,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
       total: totalUsers,
       active: activeUsers,
       newInPeriod: newUsers,
+      newToday: newToday,
+      newThisWeek: newThisWeek,
       growthPercent: parseFloat(growthPercent.toFixed(1))
     },
     platforms: {

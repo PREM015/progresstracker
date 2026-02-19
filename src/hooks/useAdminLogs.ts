@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminLogsService } from '@/services/api/admin/logs.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -82,14 +82,8 @@ export function useAdminAuditLogs(filters: LogFilters = {}) {
             if (filters.action) params.action = filters.action;
             if (filters.resource) params.resource = filters.resource;
 
-            const response = await apiClient.get<any>('/admin/audit-logs', params);
+            const payload = await AdminLogsService.getAuditLogs(params);
 
-            if (response.error) {
-                // Return empty if error
-                return { data: [], meta: { pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } } };
-            }
-
-            const payload = response.data;
             // Normalize response
             const data = Array.isArray(payload) ? payload : (payload.logs || payload.data || []);
             const meta = payload.meta || payload.pagination || {
@@ -128,13 +122,8 @@ export function useAdminSystemLogs(filters: LogFilters = {}) {
             if (filters.limit) params.limit = String(filters.limit);
             if (filters.level) params.level = filters.level;
 
-            const response = await apiClient.get<any>('/admin/logs', params);
+            const payload = await AdminLogsService.getSystemLogs(params);
 
-            if (response.error) {
-                return { data: [], meta: { pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } } };
-            }
-
-            const payload = response.data;
             const data = Array.isArray(payload) ? payload : (payload.logs || payload.data || []);
             const meta = payload.meta || payload.pagination || {
                 pagination: {

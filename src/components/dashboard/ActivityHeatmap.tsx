@@ -1,75 +1,93 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { format, eachDayOfInterval, subDays } from 'date-fns';
+import { EmptyState } from '@/components/common/EmptyState';
+import { Calendar } from 'lucide-react';
+import CalendarHeatmap from 'react-calendar-heatmap';
+import 'react-calendar-heatmap/dist/styles.css';
+import { Tooltip } from 'react-tooltip';
 
 interface ActivityHeatmapProps {
-    activityData?: Record<string, number>;
+    activityData: Record<string, number>;
+    className?: string;
 }
 
-const getIntensityClass = (count: number) => {
-    if (count === 0) return 'bg-secondary';
-    if (count === 1) return 'bg-emerald-200 dark:bg-emerald-900';
-    if (count === 2) return 'bg-emerald-300 dark:bg-emerald-700';
-    if (count === 3) return 'bg-emerald-400 dark:bg-emerald-500';
-    return 'bg-emerald-500 dark:bg-emerald-300';
-};
+export function ActivityHeatmap({ activityData = {}, className }: ActivityHeatmapProps) {
+    // Transform data for react-calendar-heatmap
+    const heatmapValues = Object.entries(activityData).map(([date, count]) => ({
+        date,
+        count: count,
+    }));
 
-export function ActivityHeatmap({ activityData = {} }: ActivityHeatmapProps) {
+    // Calculate start and end dates (e.g., last 365 days)
     const today = new Date();
-    // We'll render a fixed number that wraps nice or use a scroll area.
-    // 140 days ~ 20 weeks
-    const daysToRender = 140;
-    const startDate = subDays(today, daysToRender);
-    const dates = eachDayOfInterval({ start: startDate, end: today });
+    const startDate = new Date();
+    startDate.setFullYear(today.getFullYear() - 1);
 
     return (
-        <Card className="col-span-4 lg:col-span-2 w-full">
+        <Card className={cn("border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm", className)}>
             <CardHeader>
-                <CardTitle>Activity</CardTitle>
-                <CardDescription>Daily problem solving activity</CardDescription>
+                <CardTitle className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Activity</CardTitle>
+                <CardDescription className="text-zinc-500 dark:text-zinc-400">
+                    Your contribution graph over the last year.
+                </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap gap-1 justify-center md:justify-start">
-                        <TooltipProvider>
-                            {dates.map((date) => {
-                                const dateString = format(date, 'yyyy-MM-dd');
-                                const count = activityData[dateString] || 0;
-                                return (
-                                    <Tooltip key={dateString} delayDuration={50}>
-                                        <TooltipTrigger asChild>
-                                            <div
-                                                className={cn(
-                                                    "w-3 h-3 rounded-[2px] transition-colors",
-                                                    getIntensityClass(count)
-                                                )}
-                                            />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p className="text-xs">
-                                                {count} problems on {format(date, 'MMM d, yyyy')}
-                                            </p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                );
-                            })}
-                        </TooltipProvider>
+                {heatmapValues.length === 0 ? (
+                    <EmptyState
+                        title="No activity recorded"
+                        description="Start your streak today!"
+                        variant="small"
+                        icon={Calendar}
+                    />
+                ) : (
+                    <div className="w-full overflow-x-auto">
+                        <CalendarHeatmap
+                            startDate={startDate}
+                            endDate={today}
+                            values={heatmapValues}
+                            classForValue={(value) => {
+                                if (!value) {
+                                    return 'color-empty';
+                                }
+                                // Simple scale: 1-4
+                                const count = value.count;
+                                if (count >= 4) return 'color-scale-4';
+                                if (count >= 3) return 'color-scale-3';
+                                if (count >= 2) return 'color-scale-2';
+                                return 'color-scale-1';
+                            }}
+                            tooltipDataAttrs={(value: { date: string; count: number } | null) => {
+                                if (!value || !value.date) return null;
+                                return {
+                                    'data-tooltip-id': 'heatmap-tooltip',
+                                    'data-tooltip-content': `${value.date}: ${value.count} activities`,
+                                };
+                            }}
+                            showWeekdayLabels={true}
+                        />
+                        <Tooltip id="heatmap-tooltip" />
+                        <style jsx global>{`
+                            .react-calendar-heatmap text {
+                                font-size: 10px;
+                                fill: #aaa;
+                            }
+                            .react-calendar-heatmap .color-empty { fill: #f3f4f6; } /* zinc-100 */
+                            .dark .react-calendar-heatmap .color-empty { fill: #27272a; } /* zinc-800 */
+
+                            .react-calendar-heatmap .color-scale-1 { fill: #c7d2fe; } /* indigo-200 */
+                            .react-calendar-heatmap .color-scale-2 { fill: #818cf8; } /* indigo-400 */
+                            .react-calendar-heatmap .color-scale-3 { fill: #4f46e5; } /* indigo-600 */
+                            .react-calendar-heatmap .color-scale-4 { fill: #312e81; } /* indigo-900 */
+
+                            .dark .react-calendar-heatmap .color-scale-1 { fill: #312e81; } /* indigo-900 */
+                            .dark .react-calendar-heatmap .color-scale-2 { fill: #4338ca; } /* indigo-700 */
+                            .dark .react-calendar-heatmap .color-scale-3 { fill: #6366f1; } /* indigo-500 */
+                            .dark .react-calendar-heatmap .color-scale-4 { fill: #a5b4fc; } /* indigo-300 */
+                        `}</style>
                     </div>
-                    <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground mt-2">
-                        <span>Less</span>
-                        <div className="flex gap-1">
-                            <div className="w-3 h-3 rounded-[2px] bg-secondary" />
-                            <div className="w-3 h-3 rounded-[2px] bg-emerald-200 dark:bg-emerald-900" />
-                            <div className="w-3 h-3 rounded-[2px] bg-emerald-300 dark:bg-emerald-700" />
-                            <div className="w-3 h-3 rounded-[2px] bg-emerald-400 dark:bg-emerald-500" />
-                            <div className="w-3 h-3 rounded-[2px] bg-emerald-500 dark:bg-emerald-300" />
-                        </div>
-                        <span>More</span>
-                    </div>
-                </div>
+                )}
             </CardContent>
         </Card>
     );

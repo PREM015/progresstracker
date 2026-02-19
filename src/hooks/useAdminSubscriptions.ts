@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminSubscriptionsService } from '@/services/api/admin/subscriptions.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -44,18 +44,7 @@ export function useAdminSubscriptions() {
     const subscriptionsQuery = useQuery({
         queryKey: queryKeys.admin.billing.subscriptions(),
         queryFn: async (): Promise<Subscription[]> => {
-            const response = await apiClient.get<any>('/admin/billing/subscriptions');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.subscriptions && Array.isArray(payload.subscriptions)) return payload.subscriptions;
-            if (payload && payload.data && Array.isArray(payload.data)) return payload.data;
-
-            return [];
+            return AdminSubscriptionsService.getSubscriptions() as any;
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,

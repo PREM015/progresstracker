@@ -28,6 +28,9 @@ export interface ScraperEntry {
   pullRequests?: number;
   issues?: number;
   timeSpent?: number; // minutes
+  easy?: number;
+  medium?: number;
+  hard?: number;
   xp?: number;
   points?: number;
   rating?: number;
@@ -57,6 +60,7 @@ export interface ScraperResult {
  * Scraper metadata
  */
 export interface ScraperMetadata {
+  status?: 'success' | 'partial' | 'failed';
   username?: string;
   displayName?: string;
   profileUrl?: string;

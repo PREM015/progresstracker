@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface TrackerNotesEditorProps {
     entryId: string;
@@ -19,11 +20,12 @@ export function TrackerNotesEditor({
     autoSaveDelay = 2000,
     className = '',
 }: TrackerNotesEditorProps) {
+    const { updateEntry } = useTracker();
     const [notes, setNotes] = useState(initialNotes);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const saveTimeoutRef = useRef<NodeJS.Timeout>();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setNotes(initialNotes);
@@ -34,14 +36,7 @@ export function TrackerNotesEditor({
         setError(null);
 
         try {
-            const res = await fetch(`/api/tracker/${entryId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: content }),
-            });
-
-            if (!res.ok) throw new Error('Failed to save notes');
-
+            await updateEntry(entryId, { notes: content });
             setLastSaved(new Date());
             if (onSave) onSave(content);
         } catch (err) {

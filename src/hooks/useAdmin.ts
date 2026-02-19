@@ -9,24 +9,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminService } from '@/services/api/admin/admin.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
+
 
 interface AdminDashboardStats {
   users: {
     total: number;
     active: number;
     newInPeriod: number;
+    newToday: number;
+    newThisWeek: number;
     growthPercent: number;
   };
   platforms: {
@@ -98,15 +96,7 @@ export function useAdminDashboard() {
   const query = useQuery({
     queryKey: queryKeys.admin.dashboard(),
     queryFn: async (): Promise<AdminDashboardStats> => {
-      const response = await apiClient.get<ApiResponse<{ stats: AdminDashboardStats }>>(
-        '/admin/dashboard'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch admin dashboard');
-      }
-
-      return response.data.data!.stats;
+      return AdminService.getDashboard();
     },
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
@@ -145,16 +135,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
       if (filters.status) params.status = filters.status;
       if (filters.tier) params.tier = filters.tier;
 
-      const response = await apiClient.get<ApiResponse<{ users: AdminUser[]; total: number }>>(
-        '/admin/users',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch users');
-      }
-
-      return response.data.data!;
+      return AdminService.getUsers(params) as any;
     },
     enabled: isAdmin,
     staleTime: 30 * 1000,
@@ -165,13 +146,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const banMutation = useMutation({
     mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
-      const response = await apiClient.post(`/admin/users/${userId}/ban`, { reason });
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
+      return AdminService.banUser(userId, reason);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
@@ -190,13 +165,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const unbanMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await apiClient.post(`/admin/users/${userId}/unban`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
+      return AdminService.unbanUser(userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
@@ -215,13 +184,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const verifyMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await apiClient.post(`/admin/users/${userId}/verify`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
+      return AdminService.verifyUser(userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
@@ -240,13 +203,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ userId, sendEmail }: { userId: string; sendEmail?: boolean }) => {
-      const response = await apiClient.post(`/admin/users/${userId}/reset-password`, { sendEmail });
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
+      return AdminService.resetPassword(userId, sendEmail);
     },
   });
 
@@ -262,16 +219,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const impersonateMutation = useMutation({
     mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
-      const response = await apiClient.post<ApiResponse<{ token: string }>>(
-        `/admin/users/${userId}/impersonate`,
-        { reason }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to impersonate user');
-      }
-
-      return response.data.data!;
+      return AdminService.impersonate(userId, reason);
     },
   });
 
@@ -287,13 +235,7 @@ export function useAdminUsers(filters: AdminUserFilters = {}) {
   // ==========================================================================
   const deleteMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await apiClient.delete(`/admin/users/${userId}`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
+      return AdminService.deleteUser(userId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.users() });
@@ -360,15 +302,7 @@ export function useAdminUser(userId: string) {
   const query = useQuery({
     queryKey: queryKeys.admin.user(userId),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<{ user: AdminUser }>>(
-        `/admin/users/${userId}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'User not found');
-      }
-
-      return response.data.data!.user;
+      return AdminService.getUser(userId);
     },
     enabled: isAdmin && !!userId,
   });
@@ -392,15 +326,7 @@ export function useAdminStats() {
   const query = useQuery({
     queryKey: queryKeys.admin.stats(),
     queryFn: async () => {
-      const response = await apiClient.get<ApiResponse<{ stats: Record<string, unknown> }>>(
-        '/admin/stats'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch stats');
-      }
-
-      return response.data.data!.stats;
+      return AdminService.getStats();
     },
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,

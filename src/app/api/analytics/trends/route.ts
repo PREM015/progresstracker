@@ -244,9 +244,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       days: searchParams.get('days') || '30',
       metric: searchParams.get('metric') || 'problems',
       groupBy: searchParams.get('groupBy') || 'day',
-      platformId: searchParams.get('platformId'),
-      cumulative: searchParams.get('cumulative'),
-      includeMovingAverage: searchParams.get('includeMovingAverage'),
+      platformId: searchParams.get('platformId') || undefined,
+      cumulative: searchParams.get('cumulative') || undefined,
+      includeMovingAverage: searchParams.get('includeMovingAverage') || undefined,
       movingAverageWindow: searchParams.get('movingAverageWindow') || '7',
     });
 
@@ -449,8 +449,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           interpretation: regression.slope > 0
             ? `Increasing by ~${Math.abs(regression.slope).toFixed(1)} per ${params.groupBy}`
             : regression.slope < 0
-            ? `Decreasing by ~${Math.abs(regression.slope).toFixed(1)} per ${params.groupBy}`
-            : 'Stable trend',
+              ? `Decreasing by ~${Math.abs(regression.slope).toFixed(1)} per ${params.groupBy}`
+              : 'Stable trend',
         },
         prediction: {
           nextValue: predictedNext,

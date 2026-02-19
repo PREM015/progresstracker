@@ -5,6 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTracker } from '@/hooks/useTracker';
+import { TrackerEntryInput } from '@/types/tracker';
+import type { PlatformCategory } from '@prisma/client';
 import { Textarea } from '@/components/ui/textarea'; // Assuming we have or will treat as regular textarea if missing
 import {
     Form,
@@ -40,8 +43,8 @@ const problemSchema = z.object({
 type ProblemFormValues = z.infer<typeof problemSchema>;
 
 interface ProblemFormProps {
-    initialData?: ProblemFormValues;
-    onSubmit: (data: ProblemFormValues) => Promise<void>;
+    initialData?: Partial<TrackerEntryInput>;
+    onSubmit?: (data: any) => Promise<void>;
     isEditing?: boolean;
 }
 
@@ -61,12 +64,23 @@ export function ProblemForm({ initialData, onSubmit, isEditing = false }: Proble
         },
     });
 
+    const { createEntry } = useTracker();
     const handleSubmit = async (values: ProblemFormValues) => {
         setIsLoading(true);
         try {
-            await onSubmit(values);
+            if (onSubmit) {
+                await onSubmit(values);
+            } else {
+                await createEntry({
+                    platformId: values.platform,
+                    problemsSolved: values.status === 'solved' ? 1 : 0,
+                    timeSpent: values.timeSpent,
+                    notes: `[${values.title}] ${values.notes || ''}`,
+                    date: new Date(),
+                });
+            }
         } catch (error) {
-            console.error(error);
+            console.error('Failed to save problem:', error);
         } finally {
             setIsLoading(false);
         }

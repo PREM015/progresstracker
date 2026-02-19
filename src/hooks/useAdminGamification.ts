@@ -8,7 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminGamificationService } from '@/services/api/admin/gamification.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -43,17 +43,7 @@ export function useAdminAchievements() {
     const query = useQuery({
         queryKey: queryKeys.admin.gamification.achievements(),
         queryFn: async (): Promise<Achievement[]> => {
-            const response = await apiClient.get<any>('/admin/achievements');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.achievements && Array.isArray(payload.achievements)) return payload.achievements;
-
-            return [];
+            return AdminGamificationService.getAchievements();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -61,7 +51,7 @@ export function useAdminAchievements() {
 
     const createMutation = useMutation({
         mutationFn: async (data: AchievementInput) => {
-            return await apiClient.post<Achievement>('/admin/achievements', data);
+            return AdminGamificationService.createAchievement(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.gamification.achievements() });
@@ -70,7 +60,7 @@ export function useAdminAchievements() {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: Partial<AchievementInput> }) => {
-            return await apiClient.patch<Achievement>(`/admin/achievements/${id}`, data);
+            return AdminGamificationService.updateAchievement(id, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.gamification.achievements() });
@@ -79,7 +69,7 @@ export function useAdminAchievements() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/achievements/${id}`);
+            return AdminGamificationService.deleteAchievement(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.gamification.achievements() });
@@ -106,9 +96,7 @@ export function useAdminAchievementStats() {
     const query = useQuery({
         queryKey: queryKeys.admin.gamification.stats(),
         queryFn: async () => {
-            const response = await apiClient.get<any>('/admin/achievements/stats');
-            if (response.error) return null;
-            return response.data;
+            return AdminGamificationService.getStats();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,

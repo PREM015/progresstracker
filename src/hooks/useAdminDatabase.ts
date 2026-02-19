@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import apiClient from '@/lib/apiClient';
+import { AdminDatabaseService } from '@/services/api/admin/database.service';
 import { queryKeys } from './keys';
 
 export interface Backup {
@@ -27,16 +27,14 @@ export function useAdminDatabase() {
     const backupsQuery = useQuery({
         queryKey: queryKeys.admin.database.backups(),
         queryFn: async () => {
-            const response = await apiClient.get<Backup[]>('/admin/database/backups');
-            if (response.error) return [];
-            return response.data || [];
+            return AdminDatabaseService.getBackups();
         },
         enabled: isAdmin,
     });
 
     const createBackupMutation = useMutation({
         mutationFn: async () => {
-            return await apiClient.post<void>('/admin/database/backup');
+            return AdminDatabaseService.createBackup();
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.database.backups() });
@@ -45,7 +43,7 @@ export function useAdminDatabase() {
 
     const deleteBackupMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/database/backup/${id}`);
+            return AdminDatabaseService.deleteBackup(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.database.backups() });
@@ -54,7 +52,7 @@ export function useAdminDatabase() {
 
     const restoreBackupMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.post<void>(`/admin/database/backup/${id}/restore`);
+            return AdminDatabaseService.restoreBackup(id);
         },
     });
 
@@ -63,9 +61,7 @@ export function useAdminDatabase() {
     const statsQuery = useQuery({
         queryKey: queryKeys.admin.database.stats(),
         queryFn: async () => {
-            const response = await apiClient.get<DatabaseStats>('/admin/database/stats');
-            if (response.error) return null;
-            return response.data;
+            return AdminDatabaseService.getStats();
         },
         enabled: isAdmin,
     });

@@ -8,7 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo, useState } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { SyncService } from '@/services/api/sync.service';
 import { queryKeys } from './keys';
 import type { SyncStatus } from '@/types/platform';
 
@@ -77,17 +77,7 @@ export function useSync() {
   // ==========================================================================
   const statusQuery = useQuery({
     queryKey: queryKeys.sync.status(),
-    queryFn: async (): Promise<SyncStatusData> => {
-      const response = await apiClient.get<ApiResponse<{ status: SyncStatusData }>>(
-        '/sync/status'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch sync status');
-      }
-
-      return response.data.data!.status;
-    },
+    queryFn: () => SyncService.getStatus(),
     enabled: isAuthenticated,
     staleTime: 10 * 1000,
     refetchInterval: (query) => {
@@ -102,18 +92,7 @@ export function useSync() {
   // ==========================================================================
   const historyQuery = useQuery({
     queryKey: queryKeys.sync.history(20),
-    queryFn: async (): Promise<SyncLogEntry[]> => {
-      const response = await apiClient.get<ApiResponse<{ logs: SyncLogEntry[] }>>(
-        '/sync/history',
-        { limit: '20' }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch sync history');
-      }
-
-      return response.data.data!.logs;
-    },
+    queryFn: () => SyncService.getHistory(20),
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
   });
@@ -123,17 +102,7 @@ export function useSync() {
   // ==========================================================================
   const queueQuery = useQuery({
     queryKey: queryKeys.sync.queue(),
-    queryFn: async (): Promise<{ platform: string; scheduledAt: Date }[]> => {
-      const response = await apiClient.get<ApiResponse<{ queue: { platform: string; scheduledAt: Date }[] }>>(
-        '/sync/queue'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch sync queue');
-      }
-
-      return response.data.data!.queue;
-    },
+    queryFn: () => SyncService.getQueue(),
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
   });
@@ -143,17 +112,7 @@ export function useSync() {
   // ==========================================================================
   const syncPlatformMutation = useMutation({
     mutationKey: ['sync', 'platform'],
-    mutationFn: async (platformId: string): Promise<SyncResult> => {
-      const response = await apiClient.post<ApiResponse<{ result: SyncResult }>>(
-        `/sync/${platformId}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to trigger sync');
-      }
-
-      return response.data.data!.result;
-    },
+    mutationFn: (platformId: string) => SyncService.syncPlatform(platformId),
     onMutate: () => {
       setSyncProgress(prev => prev ? { ...prev, isRunning: true } : null);
     },
@@ -180,17 +139,7 @@ export function useSync() {
   // ==========================================================================
   const syncAllMutation = useMutation({
     mutationKey: ['sync', 'all'],
-    mutationFn: async (): Promise<SyncResult[]> => {
-      const response = await apiClient.post<ApiResponse<{ results: SyncResult[] }>>(
-        '/sync/trigger-all'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to trigger sync');
-      }
-
-      return response.data.data!.results;
-    },
+    mutationFn: () => SyncService.syncAll(),
     onMutate: () => {
       setSyncProgress(prev => prev ? { ...prev, isRunning: true } : null);
     },
@@ -214,15 +163,7 @@ export function useSync() {
   // ==========================================================================
   const cancelMutation = useMutation({
     mutationKey: ['sync', 'cancel'],
-    mutationFn: async (syncId?: string) => {
-      const response = await apiClient.post('/sync/cancel', { syncId });
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
-    },
+    mutationFn: (syncId?: string) => SyncService.cancel(syncId),
     onSuccess: () => {
       setSyncProgress(prev => prev ? { ...prev, isRunning: false } : null);
       queryClient.invalidateQueries({ queryKey: queryKeys.sync.status() });
@@ -241,17 +182,7 @@ export function useSync() {
   // ==========================================================================
   const retryMutation = useMutation({
     mutationKey: ['sync', 'retry'],
-    mutationFn: async (syncLogId: string): Promise<SyncResult> => {
-      const response = await apiClient.post<ApiResponse<{ result: SyncResult }>>(
-        `/sync/retry/${syncLogId}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to retry sync');
-      }
-
-      return response.data.data!.result;
-    },
+    mutationFn: (syncLogId: string) => SyncService.retry(syncLogId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sync.all });
     },

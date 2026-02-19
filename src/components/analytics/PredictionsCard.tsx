@@ -1,6 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Sparkles, TrendingUp, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Prediction {
   title: string;
@@ -34,65 +38,83 @@ export const PredictionsCard: React.FC<PredictionsCardProps> = ({
     const fetchPredictions = async () => {
       try {
         const res = await fetch('/api/analytics/predictions?includeFactors=false');
-        const json = (await res.json()) as ApiSuccess<PredictionsResponse>;
-        if (!res.ok || !json?.success) throw new Error('Failed to fetch predictions');
 
+        if (!res.ok) throw new Error(`Failed to fetch predictions: ${res.status}`);
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from API");
+        }
+
+        const json = (await res.json()) as ApiSuccess<PredictionsResponse>;
         if (isMounted) {
           setPredictions(json.data?.predictions || []);
         }
       } catch (error) {
         console.error('Failed to load predictions:', error);
-        if (isMounted) {
-          setPredictions([]);
-        }
+        if (isMounted) setPredictions([]);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchPredictions();
 
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
   if (loading) {
-    return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+    return <Skeleton className={cn("h-64 w-full rounded-xl", className)} />;
   }
 
   return (
-    <div className={`bg-gradient-to-br from-indigo-600 to-slate-800 text-white rounded-xl p-6 ${className}`}>
-      <div className="mb-6">
-        <h3 className="text-xl font-bold">Predictions</h3>
-        <p className="text-sm text-white/70">Data-driven projections</p>
-      </div>
-
-      <div className="space-y-4">
-        {predictions.map((pred, idx) => (
-          <div key={idx} className="bg-white/10 backdrop-blur rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold">{pred.title}</span>
-              <span className="text-xs px-2 py-1 bg-white/20 rounded">{pred.timeframe}</span>
-            </div>
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-2xl font-bold">{pred.prediction}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-white/20 rounded-full h-2">
-                <div
-                  className="bg-white h-2 rounded-full"
-                  style={{ width: `${pred.confidence}%` }}
-                />
-              </div>
-              <span className="text-xs opacity-75">{pred.confidence}% confidence</span>
-            </div>
+    <Card className={cn("border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden", className)}>
+      <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
+            <Sparkles className="w-4 h-4" />
           </div>
-        ))}
-      </div>
-    </div>
+          <div>
+            <CardTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-50">AI Predictions</CardTitle>
+            <CardDescription className="text-zinc-500">Based on your recent performance</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          {predictions.map((pred, idx) => (
+            <div key={idx} className="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{pred.title}</h4>
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">{pred.timeframe}</span>
+                </div>
+                <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{pred.prediction}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-xs text-zinc-500">
+                  <span>Confidence</span>
+                  <span>{pred.confidence}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                    style={{ width: `${pred.confidence}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          {predictions.length === 0 && (
+            <div className="p-8 text-center text-zinc-500">
+              <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Not enough data for predictions yet.</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

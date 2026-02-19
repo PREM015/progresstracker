@@ -18,7 +18,10 @@ export default function NotificationsPage() {
         }
         const res = await fetch(`/api/notifications${params.toString() ? `?${params}` : ''}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Failed to fetch notifications');
+        if (!res.ok) {
+          const errorMessage = data?.error?.message || (typeof data?.error === 'string' ? data.error : 'Failed to fetch notifications');
+          throw new Error(errorMessage);
+        }
         setNotifications(data?.data?.notifications || []);
       } catch (err) {
         console.error(err);
@@ -105,11 +108,10 @@ export default function NotificationsPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm ${
-                filter === f
+              className={`px-4 py-2 rounded-lg text-sm ${filter === f
                   ? 'bg-indigo-600 text-white'
                   : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
-              }`}
+                }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -127,9 +129,8 @@ export default function NotificationsPage() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`bg-white border rounded-xl p-6 transition ${
-                  notification.isRead ? 'border-gray-200' : 'border-indigo-200 bg-indigo-50'
-                }`}
+                className={`bg-white border rounded-xl p-6 transition ${notification.isRead ? 'border-gray-200' : 'border-indigo-200 bg-indigo-50'
+                  }`}
               >
                 <div className="flex items-start gap-4">
                   <div className="text-3xl">{getNotificationIcon(notification.type)}</div>

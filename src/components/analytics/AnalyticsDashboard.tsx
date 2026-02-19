@@ -1,6 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { ArrowUpRight, ArrowDownRight, Activity, GitCommit, Clock, Trophy } from 'lucide-react';
 
 interface Analytics {
   totalProblems: number;
@@ -78,9 +83,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         totalTimeSpent: overview?.totalTimeSpent || 0,
         totalPoints: overview?.totalPoints || 0,
         averagePerDay: overview?.avgProblemsPerDay || 0,
-        mostActiveDay: 'N/A',
+        mostActiveDay: 'N/A', // Endpoint doesn't provide this yet
         topPlatform,
-        weeklyGrowth: 0,
+        weeklyGrowth: 0, // Endpoint needs to provide comparison data for true growth
       };
 
       setAnalytics(mapped);
@@ -93,21 +98,24 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   if (loading) {
     return (
-      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 ${className}`}>
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>
-        ))}
+      <div className={cn("space-y-6", className)}>
+        <div className="h-10 w-64 bg-zinc-100 dark:bg-zinc-800 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error || !analytics) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-600">{error || 'No analytics data available'}</p>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-sm text-red-600 mb-3">{error || 'No analytics data available'}</p>
         <button
           onClick={fetchAnalytics}
-          className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
+          className="text-xs font-medium text-red-700 hover:text-red-800 underline"
         >
           Try again
         </button>
@@ -117,76 +125,83 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   return (
     <div className={className}>
-      <div className="flex gap-2 mb-6">
-        {(['7d', '30d', '90d', 'all'] as const).map((range) => (
-          <button
-            key={range}
-            onClick={() => setSelectedRange(range)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedRange === range
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            {range === 'all' ? 'All Time' : `Last ${range}`}
-          </button>
-        ))}
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Performance Overview</h2>
+        <Tabs value={selectedRange} onValueChange={(v) => setSelectedRange(v as any)} className="w-auto">
+          <TabsList className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 h-9 p-1">
+            <TabsTrigger value="7d" className="text-xs px-3 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">7 Days</TabsTrigger>
+            <TabsTrigger value="30d" className="text-xs px-3 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">30 Days</TabsTrigger>
+            <TabsTrigger value="90d" className="text-xs px-3 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">3 Months</TabsTrigger>
+            <TabsTrigger value="all" className="text-xs px-3 h-7 data-[state=active]:bg-white data-[state=active]:shadow-sm">All Time</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard label="Problems Solved" value={analytics.totalProblems.toLocaleString()} color="blue" />
-        <StatCard label="Total Commits" value={analytics.totalCommits.toLocaleString()} color="green" />
-        <StatCard label="Time Spent" value={`${Math.floor(analytics.totalTimeSpent / 60)}h`} color="purple" />
-        <StatCard label="Total Points" value={analytics.totalPoints.toLocaleString()} color="yellow" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <StatCard label="Problems Solved" value={analytics.totalProblems.toLocaleString()} icon={Activity} />
+        <StatCard label="Total Commits" value={analytics.totalCommits.toLocaleString()} icon={GitCommit} />
+        <StatCard label="Time Spent" value={`${Math.floor(analytics.totalTimeSpent / 60)}h`} icon={Clock} />
+        <StatCard label="Total Points" value={analytics.totalPoints.toLocaleString()} icon={Trophy} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Average Per Day</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {analytics.averagePerDay.toFixed(1)}
-          </div>
-          <p className="text-xs text-gray-500 mt-1">problems/day</p>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Top Platform</div>
-          <div className="text-2xl font-bold text-gray-900">
-            {analytics.topPlatform}
-          </div>
-          <p className="text-xs text-gray-500 mt-1">by activity</p>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Weekly Growth</div>
-          <div className={`text-2xl font-bold ${analytics.weeklyGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {analytics.weeklyGrowth >= 0 ? '+' : ''}{analytics.weeklyGrowth}%
-          </div>
-          <p className="text-xs text-gray-500 mt-1">vs last week</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <DetailCard
+          label="Daily Average"
+          value={analytics.averagePerDay.toFixed(1)}
+          subtitle="problems / day"
+        />
+        <DetailCard
+          label="Top Platform"
+          value={analytics.topPlatform}
+          subtitle="by activity volume"
+        />
+        <DetailCard
+          label="Growth Trend"
+          value={`${analytics.weeklyGrowth}%`}
+          subtitle="vs previous period"
+          trend={analytics.weeklyGrowth}
+        />
       </div>
     </div>
   );
 };
 
-interface StatCardProps {
-  label: string;
-  value: string;
-  color: 'blue' | 'green' | 'purple' | 'yellow';
+function StatCard({ label, value, icon: Icon }: { label: string, value: string, icon: any }) {
+  return (
+    <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm hover:shadow-md transition-all">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
+          <Icon className="w-4 h-4 text-zinc-400 dark:text-zinc-600" />
+        </div>
+        <div className="text-3xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight">{value}</div>
+      </CardContent>
+    </Card>
+  );
 }
 
-function StatCard({ label, value, color }: StatCardProps) {
-  const colorMap = {
-    blue: 'bg-blue-50 border-blue-200',
-    green: 'bg-green-50 border-green-200',
-    purple: 'bg-purple-50 border-purple-200',
-    yellow: 'bg-yellow-50 border-yellow-200',
-  };
-
+function DetailCard({ label, value, subtitle, trend }: { label: string, value: string, subtitle: string, trend?: number }) {
   return (
-    <div className={`border-2 rounded-xl p-6 ${colorMap[color]}`}>
-      <div className="text-sm font-medium text-gray-700 mb-2">{label}</div>
-      <div className="text-3xl font-bold text-gray-900">{value}</div>
-    </div>
+    <Card className="border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20 shadow-none">
+      <CardContent className="p-6">
+        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-500 mb-2">{label}</p>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{value}</span>
+          {trend !== undefined && (
+            <span className={cn(
+              "flex items-center text-xs font-medium px-2 py-0.5 rounded-full",
+              trend >= 0
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
+                : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400"
+            )}>
+              {trend >= 0 ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
+              {Math.abs(trend)}%
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{subtitle}</p>
+      </CardContent>
+    </Card>
   );
 }
 

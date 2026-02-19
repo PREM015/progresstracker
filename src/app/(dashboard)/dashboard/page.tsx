@@ -1,12 +1,18 @@
 'use client';
 
 import { OverviewStats } from '@/components/dashboard/OverviewStats';
+import { ConnectedPlatformsStats } from '@/components/dashboard/ConnectedPlatformsStats';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { BentoGrid } from '@/components/ui/BentoGrid';
 import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap';
 import { RecentActivityList } from '@/components/dashboard/RecentActivityList';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { GoalsSummary } from '@/components/dashboard/GoalsSummary';
+import { DifficultyDistribution } from '@/components/dashboard/DifficultyDistribution';
 import { PlatformBreakdown } from '@/components/dashboard/PlatformBreakdown';
 import { MetaTags } from '@/components/seo/MetaTags';
+import { ActivityTrendChart } from '@/components/dashboard/ActivityTrendChart';
 import { useStats } from '@/hooks/useStats';
 import { useGoals } from '@/hooks/useGoals';
 import { useTracker } from '@/hooks/useTracker';
@@ -21,7 +27,10 @@ export default function DashboardPage() {
     weekStats,
     monthStats,
     dashboard,
-    heatmap,
+
+heatmap,
+    overview,
+    trends,
     isLoading: isLoadingStats
   } = useStats();
 
@@ -41,34 +50,14 @@ export default function DashboardPage() {
   }
 
   // Transform data for PlatformBreakdown
-  // Assuming dashboard.platforms exists from hook
-  const platformData = dashboard?.platforms
-    ? [
-      { name: 'Connected', value: dashboard.platforms.connected, color: '#4F46E5' },
-      { name: 'Total', value: dashboard.platforms.total, color: '#E5E7EB' }
-    ]
+  // Use overview.platforms for detailed activity breakdown, fallback to empty
+  const platformData = overview?.platforms?.length
+    ? overview.platforms.map((p, i) => ({
+      name: p.name,
+      value: p.problems + p.commits, // Combine metrics for general activity
+      color: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i % 5]
+    }))
     : [];
-
-  // Or if PlatformBreakdown expects a list of platforms and their problem counts,
-  // we might need `overview` from useStats or map dashboard data differently.
-  // For now, let's stick to simple connected vs total or similar if available, 
-  // or pass empty if we don't have detailed breakdown in `dashboard` object.
-  // Actually `dashboard.platforms` has `connected` and `total`. 
-  // Let's create a visual breakdown if the component supports it.
-
-  const formattedGoals = activeGoals.map(g => ({
-    id: g.id,
-    title: g.title,
-    progress: g.progressInfo?.percentage || 0,
-    daysLeft: g.deadline ? Math.ceil((new Date(g.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : undefined,
-    target: g.targetValue,
-    current: g.currentValue // assuming these exist on Goal
-  }));
-
-  const heatmapData = heatmap.reduce((acc, curr) => {
-    acc[curr.date] = curr.level;
-    return acc;
-  }, {} as Record<string, number>);
 
   return (
     <>
@@ -84,29 +73,92 @@ export default function DashboardPage() {
 
         {/* Top Stats Row */}
         <OverviewStats
-          totalSolved={dashboard?.achievements?.total || 0} // Using achievements total as proxy or 0 if not available
+          totalSolved={dashboard?.lifetime?.problems || 0}
           streak={streak.current}
-          monthlyGoalProgress={monthStats?.change || 0} // Using change as proxy or 0
-          totalPoints={dashboard?.today?.points || 0}   // This might need total points from user profile actually
+          streakLongest={streak.longest}
+          monthlyGoalProgress={monthStats?.change || 0}
+          totalPoints={dashboard?.lifetime?.points || 0}
+          totalSolvedTrend={monthStats?.change}
+          pointsTrend={dashboard?.thisMonth?.change}
         />
 
-        {/* Main Content Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          {/* Left Column (Heatmap & Activity) - Takes 4/7 width on large screens */}
-          <div className="col-span-4 lg:col-span-4 space-y-4">
-            <ActivityHeatmap activityData={heatmapData} />
-            <RecentActivityList activities={recentEntries} />
+        {/* Dense Bento Grid Layout */}
+        <BentoGrid className="max-w-full auto-rows-[minmax(12rem,auto)]">
+          {/* Heatmap: Prominent, spans 2 cols */}
+          <ActivityHeatmap
+            activityData={heatmap.reduce((acc, curr) => ({ ...acc, [curr.date]: curr.count }), {})}
+            className="md:col-span-2 min-h-[14rem]"
+          />
+
+
+
+          {/* Difficulty Breakdown: 1 col */}
+          <DifficultyDistribution
+            data={dashboard?.lifetime?.difficulty}
+            className="md:col-span-1 min-h-[14rem]"
+          />
+
+          {/* Activity Trend Chart: Spans 2 cols */}
+          <ActivityTrendChart
+            data={trends?.trend || []}
+            className="md:col-span-2 min-h-[14rem]"
+            loading={isLoadingStats}
+          />
+
+          {/* Connected Platforms Detail: Full width or large span */}
+          <div className="md:col-span-3">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">My Platforms</h3>
+              <Link href="/platforms" className="text-sm text-indigo-600 hover:text-indigo-500 font-medium">Manage Connections &rarr;</Link>
+            </div>
+            <ConnectedPlatformsStats
+              platforms={dashboard?.platforms?.connectedPlatforms?.map(p => ({
+                ...p,
+                lastSyncedAt: p.lastSyncedAt ? p.lastSyncedAt.toString() : null
+              }))}
+            />
           </div>
 
-          {/* Right Column (Goals, Breakdown, Actions) - Takes 3/7 width on large screens */}
-          <div className="col-span-4 lg:col-span-3 space-y-4">
+          {/* Recent Activity: Tall list, spans 2 cols */}
+          <RecentActivityList
+            activities={recentEntries.map(entry => ({
+              id: entry.id,
+              type: entry.problemsSolved > 0 ? 'solve' : entry.commits > 0 ? 'post' : 'achievement',
+              title: entry.problemsSolved > 0 ? `Solved ${entry.problemsSolved} Problems` : 'Activity',
+              description: entry.platform?.name || 'General Activity',
+              timestamp: new Date(entry.date),
+              platform: entry.platform?.name,
+              points: entry.points
+            }))}
+            className="md:col-span-2 min-h-[24rem]"
+          />
+
+          {/* Right Column Stack */}
+          <div className="md:col-span-1 space-y-4">
+            {/* Quick Actions */}
             <QuickActions />
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
-              <GoalsSummary goals={formattedGoals} />
-              <PlatformBreakdown data={platformData} />
-            </div>
+
+            {/* Goals */}
+            <GoalsSummary
+              goals={activeGoals.map((g: any) => ({
+                id: g.id,
+                title: g.title,
+                current: g.progress,
+                target: g.target,
+                dueDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : 'No deadline'
+              }))}
+            />
+
+            {/* Platform Activity Breakdown */}
+            <PlatformBreakdown
+              data={platformData.map(p => ({
+                platform: p.name,
+                count: p.value,
+                color: p.color
+              }))}
+            />
           </div>
-        </div>
+        </BentoGrid>
       </div>
     </>
   );

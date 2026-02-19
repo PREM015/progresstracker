@@ -135,6 +135,15 @@ export function LoginForm() {
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Sign In
         </Button>
+
+        <div className="text-center">
+          <Link
+            href="/magic-link"
+            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            Sign in with magic link instead
+          </Link>
+        </div>
       </form>
     </AuthCard>
   );

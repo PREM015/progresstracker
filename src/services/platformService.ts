@@ -1,7 +1,16 @@
 // src/services/platformService.ts
 import { prisma, paginationArgs, buildPaginationResponse, withTransaction } from "@/lib/prisma";
-import { Prisma, PlatformCategory, AuthType, SyncStatus } from "@prisma/client";
-import { encrypt, encryptJSON,  } from "@/lib/encryption";
+import { Prisma, PlatformCategory, AuthType as PrismaAuthType, SyncStatus } from "@prisma/client";
+import { encrypt, encryptJSON } from "@/lib/encryption";
+import {
+  platforms as staticPlatforms,
+  Platform as ConfigPlatform,
+  CATEGORY_TO_PRISMA,
+  AUTH_TYPE_TO_PRISMA
+} from "@/config/platforms";
+import { ScraperFactory, StubScraper } from "./scrapers";
+import { stripeService } from "@/services/stripeService";
+import { ApiError } from "@/lib/apiError";
 
 // =============================================================================
 // TYPES
@@ -21,6 +30,11 @@ export type PlatformCategoryId =
   | "design"
   | "data_science"
   | "other";
+
+/**
+ * Auth type ID (lowercase for API/URL use)
+ */
+export type ConfigAuthType = "none" | "oauth" | "api" | "api_key" | "scraping" | "manual" | "hybrid";
 
 /**
  * Map from lowercase category ID to Prisma enum
@@ -57,7 +71,7 @@ export const CATEGORY_ID_MAP: Record<PlatformCategory, PlatformCategoryId> = {
 export interface PlatformFilters {
   category?: PlatformCategoryId | PlatformCategory;
   categories?: (PlatformCategoryId | PlatformCategory)[];
-  authType?: AuthType;
+  authType?: ConfigAuthType | string;
   isActive?: boolean;
   supportsAutoSync?: boolean;
   supportsOAuth?: boolean;
@@ -146,215 +160,259 @@ export class PlatformService {
   // ===========================================================================
 
   /**
-   * Get all platforms with optional filters
+   * Helper to map config platform to prisma-like object
+   */
+  private static mapConfigToPrisma(p: ConfigPlatform) {
+    return {
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      displayName: p.displayName || p.name,
+      description: p.description || undefined,
+      category: p.category,
+      authType: p.authType,
+      icon: p.icon || undefined,
+      logo: p.logo || undefined,
+      color: p.color || undefined,
+      backgroundColor: p.backgroundColor || undefined,
+      website: p.website || undefined,
+      profileUrlPattern: p.profileUrlPattern || undefined,
+      apiEndpoint: p.apiEndpoint || undefined,
+      subcategory: undefined, // Config doesn't have subcategory yet
+      setupGuideUrl: p.setupInstructions ? '/docs/setup/' + p.slug : undefined,
+      helpArticleUrl: undefined,
+
+      supportsAutoSync: p.supportsAutoSync,
+      supportsOAuth: p.supportsOAuth || false,
+      supportsApiKey: p.supportsApiKey || false,
+      supportsWebhook: p.supportsWebhook || false,
+      requiresCredentials: p.requiresCredentials || false,
+
+      syncInterval: p.syncInterval || 1440,
+      rateLimit: p.rateLimit || undefined,
+      rateLimitWindow: p.rateLimitWindow || undefined,
+      avgSyncDuration: undefined,
+
+      isActive: p.isActive ?? true,
+      isBeta: p.isBeta || false,
+      tags: p.tags || [],
+      maintenanceMode: false,
+      maintenanceMessage: null,
+      healthStatus: "operational",
+      successRate: 100,
+      totalUsers: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Resolve Config ID/Slug to Database UUID
+   */
+  static async resolveDbId(idOrSlug: string): Promise<string | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    if (isUuid) return idOrSlug;
+
+    const platform = await prisma.platform.findUnique({
+      where: { slug: idOrSlug },
+      select: { id: true }
+    });
+
+    // If not in DB, but matches a static platform ID, return null (it means not connected yet)
+    // But for the purpose of "resolving", if it's not in DB, it's not in DB.
+    return platform ? platform.id : null;
+  }
+
+  /**
+   * Get all platforms with optional filters (Using Static Config)
+   */
+  /**
+   * Get all platforms with filters (Using Static Config)
    */
   static async getAllPlatforms(
-    filters?: PlatformFilters,
-    options?: {
+    filters: PlatformFilters = {},
+    options: {
       page?: number;
       limit?: number;
       sortBy?: string;
       sortOrder?: "asc" | "desc";
-    }
+    } = {}
   ) {
-    const { page = 1, limit = 100, sortBy = "name", sortOrder = "asc" } = options ?? {};
+    const { page = 1, limit = 100, sortBy = "popularity", sortOrder = "desc" } = options;
 
-    const where: Prisma.PlatformWhereInput = {
-      isActive: true,
-    };
+    let allPlatforms = (await this.getAllPlatformsList()).map(p => this.mapConfigToPrisma(p));
 
-    if (filters) {
-      // Handle category filter
-      if (filters.category) {
-        where.category = this.normalizeCategory(filters.category);
-      }
+    // Filter in memory
+    let filtered = allPlatforms.filter(p => p.isActive !== false);
 
-      // Handle multiple categories
-      if (filters.categories && filters.categories.length > 0) {
-        where.category = {
-          in: filters.categories.map((c) => this.normalizeCategory(c)),
-        };
-      }
-
-      // Auth type
-      if (filters.authType) {
-        where.authType = filters.authType;
-      }
-
-      // Active status
-      if (filters.isActive !== undefined) {
-        where.isActive = filters.isActive;
-      }
-
-      // Auto sync support
-      if (filters.supportsAutoSync !== undefined) {
-        where.supportsAutoSync = filters.supportsAutoSync;
-      }
-
-      // OAuth support
-      if (filters.supportsOAuth !== undefined) {
-        where.supportsOAuth = filters.supportsOAuth;
-      }
-
-      // Search
-      if (filters.search) {
-        where.OR = [
-          { name: { contains: filters.search, mode: "insensitive" } },
-          { displayName: { contains: filters.search, mode: "insensitive" } },
-          { description: { contains: filters.search, mode: "insensitive" } },
-          { slug: { contains: filters.search, mode: "insensitive" } },
-        ];
-      }
-
-      // Tags
-      if (filters.tags && filters.tags.length > 0) {
-        where.tags = { hasSome: filters.tags };
-      }
+    if (filters.isActive !== undefined) {
+      filtered = filtered.filter(p => (p.isActive ?? true) === filters.isActive);
     }
 
-    const [platforms, total] = await Promise.all([
-      prisma.platform.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        ...paginationArgs(page, limit),
-      }),
-      prisma.platform.count({ where }),
-    ]);
+    if (filters.category) {
+      // Normalize category filter
+      const categoryFilters: string[] = [];
+      if (Array.isArray(filters.category)) {
+        categoryFilters.push(...filters.category.map(c => String(c).toLowerCase()));
+      } else {
+        categoryFilters.push(String(filters.category).toLowerCase());
+      }
 
-    return buildPaginationResponse(platforms, total, page, limit);
+      // Match against mapped category (which is Prisma enum)
+      filtered = filtered.filter(p => categoryFilters.includes(String(p.category).toLowerCase()));
+    }
+
+    if (filters.authType) {
+      filtered = filtered.filter(p => p.authType === filters.authType);
+    }
+
+    if (filters.supportsAutoSync !== undefined) {
+      filtered = filtered.filter(p => p.supportsAutoSync === filters.supportsAutoSync);
+    }
+
+    if (filters.supportsOAuth !== undefined) {
+      filtered = filtered.filter(p => (p.supportsOAuth ?? false) === filters.supportsOAuth);
+    }
+
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.slug.toLowerCase().includes(q) ||
+        (p.displayName && p.displayName.toLowerCase().includes(q))
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      // Default sort by popularity (simple heuristic if not present)
+      const valA = (a as any)[sortBy] ?? (sortBy === 'popularity' ? 0 : '');
+      const valB = (b as any)[sortBy] ?? (sortBy === 'popularity' ? 0 : '');
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const paginated = filtered.slice(start, start + limit);
+
+    return {
+      data: paginated,
+      total
+    };
   }
 
+
+
+
   /**
-   * Get all platforms (no pagination, for dropdowns etc.)
+   * Get all platforms list (Using Static Config)
    */
   static async getAllPlatformsList(activeOnly = true) {
-    return prisma.platform.findMany({
-      where: activeOnly ? { isActive: true } : {},
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        displayName: true,
-        category: true,
-        icon: true,
-        color: true,
-        supportsAutoSync: true,
-        supportsOAuth: true,
-        authType: true,
-      },
-    });
+    let platforms = staticPlatforms;
+    if (activeOnly) {
+      platforms = platforms.filter(p => p.isActive !== false);
+    }
+    return platforms.map(p => this.mapConfigToPrisma(p));
   }
 
   /**
-   * Get platforms by category
+   * Get platforms by category (Using Static Config)
    */
   static async getPlatformsByCategory(category: PlatformCategoryId | PlatformCategory) {
     const normalizedCategory = this.normalizeCategory(category);
-
-    return prisma.platform.findMany({
-      where: {
-        category: normalizedCategory,
-        isActive: true,
-      },
-      orderBy: { name: "asc" },
-    });
+    const platforms = staticPlatforms.filter(p =>
+      CATEGORY_TO_PRISMA[p.category] === normalizedCategory && p.isActive !== false
+    );
+    return platforms.map(p => this.mapConfigToPrisma(p));
   }
 
   /**
    * Get platform by ID
    */
+  /**
+   * Get platform by ID (Using Static Config)
+   */
   static async getPlatformById(id: string) {
-    return prisma.platform.findUnique({
-      where: { id },
-    });
+    console.log(`[PlatformService] getPlatformById called for id: ${id}. Total platforms in config: ${staticPlatforms.length}`);
+    const p = staticPlatforms.find(p => p.id === id || p.slug === id);
+    if (!p) console.warn(`[PlatformService] Platform not found in config for id: ${id}`);
+    return p ? this.mapConfigToPrisma(p) : null;
   }
 
   /**
-   * Get platform by slug
+   * Get platform by slug (Using Static Config)
    */
   static async getPlatformBySlug(slug: string) {
-    return prisma.platform.findUnique({
-      where: { slug },
-    });
+    const p = staticPlatforms.find(p => p.slug === slug);
+    return p ? this.mapConfigToPrisma(p) : null;
   }
 
   /**
    * Search platforms
    */
+  /**
+   * Search platforms (Using Static Config)
+   */
   static async searchPlatforms(query: string, limit = 10) {
-    return prisma.platform.findMany({
-      where: {
-        isActive: true,
-        OR: [
-          { name: { contains: query, mode: "insensitive" } },
-          { displayName: { contains: query, mode: "insensitive" } },
-          { slug: { contains: query, mode: "insensitive" } },
-          { tags: { hasSome: [query.toLowerCase()] } },
-        ],
-      },
-      orderBy: [
-        { name: "asc" },
-      ],
-      take: limit,
-    });
+    const q = query.toLowerCase();
+    const platforms = staticPlatforms.filter(p =>
+      p.isActive !== false && (
+        p.name.toLowerCase().includes(q) ||
+        p.slug.toLowerCase().includes(q) ||
+        (p.displayName && p.displayName.toLowerCase().includes(q))
+      )
+    ).slice(0, limit);
+
+    return platforms.map(p => this.mapConfigToPrisma(p));
   }
 
   /**
    * Get platforms with user connection status
    */
+  /**
+   * Get platforms with user connection status (Using Static Config + DB)
+   */
   static async getPlatformsWithConnectionStatus(
     userId: string,
     category?: PlatformCategoryId | PlatformCategory
   ): Promise<PlatformWithConnection[]> {
-    const where: Prisma.PlatformWhereInput = {
-      isActive: true,
-    };
+    const allPlatforms = staticPlatforms.filter(p => p.isActive !== false);
 
-    if (category) {
-      where.category = this.normalizeCategory(category);
-    }
+    const targetCategory = category ? this.normalizeCategory(category) : undefined;
+    const filtered = targetCategory
+      ? allPlatforms.filter(p => CATEGORY_TO_PRISMA[p.category] === targetCategory)
+      : allPlatforms;
 
-    const platforms = await prisma.platform.findMany({
-      where,
-      orderBy: { name: "asc" },
-      include: {
-        users: {
-          where: { userId },
-          select: {
-            id: true,
-            username: true,
-            isActive: true,
-            isVerified: true,
-            syncStatus: true,
-            lastSyncedAt: true,
-          },
-        },
-      },
+    // Get user connections from DB
+    const connections = await prisma.userPlatform.findMany({
+      where: { userId },
+      include: { platform: true }
     });
 
-    return platforms.map((platform) => {
-      const connection = platform.users[0];
+    return filtered.map(p => {
+      // Match connection by slug (or id if you prefer)
+      const conn = connections.find(c => c.platform.slug === p.slug);
       return {
-        id: platform.id,
-        slug: platform.slug,
-        name: platform.name,
-        displayName: platform.displayName,
-        category: platform.category,
-        icon: platform.icon,
-        color: platform.color,
-        supportsAutoSync: platform.supportsAutoSync,
-        isConnected: !!connection,
-        connection: connection
-          ? {
-              id: connection.id,
-              username: connection.username,
-              isActive: connection.isActive,
-              isVerified: connection.isVerified,
-              syncStatus: connection.syncStatus,
-              lastSyncedAt: connection.lastSyncedAt,
-            }
-          : undefined,
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        displayName: p.displayName || p.name,
+        category: CATEGORY_TO_PRISMA[p.category],
+        icon: p.icon || null,
+        color: p.color || null,
+        supportsAutoSync: p.supportsAutoSync,
+        isConnected: !!conn,
+        connection: conn ? {
+          id: conn.id,
+          username: conn.username,
+          isActive: conn.isActive,
+          isVerified: conn.isVerified,
+          syncStatus: conn.syncStatus,
+          lastSyncedAt: conn.lastSyncedAt
+        } : undefined
       };
     });
   }
@@ -390,9 +448,9 @@ export class PlatformService {
       }),
       includeCustom
         ? prisma.customPlatform.findMany({
-            where: { userId, isActive: true },
-            orderBy: { createdAt: "desc" },
-          })
+          where: { userId, isActive: true },
+          orderBy: { createdAt: "desc" },
+        })
         : [],
     ]);
 
@@ -417,88 +475,144 @@ export class PlatformService {
   }
 
   /**
-   * Connect platform to user
+   * Connect platform to user (Lazy Creation Supported)
    */
-  static async connectPlatform(id: string, platformId: string, username: string | undefined, token: string | undefined, input: ConnectPlatformInput) {
-    const { userId, ...data } = input;
+  static async connectPlatform(userId: string, platformId: string, username: string | undefined, token: string | undefined, input: ConnectPlatformInput) {
+    const { ...data } = input; // userId is in arg list too, careful
 
-    // Check if platform exists
-    const platform = await prisma.platform.findUnique({
-      where: { id: platformId },
+    // 1. Find in Config
+    const configPlatform = staticPlatforms.find(p => p.id === platformId || p.slug === platformId);
+    if (!configPlatform) {
+      throw new Error("Platform not found in configuration");
+    }
+
+    if (configPlatform.isActive === false) {
+      throw new Error("Platform is not active");
+    }
+
+    // 2. Ensure Db Record Exists (Lazy Sync)
+    const category = CATEGORY_TO_PRISMA[configPlatform.category] || 'OTHER';
+    const authType = AUTH_TYPE_TO_PRISMA[configPlatform.authType] || 'NONE';
+
+    const dbPlatform = await prisma.platform.upsert({
+      where: { slug: configPlatform.slug },
+      update: {},
+      create: {
+        slug: configPlatform.slug,
+        name: configPlatform.name,
+        displayName: configPlatform.displayName || configPlatform.name,
+        description: configPlatform.description,
+        category: category,
+        authType: authType,
+        isActive: true,
+        supportsAutoSync: configPlatform.supportsAutoSync,
+        supportsOAuth: configPlatform.supportsOAuth || false,
+        supportsApiKey: configPlatform.supportsApiKey || false,
+        syncPriority: configPlatform.syncPriority || 0,
+        syncInterval: configPlatform.syncInterval || 1440
+      }
     });
 
-    if (!platform) {
-      throw new Error("Platform not found");
+    // 3. Prepare Connection Data
+    let profileUrl = data.profileUrl;
+    if (!profileUrl && data.username && configPlatform.profileUrlPattern) {
+      profileUrl = configPlatform.profileUrlPattern.replace("{username}", data.username);
     }
 
-    if (!platform.isActive) {
-      throw new Error("Platform is not available");
-    }
+    const credentialsValue = data.credentials
+      ? (encryptJSON(data.credentials) as unknown as Prisma.InputJsonValue)
+      : data.accessToken
+        ? (encryptJSON({
+          access_token: data.accessToken,
+          refresh_token: data.refreshToken ?? "",
+          expires_at: data.tokenExpiresAt?.toISOString() ?? null,
+        }) as unknown as Prisma.InputJsonValue)
+        : undefined;
 
-    // Check if already connected
+    const connectionData = {
+      username: data.username,
+      profileUrl,
+      externalUserId: data.externalUserId,
+
+      accessToken: data.accessToken ? encrypt(data.accessToken) : null,
+      refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
+      tokenExpiresAt: data.tokenExpiresAt ?? null,
+      apiKey: data.apiKey ? encrypt(data.apiKey) : null,
+
+      ...(credentialsValue !== undefined && { credentials: credentialsValue }),
+
+      isActive: true,
+      isVerified: false, // Reset verification on connect/reconnect
+      verifiedAt: null,
+      connectionStatus: "connected",
+      autoSync: data.autoSync && configPlatform.supportsAutoSync,
+      connectionError: null,
+      lastSyncError: null,
+    };
+
+    // 4. Try to find existing connection
     const existing = await prisma.userPlatform.findUnique({
       where: {
         userId_platformId: {
           userId,
-          platformId,
-        },
-      },
+          platformId: dbPlatform.id
+        }
+      }
     });
 
+    let connection;
     if (existing) {
-      throw new Error("Platform already connected");
+      // Update existing connection
+      connection = await prisma.userPlatform.update({
+        where: { id: existing.id },
+        data: {
+          ...connectionData,
+          updatedAt: new Date(),
+        },
+        include: { platform: true },
+      });
+    } else {
+      // Check subscription limits ONLY for new connections
+      const canAdd = await stripeService.canAddPlatform(userId);
+      if (!canAdd) {
+        throw new ApiError(
+          'Platform limit reached. Upgrade your plan to connect more platforms.',
+          403,
+          'PLATFORM_LIMIT_REACHED'
+        );
+      }
+
+      // Create new connection
+      connection = await prisma.userPlatform.create({
+        data: {
+          userId,
+          platformId: dbPlatform.id,
+          ...connectionData,
+          syncStatus: "IDLE",
+        },
+        include: { platform: true },
+      });
+
+      // Update stats and stripe count only for new connections
+      await Promise.all([
+        prisma.platform.update({
+          where: { id: dbPlatform.id },
+          data: { totalUsers: { increment: 1 } }
+        }),
+        stripeService.incrementPlatformCount(userId)
+      ]);
     }
 
-    // Build profile URL if pattern exists
-    let profileUrl = data.profileUrl;
-    if (!profileUrl && data.username && platform.profileUrlPattern) {
-      profileUrl = platform.profileUrlPattern.replace("{username}", data.username);
-    }
+    // Get scraper status
+    const scraperStatus = {
+      hasAutoSync: configPlatform.supportsAutoSync && ScraperFactory.isScraperWorking(configPlatform.slug),
+      isImplemented: ScraperFactory.hasScraper(configPlatform.slug) && !(ScraperFactory.getScraper(configPlatform.slug) instanceof StubScraper),
+    };
 
-    // Build encrypted credentials JSON if tokens provided
-const credentialsValue = data.credentials
-  ? (encryptJSON(data.credentials) as unknown as Prisma.InputJsonValue)
-  : data.accessToken
-    ? (encryptJSON({
-        access_token: data.accessToken,
-        refresh_token: data.refreshToken ?? "",
-        expires_at: data.tokenExpiresAt?.toISOString() ?? null,
-      }) as unknown as Prisma.InputJsonValue)
-    : undefined;
-
-const connection = await prisma.userPlatform.create({
-  data: {
-    userId,
-    platformId,
-    username: data.username,
-    profileUrl,
-    externalUserId: data.externalUserId,
-
-    accessToken: data.accessToken ? encrypt(data.accessToken) : null,
-    refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
-    tokenExpiresAt: data.tokenExpiresAt ?? null,
-    apiKey: data.apiKey ? encrypt(data.apiKey) : null,
-
-    ...(credentialsValue !== undefined && { credentials: credentialsValue }),
-
-    isActive: true,
-    isVerified: false,
-    connectionStatus: "connected",
-    autoSync: data.autoSync ?? platform.supportsAutoSync,
-    syncStatus: "IDLE",
-  },
-  include: { platform: true },
-});
-
-    // Update platform stats
-    await prisma.platform.update({
-      where: { id: platformId },
-      data: {
-        totalUsers: { increment: 1 },
-      },
-    });
-
-    return connection;
+    return {
+      connection,
+      scraperStatus
+    };
   }
 
   /**
@@ -527,24 +641,24 @@ const connection = await prisma.userPlatform.create({
     const updateData: Prisma.UserPlatformUpdateInput = {
       updatedAt: new Date(),
     };
-if (data.accessToken !== undefined) {
-  updateData.accessToken = data.accessToken ? encrypt(data.accessToken) : null;
-}
+    if (data.accessToken !== undefined) {
+      updateData.accessToken = data.accessToken ? encrypt(data.accessToken) : null;
+    }
 
-if (data.refreshToken !== undefined) {
-  updateData.refreshToken = data.refreshToken ? encrypt(data.refreshToken) : null;
-}
+    if (data.refreshToken !== undefined) {
+      updateData.refreshToken = data.refreshToken ? encrypt(data.refreshToken) : null;
+    }
 
-if (data.apiKey !== undefined) {
-  updateData.apiKey = data.apiKey ? encrypt(data.apiKey) : null;
-}
+    if (data.apiKey !== undefined) {
+      updateData.apiKey = data.apiKey ? encrypt(data.apiKey) : null;
+    }
 
-if (data.credentials !== undefined) {
- updateData.credentials = data.credentials
-  ? (encryptJSON(data.credentials) as unknown as Prisma.InputJsonValue)
-  : Prisma.JsonNull;
+    if (data.credentials !== undefined) {
+      updateData.credentials = data.credentials
+        ? (encryptJSON(data.credentials) as unknown as Prisma.InputJsonValue)
+        : Prisma.JsonNull;
 
-}
+    }
 
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.autoSync !== undefined) updateData.autoSync = data.autoSync;
@@ -596,7 +710,7 @@ if (data.credentials !== undefined) {
 
       // Update platform stats
       await tx.platform.update({
-        where: { id: platformId },
+        where: { id: connection.platformId },
         data: {
           totalUsers: { decrement: 1 },
         },
@@ -839,54 +953,47 @@ if (data.credentials !== undefined) {
   static async getConnectionStats(userId: string): Promise<ConnectionStats> {
     const [
       totalPlatforms,
-      connectedPlatforms,
       categoryStats,
-      syncEnabledCount,
-      recentSyncCount,
+      userConnections,
     ] = await Promise.all([
       prisma.platform.count({ where: { isActive: true } }),
-      prisma.userPlatform.count({ where: { userId } }),
       prisma.platform.groupBy({
         by: ["category"],
         where: { isActive: true },
         _count: true,
       }),
-      prisma.userPlatform.count({
-        where: { userId, autoSync: true },
-      }),
-      prisma.userPlatform.count({
-        where: {
-          userId,
-          lastSyncedAt: {
-            gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+      prisma.userPlatform.findMany({
+        where: { userId },
+        include: {
+          platform: {
+            select: { category: true },
           },
         },
       }),
     ]);
 
-    // Get connected counts by category
-    const userConnections = await prisma.userPlatform.findMany({
-      where: { userId },
-      include: {
-        platform: {
-          select: { category: true },
-        },
-      },
-    });
+    const connectedPlatforms = userConnections.length;
+    const syncEnabledCount = userConnections.filter((c) => c.autoSync).length;
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentSyncCount = userConnections.filter(
+      (c) => c.lastSyncedAt && c.lastSyncedAt >= oneDayAgo
+    ).length;
 
     const byCategory: Record<string, { total: number; connected: number }> = {};
 
     for (const stat of categoryStats) {
       const categoryId = CATEGORY_ID_MAP[stat.category];
-      byCategory[categoryId] = {
-        total: stat._count,
-        connected: 0,
-      };
+      if (categoryId) {
+        byCategory[categoryId] = {
+          total: stat._count,
+          connected: 0,
+        };
+      }
     }
 
     for (const conn of userConnections) {
       const categoryId = CATEGORY_ID_MAP[conn.platform.category];
-      if (byCategory[categoryId]) {
+      if (categoryId && byCategory[categoryId]) {
         byCategory[categoryId].connected++;
       }
     }
@@ -912,7 +1019,7 @@ if (data.credentials !== undefined) {
       totalConnections,
       activeConnections,
       syncStats,
-            // ... continuing from getPlatformUsageStats
+      // ... continuing from getPlatformUsageStats
       entryStats,
     ] = await Promise.all([
       prisma.userPlatform.count({
@@ -952,8 +1059,8 @@ if (data.credentials !== undefined) {
       },
     });
 
-    const successRate = syncStats._count > 0 
-      ? (successfulSyncs / syncStats._count) * 100 
+    const successRate = syncStats._count > 0
+      ? (successfulSyncs / syncStats._count) * 100
       : 100;
 
     return {
@@ -1118,7 +1225,7 @@ if (data.credentials !== undefined) {
     displayName?: string;
     description?: string;
     category: PlatformCategory;
-    authType?: AuthType;
+    authType?: PrismaAuthType;
     icon?: string;
     logo?: string;
     color?: string;
@@ -1177,7 +1284,7 @@ if (data.credentials !== undefined) {
       displayName: string;
       description: string;
       category: PlatformCategory;
-      authType: AuthType;
+      authType: PrismaAuthType;
       icon: string;
       logo: string;
       color: string;

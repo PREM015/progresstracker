@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AchievementService } from '@/services/api/achievement.service';
 import { queryKeys } from './keys';
 import type {
   UserAchievement,
@@ -22,12 +22,6 @@ import type {
 // =============================================================================
 // TYPES
 // =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 interface AchievementFilter {
   category?: AchievementCategory;
@@ -51,17 +45,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const achievementsQuery = useQuery({
     queryKey: queryKeys.achievements.available(),
-    queryFn: async (): Promise<AchievementProgress[]> => {
-      const response = await apiClient.get<ApiResponse<{ achievements: AchievementProgress[] }>>(
-        '/achievements/progress'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch achievements');
-      }
-
-      return response.data.data!.achievements;
-    },
+    queryFn: () => AchievementService.getProgress(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -90,17 +74,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const unlockedQuery = useQuery({
     queryKey: queryKeys.achievements.unlocked(),
-    queryFn: async (): Promise<UserAchievement[]> => {
-      const response = await apiClient.get<ApiResponse<{ achievements: UserAchievement[] }>>(
-        '/achievements'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch unlocked achievements');
-      }
-
-      return response.data.data!.achievements;
-    },
+    queryFn: () => AchievementService.getUnlocked(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -110,18 +84,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const recentQuery = useQuery({
     queryKey: queryKeys.achievements.recent(),
-    queryFn: async (): Promise<UserAchievement[]> => {
-      const response = await apiClient.get<ApiResponse<{ achievements: UserAchievement[] }>>(
-        '/achievements/recent',
-        { limit: '10' }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch recent achievements');
-      }
-
-      return response.data.data!.achievements;
-    },
+    queryFn: () => AchievementService.getRecent(10),
     enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000,
   });
@@ -131,17 +94,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const pinnedQuery = useQuery({
     queryKey: queryKeys.achievements.pinned(),
-    queryFn: async (): Promise<UserAchievement[]> => {
-      const response = await apiClient.get<ApiResponse<{ achievements: UserAchievement[] }>>(
-        '/achievements/pinned'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch pinned achievements');
-      }
-
-      return response.data.data!.achievements;
-    },
+    queryFn: () => AchievementService.getPinned(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -151,17 +104,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const statsQuery = useQuery({
     queryKey: queryKeys.achievements.stats(),
-    queryFn: async (): Promise<AchievementStats> => {
-      const response = await apiClient.get<ApiResponse<{ stats: AchievementStats }>>(
-        '/achievements/stats'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch achievement stats');
-      }
-
-      return response.data.data!.stats;
-    },
+    queryFn: () => AchievementService.getStats(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -171,17 +114,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const categoriesQuery = useQuery({
     queryKey: queryKeys.achievements.categories(),
-    queryFn: async (): Promise<{ category: AchievementCategory; count: number; unlocked: number }[]> => {
-      const response = await apiClient.get<ApiResponse<{
-        categories: { category: AchievementCategory; count: number; unlocked: number }[]
-      }>>('/achievements/categories');
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch categories');
-      }
-
-      return response.data.data!.categories;
-    },
+    queryFn: () => AchievementService.getCategories(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -191,17 +124,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const pinMutation = useMutation({
     mutationKey: ['achievements', 'pin'],
-    mutationFn: async (achievementId: string): Promise<UserAchievement> => {
-      const response = await apiClient.post<ApiResponse<{ achievement: UserAchievement }>>(
-        `/achievements/${achievementId}/pin`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to pin achievement');
-      }
-
-      return response.data.data!.achievement;
-    },
+    mutationFn: (achievementId: string) => AchievementService.pin(achievementId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.pinned() });
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.unlocked() });
@@ -220,17 +143,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const unpinMutation = useMutation({
     mutationKey: ['achievements', 'unpin'],
-    mutationFn: async (achievementId: string): Promise<UserAchievement> => {
-      const response = await apiClient.delete<ApiResponse<{ achievement: UserAchievement }>>(
-        `/achievements/${achievementId}/pin`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to unpin achievement');
-      }
-
-      return response.data.data!.achievement;
-    },
+    mutationFn: (achievementId: string) => AchievementService.unpin(achievementId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.pinned() });
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.unlocked() });
@@ -249,17 +162,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
   // ==========================================================================
   const checkMutation = useMutation({
     mutationKey: ['achievements', 'check'],
-    mutationFn: async (): Promise<UserAchievement[]> => {
-      const response = await apiClient.post<ApiResponse<{ unlocked: UserAchievement[] }>>(
-        '/achievements/check'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to check achievements');
-      }
-
-      return response.data.data!.unlocked;
-    },
+    mutationFn: () => AchievementService.check(),
     onSuccess: (unlocked) => {
       if (unlocked.length > 0) {
         queryClient.invalidateQueries({ queryKey: queryKeys.achievements.all });
@@ -348,17 +251,7 @@ export function useAchievements(filters: AchievementFilter = {}) {
 export function useAchievement(id: string) {
   const query = useQuery({
     queryKey: queryKeys.achievements.byId(id),
-    queryFn: async (): Promise<AchievementProgress> => {
-      const response = await apiClient.get<ApiResponse<{ achievement: AchievementProgress }>>(
-        `/achievements/${id}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Achievement not found');
-      }
-
-      return response.data.data!.achievement;
-    },
+    queryFn: () => AchievementService.getById(id),
     enabled: !!id,
   });
 

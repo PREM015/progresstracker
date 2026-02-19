@@ -13,9 +13,13 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     // Fetch user's rank
-    fetch('/api/leaderboard/user-rank')
+    fetch('/api/leaderboard/rank')
       .then(r => r.json())
-      .then(data => setUserRank(data))
+      .then(response => {
+        if (response.success && response.data) {
+          setUserRank(response.data);
+        }
+      })
       .catch(err => console.error('Failed to fetch user rank:', err))
       .finally(() => setLoading(false));
   }, [filters]);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface TrackerValidationFormProps {
     entryId: string;
@@ -9,6 +10,7 @@ interface TrackerValidationFormProps {
 }
 
 export function TrackerValidationForm({ entryId, onValidate, className = '' }: TrackerValidationFormProps) {
+    const { updateEntry } = useTracker();
     const [validationNotes, setValidationNotes] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,13 +18,9 @@ export function TrackerValidationForm({ entryId, onValidate, className = '' }: T
         setIsSubmitting(true);
 
         try {
-            await fetch(`/api/tracker/${entryId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    isVerified: isValid,
-                    notes: validationNotes || undefined,
-                }),
+            await updateEntry(entryId, {
+                isVerified: isValid,
+                notes: validationNotes || undefined,
             });
 
             onValidate(isValid, validationNotes);

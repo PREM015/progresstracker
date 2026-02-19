@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import apiClient from '@/lib/apiClient';
+import { AdminMaintenanceService } from '@/services/api/admin/maintenance.service';
 import { queryKeys } from './keys';
 
 export interface MaintenanceWindow {
@@ -37,16 +37,14 @@ export function useAdminMaintenance() {
     const maintenanceQuery = useQuery({
         queryKey: queryKeys.admin.maintenance.windows(),
         queryFn: async () => {
-            const response = await apiClient.get<MaintenanceWindow[]>('/admin/maintenance');
-            if (response.error) return [];
-            return response.data || [];
+            return AdminMaintenanceService.getMaintenanceWindows();
         },
         enabled: isAdmin,
     });
 
     const createMaintenanceMutation = useMutation({
         mutationFn: async (data: MaintenanceInput) => {
-            return await apiClient.post<MaintenanceWindow>('/admin/maintenance', data);
+            return AdminMaintenanceService.createMaintenanceWindow(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.maintenance.windows() });
@@ -55,7 +53,7 @@ export function useAdminMaintenance() {
 
     const deleteMaintenanceMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/maintenance/${id}`);
+            return AdminMaintenanceService.deleteMaintenanceWindow(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.maintenance.windows() });
@@ -64,8 +62,7 @@ export function useAdminMaintenance() {
 
     const toggleMaintenanceMutation = useMutation({
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            const endpoint = isActive ? 'deactivate' : 'activate';
-            return await apiClient.post<void>(`/admin/maintenance/${id}/${endpoint}`);
+            return AdminMaintenanceService.toggleMaintenanceWindow(id, isActive);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.maintenance.windows() });
@@ -77,9 +74,7 @@ export function useAdminMaintenance() {
     const cacheStatsQuery = useQuery({
         queryKey: queryKeys.admin.cache.stats(),
         queryFn: async () => {
-            const response = await apiClient.get<CacheStats>('/admin/cache/stats');
-            if (response.error) return null;
-            return response.data;
+            return AdminMaintenanceService.getCacheStats();
         },
         enabled: isAdmin,
         refetchInterval: 30000, // Refresh every 30 seconds
@@ -87,10 +82,7 @@ export function useAdminMaintenance() {
 
     const clearCacheMutation = useMutation({
         mutationFn: async (key?: string) => {
-            // If key is provided, clear specific key? Or maybe separate endpoint?
-            // Assuming general clear or specific if supported.
-            // Based on CacheClearButton, it likely hits /api/admin/cache/clear
-            return await apiClient.post<void>('/admin/cache/clear', { key });
+            return AdminMaintenanceService.clearCache(key);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.cache.stats() });

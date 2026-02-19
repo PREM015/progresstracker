@@ -1,94 +1,83 @@
-"use client";
 
-import { useState, useEffect } from "react";
+'use client';
+
+import React, { useState } from 'react';
+import { Activity } from '@/services/api/activity.service';
+import { ActivityList } from '@/components/activity/ActivityList';
+import { ActivityLogForm } from '@/components/activity/ActivityLogForm';
+import { ActivityHeatmap } from '@/components/activity/ActivityHeatmap';
+import { Button } from '@/components/ui/button';
+import { Plus, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ActivityLogPage() {
-  const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [showForm, setShowForm] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    fetch(`/api/user/activity?filter=${filter}`)
-      .then(r => r.json())
-      .then(data => setActivities(data.activities || []))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, [filter]);
+  const handleEdit = (activity: Activity) => {
+    setEditingActivity(activity);
+    setShowForm(true);
+  };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  const getActivityIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      goal_completed: "🎯",
-      achievement_unlocked: "🏆",
-      platform_connected: "🔗",
-      streak_milestone: "🔥",
-      problem_solved: "💡",
-      sync_completed: "🔄",
-      profile_updated: "👤",
-    };
-    return icons[type] || "📝";
+  const handleSuccess = () => {
+    setShowForm(false);
+    setEditingActivity(null);
+    setRefreshTrigger(prev => prev + 1);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold">Activity Log</h1>
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg"
-          >
-            <option value="all">All Activity</option>
-            <option value="goals">Goals</option>
-            <option value="achievements">Achievements</option>
-            <option value="platforms">Platforms</option>
-            <option value="syncs">Syncs</option>
-          </select>
+    <div className="space-y-8 max-w-5xl mx-auto pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Activity Log
+          </h1>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+            Track your daily progress, contributions, and learning journey.
+          </p>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          {activities.length === 0 ? (
-            <div className="text-center py-16">
-              <span className="text-5xl">📊</span>
-              <p className="mt-4 text-gray-500">No activity yet</p>
-              <p className="text-sm text-gray-400 mt-2">Your activity history will appear here</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {activities.map((activity, idx) => (
-                <div key={idx} className="p-6 hover:bg-gray-50 transition">
-                  <div className="flex items-start gap-4">
-                    <div className="text-3xl">{getActivityIcon(activity.type)}</div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{activity.title}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    {activity.metadata && (
-                      <div className="text-right">
-                        {activity.metadata.points && (
-                          <span className="text-sm font-medium text-indigo-600">
-                            +{activity.metadata.points} points
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <Button
+          onClick={() => {
+            setEditingActivity(null);
+            setShowForm(!showForm);
+          }}
+          className="bg-zinc-900 dark:bg-zinc-50 text-zinc-50 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200"
+        >
+          {showForm ? <X className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+          {showForm ? 'Close Form' : 'Log Activity'}
+        </Button>
+      </div>
+
+      {/* Heatmap Section */}
+      <ActivityHeatmap refreshTrigger={refreshTrigger} />
+
+      {/* Form Section */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <ActivityLogForm
+              initialData={editingActivity}
+              onSuccess={handleSuccess}
+              onCancel={() => setShowForm(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* List Section */}
+      <div>
+        <h2 className="text-xl font-bold mb-4 text-zinc-900 dark:text-zinc-50">Recent Activities</h2>
+        <ActivityList
+          onEdit={handleEdit}
+          refreshTrigger={refreshTrigger}
+        />
       </div>
     </div>
   );

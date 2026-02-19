@@ -44,8 +44,18 @@ export const TimeSpentAnalysis: React.FC<TimeSpentAnalysisProps> = ({
     const fetchTime = async () => {
       try {
         const res = await fetch('/api/analytics/time-spent?groupBy=category&days=30');
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch time spent data: ${res.status}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from API");
+        }
+
         const json = (await res.json()) as ApiSuccess<TimeSpentResponse>;
-        if (!res.ok || !json?.success) throw new Error('Failed to fetch time spent data');
+        if (!json?.success) throw new Error('API reported failure');
 
         const items = (json.data?.data || []).map((item, idx) => ({
           category: item.label,
@@ -111,7 +121,7 @@ export const TimeSpentAnalysis: React.FC<TimeSpentAnalysisProps> = ({
               ].join(' ');
 
               return [...acc, <path key={idx} d={d} fill={item.color} />];
-            }, [] as JSX.Element[])}
+            }, [] as React.ReactNode[])}
           </svg>
         </div>
       </div>

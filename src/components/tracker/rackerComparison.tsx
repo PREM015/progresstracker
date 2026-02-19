@@ -1,6 +1,5 @@
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 import type { TrackerEntry } from '@/types/tracker';
 import { formatTimeSpent } from '@/types/tracker';
 
@@ -30,51 +29,37 @@ export function TrackerComparison({
     comparisonType = 'week',
     className = ''
 }: TrackerComparisonProps) {
-    const [currentPeriod, setCurrentPeriod] = useState<PeriodStats | null>(null);
-    const [previousPeriod, setPreviousPeriod] = useState<PeriodStats | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
     const periods = useMemo(() => getPeriods(comparisonType), [comparisonType]);
 
-    useEffect(() => {
-        fetchComparisonData();
-    }, [comparisonType]);
+    const filters = useMemo(() => ({
+        startDate: periods.previous.start,
+        endDate: periods.current.end,
+        limit: 2000
+    }), [periods]);
 
-    const fetchComparisonData = async () => {
-        setLoading(true);
-        setError(null);
+    const { entries, isLoading, error } = useTracker(filters);
 
-        try {
-            const [currentData, previousData] = await Promise.all([
-                fetchPeriodData(periods.current),
-                fetchPeriodData(periods.previous),
-            ]);
-
-            setCurrentPeriod(currentData);
-            setPreviousPeriod(previousData);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const fetchPeriodData = async (period: ComparisonPeriod): Promise<PeriodStats> => {
-        const params = new URLSearchParams({
-            startDate: period.start.toISOString(),
-            endDate: period.end.toISOString(),
-            limit: '1000',
+    const currentPeriod = useMemo(() => {
+        if (!entries) return null;
+        const periodEntries = entries.filter(e => {
+            const d = new Date(e.date);
+            return d >= periods.current.start && d <= periods.current.end;
         });
+        return calculatePeriodStats(periods.current.label, periodEntries);
+    }, [entries, periods.current]);
 
-        const res = await fetch(`/api/tracker?${params}`);
-        if (!res.ok) throw new Error('Failed to fetch data');
+    const previousPeriod = useMemo(() => {
+        if (!entries) return null;
+        const periodEntries = entries.filter(e => {
+            const d = new Date(e.date);
+            return d >= periods.previous.start && d <= periods.previous.end;
+        });
+        return calculatePeriodStats(periods.previous.label, periodEntries);
+    }, [entries, periods.previous]);
 
-        const data = await res.json();
-        const entries: TrackerEntry[] = data.data || [];
-
+    const calculatePeriodStats = (label: string, entries: TrackerEntry[]): PeriodStats => {
         return {
-            period: period.label,
+            period: label,
             problems: entries.reduce((sum, e) => sum + e.problemsSolved, 0),
             commits: entries.reduce((sum, e) => sum + e.commits, 0),
             time: entries.reduce((sum, e) => sum + e.timeSpent, 0),
@@ -88,7 +73,7 @@ export function TrackerComparison({
         return Math.round(((current - previous) / previous) * 100);
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className={`animate-pulse ${className}`}>
                 <div className="h-64 bg-gray-100 rounded-xl"></div>
@@ -99,7 +84,7 @@ export function TrackerComparison({
     if (error || !currentPeriod || !previousPeriod) {
         return (
             <div className={`bg-red-50 border border-red-200 rounded-xl p-6 ${className}`}>
-                <p className="text-red-600">{error || 'No data available'}</p>
+                <p className="text-red-600">Failed to load comparison data</p>
             </div>
         );
     }

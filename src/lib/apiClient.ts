@@ -10,6 +10,7 @@ interface ApiClientOptions {
 }
 
 interface ApiResponse<T> {
+  success: boolean;
   data: T;
   error?: string;
   status: number;
@@ -47,12 +48,14 @@ class ApiClient {
       return {
         data,
         status: response.status,
+        success: response.ok,
         error: !response.ok ? data.error || 'Request failed' : undefined,
       };
     } catch (error) {
       return {
         data: null as T,
         status: 500,
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }

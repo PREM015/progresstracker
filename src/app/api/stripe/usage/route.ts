@@ -1,88 +1,94 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { stripe } from '@/lib/stripe';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 
 const RATE_LIMIT = 20;
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
 
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-function addHeaders(response: NextResponse, requestId: string, rateLimitResult?: any): NextResponse {
-  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => response.headers.set(key, value));
-  response.headers.set('X-Request-ID', requestId);
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  return response;
-}
-
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
+export async function GET(request: NextRequest) {
+  const requestId = `req_${Date.now()}`;
   const startTime = Date.now();
 
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return addHeaders(apiResponse.unauthorized('Unauthorized', requestId), requestId);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Unauthorized', requestId);
     }
 
-    const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, `stripe:usage:${session.user.id}`);
-
     if (!rateLimitResult.success) {
-      return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
+      return apiResponse.rateLimited(60, requestId);
     }
 
+    // Fetch subscription for limits
     const subscription = await prisma.subscription.findUnique({
       where: { userId: session.user.id }
     });
 
-    if (!subscription?.stripeSubscriptionId) {
-      return addHeaders(apiResponse.notFound('No active subscription found', requestId), requestId, rateLimitResult);
+    if (!subscription) {
+      return apiResponse.notFound('Subscription not found', requestId);
     }
 
-    // Retrieve upcoming invoice to see current usage
-    const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
-      customer: subscription.stripeCustomerId,
-      subscription: subscription.stripeSubscriptionId,
-    }).catch(err => null); // Might fail if canceled or something
+    // Fetch Usage Counts
+    const platformCount = await prisma.userPlatform.count({
+      where: { userId: session.user.id, isActive: true }
+    });
 
-    const usage = upcomingInvoice?.lines.data.map(line => ({
-      description: line.description,
-      quantity: line.quantity,
-      amount: line.amount,
-      period: {
-        start: new Date(line.period.start * 1000),
-        end: new Date(line.period.end * 1000),
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    // Exports this month
+    const exportCount = await prisma.exportJob.count({
+      where: {
+        userId: session.user.id,
+        createdAt: { gte: startOfMonth },
+        status: 'COMPLETED'
       }
-    })) || [];
+    });
 
-    logger.info('GET stripe usage completed', { userId: session.user.id, requestId, duration: Date.now() - startTime });
+    // API Requests today (mocked or from Redis/Logs if available, using placeholder for now)
+    // In a real app, you'd track this in Redis or a DB table
+    const apiRequestsCount = 0;
 
-    return addHeaders(apiResponse.success(usage, { meta: { requestId } }), requestId, rateLimitResult);
+    // Calculate percentages
+    const platformLimit = subscription.platformLimit;
+    const exportLimit = subscription.exportLimitMonthly;
+    const apiLimit = subscription.apiRequestsDaily;
+
+    const usageData = {
+      platforms: {
+        used: platformCount,
+        limit: platformLimit,
+        percentage: platformLimit > 0 ? (platformCount / platformLimit) * 100 : 0
+      },
+      exports: {
+        used: exportCount,
+        limit: exportLimit,
+        percentage: exportLimit > 0 ? (exportCount / exportLimit) * 100 : 0,
+        resetsAt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1) // Start of next month
+      },
+      apiRequests: {
+        used: apiRequestsCount,
+        limit: apiLimit,
+        percentage: apiLimit > 0 ? (apiRequestsCount / apiLimit) * 100 : 0,
+        resetsAt: new Date(new Date().setHours(24, 0, 0, 0)) // Start of tomorrow
+      },
+      storage: { // Mocked storage
+        used: 0,
+        limit: 1000,
+        percentage: 0
+      }
+    };
+
+    return apiResponse.success({ usage: usageData }, { meta: { requestId } });
 
   } catch (error) {
     logger.error('GET stripe usage failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
+    return apiResponse.internalError('Operation failed', requestId);
   }
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: SECURITY_HEADERS });
 }

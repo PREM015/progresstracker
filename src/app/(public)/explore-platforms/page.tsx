@@ -8,7 +8,7 @@ export default function ExplorePlatformsPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   useEffect(() => {
-    fetch('/api/platforms/all')
+    fetch('/api/platforms')
       .then(r => r.json())
       .then(data => setPlatforms(data.platforms || []))
       .catch(err => console.error(err))
@@ -37,8 +37,8 @@ export default function ExplorePlatformsPage() {
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${selectedCategory === cat
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white border border-gray-200 text-gray-700 hover:border-gray-300'
                 }`}
             >
               {cat === 'all' ? 'All Platforms' : cat}

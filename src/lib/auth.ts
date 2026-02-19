@@ -19,8 +19,11 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
+      username?: string | null;
       role: "admin" | "user";
       isAdmin: boolean;
+      isVerified: boolean;
+      isPublic: boolean;
     };
   }
 
@@ -28,6 +31,9 @@ declare module "next-auth" {
     id: string;
     role: "admin" | "user";
     isAdmin: boolean;
+    username?: string | null;
+    isVerified: boolean;
+    isPublic: boolean;
   }
 }
 
@@ -35,8 +41,11 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     email: string;
+    username?: string | null;
+    image?: string | null;
     role: "admin" | "user";
     isAdmin: boolean;
+    isVerified: boolean;
     provider?: string;
   }
 }
@@ -122,66 +131,66 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-      return {
-  id: user.id,
-  email: user.email!,
-    emailVerified: user.emailVerified,
-  name: user.name,
-  image: user.image,
-  username: user.username,
-  role: user.role as "admin" | "user",
-  isAdmin: user.isAdmin,
+        return {
+          id: user.id,
+          email: user.email!,
+          emailVerified: user.emailVerified,
+          name: user.name,
+          image: user.image,
+          username: user.username,
+          role: user.role as "admin" | "user",
+          isAdmin: user.isAdmin,
 
-  permissions: user.permissions,
-  isActive: user.isActive,
-  isVerified: user.isVerified,
-  isBanned: user.isBanned,
-  banReason: user.banReason,
-  currentStreak: user.currentStreak,
-  longestStreak: user.longestStreak,
-  streakStartDate: user.streakStartDate,
-  streakFreezeCount: user.streakFreezeCount,
-  streakFreezeUsedAt: user.streakFreezeUsedAt,
-  totalProblems: user.totalProblems,
-  totalCommits: user.totalCommits,
-  totalProjects: user.totalProjects,
-  totalCertifications: user.totalCertifications,
-  totalAchievements: user.totalAchievements,
-  totalPoints: user.totalPoints,
-  preferredLanguage: user.preferredLanguage,
-  timezone: user.timezone,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
-  isPublic: user.isPublic ?? true,
-  showEmail: user.showEmail ?? false,
-  showLocation: user.showLocation ?? false,
-  showActivity: user.showActivity ?? true,
-  showAchievements: user.showAchievements ?? true,
-  showGoals: user.showGoals ?? true,
-  showPlatforms: user.showPlatforms ?? true,
-  showStreak: user.showStreak ?? true,
-  // Optional fields can be null/undefined if not set
-  bio: user.bio,
-  location: user.location,
-  website: user.website,
-  company: user.company,
-  jobTitle: user.jobTitle,
-  githubUsername: user.githubUsername,
-  linkedinUrl: user.linkedinUrl,
-  twitterHandle: user.twitterHandle,
-  discordUsername: user.discordUsername,
-  lastActivityDate: user.lastActivityDate,
+          permissions: user.permissions,
+          isActive: user.isActive,
+          isVerified: user.isVerified,
+          isBanned: user.isBanned,
+          banReason: user.banReason,
+          currentStreak: user.currentStreak,
+          longestStreak: user.longestStreak,
+          streakStartDate: user.streakStartDate,
+          streakFreezeCount: user.streakFreezeCount,
+          streakFreezeUsedAt: user.streakFreezeUsedAt,
+          totalProblems: user.totalProblems,
+          totalCommits: user.totalCommits,
+          totalProjects: user.totalProjects,
+          totalCertifications: user.totalCertifications,
+          totalAchievements: user.totalAchievements,
+          totalPoints: user.totalPoints,
+          preferredLanguage: user.preferredLanguage,
+          timezone: user.timezone,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          isPublic: user.isPublic ?? true,
+          showEmail: user.showEmail ?? false,
+          showLocation: user.showLocation ?? false,
+          showActivity: user.showActivity ?? true,
+          showAchievements: user.showAchievements ?? true,
+          showGoals: user.showGoals ?? true,
+          showPlatforms: user.showPlatforms ?? true,
+          showStreak: user.showStreak ?? true,
+          // Optional fields can be null/undefined if not set
+          bio: user.bio,
+          location: user.location,
+          website: user.website,
+          company: user.company,
+          jobTitle: user.jobTitle,
+          githubUsername: user.githubUsername,
+          linkedinUrl: user.linkedinUrl,
+          twitterHandle: user.twitterHandle,
+          discordUsername: user.discordUsername,
+          lastActivityDate: user.lastActivityDate,
 
-  lastLoginAt: user.lastLoginAt,
-  lastActiveAt: user.lastActiveAt,
-  passwordChangedAt: user.passwordChangedAt,
-  deletedAt: user.deletedAt,
-  referralCode: user.referralCode,
-  referredBy: user.referredBy,
-  signupSource: user.signupSource,
-  rank: user.rank,
-};
-        
+          lastLoginAt: user.lastLoginAt,
+          lastActiveAt: user.lastActiveAt,
+          passwordChangedAt: user.passwordChangedAt,
+          deletedAt: user.deletedAt,
+          referralCode: user.referralCode,
+          referredBy: user.referredBy,
+          signupSource: user.signupSource,
+          rank: user.rank,
+        };
+
       },
     }),
 
@@ -206,21 +215,23 @@ export const authOptions: NextAuthOptions = {
 
   /* -------------------------------- CALLBACKS ------------------------------ */
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session }) {
       // Initial login
       if (user) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: {
-            role: true,
-            isAdmin: true,
-          },
-        });
-
         token.id = user.id;
-        token.email = user.email ?? undefined;
-        token.role = (dbUser?.role as "admin" | "user") ?? "user";
-        token.isAdmin = dbUser?.isAdmin ?? false;
+        token.email = user.email!;
+        token.username = user.username;
+        token.image = user.image;
+        token.role = user.role;
+        token.isAdmin = user.isAdmin;
+        token.isVerified = user.isVerified;
+      }
+
+      // Handle updates
+      if (trigger === "update" && session?.user) {
+        token.name = session.user.name;
+        token.image = session.user.image;
+        token.username = session.user.username;
       }
 
       if (account) {
@@ -234,8 +245,12 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id;
         session.user.email = token.email ?? null;
+        session.user.name = token.name;
+        session.user.image = token.image;
+        session.user.username = token.username;
         session.user.role = token.role;
         session.user.isAdmin = token.isAdmin;
+        session.user.isVerified = token.isVerified;
       }
       return session;
     },

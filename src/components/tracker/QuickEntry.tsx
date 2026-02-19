@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface QuickEntryProps {
-  onSubmit: (data: QuickEntryData) => Promise<void>;
+  onSubmit?: (data: QuickEntryData) => Promise<void>;
   className?: string;
 }
 
@@ -16,6 +17,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
   onSubmit,
   className = '',
 }) => {
+  const { createEntry } = useTracker();
   const [data, setData] = useState<QuickEntryData>({ platform: 'leetcode', value: 1 });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -23,8 +25,18 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await onSubmit(data);
+      if (onSubmit) {
+        await onSubmit(data);
+      } else {
+        await createEntry({
+          platformId: data.platform,
+          problemsSolved: data.value,
+          date: new Date(),
+        });
+      }
       setData({ platform: 'leetcode', value: 1 });
+    } catch (error) {
+      console.error('Quick entry failed:', error);
     } finally {
       setIsSubmitting(false);
     }

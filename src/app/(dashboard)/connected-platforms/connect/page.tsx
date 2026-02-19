@@ -17,7 +17,13 @@ export default function ConnectPlatformPage() {
     if (platform) {
       fetch(`/api/platforms/${platform}`)
         .then(r => r.json())
-        .then(data => setPlatformInfo(data.platform))
+        .then(data => {
+          if (data.success && data.data?.platform) {
+            setPlatformInfo(data.data.platform);
+          } else {
+            console.error('Platform not found in API response:', data);
+          }
+        })
         .catch(err => console.error(err))
         .finally(() => setLoading(false));
     } else {
@@ -33,7 +39,11 @@ export default function ConnectPlatformPage() {
       const response = await fetch('/api/platforms/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platformId: platform, ...formData }),
+        body: JSON.stringify({
+          platformId: platformInfo.id || platform,
+          username: formData.username || undefined,
+          apiKey: formData.apiKey || undefined
+        }),
       });
 
       if (response.ok) {

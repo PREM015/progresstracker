@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminSupportService } from '@/services/api/admin/support.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -80,13 +80,7 @@ export function useAdminSupport(filters: TicketFilters = {}) {
             if (filters.status && filters.status !== 'all') params.status = filters.status;
             if (filters.priority) params.priority = filters.priority;
 
-            const response = await apiClient.get<any>('/admin/support-tickets', params);
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            const payload = response.data;
+            const payload = await AdminSupportService.getTicketList(params);
 
             // Normalize response to match TicketsResponse structure
             // If API returns simple array (like in SupportTicketsList original code), wrap it

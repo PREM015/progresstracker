@@ -12,14 +12,14 @@ export const emailConfig = {
     support: process.env.EMAIL_FROM_SUPPORT || 'ProgressTracker Support <support@progresstracker.app>',
     notifications: process.env.EMAIL_FROM_NOTIFICATIONS || 'ProgressTracker <notifications@progresstracker.app>',
   },
-  
+
   // Reply-to address
   replyTo: process.env.EMAIL_REPLY_TO || 'support@progresstracker.app',
-  
+
   // App info
   appName: process.env.APP_NAME || 'ProgressTracker',
   baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://progresstracker.app',
-  
+
   // Social links
   socialLinks: {
     twitter: 'https://twitter.com/progresstracker',
@@ -33,7 +33,8 @@ export const emailConfig = {
 // =============================================================================
 
 // Initialize Resend client
-export const resend = new Resend(process.env.RESEND_API_KEY || '');
+// Initialize Resend client
+export const resend = new Resend(process.env.RESEND_API_KEY || 're_123456789');
 
 // =============================================================================
 // PROVIDER CONFIGURATIONS (for SMTP fallback)

@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminFeedbackService } from '@/services/api/admin/feedback.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -40,18 +40,7 @@ export function useAdminFeedback() {
     const feedbackQuery = useQuery({
         queryKey: queryKeys.admin.feedback(),
         queryFn: async (): Promise<Feedback[]> => {
-            const response = await apiClient.get<any>('/admin/feedback');
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.feedback && Array.isArray(payload.feedback)) return payload.feedback;
-            if (payload && payload.data && Array.isArray(payload.data)) return payload.data;
-
-            return [];
+            return AdminFeedbackService.getFeedback() as any;
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,

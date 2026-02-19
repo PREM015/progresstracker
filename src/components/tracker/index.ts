@@ -1,8 +1,3 @@
-/**
- * Index file for components/tracker
- * Auto-generated barrel export file
- */
-
 export { TrackerDashboard } from './TrackerDashboard';
 export { TrackerEntryForm } from './TrackerEntryForm';
 export { TrackerEntryList } from './TrackerEntryList';
@@ -15,3 +10,4 @@ export { TrackerBulkActions } from './TrackerBulkActions';
 export { TrackerImport } from './TrackerImport';
 export { TrackerExport } from './TrackerExport';
 export { QuickEntry } from './QuickEntry';
+export { TrackerComparison } from './TrackerComparison';

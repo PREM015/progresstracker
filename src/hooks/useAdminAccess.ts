@@ -8,7 +8,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminAccessService } from '@/services/api/admin/access.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -58,9 +58,7 @@ export function useAdminRoles() {
     const query = useQuery({
         queryKey: queryKeys.admin.access.roles(),
         queryFn: async (): Promise<Role[]> => {
-            const response = await apiClient.get<any>('/admin/roles');
-            if (response.error) return [];
-            return response.data || [];
+            return AdminAccessService.getRoles();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -68,7 +66,7 @@ export function useAdminRoles() {
 
     const createMutation = useMutation({
         mutationFn: async (data: RoleInput) => {
-            return await apiClient.post<Role>('/admin/roles', data);
+            return AdminAccessService.createRole(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.access.roles() });
@@ -77,7 +75,7 @@ export function useAdminRoles() {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: Partial<RoleInput> }) => {
-            return await apiClient.patch<Role>(`/admin/roles/${id}`, data);
+            return AdminAccessService.updateRole(id, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.access.roles() });
@@ -86,7 +84,7 @@ export function useAdminRoles() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            return await apiClient.delete<void>(`/admin/roles/${id}`);
+            return AdminAccessService.deleteRole(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.access.roles() });
@@ -113,9 +111,7 @@ export function useAdminRole(id: string) {
     const query = useQuery({
         queryKey: [...queryKeys.admin.access.roles(), id],
         queryFn: async (): Promise<Role | null> => {
-            const response = await apiClient.get<any>(`/admin/roles/${id}`);
-            if (response.error) return null;
-            return response.data;
+            return AdminAccessService.getRole(id);
         },
         enabled: isAdmin && !!id,
         staleTime: 5 * 60 * 1000,
@@ -136,9 +132,7 @@ export function useAdminPermissions() {
     const query = useQuery({
         queryKey: queryKeys.admin.access.permissions(),
         queryFn: async (): Promise<Permission[]> => {
-            const response = await apiClient.get<any>('/admin/permissions');
-            if (response.error) return [];
-            return response.data || [];
+            return AdminAccessService.getPermissions();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -147,7 +141,7 @@ export function useAdminPermissions() {
     // Permissions might typically be system-defined, but if we allow creating them:
     const createMutation = useMutation({
         mutationFn: async (data: PermissionInput) => {
-            return await apiClient.post<Permission>('/admin/permissions', data);
+            return AdminAccessService.createPermission(data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.access.permissions() });
@@ -156,7 +150,7 @@ export function useAdminPermissions() {
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string; data: Partial<PermissionInput> }) => {
-            return await apiClient.patch<Permission>(`/admin/permissions/${id}`, data);
+            return AdminAccessService.updatePermission(id, data);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.access.permissions() });
@@ -182,9 +176,7 @@ export function useAdminPermissionMatrix() {
     const query = useQuery({
         queryKey: [...queryKeys.admin.access.all, 'matrix'],
         queryFn: async () => {
-            const response = await apiClient.get<any>('/admin/permissions/matrix');
-            if (response.error) return null;
-            return response.data;
+            return AdminAccessService.getMatrix();
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -192,11 +184,7 @@ export function useAdminPermissionMatrix() {
 
     const toggleMutation = useMutation({
         mutationFn: async ({ roleId, permissionId, hasPermission }: { roleId: string; permissionId: string; hasPermission: boolean }) => {
-            if (hasPermission) {
-                return await apiClient.delete<void>(`/api/admin/roles/${roleId}/permissions`, { permissionId });
-            } else {
-                return await apiClient.post<void>(`/api/admin/roles/${roleId}/permissions`, { permissionId });
-            }
+            return AdminAccessService.togglePermission(roleId, permissionId, hasPermission);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [...queryKeys.admin.access.all, 'matrix'] });

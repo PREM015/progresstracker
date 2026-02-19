@@ -39,7 +39,7 @@ export class LeetCodeScraper extends BaseScraper {
       this.validateCredentials(credentials, ['username']);
       const username = credentials.username!;
 
-      // Fetch user profile and stats
+      // 1. Fetch user profile and stats
       const statsQuery = `
         query getUserProfile($username: String!) {
           matchedUser(username: $username) {
@@ -60,32 +60,50 @@ export class LeetCodeScraper extends BaseScraper {
         }
       `;
 
-      const statsData = await this.graphql<LeetCodeUserStats>(
-        `${this.baseUrl}/graphql`,
-        statsQuery,
-        { username },
-        { Referer: this.baseUrl, Origin: this.baseUrl }
-      );
+      let statsData;
+      try {
+        statsData = await this.graphql<LeetCodeUserStats>(
+          `${this.baseUrl}/graphql`,
+          statsQuery,
+          { username },
+          {
+            Referer: this.baseUrl,
+            Origin: this.baseUrl,
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        );
+      } catch (error: any) {
+        // Log deep details about the failure
+        if (error.response) {
+          console.error(`LeetCode API Error: ${error.response.status}`, error.response.data);
+        }
+        throw error;
+      }
 
       if (!statsData.matchedUser) {
-        return this.failure(`LeetCode user "${username}" not found`);
+        return this.failure(`LeetCode user "${username}" not found or profile is private.`);
       }
 
       const user = statsData.matchedUser;
 
-      // Parse submission calendar
+      // 2. Parse submission calendar
       let entries: ScraperEntry[] = [];
       try {
         const calendar = JSON.parse(user.submissionCalendar || '{}') as Record<string, number>;
         entries = Object.entries(calendar)
           .filter(([, count]) => count > 0)
           .map(([timestamp, count]) => ({
-            date: this.parseDate(parseInt(timestamp)),
+            date: this.parseDate(parseInt(timestamp) * 1000), // API timestamp is seconds
             problems: count,
             notes: `Solved ${count} problem${count > 1 ? 's' : ''} on LeetCode`,
           }));
-      } catch {
-        // If calendar parsing fails, try to fetch recent submissions
+      } catch (e) {
+        console.warn('Failed to parse submission calendar', e);
+        // Fallback or just continue with empty entries
+      }
+
+      // If calendar is empty/failed, try recent submissions as fallback
+      if (entries.length === 0) {
         try {
           const recentQuery = `
             query recentAcSubmissions($username: String!, $limit: Int!) {
@@ -108,7 +126,7 @@ export class LeetCodeScraper extends BaseScraper {
           const submissions = recentData.recentAcSubmissionList || [];
           const counts = this.countByDate(
             submissions,
-            (s) => this.parseDate(parseInt(s.timestamp)),
+            (s) => this.parseDate(parseInt(s.timestamp) * 1000),
             (s) => s.titleSlug
           );
 

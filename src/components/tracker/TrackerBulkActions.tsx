@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface TrackerBulkActionsProps {
   selectedIds: string[];
-  onDelete: () => void;
-  onExport: () => void;
+  onDelete?: () => void;
+  onExport?: () => void;
   className?: string;
 }
 
@@ -15,6 +16,8 @@ export const TrackerBulkActions: React.FC<TrackerBulkActionsProps> = ({
   onExport,
   className = '',
 }) => {
+  const { bulkDelete } = useTracker();
+  const [isDeleting, setIsDeleting] = useState(false);
   if (selectedIds.length === 0) return null;
 
   return (
@@ -31,10 +34,22 @@ export const TrackerBulkActions: React.FC<TrackerBulkActionsProps> = ({
           📥 Export
         </button>
         <button
-          onClick={onDelete}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          onClick={async () => {
+            if (onDelete) {
+              onDelete();
+            } else {
+              setIsDeleting(true);
+              try {
+                await bulkDelete(selectedIds);
+              } finally {
+                setIsDeleting(false);
+              }
+            }
+          }}
+          disabled={isDeleting}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
         >
-          🗑️ Delete
+          {isDeleting ? '...' : '🗑️ Delete'}
         </button>
       </div>
     </div>

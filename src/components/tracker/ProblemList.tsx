@@ -9,8 +9,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useTracker } from '@/hooks/useTracker';
+import { TrackerEntry } from '@/types/tracker';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { ExternalLink, MoreHorizontal, Edit, Trash2, Clock, CheckCircle2, Circle } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,6 +22,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { EmptyState } from '@/components/common/EmptyState';
 import { FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface Problem {
     id: string;
@@ -39,116 +42,118 @@ interface ProblemListProps {
     onDelete?: (id: string) => void;
 }
 
-const getDifficultyColor = (difficulty: string) => {
+const getDifficultyStyle = (difficulty: string) => {
     switch (difficulty) {
         case 'easy':
-            return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 hover:bg-green-100 dark:hover:bg-green-900';
+            return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/50';
         case 'medium':
-            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100 hover:bg-yellow-100 dark:hover:bg-yellow-900';
+            return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/50';
         case 'hard':
-            return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100 hover:bg-red-100 dark:hover:bg-red-900';
+            return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-900/50';
         default:
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+            return 'bg-zinc-100 text-zinc-700 border-zinc-200';
     }
 };
 
-const getStatusColor = (status: string) => {
+const getStatusIcon = (status: string) => {
     switch (status) {
         case 'solved':
-            return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+            return <CheckCircle2 className="w-4 h-4 text-indigo-500" />;
         case 'attempted':
-            return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100';
-        case 'todo':
-            return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100';
+            return <div className="w-4 h-4 rounded-full border-2 border-orange-400 border-t-transparent animate-spin-slow" />;
         default:
-            return '';
+            return <Circle className="w-4 h-4 text-zinc-300" />;
     }
 };
 
 export function ProblemList({ problems = [], onEdit, onDelete }: ProblemListProps) {
-    if (problems.length === 0) {
+    const safeProblems = (Array.isArray(problems) ? problems : []).filter(p => !!p);
+
+    if (safeProblems.length === 0) {
         return (
-            <EmptyState
-                title="No problems found"
-                description="Try adjusting your filters or log a new problem."
-                icon={FileText}
-            />
+            <div className="rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 p-12 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <EmptyState
+                    title="No problems found"
+                    description="Try adjusting your filters or log a new problem."
+                    icon={FileText}
+                />
+            </div>
         );
     }
 
     return (
-        <div className="rounded-md border bg-card">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-sm">
             <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-[300px]">Problem</TableHead>
+                <TableHeader className="bg-zinc-50/50 dark:bg-zinc-900/50">
+                    <TableRow className="hover:bg-transparent border-zinc-200 dark:border-zinc-800">
+                        <TableHead className="w-[40%] pl-6">Problem</TableHead>
                         <TableHead>Platform</TableHead>
                         <TableHead>Difficulty</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Solved</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-right pr-6">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {problems.map((problem) => (
-                        <TableRow key={problem.id}>
-                            <TableCell className="font-medium">
-                                <div className="flex flex-col">
-                                    <span className="flex items-center gap-2">
+                    {safeProblems.map((problem) => (
+                        <TableRow key={problem.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-900/50 border-zinc-100 dark:border-zinc-800 transition-colors">
+                            <TableCell className="pl-6 py-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="flex items-center gap-2 font-medium text-zinc-900 dark:text-zinc-100">
                                         {problem.title}
                                         {problem.url && (
                                             <a
                                                 href={problem.url}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="text-muted-foreground hover:text-primary"
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-indigo-500"
                                             >
-                                                <ExternalLink className="h-3 w-3" />
+                                                <ExternalLink className="h-3.5 w-3.5" />
                                             </a>
                                         )}
                                     </span>
                                     {problem.timeSpent && (
-                                        <span className="text-xs text-muted-foreground">
-                                            Time: {problem.timeSpent} mins
+                                        <span className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                            <Clock className="w-3 h-3" /> {problem.timeSpent} mins
                                         </span>
                                     )}
                                 </div>
                             </TableCell>
                             <TableCell>
-                                <Badge variant="outline" className="capitalize">
+                                <Badge variant="outline" className="capitalize font-normal text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
                                     {problem.platform}
                                 </Badge>
                             </TableCell>
                             <TableCell>
-                                <Badge className={getDifficultyColor(problem.difficulty)} variant="secondary">
+                                <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium border", getDifficultyStyle(problem.difficulty))}>
                                     {problem.difficulty}
-                                </Badge>
+                                </span>
                             </TableCell>
                             <TableCell>
-                                <Badge className={getStatusColor(problem.status)} variant="outline">
-                                    {problem.status}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                    {getStatusIcon(problem.status)}
+                                    <span className="text-sm text-zinc-600 dark:text-zinc-300 capitalize">{problem.status}</span>
+                                </div>
                             </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
+                            <TableCell className="text-zinc-500 text-sm">
                                 {problem.solvedAt
                                     ? formatDistanceToNow(problem.solvedAt, { addSuffix: true })
                                     : '-'}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right pr-6">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Open menu</span>
+                                        <Button variant="ghost" className="h-8 w-8 p-0 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuContent align="end" className="w-32">
                                         <DropdownMenuItem onClick={() => onEdit?.(problem.id)}>
                                             <Edit className="mr-2 h-4 w-4" />
                                             Edit
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                            className="text-destructive focus:text-destructive"
+                                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
                                             onClick={() => onDelete?.(problem.id)}
                                         >
                                             <Trash2 className="mr-2 h-4 w-4" />

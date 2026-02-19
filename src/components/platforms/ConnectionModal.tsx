@@ -18,20 +18,28 @@ interface ConnectionModalProps {
     isOpen: boolean;
     onClose: () => void;
     platformId: string;
+    onSubmit: (data: Record<string, any>) => Promise<void>;
 }
 
-export function ConnectionModal({ isOpen, onClose, platformId }: ConnectionModalProps) {
+export function ConnectionModal({ isOpen, onClose, platformId, onSubmit }: ConnectionModalProps) {
     const [isLoading, setIsLoading] = useState(false);
+    const [username, setUsername] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
-    const handleConnect = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         setIsLoading(true);
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        setIsLoading(false);
-        onClose();
+        try {
+            await onSubmit({ username });
+            onClose();
+        } catch (err) {
+            console.error('Connection failed', err);
+            setError('Failed to connect. Please check your credentials.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -44,13 +52,23 @@ export function ConnectionModal({ isOpen, onClose, platformId }: ConnectionModal
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleConnect} className="space-y-4 py-4">
+                <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="username">Username / Profile URL</Label>
-                        <Input id="username" placeholder={`Your ${platformId} username`} required />
+                        <Input
+                            id="username"
+                            placeholder={`Your ${platformId} username`}
+                            required
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
                     </div>
 
-                    {/* Dynamic fields based on platform could go here */}
+                    {error && (
+                        <div className="text-sm text-red-500 font-medium">
+                            {error}
+                        </div>
+                    )}
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>

@@ -14,60 +14,13 @@ import {
 } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { TrackerService } from '@/services/api/tracker.service';
 import { queryKeys } from './keys';
 import type {
   TrackerEntry,
   TrackerEntryInput,
-  TrackerSummary,
   TrackerFilter,
-  DailyStats,
-  BulkOperationResult,
 } from '@/types/tracker';
-
-// =============================================================================
-// TYPES
-// =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  hasMore: boolean;
-}
-
-interface TrackerStatsResponse {
-  today: DailyStats | null;
-  thisWeek: {
-    problems: number;
-    commits: number;
-    time: number;
-    points: number;
-  };
-  thisMonth: {
-    problems: number;
-    commits: number;
-    time: number;
-    points: number;
-  };
-  streak: {
-    current: number;
-    longest: number;
-  };
-}
-
-interface HeatmapData {
-  date: string;
-  count: number;
-  level: 0 | 1 | 2 | 3 | 4;
-}
 
 // =============================================================================
 // HOOK IMPLEMENTATION
@@ -83,33 +36,11 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const entriesQuery = useInfiniteQuery({
     queryKey: queryKeys.tracker.entries(filters),
-    queryFn: async ({ pageParam = 1 }): Promise<PaginatedResponse<TrackerEntry>> => {
-      const params: Record<string, string> = {
-        page: String(pageParam),
-        limit: '20',
-      };
-
-      if (filters.startDate) params.startDate = String(filters.startDate);
-      if (filters.endDate) params.endDate = String(filters.endDate);
-      if (filters.platformIds?.length) params.platformIds = filters.platformIds.join(',');
-      if (filters.categories?.length) params.categories = filters.categories.join(',');
-      if (filters.source) params.source = filters.source;
-      if (filters.search) params.search = filters.search;
-
-      const response = await apiClient.get<ApiResponse<PaginatedResponse<TrackerEntry>>>(
-        '/tracker',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch entries');
-      }
-
-      return response.data.data!;
-    },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.hasMore) return undefined;
-      return lastPage.page + 1;
+    queryFn: ({ pageParam = 1 }) =>
+      TrackerService.getEntries({ ...filters, page: pageParam as number, limit: 20 }),
+    getNextPageParam: (lastPage: any) => {
+      if (!lastPage?.pagination?.hasNextPage) return undefined;
+      return lastPage.pagination.page + 1;
     },
     initialPageParam: 1,
     enabled: isAuthenticated,
@@ -118,7 +49,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
 
   // Flatten entries from all pages
   const entries = useMemo(() => {
-    return entriesQuery.data?.pages.flatMap(page => page.items) ?? [];
+    return entriesQuery.data?.pages.flatMap(page => page.data) ?? [];
   }, [entriesQuery.data]);
 
   // ==========================================================================
@@ -126,18 +57,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const recentQuery = useQuery({
     queryKey: queryKeys.tracker.recent(10),
-    queryFn: async (): Promise<TrackerEntry[]> => {
-      const response = await apiClient.get<ApiResponse<{ entries: TrackerEntry[] }>>(
-        '/tracker/recent',
-        { limit: '10' }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch recent entries');
-      }
-
-      return response.data.data!.entries;
-    },
+    queryFn: () => TrackerService.getRecent(10),
     enabled: isAuthenticated,
     staleTime: 1 * 60 * 1000, // 1 minute
   });
@@ -147,15 +67,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const statsQuery = useQuery({
     queryKey: queryKeys.tracker.stats(),
-    queryFn: async (): Promise<TrackerStatsResponse> => {
-      const response = await apiClient.get<ApiResponse<TrackerStatsResponse>>('/tracker/stats');
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch stats');
-      }
-
-      return response.data.data!;
-    },
+    queryFn: () => TrackerService.getStats(),
     enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000,
   });
@@ -165,17 +77,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const summaryQuery = useQuery({
     queryKey: queryKeys.tracker.summary(),
-    queryFn: async (): Promise<TrackerSummary> => {
-      const response = await apiClient.get<ApiResponse<{ summary: TrackerSummary }>>(
-        '/tracker/summary'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch summary');
-      }
-
-      return response.data.data!.summary;
-    },
+    queryFn: () => TrackerService.getSummary(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -185,17 +87,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const heatmapQuery = useQuery({
     queryKey: queryKeys.tracker.heatmap(new Date().getFullYear()),
-    queryFn: async (): Promise<HeatmapData[]> => {
-      const response = await apiClient.get<ApiResponse<{ heatmap: HeatmapData[] }>>(
-        '/tracker/heatmap'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch heatmap');
-      }
-
-      return response.data.data!.heatmap;
-    },
+    queryFn: () => TrackerService.getHeatmap(new Date().getFullYear()),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -205,18 +97,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const createMutation = useMutation({
     mutationKey: ['tracker', 'create'],
-    mutationFn: async (data: TrackerEntryInput): Promise<TrackerEntry> => {
-      const response = await apiClient.post<ApiResponse<{ entry: TrackerEntry }>>(
-        '/tracker',
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create entry');
-      }
-
-      return response.data.data!.entry;
-    },
+    mutationFn: (data: TrackerEntryInput) => TrackerService.createEntry(data),
     onSuccess: () => {
       // Invalidate all tracker-related queries
       queryClient.invalidateQueries({ queryKey: queryKeys.tracker.all });
@@ -237,24 +118,13 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const updateMutation = useMutation({
     mutationKey: ['tracker', 'update'],
-    mutationFn: async ({
+    mutationFn: ({
       id,
       data
     }: {
       id: string;
       data: Partial<TrackerEntryInput>
-    }): Promise<TrackerEntry> => {
-      const response = await apiClient.put<ApiResponse<{ entry: TrackerEntry }>>(
-        `/tracker/${id}`,
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to update entry');
-      }
-
-      return response.data.data!.entry;
-    },
+    }) => TrackerService.updateEntry(id, data),
     onSuccess: (updatedEntry) => {
       // Update entry in cache
       queryClient.setQueryData(
@@ -279,15 +149,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const deleteMutation = useMutation({
     mutationKey: ['tracker', 'delete'],
-    mutationFn: async (id: string) => {
-      const response = await apiClient.delete(`/tracker/${id}`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return id;
-    },
+    mutationFn: (id: string) => TrackerService.deleteEntry(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tracker.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
@@ -306,18 +168,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const bulkCreateMutation = useMutation({
     mutationKey: ['tracker', 'bulkCreate'],
-    mutationFn: async (entries: TrackerEntryInput[]): Promise<BulkOperationResult> => {
-      const response = await apiClient.post<ApiResponse<BulkOperationResult>>(
-        '/tracker/bulk',
-        { entries }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create entries');
-      }
-
-      return response.data.data!;
-    },
+    mutationFn: (entries: TrackerEntryInput[]) => TrackerService.bulkCreate(entries),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tracker.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
@@ -336,18 +187,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   // ==========================================================================
   const bulkDeleteMutation = useMutation({
     mutationKey: ['tracker', 'bulkDelete'],
-    mutationFn: async (ids: string[]): Promise<BulkOperationResult> => {
-      const response = await apiClient.post<ApiResponse<BulkOperationResult>>(
-        '/tracker/batch-delete',
-        { ids }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to delete entries');
-      }
-
-      return response.data.data!;
-    },
+    mutationFn: (ids: string[]) => TrackerService.bulkDelete(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tracker.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
@@ -362,6 +202,36 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
   );
 
   // ==========================================================================
+  // DERIVED STATISTICS (MEMOIZED)
+  // ==========================================================================
+  const computedStats = useMemo(() => {
+    // Safety check for entries
+    const safeEntries = Array.isArray(entries) ? entries : [];
+    if (!safeEntries.length) return null;
+
+    const total = safeEntries.length;
+    const avgDifficulty = safeEntries.reduce((acc: number, curr: any) => acc + (curr?.averageDifficulty || 0), 0) / total;
+    const verifiedCount = safeEntries.filter((e: any) => e?.isVerified).length;
+    const verificationRate = (verifiedCount / total) * 100;
+
+    // Category distribution
+    const categories: Record<string, number> = {};
+    safeEntries.forEach((e: any) => {
+      if (e?.category) {
+        categories[e.category] = (categories[e.category] || 0) + 1;
+      }
+    });
+
+    return {
+      total,
+      avgDifficulty,
+      verificationRate,
+      categories,
+      lastEntry: safeEntries[0] || null
+    };
+  }, [entries]);
+
+  // ==========================================================================
   // RETURN
   // ==========================================================================
   return useMemo(() => ({
@@ -371,6 +241,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
     stats: statsQuery.data ?? null,
     summary: summaryQuery.data ?? null,
     heatmap: heatmapQuery.data ?? [],
+    computedStats, // New memoized computed data
 
     // Pagination
     hasNextPage: entriesQuery.hasNextPage,
@@ -388,6 +259,8 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
     error: entriesQuery.error,
     recentError: recentQuery.error,
     statsError: statsQuery.error,
+    summaryError: summaryQuery.error, // Added summaryError
+
 
     // Actions
     createEntry,
@@ -420,8 +293,10 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
     statsQuery.error,
     summaryQuery.data,
     summaryQuery.isLoading,
+    summaryQuery.error, // Added to deps
     heatmapQuery.data,
     heatmapQuery.isLoading,
+    computedStats, // Added to deps
     entriesQuery.isLoading,
     entriesQuery.error,
     entriesQuery.hasNextPage,
@@ -451,17 +326,7 @@ export function useTracker(filters: TrackerFilter & { [key: string]: any } = {})
 export function useTrackerEntry(id: string) {
   const query = useQuery({
     queryKey: queryKeys.tracker.entry(id),
-    queryFn: async (): Promise<TrackerEntry> => {
-      const response = await apiClient.get<ApiResponse<{ entry: TrackerEntry }>>(
-        `/tracker/${id}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Entry not found');
-      }
-
-      return response.data.data!.entry;
-    },
+    queryFn: () => TrackerService.getEntry(id),
     enabled: !!id,
   });
 
@@ -480,18 +345,7 @@ export function useTrackerEntry(id: string) {
 export function useDailyEntry(date: string) {
   const query = useQuery({
     queryKey: queryKeys.tracker.daily(date),
-    queryFn: async (): Promise<TrackerEntry | null> => {
-      const response = await apiClient.get<ApiResponse<{ entry: TrackerEntry | null }>>(
-        '/tracker/daily',
-        { date }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch daily entry');
-      }
-
-      return response.data.data!.entry;
-    },
+    queryFn: () => TrackerService.getDailyEntry(date),
     enabled: !!date,
   });
 

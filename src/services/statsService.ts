@@ -45,6 +45,8 @@ export interface OverallStatsResponse {
 export interface PlatformBreakdownItem {
   platformId: string;
   platformName?: string;
+  slug?: string;
+  icon?: string | null;
   problems: number;
   commits: number;
   time: number;
@@ -408,7 +410,7 @@ export class StatsService {
       },
       include: {
         platform: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, slug: true, icon: true },
         },
       },
     });
@@ -421,6 +423,8 @@ export class StatsService {
         breakdown[key] = {
           platformId: key,
           platformName: entry.platform?.name,
+          slug: entry.platform?.slug,
+          icon: entry.platform?.icon,
           problems: 0,
           commits: 0,
           time: 0,

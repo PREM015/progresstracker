@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-import {  startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 
 // =============================================================================
 // CONSTANTS
@@ -253,8 +253,51 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       stats: periodStats,
       changes,
       totals: {
-        problems: user?.totalProblems || 0,
-        commits: user?.totalCommits || 0,
+        problems: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalProblems || (p.cachedStats as any)?.problemsSolved || 0), 0);
+          // Prefer cachedTotal (real synced data) over user.totalProblems (potential stale/seed data)
+          // unless cachedTotal is 0 (new user or no sync yet)
+          return cachedTotal > 0 ? cachedTotal : (user?.totalProblems || 0);
+        })(),
+        commits: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalCommits || (p.cachedStats as any)?.commits || 0), 0);
+          return Math.max(cachedTotal, user?.totalCommits || 0);
+        })(),
+        time: await prisma.trackerEntry.aggregate({
+          where: { userId },
+          _sum: { timeSpent: true }
+        }).then(res => res._sum.timeSpent || 0),
+        points: user?.totalPoints || 0,
+      },
+      lifetime: {
+        problems: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalProblems || (p.cachedStats as any)?.problemsSolved || 0), 0);
+          return Math.max(cachedTotal, user?.totalProblems || 0);
+        })(),
+        commits: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalCommits || (p.cachedStats as any)?.commits || 0), 0);
+          return Math.max(cachedTotal, user?.totalCommits || 0);
+        })(),
+        time: await prisma.trackerEntry.aggregate({
+          where: { userId },
+          _sum: { timeSpent: true }
+        }).then(res => res._sum.timeSpent || 0),
         points: user?.totalPoints || 0,
       },
       streak: {

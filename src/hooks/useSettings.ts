@@ -8,18 +8,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { SettingsService } from '@/services/api/settings.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 interface UserSettings {
   // Appearance
@@ -29,7 +23,7 @@ interface UserSettings {
   fontSize: 'small' | 'medium' | 'large';
   reducedMotion: boolean;
   highContrast: boolean;
-  
+
   // Localization
   language: string;
   timezone: string;
@@ -37,29 +31,29 @@ interface UserSettings {
   timeFormat: '12h' | '24h';
   weekStartsOn: number;
   numberFormat: string;
-  
+
   // Sync Preferences
   autoSync: boolean;
   syncFrequency: 'realtime' | 'hourly' | 'daily' | 'manual';
   syncOnLogin: boolean;
   syncInBackground: boolean;
-  
+
   // Privacy
   publicProfile: boolean;
   showInLeaderboard: boolean;
   allowAnalytics: boolean;
   allowCookies: boolean;
-  
+
   // Dashboard
   dashboardLayout: Record<string, unknown> | null;
   defaultDateRange: string;
   showWelcomeBanner: boolean;
-  
+
   // Features
   keyboardShortcuts: boolean;
   soundEffects: boolean;
   desktopNotifications: boolean;
-  
+
   // Data
   dataRetentionDays: number;
 }
@@ -89,17 +83,7 @@ export function useSettings() {
   // ==========================================================================
   const settingsQuery = useQuery({
     queryKey: queryKeys.user.settings(),
-    queryFn: async (): Promise<UserSettings> => {
-      const response = await apiClient.get<ApiResponse<{ settings: UserSettings }>>(
-        '/user/settings'
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch settings');
-      }
-      
-      return response.data.data!.settings;
-    },
+    queryFn: () => SettingsService.get(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -109,18 +93,7 @@ export function useSettings() {
   // ==========================================================================
   const updateMutation = useMutation({
     mutationKey: ['settings', 'update'],
-    mutationFn: async (data: Partial<UserSettings>): Promise<UserSettings> => {
-      const response = await apiClient.put<ApiResponse<{ settings: UserSettings }>>(
-        '/user/settings',
-        data
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to update settings');
-      }
-      
-      return response.data.data!.settings;
-    },
+    mutationFn: (data: Partial<UserSettings>) => SettingsService.update(data),
     onSuccess: (updatedSettings) => {
       queryClient.setQueryData(queryKeys.user.settings(), updatedSettings);
     },
@@ -153,11 +126,11 @@ export function useSettings() {
         '/user/profile',
         data
       );
-      
+
       if (response.error || !response.data?.success) {
         throw new Error(response.error || 'Failed to update privacy settings');
       }
-      
+
       return response.data.data!.user;
     },
     onSuccess: () => {
@@ -202,17 +175,7 @@ export function useSettings() {
   // ==========================================================================
   const resetMutation = useMutation({
     mutationKey: ['settings', 'reset'],
-    mutationFn: async (): Promise<UserSettings> => {
-      const response = await apiClient.post<ApiResponse<{ settings: UserSettings }>>(
-        '/user/settings/reset'
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to reset settings');
-      }
-      
-      return response.data.data!.settings;
-    },
+    mutationFn: () => SettingsService.reset(),
     onSuccess: (defaultSettings) => {
       queryClient.setQueryData(queryKeys.user.settings(), defaultSettings);
     },
@@ -228,7 +191,7 @@ export function useSettings() {
   return useMemo(() => ({
     // Data
     settings: settingsQuery.data ?? null,
-    
+
     // Individual settings (with defaults)
     theme: settingsQuery.data?.theme ?? 'system',
     language: settingsQuery.data?.language ?? 'en',
@@ -239,13 +202,13 @@ export function useSettings() {
     showInLeaderboard: settingsQuery.data?.showInLeaderboard ?? true,
     keyboardShortcuts: settingsQuery.data?.keyboardShortcuts ?? true,
     compactMode: settingsQuery.data?.compactMode ?? false,
-    
+
     // Loading states
     isLoading: settingsQuery.isLoading,
-    
+
     // Error states
     error: settingsQuery.error,
-    
+
     // Actions
     updateSettings,
     updateTheme,
@@ -254,12 +217,12 @@ export function useSettings() {
     updateDashboardLayout,
     resetSettings,
     refetch: settingsQuery.refetch,
-    
+
     // Mutation states
     isUpdating: updateMutation.isPending,
     isUpdatingPrivacy: updatePrivacyMutation.isPending,
     isResetting: resetMutation.isPending,
-    
+
     // Mutation errors
     updateError: updateMutation.error,
     privacyError: updatePrivacyMutation.error,

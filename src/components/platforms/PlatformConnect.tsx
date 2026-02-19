@@ -30,7 +30,7 @@ export const PlatformConnect: React.FC<PlatformConnectProps> = ({
       const res = await fetch(`/api/platforms/${platformId}/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify({ ...credentials, action: 'connect' }),
       });
 
       if (!res.ok) {

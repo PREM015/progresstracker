@@ -1,6 +1,7 @@
 // src/services/scrapers/githubScraper.ts
 import { BaseScraper } from './baseScraper';
 import type { ScraperCredentials, ScraperResult, ScraperEntry } from './types';
+import { logger } from '@/lib/logger';
 
 interface GitHubUser {
   login: string;
@@ -45,34 +46,49 @@ export class GitHubScraper extends BaseScraper {
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
     try {
-      if (!credentials.token && !credentials.accessToken) {
-        return this.failure('GitHub requires authentication. Please connect with OAuth.');
-      }
-
       const token = credentials.token || credentials.accessToken;
-      const headers = {
-        Authorization: `Bearer ${token}`,
+      const headers: Record<string, string> = {
         Accept: 'application/vnd.github.v3+json',
       };
 
-      // Get user info
-      const user = await this.get<GitHubUser>(`${this.baseUrl}/user`, {}, headers);
-      const username = user.login;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
 
-      // Get events (contributions)
+      let username = credentials.username;
+      let user: GitHubUser;
+
+      if (token) {
+        // Get authenticated user info
+        user = await this.get<GitHubUser>(`${this.baseUrl}/user`, {}, headers);
+        username = user.login;
+      } else if (username) {
+        // Get public user info
+        user = await this.get<GitHubUser>(`${this.baseUrl}/users/${username}`, {}, headers);
+      } else {
+        return this.failure('GitHub requires either an OAuth token or a username.');
+      }
+
+      // Get events (contributions) - public events or authenticated events
       const events = await this.get<GitHubEvent[]>(
         `${this.baseUrl}/users/${username}/events`,
         { per_page: 100 },
         headers
       );
-// ✅ Use GitHubCommitSearchResult (feature: last commit message)
-const commitSearch = await this.get<GitHubCommitSearchResult>(
-  `${this.baseUrl}/search/commits`,
-  { q: `author:${username}`, per_page: 1 },
-  { ...headers, Accept: 'application/vnd.github.cloak-preview+json' }
-);
 
-const lastCommitMessage = commitSearch.items?.[0]?.commit?.message || null;
+      // ✅ Use GitHubCommitSearchResult (feature: last commit message)
+      // Note: Search API can work without auth but rate limit is very low
+      let lastCommitMessage = null;
+      try {
+        const commitSearch = await this.get<GitHubCommitSearchResult>(
+          `${this.baseUrl}/search/commits`,
+          { q: `author:${username}`, per_page: 1 },
+          { ...headers, Accept: 'application/vnd.github.cloak-preview+json' }
+        );
+        lastCommitMessage = commitSearch.items?.[0]?.commit?.message || null;
+      } catch (e) {
+        logger.debug(`GitHub commit search failed for ${username} (likely rate limited or no auth)`);
+      }
 
       // Count contributions by date
       const contributionMap = new Map<string, { commits: number; prs: number; issues: number }>();
@@ -112,6 +128,32 @@ const lastCommitMessage = commitSearch.items?.[0]?.commit?.message || null;
         })
       );
 
+      // Try to get total contributions via GraphQL (if token has scopes)
+      let totalContributions = 0;
+      try {
+        const query = `
+          query($username: String!) {
+            user(login: $username) {
+              contributionsCollection {
+                contributionCalendar {
+                  totalContributions
+                }
+              }
+            }
+          }
+        `;
+        const data = await this.graphql<any>(
+          'https://api.github.com/graphql',
+          query,
+          { username },
+          { Authorization: `Bearer ${token}` }
+        );
+        totalContributions = data?.user?.contributionsCollection?.contributionCalendar?.totalContributions || 0;
+      } catch (e) {
+        // Fallback to sum of events if GraphQL fails
+        totalContributions = entries.reduce((sum, e) => sum + (e.commits || 0) + (e.pullRequests || 0) + (e.issues || 0), 0);
+      }
+
       // Calculate totals
       const totalCommits = entries.reduce((sum, e) => sum + (e.commits || 0), 0);
       const totalPRs = entries.reduce((sum, e) => sum + (e.pullRequests || 0), 0);
@@ -121,8 +163,8 @@ const lastCommitMessage = commitSearch.items?.[0]?.commit?.message || null;
         displayName: user.name || username,
         profileUrl: user.html_url,
         avatarUrl: user.avatar_url,
-        totalCommits,
-        totalProblems: totalCommits,
+        totalCommits: totalContributions > 0 ? totalContributions : totalCommits, // Use total contributions if available
+        totalProblems: totalContributions > 0 ? totalContributions : totalCommits,
         totalPRs,
         lastCommitMessage,
 

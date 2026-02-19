@@ -44,8 +44,18 @@ export const PlatformComparison: React.FC<PlatformComparisonProps> = ({
     const fetchPlatforms = async () => {
       try {
         const res = await fetch('/api/analytics/platforms?days=30&sortBy=problems');
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch platform analytics: ${res.status}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from API");
+        }
+
         const json = (await res.json()) as ApiSuccess<PlatformAnalyticsResponse>;
-        if (!res.ok || !json?.success) throw new Error('Failed to fetch platform analytics');
+        if (!json?.success) throw new Error('API reported failure');
 
         const mapped = (json.data?.platforms || []).map((item) => ({
           platform: item.name,

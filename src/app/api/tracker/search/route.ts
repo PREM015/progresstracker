@@ -80,20 +80,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -106,20 +106,20 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
@@ -147,7 +147,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   try {
     // TODO: Return appropriate headers for resource
     // Example: X-Total-Count, X-Resource-Status, etc.
-    
+
     const response = new NextResponse(null, { status: 200 });
     return addHeaders(response, requestId);
   } catch (error) {
@@ -180,14 +180,14 @@ export async function GET(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
+      page: searchParams.get('page') || '1',
+      limit: searchParams.get('limit') || '20',
       search: searchParams.get('search') || undefined,
       sortBy: searchParams.get('sortBy') || undefined,
       sortOrder: searchParams.get('sortOrder') || 'desc',
@@ -203,15 +203,35 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Build where clause
+    const where: Prisma.TrackerEntryWhereInput = {
+      userId,
+    };
+
+    if (search) {
+      where.OR = [
+        { notes: { contains: search } }, // Case insensitive usually depends on DB collation
+        // Add other searchable fields if needed
+      ];
+    }
+
+    // Add other filters if passed in queryParams (currently only search is in validation)
+    // To support more filters, update querySchema validation first.
+    // For now, we only support basic text search on notes as per the schema.
+
+    const [total, entries] = await Promise.all([
+      prisma.trackerEntry.count({ where }),
+      prisma.trackerEntry.findMany({
+        where,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: { [sortBy || 'date']: sortOrder },
+        include: {
+          platform: true,
+          customPlatform: true,
+        },
+      }),
+    ]);
 
     logger.info('GET tracker/search completed', {
       userId,
@@ -222,7 +242,7 @@ export async function GET(
     });
 
     const response = apiResponse.paginated(
-      data,
+      entries,
       {
         page,
         limit,
@@ -265,7 +285,7 @@ export async function POST(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // Parse request body
@@ -300,21 +320,21 @@ export async function POST(
     // 4. Create audit log if needed
     // 5. Trigger side effects (notifications, etc.)
     // -------------------------------------------------------------------------
-    
+
     const result = {}; // TODO: Replace with actual creation
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('POST tracker/search completed', {
       userId,

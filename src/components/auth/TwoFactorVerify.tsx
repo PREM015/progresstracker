@@ -110,3 +110,5 @@ export function TwoFactorVerify() {
     </AuthCard>
   );
 }
+
+export default TwoFactorVerify;

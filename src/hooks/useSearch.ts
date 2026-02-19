@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo, useState } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { SearchService } from '@/services/api/search.service';
 import { queryKeys } from './keys';
 import { useDebounce } from './utils/useDebounce';
 
@@ -77,29 +77,13 @@ export function useSearch(initialQuery: string = '') {
   const searchQuery = useQuery({
     queryKey: queryKeys.search.results(debouncedQuery, filters),
     queryFn: async (): Promise<SearchResults> => {
-      const params: Record<string, string> = {
-        q: debouncedQuery,
-        limit: '20',
-      };
-
-      if (filters.types?.length) {
-        params.types = filters.types.join(',');
-      }
-      if (filters.dateFrom) params.dateFrom = filters.dateFrom;
-      if (filters.dateTo) params.dateTo = filters.dateTo;
-      if (filters.platformId) params.platformId = filters.platformId;
-      if (filters.category) params.category = filters.category;
-
-      const response = await apiClient.get<ApiResponse<SearchResults>>(
-        '/search',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Search failed');
-      }
-
-      return response.data.data!;
+      return SearchService.search(debouncedQuery, {
+        types: filters.types,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+        platformId: filters.platformId,
+        category: filters.category,
+      });
     },
     enabled: isAuthenticated && debouncedQuery.length >= 2,
     staleTime: 30 * 1000,
@@ -111,16 +95,7 @@ export function useSearch(initialQuery: string = '') {
   const suggestionsQuery = useQuery({
     queryKey: queryKeys.search.suggestions(debouncedQuery),
     queryFn: async (): Promise<string[]> => {
-      const response = await apiClient.get<ApiResponse<{ suggestions: string[] }>>(
-        '/search/autocomplete',
-        { q: debouncedQuery }
-      );
-
-      if (response.error || !response.data?.success) {
-        return [];
-      }
-
-      return response.data.data!.suggestions;
+      return SearchService.getSuggestions(debouncedQuery);
     },
     enabled: isAuthenticated && debouncedQuery.length >= 1 && debouncedQuery.length < 3,
     staleTime: 60 * 1000,
@@ -132,15 +107,7 @@ export function useSearch(initialQuery: string = '') {
   const recentQuery = useQuery({
     queryKey: queryKeys.search.recent(),
     queryFn: async (): Promise<RecentSearch[]> => {
-      const response = await apiClient.get<ApiResponse<{ searches: RecentSearch[] }>>(
-        '/search/recent'
-      );
-
-      if (response.error || !response.data?.success) {
-        return [];
-      }
-
-      return response.data.data!.searches;
+      return SearchService.getRecent();
     },
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
@@ -151,7 +118,7 @@ export function useSearch(initialQuery: string = '') {
   // ==========================================================================
   const saveSearchMutation = useMutation({
     mutationFn: async (searchQuery: string) => {
-      await apiClient.post('/search/history', { query: searchQuery });
+      await SearchService.saveHistory(searchQuery);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.search.recent() });
@@ -163,7 +130,7 @@ export function useSearch(initialQuery: string = '') {
   // ==========================================================================
   const clearRecentMutation = useMutation({
     mutationFn: async () => {
-      await apiClient.delete('/search/history');
+      await SearchService.clearHistory();
     },
     onSuccess: () => {
       queryClient.setQueryData(queryKeys.search.recent(), []);

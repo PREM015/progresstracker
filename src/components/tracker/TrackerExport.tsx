@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ExportService } from '@/services/api/export.service';
 
 interface TrackerExportProps {
   className?: string;
@@ -15,13 +16,15 @@ export const TrackerExport: React.FC<TrackerExportProps> = ({
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const res = await fetch(`/api/tracker/export?format=${format}`);
-      const blob = await res.blob();
+      const result = await ExportService.generate({ format });
+      const blob = await ExportService.download(result.id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `tracker_export_${Date.now()}.${format}`;
       a.click();
+    } catch (error) {
+      console.error('Export failed:', error);
     } finally {
       setIsExporting(false);
     }

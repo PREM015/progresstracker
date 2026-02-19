@@ -492,11 +492,46 @@ export const searchService = {
      */
     async saveRecentSearch(userId: string, query: string): Promise<void> {
         try {
-            // In a real implementation, you'd have a RecentSearch model
-            // For now, we'll use user metadata
-            // TODO: Recent searches implementation requires schema update
-            log.debug('Recent search save not implemented', { userId, query });
-            // Placeholder: do nothing
+            const cleanQuery = query.trim();
+            if (!cleanQuery) return;
+
+            // Delete existing identical search to bring it to top
+            await prisma.recentSearch.deleteMany({
+                where: {
+                    userId,
+                    query: cleanQuery,
+                },
+            });
+
+            // Create new entry
+            await prisma.recentSearch.create({
+                data: {
+                    userId,
+                    query: cleanQuery,
+                },
+            });
+
+            // Clean up old searches (keep last 10)
+            const count = await prisma.recentSearch.count({
+                where: { userId },
+            });
+
+            if (count > 10) {
+                const oldSearches = await prisma.recentSearch.findMany({
+                    where: { userId },
+                    orderBy: { createdAt: 'desc' },
+                    skip: 10,
+                    select: { id: true },
+                });
+
+                if (oldSearches.length > 0) {
+                    await prisma.recentSearch.deleteMany({
+                        where: {
+                            id: { in: oldSearches.map(s => s.id) },
+                        },
+                    });
+                }
+            }
         } catch (error) {
             log.error('Error saving recent search', { userId, query }, error);
         }
@@ -507,8 +542,14 @@ export const searchService = {
      */
     async getRecentSearches(userId: string): Promise<string[]> {
         try {
-            // TODO: Recent searches implementation requires schema update
-            return [];
+            const searches = await prisma.recentSearch.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 10,
+                select: { query: true },
+            });
+
+            return searches.map(s => s.query);
         } catch (error) {
             log.error('Error getting recent searches', { userId }, error);
             return [];

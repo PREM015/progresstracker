@@ -681,6 +681,28 @@ export class TrackerService {
   // ===========================================================================
 
   /**
+   * Helper to resolve platform ID from ID or Slug
+   */
+  private static async resolvePlatformId(idOrSlug: string): Promise<string | null> {
+    // Optimization: if it looks like a CUID (25 chars, starts with 'c'), maybe skip slug check?
+    // But for safety, just check both.
+    const platform = await prisma.platform.findFirst({
+      where: {
+        OR: [
+          { id: idOrSlug },
+          { slug: idOrSlug }
+        ]
+      },
+      select: { id: true }
+    });
+    return platform?.id || null;
+  }
+
+  // ===========================================================================
+  // CREATE ENTRIES
+  // ===========================================================================
+
+  /**
    * Create a new tracker entry
    */
   static async createEntry(data: TrackerEntryInput) {
@@ -688,13 +710,22 @@ export class TrackerService {
     const normalizedDate = new Date(data.date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Check for existing entry (prevent duplicates)
+    // Resolve platform ID
+    let finalPlatformId = data.platformId;
     if (data.platformId) {
+      const resolved = await this.resolvePlatformId(data.platformId);
+      if (resolved) {
+        finalPlatformId = resolved;
+      }
+    }
+
+    // Check for existing entry (prevent duplicates)
+    if (finalPlatformId) {
       const existing = await prisma.trackerEntry.findFirst({
         where: {
           userId: data.userId,
           date: normalizedDate,
-          platformId: data.platformId,
+          platformId: finalPlatformId,
         },
       });
 
@@ -704,7 +735,7 @@ export class TrackerService {
     }
 
     // Update date in data
-    const entryData = { ...data, date: normalizedDate };
+    const entryData = { ...data, date: normalizedDate, platformId: finalPlatformId };
 
     const entry = await prisma.trackerEntry.create({
       data: buildCreateData(entryData),
@@ -731,26 +762,53 @@ export class TrackerService {
     const normalizedDate = new Date(data.date);
     normalizedDate.setHours(0, 0, 0, 0);
 
+    // Resolve platform ID
+    let finalPlatformId = data.platformId;
+    if (data.platformId) {
+      const resolved = await this.resolvePlatformId(data.platformId);
+      if (resolved) {
+        finalPlatformId = resolved;
+      }
+    }
+
     // Find existing entry
     const existing = await prisma.trackerEntry.findFirst({
       where: {
         userId: data.userId,
         date: normalizedDate,
-        platformId: data.platformId,
+        platformId: finalPlatformId,
       },
     });
 
     if (existing) {
-      return this.updateEntry(existing.id, data, data.userId);
+      // Need to cast to compatible type or ensure updateEntry handles it
+      // updateEntry takes TrackerEntryUpdateInput (Partial<Omit...>)
+      // We need to convert Input to UpdateInput
+      // For now, simpler to just pass what we have if compatible, 
+      // but TrackerEntryInput has userId which UpdateInput excludes.
+      const { userId, ...updateData } = data;
+      // Also ensure platformId is the resolved one
+      const updatePayload = { ...updateData, platformId: finalPlatformId };
+      return this.updateEntry(existing.id, updatePayload, data.userId);
     }
 
-    return this.createEntry(data);
+    // Pass the resolved platformId to createEntry 
+    // (createEntry will resolve it again, but that's fine/safe, or we can pass modified data)
+    return this.createEntry({ ...data, platformId: finalPlatformId });
   }
 
   /**
    * Bulk create entries
    */
   static async bulkCreateEntries(entries: TrackerEntryInput[]) {
+    // Pre-fetch platform map for resolution
+    const platforms = await prisma.platform.findMany({ select: { id: true, slug: true } });
+    const platformMap = new Map<string, string>();
+    platforms.forEach(p => {
+      platformMap.set(p.id, p.id);
+      platformMap.set(p.slug, p.id);
+    });
+
     const results = await withTransaction(async (tx) => {
       const created = [];
 
@@ -758,7 +816,12 @@ export class TrackerService {
         const normalizedDate = new Date(entry.date);
         normalizedDate.setHours(0, 0, 0, 0);
 
-        const entryData = { ...entry, date: normalizedDate };
+        let finalPlatformId = entry.platformId;
+        if (entry.platformId && platformMap.has(entry.platformId)) {
+          finalPlatformId = platformMap.get(entry.platformId);
+        }
+
+        const entryData = { ...entry, date: normalizedDate, platformId: finalPlatformId };
 
         const result = await tx.trackerEntry.create({
           data: buildCreateData(entryData),

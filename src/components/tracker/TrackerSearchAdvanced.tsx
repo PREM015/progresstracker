@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { PlatformCategory } from '@prisma/client';
+import { TrackerFilter, EntrySource } from '@/types/tracker';
 
 interface TrackerSearchAdvancedProps {
     onSearch: (filters: SearchFilters) => void;
@@ -9,18 +10,9 @@ interface TrackerSearchAdvancedProps {
     className?: string;
 }
 
-export interface SearchFilters {
-    search?: string;
-    startDate?: string;
-    endDate?: string;
-    platformIds?: string[];
-    categories?: PlatformCategory[];
-    minProblems?: number;
+export interface SearchFilters extends TrackerFilter {
     minCommits?: number;
     minTime?: number;
-    hasNotes?: boolean;
-    tags?: string[];
-    source?: string;
 }
 
 export function TrackerSearchAdvanced({ onSearch, onReset, className = '' }: TrackerSearchAdvancedProps) {
@@ -90,7 +82,7 @@ export function TrackerSearchAdvanced({ onSearch, onReset, className = '' }: Tra
                             </label>
                             <input
                                 type="date"
-                                value={filters.startDate || ''}
+                                value={filters.startDate as string || ''}
                                 onChange={(e) => updateFilter('startDate', e.target.value)}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
@@ -102,7 +94,7 @@ export function TrackerSearchAdvanced({ onSearch, onReset, className = '' }: Tra
                             </label>
                             <input
                                 type="date"
-                                value={filters.endDate || ''}
+                                value={filters.endDate as string || ''}
                                 onChange={(e) => updateFilter('endDate', e.target.value)}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             />
@@ -158,7 +150,7 @@ export function TrackerSearchAdvanced({ onSearch, onReset, className = '' }: Tra
                             </label>
                             <select
                                 value={filters.source || ''}
-                                onChange={(e) => updateFilter('source', e.target.value || undefined)}
+                                onChange={(e) => updateFilter('source', (e.target.value || undefined) as EntrySource)}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                             >
                                 <option value="">All sources</option>

@@ -9,11 +9,11 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AuthService } from '@/services/api/auth.service';
 import { queryKeys } from './keys';
-import type { 
-  LoginCredentials, 
-  RegisterCredentials, 
+import type {
+  LoginCredentials,
+  RegisterCredentials,
   AuthResult,
   PasswordResetRequest,
   PasswordResetConfirm,
@@ -57,10 +57,10 @@ export function useAuth(options: UseAuthOptions = {}) {
   // ==========================================================================
   const loginMutation = useMutation({
     mutationKey: ['auth', 'login'],
-    mutationFn: async ({ 
-      email, 
-      password, 
-      redirectTo = options.redirectTo || '/dashboard' 
+    mutationFn: async ({
+      email,
+      password,
+      redirectTo = options.redirectTo || '/dashboard'
     }: LoginCredentials & LoginOptions) => {
       const result = await signIn('credentials', {
         email,
@@ -77,7 +77,7 @@ export function useAuth(options: UseAuthOptions = {}) {
     onSuccess: (data) => {
       // Invalidate all queries to refetch with new auth
       queryClient.invalidateQueries();
-      
+
       if (data.redirectTo) {
         router.push(data.redirectTo);
       }
@@ -111,25 +111,21 @@ export function useAuth(options: UseAuthOptions = {}) {
   // ==========================================================================
   const registerMutation = useMutation({
     mutationKey: ['auth', 'register'],
-    mutationFn: async ({ 
-      email, 
-      password, 
-      name, 
+    mutationFn: async ({
+      email,
+      password,
+      name,
       username,
       acceptTerms,
       redirectTo = '/dashboard',
     }: RegisterCredentials & RegisterOptions): Promise<AuthResult> => {
-      const response = await apiClient.post<AuthResult>('/auth/register', {
+      const response = await AuthService.register({
         email,
         password,
         name,
         username,
         acceptTerms,
       });
-
-      if (response.error || !response.data.success) {
-        throw new Error(response.error || response.data.error || 'Registration failed');
-      }
 
       // Auto-login after registration
       const loginResult = await signIn('credentials', {
@@ -142,7 +138,7 @@ export function useAuth(options: UseAuthOptions = {}) {
         throw new Error('Registration successful but login failed. Please try logging in.');
       }
 
-      return { ...response.data, redirectTo } as AuthResult & { redirectTo: string };
+      return { success: true, ...(response as any), redirectTo } as AuthResult & { redirectTo: string };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries();
@@ -169,11 +165,11 @@ export function useAuth(options: UseAuthOptions = {}) {
     mutationKey: ['auth', 'logout'],
     mutationFn: async (redirectTo: string = '/login') => {
       // Call custom logout endpoint to clean up server-side
-      await apiClient.post('/auth/logout-custom');
-      
+      await AuthService.logoutCustom();
+
       // Sign out from next-auth
       await signOut({ redirect: false });
-      
+
       return { redirectTo };
     },
     onSuccess: (data) => {
@@ -196,13 +192,7 @@ export function useAuth(options: UseAuthOptions = {}) {
   const forgotPasswordMutation = useMutation({
     mutationKey: ['auth', 'forgotPassword'],
     mutationFn: async ({ email }: PasswordResetRequest) => {
-      const response = await apiClient.post('/auth/forgot-password', { email });
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      return response.data;
+      return AuthService.forgotPassword(email);
     },
   });
 
@@ -216,17 +206,7 @@ export function useAuth(options: UseAuthOptions = {}) {
   const resetPasswordMutation = useMutation({
     mutationKey: ['auth', 'resetPassword'],
     mutationFn: async ({ token, newPassword, confirmPassword }: PasswordResetConfirm) => {
-      const response = await apiClient.post('/auth/reset-password', {
-        token,
-        newPassword,
-        confirmPassword,
-      });
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      return response.data;
+      return AuthService.resetPassword(token, newPassword);
     },
   });
 
@@ -243,13 +223,7 @@ export function useAuth(options: UseAuthOptions = {}) {
   const resendVerificationMutation = useMutation({
     mutationKey: ['auth', 'resendVerification'],
     mutationFn: async () => {
-      const response = await apiClient.post('/auth/resend-verification');
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      return response.data;
+      return AuthService.resendVerification();
     },
   });
 
@@ -276,7 +250,7 @@ export function useAuth(options: UseAuthOptions = {}) {
     isLoading,
     isAuthenticated,
     isUnauthenticated,
-    
+
     // Auth actions
     login,
     socialLogin,
@@ -286,13 +260,13 @@ export function useAuth(options: UseAuthOptions = {}) {
     resetPassword,
     resendVerification,
     refreshSession,
-    
+
     // Mutation states
     isLoggingIn: loginMutation.isPending,
     isRegistering: registerMutation.isPending,
     isLoggingOut: logoutMutation.isPending,
     isResettingPassword: resetPasswordMutation.isPending,
-    
+
     // Errors
     loginError: loginMutation.error,
     registerError: registerMutation.error,

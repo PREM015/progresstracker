@@ -1,6 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/apiClient';
+import { PublicService } from '@/services/api/public.service';
 
 interface PublicStats {
     activeUsers: string;
@@ -25,15 +25,7 @@ export function usePublicStats() {
     const query = useQuery({
         queryKey: queryKeys.public.stats(),
         queryFn: async (): Promise<PublicStats> => {
-            const response = await apiClient.get<ApiResponse<{ stats: PublicStats }>>(
-                '/stats/public'
-            );
-
-            if (response.error || !response.data?.success) {
-                throw new Error(response.error || 'Failed to fetch public stats');
-            }
-
-            return response.data.data!.stats;
+            return PublicService.getGlobalStats();
         },
         staleTime: 60 * 60 * 1000, // 1 hour
         retry: 1,

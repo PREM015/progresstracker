@@ -200,7 +200,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
       userId,
       startDate ? new Date(startDate) : new Date(0),
       endDate ? new Date(endDate) : new Date(),
-    { platformId, category: category ?? undefined },
+      { platformId, category: category ?? undefined },
 
       { page: 1, limit: 1 }
     );
@@ -229,15 +229,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Parse and validate query params
     const { searchParams } = new URL(request.url);
-    const queryValidation = querySchema.safeParse(Object.fromEntries(searchParams));
-
-    if (!queryValidation.success) {
-      return addHeaders(
-        apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
 
     const {
       page,
@@ -250,7 +241,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       source,
       sortBy,
       sortOrder,
-    } = queryValidation.data;
+    } = querySchema.parse({
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+      platformId: searchParams.get('platformId') || undefined,
+      customPlatformId: searchParams.get('customPlatformId') || undefined,
+      category: searchParams.get('category') || undefined,
+      source: searchParams.get('source') || undefined,
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortOrder: searchParams.get('sortOrder') || undefined,
+    });
 
     // Get entries
     const result = await TrackerService.getEntries(
@@ -406,7 +408,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('POST /tracker failed', { requestId }, error);
-    
+
     if (error instanceof Error && error.message.includes('already exists')) {
       return addHeaders(
         apiResponse.error({ message: error.message, code: 'DUPLICATE_ENTRY', statusCode: 409 }, requestId),
@@ -454,8 +456,14 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     const { ids, data } = validation.data;
 
+    // Convert date string to Date object if present
+    const updateData: any = { ...data };
+    if (data.date) {
+      updateData.date = new Date(data.date);
+    }
+
     // Bulk update
-    const result = await TrackerService.bulkUpdateEntries(ids, data, userId);
+    const result = await TrackerService.bulkUpdateEntries(ids, updateData, userId);
 
     // Audit log
     auditLogService.create({
@@ -475,7 +483,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       requestId,
     });
 
-    const response = apiResponse.success(result, {  });
+    const response = apiResponse.success(result, {});
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('PUT /tracker failed', { requestId }, error);
@@ -519,7 +527,13 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     const { ids, data } = validation.data;
 
-    const result = await TrackerService.bulkUpdateEntries(ids, data, userId);
+    // Convert date string to Date object if present
+    const updateData: any = { ...data };
+    if (data.date) {
+      updateData.date = new Date(data.date);
+    }
+
+    const result = await TrackerService.bulkUpdateEntries(ids, updateData, userId);
 
     auditLogService.create({
       userId,
@@ -538,7 +552,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       requestId,
     });
 
-    const response = apiResponse.success(result, { });
+    const response = apiResponse.success(result, {});
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('PATCH /tracker failed', { requestId }, error);
@@ -606,7 +620,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       requestId,
     });
 
-    const response = apiResponse.success(result, {  message: `Deleted ${result.deleted} entries` });
+    const response = apiResponse.success(result, { message: `Deleted ${result.deleted} entries` });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('DELETE /tracker failed', { requestId }, error);

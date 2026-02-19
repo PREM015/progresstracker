@@ -53,7 +53,7 @@ const createReportSchema = z.object({
 
 async function validateUserAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user?.id) {
     return { error: apiResponse.unauthorized('Authentication required', requestId) };
   }
@@ -61,22 +61,26 @@ async function validateUserAuth(request: NextRequest, requestId: string) {
   // Check if user is active
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { 
-      id: true, 
-      isActive: true, 
+    select: {
+      id: true,
+      isActive: true,
       isBanned: true,
       subscription: {
-        select: { 
-          tier: true, 
-          exportLimitMonthly: true, 
+        select: {
+          tier: true,
+          exportLimitMonthly: true,
           currentExportCount: true,
-          usageResetAt: true 
+          usageResetAt: true
         }
       }
     }
   });
 
-  if (!user?.isActive || user.isBanned) {
+  if (!user) {
+    return { error: apiResponse.unauthorized('User not found', requestId) };
+  }
+
+  if (!user.isActive || user.isBanned) {
     return { error: apiResponse.forbidden('Account is not active', requestId) };
   }
 
@@ -108,13 +112,13 @@ async function generateReportData(userId: string, periodStart: Date, periodEnd: 
         gte: periodStart,
         lte: periodEnd,
       },
-      ...(options.platforms && { 
-        platform: { 
-          slug: { in: options.platforms } 
-        } 
+      ...(options.platforms && {
+        platform: {
+          slug: { in: options.platforms }
+        }
       }),
-      ...(options.categories && { 
-        category: { in: options.categories } 
+      ...(options.categories && {
+        category: { in: options.categories }
       })
     },
     include: {
@@ -167,7 +171,7 @@ async function generateReportData(userId: string, periodStart: Date, periodEnd: 
 
   // Generate insights
   const insights = [];
-  
+
   // Activity consistency
   const consistencyRate = (stats.daysActive / stats.totalDays) * 100;
   if (consistencyRate > 80) {
@@ -188,7 +192,7 @@ async function generateReportData(userId: string, periodStart: Date, periodEnd: 
   if (weeklyTrends.length > 1) {
     const lastWeek = weeklyTrends[weeklyTrends.length - 1];
     const previousWeek = weeklyTrends[weeklyTrends.length - 2];
-    
+
     if (lastWeek.problems > previousWeek.problems * 1.2) {
       insights.push({
         type: 'positive',
@@ -200,8 +204,8 @@ async function generateReportData(userId: string, periodStart: Date, periodEnd: 
 
   // Top performing platform
   const topPlatform = Object.entries(platformBreakdown)
-    .sort(([,a], [,b]) => (b as any).problems - (a as any).problems)[0];
-  
+    .sort(([, a], [, b]) => (b as any).problems - (a as any).problems)[0];
+
   if (topPlatform) {
     insights.push({
       type: 'info',
@@ -266,7 +270,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Total-Count', String(count));
     response.headers.set('X-Request-ID', requestId);
-    
+
     return response;
   } catch (error) {
     logger.error('HEAD reports failed', { requestId }, error);
@@ -287,8 +291,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (error) return error;
 
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      30, 
+      apiRateLimiter,
+      30,
       `reports:${session!.user.id}`
     );
 
@@ -299,15 +303,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query
     const { searchParams } = new URL(request.url);
     const queryValidation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
-      type: searchParams.get('type'),
-      status: searchParams.get('status'),
-      search: searchParams.get('search'),
-      sortBy: searchParams.get('sortBy'),
-      sortOrder: searchParams.get('sortOrder'),
-      dateFrom: searchParams.get('dateFrom'),
-      dateTo: searchParams.get('dateTo'),
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      type: searchParams.get('type') || undefined,
+      status: searchParams.get('status') || undefined,
+      search: searchParams.get('search') || undefined,
+      sortBy: searchParams.get('sortBy') || undefined,
+      sortOrder: searchParams.get('sortOrder') || undefined,
+      dateFrom: searchParams.get('dateFrom') || undefined,
+      dateTo: searchParams.get('dateTo') || undefined,
     });
 
     if (!queryValidation.success) {
@@ -322,7 +326,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Build where clause
     const where: any = { userId: user!.id };
-    
+
     if (type) where.type = type;
     if (status) where.status = status;
     if (search) {
@@ -400,8 +404,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (error) return error;
 
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      10, 
+      apiRateLimiter,
+      10,
       `reports-create:${session!.user.id}`
     );
 
@@ -412,12 +416,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Check subscription limits
     const now = new Date();
     const subscription = user!.subscription;
-    
+
     if (subscription && subscription.usageResetAt && subscription.usageResetAt < now) {
       // Reset monthly usage
       await prisma.subscription.update({
         where: { userId: user!.id },
-        data: { 
+        data: {
           currentExportCount: 0,
           usageResetAt: new Date(now.getFullYear(), now.getMonth() + 1, 1)
         }
@@ -470,7 +474,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Generate title if not provided
     const title = data.title || `${data.type.charAt(0).toUpperCase() + data.type.slice(1)} Report`;
-    
+
     // Generate summary
     const summary = `Report for ${periodStart.toLocaleDateString()} - ${periodEnd.toLocaleDateString()}. 
 Problems solved: ${reportData.stats.totalProblems}, Commits: ${reportData.stats.totalCommits}, 
@@ -494,7 +498,7 @@ Days active: ${reportData.stats.daysActive}/${reportData.stats.totalDays}, Point
     if (subscription) {
       await prisma.subscription.update({
         where: { userId: user!.id },
-        data: { 
+        data: {
           currentExportCount: { increment: 1 }
         }
       });
@@ -509,11 +513,11 @@ Days active: ${reportData.stats.daysActive}/${reportData.stats.totalDays}, Point
         entityType: 'report',
         entityId: report.id,
         description: `Generated ${data.type} report`,
-        newValue: { 
-          type: data.type, 
-          periodStart, 
+        newValue: {
+          type: data.type,
+          periodStart,
           periodEnd,
-          dataPoints: reportData.stats.totalProblems 
+          dataPoints: reportData.stats.totalProblems
         },
         ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
         userAgent: request.headers.get('user-agent'),

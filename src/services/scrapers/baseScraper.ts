@@ -324,6 +324,10 @@ export abstract class BaseScraper {
       entries: [],
       error: errorMessage,
       errorCode,
+      metadata: {
+        lastFetched: new Date(),
+        status: 'failed',
+      },
     };
   }
 
@@ -429,6 +433,23 @@ export abstract class BaseScraper {
       entries,
       metadata: {
         lastFetched: new Date(),
+        status: 'success',
+        ...metadata,
+      },
+    };
+  }
+
+  /**
+   * Create partial success result
+   */
+  protected partial(entries: ScraperEntry[], error: string, metadata?: ScraperMetadata): ScraperResult {
+    return {
+      success: true,
+      entries,
+      error,
+      metadata: {
+        lastFetched: new Date(),
+        status: 'partial',
         ...metadata,
       },
     };

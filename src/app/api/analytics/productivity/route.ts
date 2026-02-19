@@ -159,8 +159,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
       days: searchParams.get('days') || '30',
-      includePatterns: searchParams.get('includePatterns'),
-      includeComparison: searchParams.get('includeComparison'),
+      includePatterns: searchParams.get('includePatterns') || undefined,
+      includeComparison: searchParams.get('includeComparison') || undefined,
     });
 
     if (!queryValidation.success) {

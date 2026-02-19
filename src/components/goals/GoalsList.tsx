@@ -3,30 +3,45 @@
 import React from 'react';
 import { useGoals } from '@/hooks/useGoals';
 import { FilterState } from './GoalFilters';
-import { GoalStatus } from '@/types/goal';
+import { GoalCard } from './GoalCard';
+import { GoalStatus, GoalCategory } from '@/types/goal';
+import { GoalService } from '@/services/api/goal.service';
+import { Target, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
 
 interface GoalsListProps {
   userId: string;
   filters: FilterState;
   className?: string;
+  onEdit?: (goal: any) => void;
+  refreshTrigger?: number;
 }
 
 export const GoalsList: React.FC<GoalsListProps> = ({
   userId,
   filters,
   className = '',
+  onEdit,
+  refreshTrigger = 0,
 }) => {
-  // Cast filters to match useGoals expectation or ensure FilterState aligns
-  const { goals, stats, isLoading, error, refetch } = useGoals({
+  const { goals, isLoading, error, refetch } = useGoals({
     ...filters,
     status: filters.status as GoalStatus | undefined,
+    category: filters.category as GoalCategory | undefined,
   });
+
+  React.useEffect(() => {
+    if (refreshTrigger > 0) {
+      refetch();
+    }
+  }, [refreshTrigger, refetch]);
 
   if (isLoading) {
     return (
       <div className={`space-y-4 ${className}`}>
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse"></div>
+          <div key={i} className="h-40 w-full rounded-2xl bg-zinc-100 dark:bg-zinc-900 animate-pulse border border-zinc-200 dark:border-zinc-800" />
         ))}
       </div>
     );
@@ -34,91 +49,67 @@ export const GoalsList: React.FC<GoalsListProps> = ({
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-        <p className="text-red-600">{(error as Error).message}</p>
-        <button
-          onClick={() => refetch()}
-          className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
-        >
-          Try again
-        </button>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-8 text-center dark:border-rose-900/30 dark:bg-rose-950/20">
+        <AlertTriangle className="mx-auto h-10 w-10 text-rose-500 mb-4" />
+        <h3 className="text-lg font-semibold text-rose-700 dark:text-rose-400 mb-2">Failed to load goals</h3>
+        <p className="text-sm text-rose-600/80 dark:text-rose-400/80 mb-6">{(error as Error).message}</p>
+        <Button onClick={() => refetch()} variant="outline" className="border-rose-200 hover:bg-rose-100 text-rose-600">
+          <RefreshCcw className="w-4 h-4 mr-2" />
+          Try Again
+        </Button>
       </div>
     );
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this goal?')) return;
+
+    try {
+      await GoalService.deleteGoal(id);
+      refetch();
+    } catch (err) {
+      console.error('Failed to delete goal', err);
+      // Optional: Add toast notification here
+    }
+  };
+
   return (
     <div className={className}>
-      {/* Stats Overview */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Goals</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.active}</div>
-            <div className="text-sm text-gray-600">Active</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <div className="text-sm text-gray-600">Completed</div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-2xl font-bold text-indigo-600">{stats.completionRate}%</div>
-            <div className="text-sm text-gray-600">Success Rate</div>
-          </div>
-        </div>
-      )}
-
-      {/* Goals List */}
-      <div className="space-y-4">
+      <AnimatePresence mode="popLayout">
         {goals.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-xl">
-            <p className="text-gray-500">No goals found</p>
-            <button className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              Create Your First Goal
-            </button>
-          </div>
-        ) : (
-          goals.map((goal) => (
-            <div
-              key={goal.id}
-              className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <h3 className="text-lg font-bold text-gray-900">{goal.title}</h3>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${goal.status === 'completed'
-                  ? 'bg-green-100 text-green-700'
-                  : goal.status === 'active'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-700'
-                  }`}>
-                  {GOAL_STATUS_CONFIG[goal.status]?.label || goal.status}
-                </span>
-              </div>
-              {goal.description && (
-                <p className="text-sm text-gray-600 mb-4">{goal.description}</p>
-              )}
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span>Target: {goal.target} {goal.unit}</span>
-                <span>•</span>
-                <span>Progress: {goal.progress}</span>
-                {goal.deadline && (
-                  <>
-                    <span>•</span>
-                    <span>Due: {new Date(goal.deadline).toLocaleDateString()}</span>
-                  </>
-                )}
-              </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/50"
+          >
+            <div className="p-4 rounded-full bg-indigo-50 dark:bg-indigo-900/20 mb-4 text-indigo-500">
+              <Target className="w-8 h-8" />
             </div>
-          ))
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-2">No goals found</h3>
+            <p className="text-zinc-500 max-w-sm mb-6">
+              You haven't created any goals that match your filters yet. Start by creating a new goal!
+            </p>
+          </motion.div>
+        ) : (
+          <div className="grid gap-4">
+            {goals.map((goal, index) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal as any}
+                className="w-full"
+                onEdit={(id) => {
+                  const goalToEdit = goals.find((g) => g.id === id);
+                  if (goalToEdit && onEdit) onEdit(goalToEdit);
+                }}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 };
-
-// Import config for labels
-import { GOAL_STATUS_CONFIG } from '@/types/goal';
 
 export default GoalsList;

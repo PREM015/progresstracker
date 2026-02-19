@@ -1,123 +1,96 @@
-/**
- * Component: UsageMeter
- * Location: components/billing/UsageMeter.tsx
- * 
- * Description: Usage limits
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSubscription } from '@/hooks/useSubscription';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/stripe/usage
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - Subscription
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for Subscription model
-interface ISubscription {
-  id: string;
-  // Add fields from your Prisma Subscription model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
-import { apiClient } from '@/lib/apiClient';
-
-// Example API calls:
-// /api/stripe/usage
-const fetchUsageMeterData = async () => {
-  try {
-    const response = await apiClient.get('/api/stripe/usage');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
 interface UsageMeterProps {
   className?: string;
-  // Add component-specific props here
+  onUpgrade?: () => void;
 }
 
-// ===== COMPONENT =====
-export const UsageMeter: React.FC<UsageMeterProps> = ({
-  className,
-}) => {
-  // Component state
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+export default function UsageMeter({ className, onUpgrade }: UsageMeterProps) {
+  const { usage, isLoadingUsage, error, isFree } = useSubscription();
 
-  // Fetch data on mount
-  useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
-  }, []);
+  if (isLoadingUsage) {
+    return (
+      <Card className={className}>
+        <CardContent className="pt-6 flex justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        </CardContent>
+      </Card>
+    );
+  }
 
-  // Component logic
-  
-  // Render
+  if (error || !usage) {
+    return null; // Don't show if failed or no data
+  }
+
+  const { platforms, exports, apiRequests } = usage;
+
+  const renderMeter = (
+    label: string,
+    used: number,
+    limit: number,
+    percentage: number,
+    colorClass: string = 'bg-indigo-500'
+  ) => {
+    const isOverLimit = used >= limit;
+
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-zinc-400 font-medium">{label}</span>
+          <span className={`${isOverLimit ? 'text-red-500 font-bold' : 'text-zinc-300'}`}>
+            {used} / {limit === -1 ? '∞' : limit}
+          </span>
+        </div>
+        <Progress value={percentage} className="h-2" indicatorClassName={isOverLimit ? 'bg-red-500' : colorClass} />
+      </div>
+    );
+  };
+
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>UsageMeter</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
-    </div>
+    <Card className={`${className} bg-zinc-900 border-zinc-800`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-white text-lg flex justify-between items-center">
+          Usage & Limits
+          {isFree && onUpgrade && (
+            <Button variant="ghost" size="sm" onClick={onUpgrade} className="text-xs text-indigo-400 hover:text-indigo-300 h-auto p-0 hover:bg-transparent">
+              Increase Limits
+            </Button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6 pt-4">
+        {renderMeter('Connected Platforms', platforms.used, platforms.limit, platforms.percentage, 'bg-emerald-500')}
+        {renderMeter('Monthly Exports', exports.used, exports.limit, exports.percentage, 'bg-blue-500')}
+        {renderMeter('Daily API Requests', apiRequests.used, apiRequests.limit, apiRequests.percentage, 'bg-purple-500')}
+
+        {(platforms.percentage >= 90 || exports.percentage >= 90) && (
+          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-yellow-500">Approaching Limits</p>
+              <p className="text-xs text-zinc-400">
+                You're nearing your subscription limits. Upgrade now to avoid interruptions.
+              </p>
+              {onUpgrade && (
+                <Button
+                  onClick={onUpgrade}
+                  variant="link"
+                  className="text-yellow-500 p-0 h-auto text-xs underline"
+                >
+                  Upgrade Plan
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default UsageMeter;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/stripe/usage
- *  * - Model: Subscription
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}

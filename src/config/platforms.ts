@@ -140,6 +140,11 @@ export function toPrismaAuthType(authType: AuthType): PrismaAuthType {
 // PLATFORMS CONFIGURATION (80+ Platforms)
 // =============================================================================
 
+// NOTES:
+// - authType: 'scraping' | 'oauth' | 'api_key' | 'manual'
+// - supportsAutoSync: true if we can fetch data automatically
+// - setupInstructions: displayed to user when connecting
+
 export const platforms: Platform[] = [
   // ========================================
   // DSA / COMPETITIVE PROGRAMMING (18)
@@ -755,9 +760,9 @@ export const platforms: Platform[] = [
     backgroundColor: '#FFFFFF',
     website: 'https://www.linkedin.com',
     profileUrlPattern: 'https://www.linkedin.com/in/{username}',
-    authType: 'oauth',
-    supportsAutoSync: true,
-    supportsOAuth: true,
+    authType: 'manual',
+    supportsAutoSync: false,
+    supportsOAuth: false, // OAuth requires partner API access
     supportsApiKey: false,
     requiresCredentials: false,
     description: 'Professional networking and job search platform',
@@ -770,7 +775,7 @@ export const platforms: Platform[] = [
       'search_appearances',
       'followers',
     ],
-    setupInstructions: 'Click "Connect with LinkedIn" to authorize access',
+    setupInstructions: 'Manually track LinkedIn applications and connections',
     syncInterval: 1440,
     syncPriority: 8,
     rateLimit: 100,
@@ -845,11 +850,11 @@ export const platforms: Platform[] = [
     color: '#4A90D9',
     backgroundColor: '#FFFFFF',
     website: 'https://www.naukri.com',
-    authType: 'scraping',
-    supportsAutoSync: true,
+    authType: 'manual',
+    supportsAutoSync: false,
     supportsOAuth: false,
     supportsApiKey: false,
-    requiresCredentials: true,
+    requiresCredentials: false,
     description: "India's leading job portal with 75M+ resumes",
     dataPoints: [
       'applications_sent',
@@ -909,11 +914,11 @@ export const platforms: Platform[] = [
     backgroundColor: '#FFFFFF',
     website: 'https://internshala.com',
     profileUrlPattern: 'https://internshala.com/student/profile/{username}',
-    authType: 'scraping',
-    supportsAutoSync: true,
+    authType: 'manual',
+    supportsAutoSync: false,
     supportsOAuth: false,
     supportsApiKey: false,
-    requiresCredentials: true,
+    requiresCredentials: false,
     description: 'Internships and fresher jobs in India',
     dataPoints: [
       'applications_sent',
@@ -1080,11 +1085,11 @@ export const platforms: Platform[] = [
     color: '#FF6B35',
     backgroundColor: '#FFFFFF',
     website: 'https://www.instahyre.com',
-    authType: 'scraping',
-    supportsAutoSync: true,
+    authType: 'manual',
+    supportsAutoSync: false,
     supportsOAuth: false,
     supportsApiKey: false,
-    requiresCredentials: true,
+    requiresCredentials: false,
     description: 'AI-powered job matching for tech professionals in India',
     dataPoints: [
       'applications_sent',
@@ -1157,7 +1162,6 @@ export const platforms: Platform[] = [
     tags: ['anonymous', 'discussions', 'insider'],
     isActive: true,
   },
-
   // ========================================
   // HACKATHONS & COMPETITIONS (15)
   // ========================================
@@ -1428,6 +1432,7 @@ export const platforms: Platform[] = [
     tags: ['products', 'launches', 'startup'],
     isActive: true,
   },
+
   {
     id: 'hackathoncom',
     name: 'Hackathon.com',
@@ -2121,7 +2126,7 @@ export const platforms: Platform[] = [
     isActive: true,
   },
   // ===== FILE: src/config/platforms.ts (CONTINUED) =====
-// Continue from where we left off...
+  // Continue from where we left off...
 
   {
     id: 'frontendmasters',
@@ -2888,7 +2893,7 @@ export const platformStats = {
   byCategory: platformCounts,
   byAuthType: {
     oauth: platforms.filter((p) => p.authType === 'oauth').length,
-    api: platforms.filter((p) =>  p.authType === 'api_key').length,
+    api: platforms.filter((p) => p.authType === 'api_key').length,
     scraping: platforms.filter((p) => p.authType === 'scraping').length,
     manual: platforms.filter((p) => p.authType === 'manual').length,
   },

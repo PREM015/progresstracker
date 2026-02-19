@@ -9,12 +9,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { GoalService } from '@/services/api/goal.service';
 import { queryKeys } from './keys';
 import type {
   Goal,
   GoalWithProgress,
-  GoalStats,
   GoalTemplate,
   GoalReminder,
   CreateGoalRequest,
@@ -22,17 +21,6 @@ import type {
   GoalFilter,
   GoalStatus,
 } from '@/types/goal';
-import { calculateGoalProgress } from '@/types/goal';
-
-// =============================================================================
-// TYPES
-// =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 // =============================================================================
 // HOOK IMPLEMENTATION
@@ -48,38 +36,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const goalsQuery = useQuery({
     queryKey: queryKeys.goals.list(filters),
-    queryFn: async (): Promise<Goal[]> => {
-      const params: Record<string, string> = {};
-
-      if (filters.status) {
-        params.status = Array.isArray(filters.status)
-          ? filters.status.join(',')
-          : filters.status;
-      }
-      if (filters.type) {
-        params.type = Array.isArray(filters.type)
-          ? filters.type.join(',')
-          : filters.type;
-      }
-      if (filters.category) {
-        params.category = Array.isArray(filters.category)
-          ? filters.category.join(',')
-          : filters.category;
-      }
-      if (filters.platformId) params.platformId = filters.platformId;
-      if (filters.search) params.search = filters.search;
-
-      const response = await apiClient.get<ApiResponse<{ goals: Goal[] }>>(
-        '/goals',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch goals');
-      }
-
-      return response.data.data!.goals;
-    },
+    queryFn: () => GoalService.getGoals(filters),
     enabled: isAuthenticated,
     staleTime: 2 * 60 * 1000,
   });
@@ -89,21 +46,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const activeQuery = useQuery({
     queryKey: queryKeys.goals.active(),
-    queryFn: async (): Promise<GoalWithProgress[]> => {
-      const response = await apiClient.get<ApiResponse<{ goals: Goal[] }>>(
-        '/goals/active'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch active goals');
-      }
-
-      // Add progress info to each goal
-      return response.data.data!.goals.map(goal => ({
-        ...goal,
-        progressInfo: calculateGoalProgress(goal),
-      }));
-    },
+    queryFn: () => GoalService.getActiveGoals(),
     enabled: isAuthenticated,
     staleTime: 1 * 60 * 1000,
   });
@@ -113,17 +56,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const statsQuery = useQuery({
     queryKey: queryKeys.goals.stats(),
-    queryFn: async (): Promise<GoalStats> => {
-      const response = await apiClient.get<ApiResponse<{ stats: GoalStats }>>(
-        '/goals/stats'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch goal stats');
-      }
-
-      return response.data.data!.stats;
-    },
+    queryFn: () => GoalService.getStats(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -133,17 +66,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const templatesQuery = useQuery({
     queryKey: queryKeys.goals.templates(),
-    queryFn: async (): Promise<GoalTemplate[]> => {
-      const response = await apiClient.get<ApiResponse<{ templates: GoalTemplate[] }>>(
-        '/goals/templates'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch templates');
-      }
-
-      return response.data.data!.templates;
-    },
+    queryFn: () => GoalService.getTemplates(),
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 
@@ -152,18 +75,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const createMutation = useMutation({
     mutationKey: ['goals', 'create'],
-    mutationFn: async (data: CreateGoalRequest): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        '/goals',
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (data: CreateGoalRequest) => GoalService.createGoal(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -181,24 +93,13 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const createFromTemplateMutation = useMutation({
     mutationKey: ['goals', 'createFromTemplate'],
-    mutationFn: async ({
+    mutationFn: ({
       templateId,
       overrides
     }: {
       templateId: string;
       overrides?: Partial<CreateGoalRequest>
-    }): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        '/goals',
-        { templateId, ...overrides }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create goal from template');
-      }
-
-      return response.data.data!.goal;
-    },
+    }) => GoalService.createFromTemplate(templateId, overrides),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -216,24 +117,13 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const updateMutation = useMutation({
     mutationKey: ['goals', 'update'],
-    mutationFn: async ({
+    mutationFn: ({
       id,
       data
     }: {
       id: string;
       data: UpdateGoalRequest
-    }): Promise<Goal> => {
-      const response = await apiClient.put<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}`,
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to update goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    }) => GoalService.updateGoal(id, data),
     onSuccess: (updatedGoal) => {
       queryClient.setQueryData(queryKeys.goals.byId(updatedGoal.id), updatedGoal);
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.list() });
@@ -253,24 +143,13 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const updateProgressMutation = useMutation({
     mutationKey: ['goals', 'updateProgress'],
-    mutationFn: async ({
+    mutationFn: ({
       id,
       progress
     }: {
       id: string;
       progress: number
-    }): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/progress`,
-        { progress }
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to update progress');
-      }
-
-      return response.data.data!.goal;
-    },
+    }) => GoalService.updateProgress(id, progress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.all });
@@ -289,17 +168,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const completeMutation = useMutation({
     mutationKey: ['goals', 'complete'],
-    mutationFn: async (id: string): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/complete`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to complete goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (id: string) => GoalService.completeGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.all });
@@ -319,17 +188,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const archiveMutation = useMutation({
     mutationKey: ['goals', 'archive'],
-    mutationFn: async (id: string): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/archive`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to archive goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (id: string) => GoalService.archiveGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -347,17 +206,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const unarchiveMutation = useMutation({
     mutationKey: ['goals', 'unarchive'],
-    mutationFn: async (id: string): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/unarchive`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to unarchive goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (id: string) => GoalService.unarchiveGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -375,17 +224,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const pauseMutation = useMutation({
     mutationKey: ['goals', 'pause'],
-    mutationFn: async (id: string): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/pause`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to pause goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (id: string) => GoalService.pause(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -400,17 +239,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
 
   const resumeMutation = useMutation({
     mutationKey: ['goals', 'resume'],
-    mutationFn: async (id: string): Promise<Goal> => {
-      const response = await apiClient.post<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}/resume`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to resume goal');
-      }
-
-      return response.data.data!.goal;
-    },
+    mutationFn: (id: string) => GoalService.resume(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -428,15 +257,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const deleteMutation = useMutation({
     mutationKey: ['goals', 'delete'],
-    mutationFn: async (id: string) => {
-      const response = await apiClient.delete(`/goals/${id}`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return id;
-    },
+    mutationFn: (id: string) => GoalService.deleteGoal(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -544,21 +365,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
 export function useGoal(id: string) {
   const query = useQuery({
     queryKey: queryKeys.goals.byId(id),
-    queryFn: async (): Promise<GoalWithProgress> => {
-      const response = await apiClient.get<ApiResponse<{ goal: Goal }>>(
-        `/goals/${id}`
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Goal not found');
-      }
-
-      const goal = response.data.data!.goal;
-      return {
-        ...goal,
-        progressInfo: calculateGoalProgress(goal),
-      };
-    },
+    queryFn: () => GoalService.getGoal(id),
     enabled: !!id,
   });
 
@@ -580,49 +387,19 @@ export function useGoalReminders(goalId?: string) {
 
   const query = useQuery({
     queryKey: queryKeys.goals.reminders(),
-    queryFn: async (): Promise<GoalReminder[]> => {
-      const params = (goalId ? { goalId } : {}) as Record<string, string>;
-      const response = await apiClient.get<ApiResponse<{ reminders: GoalReminder[] }>>(
-        '/goals/reminders',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch reminders');
-      }
-
-      return response.data.data!.reminders;
-    },
+    queryFn: () => GoalService.getReminders(goalId),
   });
 
   const createReminderMutation = useMutation({
-    mutationFn: async (data: Partial<GoalReminder> & { goalId: string }) => {
-      const response = await apiClient.post<ApiResponse<{ reminder: GoalReminder }>>(
-        `/goals/${data.goalId}/reminders`,
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create reminder');
-      }
-
-      return response.data.data!.reminder;
-    },
+    mutationFn: (data: Partial<GoalReminder> & { goalId: string }) => GoalService.createReminder(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.reminders() });
     },
   });
 
   const deleteReminderMutation = useMutation({
-    mutationFn: async ({ goalId, reminderId }: { goalId: string; reminderId: string }) => {
-      const response = await apiClient.delete(`/goals/${goalId}/reminders/${reminderId}`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return reminderId;
-    },
+    mutationFn: ({ goalId, reminderId }: { goalId: string; reminderId: string }) =>
+      GoalService.deleteReminder(goalId, reminderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.reminders() });
     },

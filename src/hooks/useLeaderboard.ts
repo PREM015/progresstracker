@@ -8,48 +8,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { LeaderboardService, type LeaderboardPeriod } from '@/services/api/leaderboard.service';
+import type { LeaderboardEntry, LeaderboardData, UserRank } from '@/services/api/leaderboard.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-interface LeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  name: string | null;
-  image: string | null;
-  score: number;
-  problems: number;
-  streak: number;
-  change: number; // rank change from previous period
-  isCurrentUser: boolean;
-}
-
-interface LeaderboardData {
-  entries: LeaderboardEntry[];
-  total: number;
-  period: string;
-  updatedAt: Date;
-}
-
-interface UserRank {
-  rank: number | null;
-  percentile: number | null;
-  score: number;
-  change: number | null;
-  nearbyUsers: LeaderboardEntry[];
-}
-
-type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
 type LeaderboardType = 'global' | 'friends' | 'platform' | 'category';
 
 // =============================================================================
@@ -91,36 +57,28 @@ export function useLeaderboard(
   const leaderboardQuery = useQuery({
     queryKey: getQueryKey(),
     queryFn: async (): Promise<LeaderboardData> => {
-      const params: Record<string, string> = {
-        period,
-        limit: String(options?.limit ?? 50),
-      };
-      
-      if (type === 'platform' && options?.platformId) {
-        params.platformId = options.platformId;
+      const limit = options?.limit ?? 50;
+
+      switch (type) {
+        case 'friends':
+          return LeaderboardService.getFriends(period, limit);
+
+        case 'platform':
+          if (!options?.platformId) {
+            throw new Error('Platform ID required for platform leaderboard');
+          }
+          return LeaderboardService.getPlatform(options.platformId, period, limit);
+
+        case 'category':
+          if (!options?.category) {
+            throw new Error('Category required for category leaderboard');
+          }
+          return LeaderboardService.getCategory(options.category, period, limit);
+
+        case 'global':
+        default:
+          return LeaderboardService.getGlobal(period, limit);
       }
-      if (type === 'category' && options?.category) {
-        params.category = options.category;
-      }
-      
-      const endpoint = type === 'friends' 
-        ? '/leaderboard/friends' 
-        : type === 'platform'
-        ? `/leaderboard/platform/${options?.platformId}`
-        : type === 'category'
-        ? `/leaderboard/category/${options?.category}`
-        : `/leaderboard/${period}`;
-      
-      const response = await apiClient.get<ApiResponse<{ leaderboard: LeaderboardData }>>(
-        endpoint,
-        params
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch leaderboard');
-      }
-      
-      return response.data.data!.leaderboard;
     },
     enabled: isAuthenticated && (type !== 'platform' || !!options?.platformId),
     staleTime: 5 * 60 * 1000,
@@ -132,16 +90,7 @@ export function useLeaderboard(
   const rankQuery = useQuery({
     queryKey: queryKeys.leaderboard.myRank(),
     queryFn: async (): Promise<UserRank> => {
-      const response = await apiClient.get<ApiResponse<{ rank: UserRank }>>(
-        '/leaderboard/rank',
-        { period }
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch rank');
-      }
-      
-      return response.data.data!.rank;
+      return LeaderboardService.getMyRank(period);
     },
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
@@ -156,26 +105,26 @@ export function useLeaderboard(
     total: leaderboardQuery.data?.total ?? 0,
     period: leaderboardQuery.data?.period ?? period,
     updatedAt: leaderboardQuery.data?.updatedAt ?? null,
-    
+
     // User rank
     myRank: rankQuery.data ?? null,
     rank: rankQuery.data?.rank ?? null,
     percentile: rankQuery.data?.percentile ?? null,
     nearbyUsers: rankQuery.data?.nearbyUsers ?? [],
-    
+
     // Loading states
     isLoading: leaderboardQuery.isLoading,
     isLoadingRank: rankQuery.isLoading,
-    
+
     // Error states
     error: leaderboardQuery.error,
     rankError: rankQuery.error,
-    
+
     // Refetch
     refetch: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.leaderboard.all });
     },
-    
+
     // Convenience
     topThree: leaderboardQuery.data?.entries.slice(0, 3) ?? [],
     isInTopTen: (rankQuery.data?.rank ?? 999) <= 10,

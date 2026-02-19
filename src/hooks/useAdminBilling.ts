@@ -8,7 +8,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminBillingService } from '@/services/api/admin/billing.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -61,13 +61,7 @@ export function useAdminBilling(period: 'month' | 'quarter' | 'year' = 'month') 
     const statsQuery = useQuery({
         queryKey: queryKeys.admin.billing.stats(period),
         queryFn: async (): Promise<BillingStats | null> => {
-            const response = await apiClient.get<any>('/admin/billing', { period });
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            return response.data || null;
+            return AdminBillingService.getStats(period);
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -91,13 +85,7 @@ export function useAdminInvoices(status: 'all' | 'PAID' | 'PENDING' | 'FAILED' =
             const params: Record<string, string> = {};
             if (status !== 'all') params.status = status;
 
-            const response = await apiClient.get<any>('/admin/billing/invoices', params);
-
-            if (response.error) {
-                return [];
-            }
-
-            return (response.data as Invoice[]) || [];
+            return AdminBillingService.getInvoices(params);
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -118,9 +106,7 @@ export function useAdminPaymentMethods() {
     const query = useQuery({
         queryKey: queryKeys.admin.billing.paymentMethods(),
         queryFn: async (): Promise<PaymentMethod[]> => {
-            const response = await apiClient.get<any>('/admin/billing/payment-methods');
-            if (response.error) return [];
-            return (response.data as PaymentMethod[]) || [];
+            return AdminBillingService.getPaymentMethods();
         },
         enabled: isAdmin,
     });

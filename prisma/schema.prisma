@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-
 }
 
 // ============================================================================
@@ -453,6 +452,7 @@ model User {
   // Share Links
   shareLinks   ShareLink[]
   shareViews   ShareViewLog[]
+  recentSearches RecentSearch[]
 
   @@index([email])
   @@index([username])
@@ -2040,6 +2040,7 @@ model AuditLog {
   oldValue    Json?
   newValue    Json?
   changes     Json?
+  metadata    Json?
 
   ipAddress String?
   userAgent String? @db.Text
@@ -2863,4 +2864,16 @@ model Bookmark {
   @@unique([userId, entityType, entityId])
   @@index([userId])
   @@index([entityType])
+}
+
+model RecentSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }

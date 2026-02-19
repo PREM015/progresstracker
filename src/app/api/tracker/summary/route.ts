@@ -9,9 +9,9 @@ import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
-      return apiError("Unauthorized", 401);
+      return apiResponse.unauthorized("Unauthorized");
     }
 
     const { searchParams } = new URL(request.url);
@@ -161,21 +161,59 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
-    return apiResponse({
-      period,
-      startDate,
-      endDate,
-      summary: {
-        ...summary,
-        activeDays: activeDays.length,
+    // Format response to match TrackerSummary interface
+    const responseData = {
+      dateRange: {
+        start: startDate,
+        end: endDate,
+        days: Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)),
       },
-      previousSummary,
+      totals: {
+        problems: summary._sum.problemsSolved || 0,
+        commits: summary._sum.commits || 0,
+        pullRequests: summary._sum.pullRequests || 0,
+        time: summary._sum.timeSpent || 0,
+        points: summary._sum.points || 0,
+        entries: summary._count.id || 0,
+      },
+      averages: {
+        problemsPerDay: 0, // Calculated below
+        commitsPerDay: 0,
+        timePerDay: 0,
+        pointsPerDay: 0,
+      },
+      streaks: {
+        current: 0, // TODO: Fetch real streak
+        longest: 0,
+      },
       changes,
-      topPlatforms,
-      topCategories,
-    });
+      byPlatform: topPlatforms.map(p => ({
+        platformId: p.platformId,
+        platformName: p.platformId || "Unknown", // TODO: Resolve real name
+        entries: 0,
+        problems: p._sum.problemsSolved || 0,
+        commits: p._sum.commits || 0,
+        time: p._sum.timeSpent || 0,
+      })),
+      byCategory: topCategories.map(c => ({
+        category: c.category,
+        entries: 0,
+        problems: c._sum.problemsSolved || 0,
+        time: c._sum.timeSpent || 0,
+      })),
+      activeDays: activeDays.length,
+    };
+
+    // Calculate averages
+    const days = Math.max(1, responseData.dateRange.days);
+    responseData.averages.problemsPerDay = Math.round((responseData.totals.problems / days) * 10) / 10;
+    responseData.averages.commitsPerDay = Math.round((responseData.totals.commits / days) * 10) / 10;
+    responseData.averages.timePerDay = Math.round(responseData.totals.time / days);
+    responseData.averages.pointsPerDay = Math.round(responseData.totals.points / days);
+
+    return apiResponse.success(responseData);
   } catch (error) {
     console.error("Error fetching tracker summary:", error);
-    return apiError("Failed to fetch summary", 500);
+    return apiResponse.internalError("Failed to fetch summary");
   }
 }

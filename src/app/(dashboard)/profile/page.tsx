@@ -1,97 +1,66 @@
 "use client";
 
-import React from 'react';
-import { ProfileHeader } from '@/components/profile/ProfileHeader';
-import { ProfileStats } from '@/components/profile/ProfileStats';
-import { ProfileActivity } from '@/components/profile/ProfileActivity';
-import { ProfileBadges } from '@/components/profile/ProfileBadges';
-import { ProfileAchievements } from '@/components/profile/ProfileAchievements';
-import { ProfilePlatforms } from '@/components/profile/ProfilePlatforms';
-import { useUser } from '@/hooks/useUser';
-import { useAchievements } from '@/hooks/useAchievements';
-import { usePlatforms } from '@/hooks/usePlatforms';
+import { useSession } from "next-auth/react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 
 export default function ProfilePage() {
-  const { user, isLoading: isLoadingUser } = useUser();
-  const { unlocked: unlockedAchievements, isLoading: isLoadingAchievements } = useAchievements();
-  const { available, connected, isLoading: isLoadingPlatforms } = usePlatforms();
+  const { data: session, status } = useSession();
 
-  const isLoading = isLoadingUser || isLoadingAchievements || isLoadingPlatforms;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-48 bg-gray-100 rounded-xl"></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="h-32 bg-gray-100 rounded-xl"></div>
-          <div className="h-32 bg-gray-100 rounded-xl"></div>
-          <div className="h-32 bg-gray-100 rounded-xl"></div>
-        </div>
-      </div>
-    );
+  if (status === "loading") {
+    return <div className="flex h-[50vh] items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-muted-foreground" /></div>;
   }
 
-  if (!user) return null;
-
-  // Transform UserAchievement to Badge interface
-  const badges = unlockedAchievements.map(ua => ({
-    id: ua.achievement.id,
-    name: ua.achievement.title,
-    icon: ua.achievement.icon,
-    description: ua.achievement.description,
-    tier: ua.achievement.tier as 'bronze' | 'silver' | 'gold' | 'platinum',
-    unlockedAt: new Date(ua.unlockedAt).toISOString(),
-  }));
-
-  // Transform UserAchievement to ProfileAchievements interface
-  const recentAchievements = unlockedAchievements.map(ua => ({
-    id: ua.achievement.id,
-    name: ua.achievement.title,
-    icon: ua.achievement.icon,
-    tier: ua.achievement.tier as 'bronze' | 'silver' | 'gold',
-    unlockedAt: new Date(ua.unlockedAt).toISOString(),
-  }));
-
-  // Transform Platforms
-  const platformList = available?.map(p => {
-    const isConnected = connected?.some(c => c.platformId === p.id) || false;
-    const connection = connected?.find(c => c.platformId === p.id);
-    return {
-      name: p.name,
-      username: connection?.username || '',
-      connected: isConnected,
-      stats: {
-        problems: 0,
-        commits: 0
-      }
-    };
-  }) || [];
-
   return (
-    <div className="space-y-6">
-      <ProfileHeader
-        user={{
-          name: user.name || 'User',
-          username: user.username || 'user',
-          bio: user.bio,
-          avatar: user.image,
-          joinedAt: new Date(user.createdAt).toLocaleDateString(),
-        }}
-      />
-
-      <ProfileStats userId={user.id} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <ProfileActivity activity={[]} /> {/* Activity requires separate hook or data source */}
-          <ProfileBadges badges={badges} />
-          <ProfileAchievements achievements={recentAchievements} />
-        </div>
-
-        <div className="space-y-6">
-          <ProfilePlatforms platforms={platformList} />
-        </div>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div>
+        <h1 className="text-3xl font-bold">Your Profile</h1>
+        <p className="text-muted-foreground mt-2">Manage your account settings and preferences.</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your photo and personal details.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center gap-6">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={session?.user?.image || ""} />
+              <AvatarFallback className="text-xl">{session?.user?.name?.[0] || "U"}</AvatarFallback>
+            </Avatar>
+            <Button variant="outline">Change Photo</Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <Input id="name" defaultValue={session?.user?.name || ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input id="email" type="email" defaultValue={session?.user?.email || ""} disabled className="bg-muted" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Preferences</CardTitle>
+          <CardDescription>Manage your display and notification settings.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Placeholder for settings */}
+          <div className="text-sm text-muted-foreground">
+            Visit <a href="/settings" className="text-indigo-600 hover:underline">Settings</a> for more options.
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

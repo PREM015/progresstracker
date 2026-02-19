@@ -1,123 +1,79 @@
-/**
- * Component: MaintenancePage
- * Location: components/errors/MaintenancePage.tsx
- * 
- * Description: Maintenance mode
- */
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
-
-// ===== API ROUTES THIS COMPONENT USES =====
-// The following API routes are used by this component:
-// // - /api/status
-
-// ===== DATABASE MODELS THIS COMPONENT USES =====
-// The following database models are referenced:
-// // - MaintenanceWindow
-
-// ===== TYPESCRIPT INTERFACES =====
-// Define interfaces based on your Prisma models:
-
-// Interface for MaintenanceWindow model
-interface IMaintenanceWindow {
-  id: string;
-  // Add fields from your Prisma MaintenanceWindow model
-  // Check schema.prisma for exact field definitions
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ===== EXAMPLE API CALLS =====
-// Here's how to call the APIs this component needs:
-
+import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Wrench, RefreshCw, Clock } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { apiClient } from '@/lib/apiClient';
 
-// Example API calls:
-// /api/status
-const fetchMaintenancePageData = async () => {
-  try {
-    const response = await apiClient.get('/api/status');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};
-// ===== COMPONENT IMPORTS =====
-// Import other UI components as needed:
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { Input } from '@/components/ui/Input';
-
-// ===== HOOKS & CONTEXT =====
-// Import any custom hooks or context:
-// import { useAuth } from '@/hooks/useAuth';
-// import { useToast } from '@/context/ToastContext';
-
-// ===== UTILITIES =====
-// Import utility functions:
-// import { cn } from '@/lib/utils';
-// import { formatDate } from '@/lib/date';
-
-// ===== TYPES =====
-interface MaintenancePageProps {
-  className?: string;
-  // Add component-specific props here
-}
-
-// ===== COMPONENT =====
-export const MaintenancePage: React.FC<MaintenancePageProps> = ({
-  className,
-}) => {
-  // Component state
+export default function MaintenancePage() {
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ maintenance: boolean; message?: string } | null>(null);
 
-  // Fetch data on mount
+  const checkStatus = async () => {
+    try {
+      setLoading(true);
+      const res = await apiClient.get('/api/system/status');
+      if (res.data && !res.data.maintenance) {
+        // If maintenance is over, redirect to home
+        window.location.href = '/';
+      } else {
+        setStatus(res.data);
+      }
+    } catch (error) {
+      console.error('Failed to check status', error);
+      // Fallback if API fails (maybe API is down too)
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Implement data fetching logic
-    // Example:
-    // fetchData();
+    checkStatus();
+    // Auto-check every minute
+    const interval = setInterval(checkStatus, 60000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Component logic
-  
-  // Render
   return (
-    <div className={className}>
-      {/* Implement your component UI here */}
-      <h1>MaintenancePage</h1>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
-      {/* Add your component content */}
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-lg w-full text-center space-y-8"
+      >
+        <div className="relative w-32 h-32 mx-auto">
+          <div className="absolute inset-0 bg-yellow-500/20 rounded-full animate-pulse" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Wrench className="w-16 h-16 text-yellow-500" />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h1 className="text-4xl font-bold text-white tracking-tight">
+            System Maintenance
+          </h1>
+          <p className="text-zinc-400 text-lg max-w-md mx-auto">
+            {status?.message || "We're currently performing scheduled maintenance to improve our services. We'll be back shortly."}
+          </p>
+        </div>
+
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 max-w-sm mx-auto">
+          <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm mb-4">
+            <Clock className="w-4 h-4" />
+            <span>Estimated completion: <strong>Soon</strong></span>
+          </div>
+
+          <Button
+            onClick={checkStatus}
+            disabled={loading}
+            className="w-full bg-white text-black hover:bg-zinc-200"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Check Status
+          </Button>
+        </div>
+      </motion.div>
     </div>
   );
-};
-
-// ===== SUBCOMPONENTS =====
-// Define any sub-components here
-
-// ===== STYLES =====
-// Add any component-specific styles
-
-// ===== EXPORTS =====
-export default MaintenancePage;
-
-// ===== DEVELOPER NOTES =====
-/*
- * BACKEND CONNECTIONS:
- *  * - API: /api/status
- *  * - Model: MaintenanceWindow
- * 
- * TODO:
- * - [ ] Implement component logic
- * - [ ] Connect to API endpoints
- * - [ ] Add error handling
- * - [ ] Add loading states
- * - [ ] Add tests
- * - [ ] Add accessibility features
- * - [ ] Optimize performance
- */
+}

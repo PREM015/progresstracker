@@ -30,6 +30,12 @@ interface SummaryResponse {
     commits: number;
     time: number;
   };
+  lifetime: {
+    problems: number;
+    commits: number;
+    time: number;
+    points: number;
+  };
 }
 
 export const OverviewStats: React.FC<OverviewStatsProps> = ({
@@ -51,25 +57,25 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
         const mapped: OverviewStat[] = [
           {
             label: 'Problems Solved',
-            value: data.stats.problems,
+            value: data.lifetime?.problems ?? data.stats.problems,
             change: data.changes.problems,
             trend: data.changes.problems > 0 ? 'up' : data.changes.problems < 0 ? 'down' : 'neutral',
           },
           {
             label: 'Commits',
-            value: data.stats.commits,
+            value: data.lifetime?.commits ?? data.stats.commits,
             change: data.changes.commits,
             trend: data.changes.commits > 0 ? 'up' : data.changes.commits < 0 ? 'down' : 'neutral',
           },
           {
             label: 'Time Spent',
-            value: `${Math.round(data.stats.time / 60)}h`,
+            value: `${Math.round((data.lifetime?.time || data.stats.time) / 60)}h`,
             change: data.changes.time,
             trend: data.changes.time > 0 ? 'up' : data.changes.time < 0 ? 'down' : 'neutral',
           },
           {
             label: 'Points',
-            value: data.stats.points,
+            value: data.lifetime?.points ?? data.stats.points,
             change: 0,
             trend: 'neutral',
           },
@@ -110,7 +116,7 @@ export const OverviewStats: React.FC<OverviewStatsProps> = ({
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-gray-600">{stat.label}</span>
             <span className={`text-sm font-medium ${stat.trend === 'up' ? 'text-green-600' :
-                stat.trend === 'down' ? 'text-red-600' : 'text-gray-600'
+              stat.trend === 'down' ? 'text-red-600' : 'text-gray-600'
               }`}
             >
               {stat.change !== 0 && `${stat.change > 0 ? '+' : ''}${stat.change}%`}

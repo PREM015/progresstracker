@@ -1,10 +1,13 @@
-// src/components/achievements/AchievementsList.tsx
 'use client';
 
-import { memo, useState, useEffect, useCallback, useMemo, useTransition } from 'react';
+import { memo, useState, useCallback, useTransition } from 'react';
 import type { Achievement, UserAchievement, AchievementProgress } from '@/types/achievement';
 import type { AchievementFilterState } from './AchievementFilters';
-import { RARITY_CONFIG } from '@/types/achievement';
+import { Card } from '@/components/ui/card';
+import { CheckCircle2, Lock, Pin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAchievements } from '@/hooks/useAchievements';
 
 // =============================================================================
 // TYPES
@@ -20,12 +23,6 @@ interface AchievementsListProps {
   className?: string;
 }
 
-interface AchievementItem {
-  achievement: Achievement;
-  userAchievement?: UserAchievement;
-  progress?: AchievementProgress;
-}
-
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -39,11 +36,6 @@ export const AchievementsList = memo(function AchievementsList({
   onPinToggle,
   className = '',
 }: AchievementsListProps) {
-  const [items, setItems] = useState<AchievementItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
   const [filters, setFilters] = useState<AchievementFilterState>({
     category: null,
     rarity: null,
@@ -54,357 +46,190 @@ export const AchievementsList = memo(function AchievementsList({
     ...initialFilters,
   });
 
-  // Fetch achievements
-  const fetchAchievements = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  // Use hook for data fetching and filtering
+  const {
+    achievements: filteredItems, // Hook handles filtering based on params
+    isLoading,
+    error,
+    pinAchievement
+  } = useAchievements({
+    category: filters.category || undefined,
+    rarity: filters.rarity || undefined,
+    search: filters.search,
+    isUnlocked: filters.status === 'unlocked' ? true : filters.status === 'locked' ? false : undefined
+  });
 
-    try {
-      const [achievementsRes, userAchievementsRes, progressRes] = await Promise.all([
-        fetch('/api/achievements'),
-        userId ? fetch('/api/achievements/available') : Promise.resolve(null),
-        userId ? fetch('/api/achievements/progress') : Promise.resolve(null),
-      ]);
-
-      if (!achievementsRes.ok) throw new Error('Failed to fetch achievements');
-
-      const achievementsData = await achievementsRes.json();
-      const userAchievementsData = userAchievementsRes ? await userAchievementsRes.json() : { achievements: [] };
-      const progressData = progressRes ? await progressRes.json() : { progress: [] };
-
-      const userAchievementsMap = new Map<string, UserAchievement>(
-        (userAchievementsData.achievements || []).map((ua: UserAchievement) => [ua.achievementId, ua])
-      );
-      const progressMap = new Map<string, AchievementProgress>(
-        (progressData.progress || []).map((p: AchievementProgress) => [p.achievementId, p])
-      );
-
-      const combinedItems: AchievementItem[] = (achievementsData.achievements || []).map((achievement: Achievement) => ({
-        achievement,
-        userAchievement: userAchievementsMap.get(achievement.id),
-        progress: progressMap.get(achievement.id),
-      }));
-
-      setItems(combinedItems);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    fetchAchievements();
-  }, [fetchAchievements]);
-
-  // Filter and sort items
-  const filteredItems = useMemo(() => {
-    let result = [...items];
-
-    // Filter by status
-    if (filters.status === 'unlocked') {
-      result = result.filter(item => item.userAchievement);
-    } else if (filters.status === 'locked') {
-      result = result.filter(item => !item.userAchievement);
-    }
-
-    // Filter by category
-    if (filters.category) {
-      result = result.filter(item => item.achievement.category === filters.category);
-    }
-
-    // Filter by rarity
-    if (filters.rarity) {
-      result = result.filter(item => item.achievement.rarity === filters.rarity);
-    }
-
-    // Filter by tier
-    if (filters.tier) {
-      result = result.filter(item => item.achievement.tier === filters.tier);
-    }
-
-    // Filter by search
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      result = result.filter(item =>
-        item.achievement.title.toLowerCase().includes(search) ||
-        item.achievement.description.toLowerCase().includes(search)
-      );
-    }
-
-    // Sort
-    switch (filters.sortBy) {
-      case 'points':
-        result.sort((a, b) => b.achievement.points - a.achievement.points);
-        break;
-      case 'rarity':
-        const rarityOrder = ['legendary', 'epic', 'rare', 'uncommon', 'common'];
-        result.sort((a, b) =>
-          rarityOrder.indexOf(a.achievement.rarity) - rarityOrder.indexOf(b.achievement.rarity)
-        );
-        break;
-      case 'recent':
-        result.sort((a, b) => {
-          if (!a.userAchievement?.unlockedAt) return 1;
-          if (!b.userAchievement?.unlockedAt) return -1;
-          return new Date(b.userAchievement.unlockedAt).getTime() - new Date(a.userAchievement.unlockedAt).getTime();
-        });
-        break;
-      case 'progress':
-        result.sort((a, b) => (b.progress?.percentage || 0) - (a.progress?.percentage || 0));
-        break;
-      default:
-        result.sort((a, b) => (a.achievement.sortOrder || 0) - (b.achievement.sortOrder || 0));
-    }
-
-    return result;
-  }, [items, filters]);
+  const [isPending, startTransition] = useTransition();
 
   const handlePinToggle = useCallback(async (achievementId: string) => {
-    if (!onPinToggle) return;
+    if (!onPinToggle && !pinAchievement) return;
 
     startTransition(async () => {
       try {
-        await onPinToggle(achievementId);
-        // Optimistically update the local state
-        setItems(prev => prev.map(item => {
-          if (item.achievement.id === achievementId && item.userAchievement) {
-            return {
-              ...item,
-              userAchievement: {
-                ...item.userAchievement,
-                isPinned: !item.userAchievement.isPinned,
-              },
-            };
-          }
-          return item;
-        }));
+        if (onPinToggle) {
+          await onPinToggle(achievementId);
+        } else {
+          // Fallback to hook's pin function if prop not provided
+          await pinAchievement(achievementId);
+        }
       } catch (error) {
         console.error('Failed to toggle pin:', error);
       }
     });
-  }, [onPinToggle]);
+  }, [onPinToggle, pinAchievement]);
 
-  if (isLoading) {
-    return <ListSkeleton layout={layout} className={className} />;
-  }
+  if (isLoading) return <ListSkeleton layout={layout} className={className} />;
 
-  if (error) {
-    return (
-      <div className={`bg-red-50 border border-red-200 rounded-xl p-6 text-center ${className}`}>
-        <p className="text-red-600">{error}</p>
-        <button
-          onClick={fetchAchievements}
-          className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  const layoutClass = layout === 'grid'
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-    : 'space-y-3';
+  // Transform error object to string if needed, or generic message
+  if (error) return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Failed to load achievements. Please try again later.</div>;
 
   return (
     <div className={className}>
-      {/* Quick Stats */}
-      <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">
-        <span>
-          <strong className="text-gray-900">{items.filter(i => i.userAchievement).length}</strong> unlocked
-        </span>
-        <span>•</span>
-        <span>
-          <strong className="text-gray-900">{items.filter(i => !i.userAchievement).length}</strong> locked
-        </span>
-        <span>•</span>
-        <span>
-          <strong className="text-indigo-600">{items.reduce((sum, i) => sum + (i.userAchievement ? i.achievement.points : 0), 0)}</strong> points
-        </span>
+      {/* Quick Stats Header - Calculate from items */}
+      <div className="flex items-center gap-6 mb-8 px-1">
+        <StatBadge label="Unlocked" value={filteredItems.filter(i => i.isUnlocked).length} color="indigo" />
+        <StatBadge label="Locked" value={filteredItems.filter(i => !i.isUnlocked).length} color="zinc" />
+        <StatBadge label="Total Points" value={filteredItems.filter(i => i.isUnlocked).reduce((sum, i) => sum + (i.achievement.points || 0), 0)} color="amber" />
       </div>
 
-      {/* List */}
-      {filteredItems.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl">
-          <span className="text-4xl">🔍</span>
-          <p className="mt-3 text-gray-500">No achievements found</p>
-          {filters.search && (
-            <button
-              onClick={() => setFilters(f => ({ ...f, search: '' }))}
-              className="mt-2 text-sm text-indigo-600 hover:text-indigo-700"
-            >
-              Clear search
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className={layoutClass}>
-          {filteredItems.map(({ achievement, userAchievement, progress }) => (
-            <AchievementListItem
-              key={achievement.id}
-              achievement={achievement}
-              userAchievement={userAchievement}
-              progress={progress}
-              layout={layout}
-              onClick={onAchievementClick ? () => onAchievementClick(achievement) : undefined}
-              onPinToggle={onPinToggle ? () => handlePinToggle(achievement.id) : undefined}
-            />
-          ))}
+      <div className={layout === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" : "space-y-3"}>
+        {filteredItems.map((item) => (
+          <AchievementCard
+            key={item.achievement.id}
+            achievement={item.achievement}
+            userAchievement={item.isUnlocked ? {
+              // Creating a partial object compatible with what AchievementCard expects
+              // The card mainly checks for existence and isPinned
+              id: 'local-mock',
+              userId: userId || 'current',
+              achievementId: item.achievement.id,
+              unlockedAt: item.unlockedAt!,
+              isPinned: item.isPinned,
+              // Add other required fields with defaults to satisfy type if needed, 
+              // though 'any' in local component makes it lenient.
+              // If we were using strict types, we'd need full UserAchievement
+            } : undefined}
+            progress={{
+              current: item.current,
+              target: item.target,
+              percentage: item.percentage,
+              remaining: item.remaining
+            }}
+            onClick={onAchievementClick ? () => onAchievementClick(item.achievement) : undefined}
+            onPinToggle={() => handlePinToggle(item.achievement.id)}
+          />
+        ))}
+      </div>
+
+      {filteredItems.length === 0 && (
+        <div className="text-center py-10 text-muted-foreground">
+          No achievements found matching your filters.
         </div>
       )}
     </div>
   );
 });
 
+
 // =============================================================================
-// LIST ITEM COMPONENT
+// SUBCOMPONENTS
 // =============================================================================
 
-interface AchievementListItemProps {
-  achievement: Achievement;
-  userAchievement?: UserAchievement;
-  progress?: AchievementProgress;
-  layout: 'grid' | 'list';
-  onClick?: () => void;
-  onPinToggle?: () => void;
+function StatBadge({ label, value, color }: { label: string, value: number, color: 'indigo' | 'zinc' | 'amber' }) {
+  const colors = {
+    indigo: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-800",
+    zinc: "text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/10 border-zinc-200 dark:border-zinc-800",
+    amber: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-800",
+  };
+
+  return (
+    <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium", colors[color])}>
+      <span className="font-bold">{value}</span>
+      <span className="opacity-80">{label}</span>
+    </div>
+  );
 }
 
-const AchievementListItem = memo(function AchievementListItem({
-  achievement,
-  userAchievement,
-  progress,
-  layout,
-  onClick,
-  onPinToggle,
-}: AchievementListItemProps) {
+// Keeping local AchievementCard to avoid props mismatch with the one in components/achievements
+// and to ensure interactivity is preserved as requested.
+function AchievementCard({ achievement, userAchievement, progress, onClick, onPinToggle }: any) {
   const isUnlocked = !!userAchievement;
-  const rarityConfig = RARITY_CONFIG[achievement.rarity];
   const progressPercent = progress?.percentage ?? (isUnlocked ? 100 : 0);
+  const rarity = (achievement.rarity || "common") as string;
 
-  if (layout === 'list') {
-    return (
-      <div
-        className={`
-          flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl
-          ${isUnlocked ? '' : 'opacity-75'}
-          ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}
-        `}
-        onClick={onClick}
-      >
-        <div className={`w-12 h-12 flex items-center justify-center rounded-xl text-2xl ${isUnlocked ? rarityConfig.bgClass : 'bg-gray-100 grayscale'}`}>
-          {achievement.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="font-medium text-gray-900 truncate">{achievement.title}</h4>
-            {userAchievement?.isPinned && <span className="text-yellow-500">📌</span>}
-          </div>
-          <p className="text-sm text-gray-500 truncate">{achievement.description}</p>
-        </div>
-        {!isUnlocked && (
-          <div className="w-24">
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-500 rounded-full transition-all"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <div className="text-xs text-gray-400 text-right mt-1">{progressPercent}%</div>
-          </div>
-        )}
-        <div className="text-right">
-          <div className={`font-bold ${isUnlocked ? 'text-indigo-600' : 'text-gray-400'}`}>
-            +{achievement.points}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const rarityColor = {
+    common: "bg-zinc-500",
+    uncommon: "bg-emerald-500",
+    rare: "bg-blue-500",
+    epic: "bg-purple-500",
+    legendary: "bg-amber-500",
+    mythic: "bg-rose-500",
+  }[rarity] || "bg-zinc-500";
 
-  // Grid layout
   return (
-    <div
-      className={`
-        relative p-4 bg-white border border-gray-200 rounded-xl overflow-hidden
-        ${isUnlocked ? '' : 'opacity-80'}
-        ${onClick ? 'cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5' : ''}
-      `}
+    <Card
+      className={cn(
+        "relative overflow-hidden transition-all duration-200 group cursor-pointer border-zinc-200 dark:border-zinc-800",
+        isUnlocked ? "bg-white dark:bg-zinc-950 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md" : "bg-zinc-50 dark:bg-zinc-900/50 opacity-80"
+      )}
       onClick={onClick}
     >
-      <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: rarityConfig.color }} />
+      {/* Rarity Stripe */}
+      <div className={cn("absolute top-0 left-0 w-1 h-full opacity-60 group-hover:opacity-100 transition-opacity", rarityColor)} />
 
-      <div className="flex items-start gap-3">
-        <div className={`w-12 h-12 flex items-center justify-center rounded-xl text-2xl ${isUnlocked ? rarityConfig.bgClass : 'bg-gray-100 grayscale'}`}>
-          {achievement.icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <h4 className="font-medium text-gray-900 truncate text-sm">{achievement.title}</h4>
-            {userAchievement?.isPinned && <span className="text-yellow-500 text-xs">📌</span>}
+      <div className="p-4 pl-6">
+        <div className="flex justify-between items-start mb-3">
+          <div className={cn(
+            "w-10 h-10 rounded-lg flex items-center justify-center text-lg",
+            isUnlocked ? "bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-400"
+          )}>
+            {achievement.icon || "🏆"}
           </div>
-          <span className={`text-xs font-medium ${rarityConfig.textClass}`}>{rarityConfig.label}</span>
+          {userAchievement?.isPinned && <Pin className="w-4 h-4 text-zinc-400 fill-zinc-400 transform rotate-45" />}
         </div>
-        <div className="text-right">
-          <div className={`text-sm font-bold ${isUnlocked ? 'text-indigo-600' : 'text-gray-400'}`}>
-            +{achievement.points}
+
+        <div className="space-y-1 mb-4">
+          <h3 className={cn("font-semibold text-sm leading-tight", isUnlocked ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400")}>
+            {achievement.title}
+          </h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-500 line-clamp-2 min-h-[2.5em]">
+            {achievement.description}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between mt-auto">
+          <span className={cn("text-xs font-semibold px-2 py-0.5 rounded",
+            isUnlocked ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500"
+          )}>
+            {achievement.points} pts
+          </span>
+
+          {isUnlocked ? (
+            <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-500 font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Unlocked</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs text-zinc-400">
+              <Lock className="w-3 h-3" />
+              <span>{progressPercent}%</span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Bar for Locked Items */}
+        {!isUnlocked && progressPercent > 0 && (
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-zinc-100 dark:bg-zinc-800">
+            <div className="h-full bg-indigo-500/50" style={{ width: `${progressPercent}%` }} />
           </div>
-        </div>
+        )}
       </div>
-
-      <p className="mt-2 text-xs text-gray-500 line-clamp-2">{achievement.description}</p>
-
-      {!isUnlocked && (
-        <div className="mt-3">
-          <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {isUnlocked && (
-        <div className="mt-3 flex items-center gap-1 text-xs text-green-600">
-          <CheckIcon className="w-3 h-3" />
-          Unlocked
-        </div>
-      )}
-    </div>
-  );
-});
-
-// =============================================================================
-// SKELETON
-// =============================================================================
-
-function ListSkeleton({ layout, className }: { layout: 'grid' | 'list'; className?: string }) {
-  const count = layout === 'grid' ? 8 : 5;
-  const layoutClass = layout === 'grid'
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-    : 'space-y-3';
-  const itemClass = layout === 'grid' ? 'h-40 rounded-xl' : 'h-20 rounded-xl';
-
-  return (
-    <div className={`${layoutClass} ${className}`}>
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className={`${itemClass} bg-gray-100 animate-pulse`} />
-      ))}
-    </div>
+    </Card>
   );
 }
 
-// =============================================================================
-// ICONS
-// =============================================================================
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-    </svg>
-  );
+function ListSkeleton({ layout, className }: any) {
+  return <div className="grid grid-cols-1 md:grid-cols-4 gap-4"><Skeleton className="h-40 rounded-xl" /><Skeleton className="h-40 rounded-xl" /><Skeleton className="h-40 rounded-xl" /><Skeleton className="h-40 rounded-xl" /></div>;
 }
 
 export default AchievementsList;

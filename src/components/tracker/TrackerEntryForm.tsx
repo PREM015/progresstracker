@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
+import type { TrackerEntryInput } from '@/types/tracker';
 
 interface TrackerEntryFormProps {
-  onSubmit: (data: EntryData) => Promise<void>;
-  initialData?: Partial<EntryData>;
+  onSubmit?: (data: any) => Promise<void>;
+  initialData?: Partial<TrackerEntryInput>;
   onCancel?: () => void;
   className?: string;
 }
@@ -25,24 +27,26 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
   onCancel,
   className = '',
 }) => {
-  const [formData, setFormData] = useState<EntryData>({
-    platform: initialData?.platform || '',
-    title: initialData?.title || '',
-    description: initialData?.description || '',
-    value: initialData?.value || 0,
+  const { createEntry, isCreating } = useTracker();
+  const [formData, setFormData] = useState<Partial<TrackerEntryInput>>({
+    platformId: initialData?.platformId || '',
+    notes: initialData?.notes || '',
+    problemsSolved: initialData?.problemsSolved || 0,
     date: initialData?.date || new Date().toISOString().split('T')[0],
-    category: initialData?.category || '',
+    category: initialData?.category || undefined,
     tags: initialData?.tags || [],
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     try {
-      await onSubmit(formData);
-    } finally {
-      setIsSubmitting(false);
+      if (onSubmit) {
+        await onSubmit(formData);
+      } else {
+        await createEntry(formData as any);
+      }
+    } catch (error) {
+      console.error('Failed to save entry:', error);
     }
   };
 
@@ -55,8 +59,8 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
             <select
-              value={formData.platform}
-              onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+              value={formData.platformId}
+              onChange={(e) => setFormData({ ...formData, platformId: e.target.value })}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             >
@@ -71,7 +75,7 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
             <input
               type="date"
-              value={formData.date}
+              value={formData.date as string}
               onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -83,19 +87,19 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
           <input
             type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             required
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-            placeholder="What did you accomplish?"
+            placeholder="Add brief notes..."
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
           <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             placeholder="Add more details..."
@@ -107,8 +111,8 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">Value</label>
             <input
               type="number"
-              value={formData.value}
-              onChange={(e) => setFormData({ ...formData, value: parseInt(e.target.value) })}
+              value={formData.problemsSolved}
+              onChange={(e) => setFormData({ ...formData, problemsSolved: parseInt(e.target.value) || 0 })}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             />
@@ -117,8 +121,8 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
             <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              value={formData.category as string}
+              onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg"
             >
               <option value="">Select category</option>
@@ -141,10 +145,10 @@ export const TrackerEntryForm: React.FC<TrackerEntryFormProps> = ({
           )}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isCreating}
             className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
           >
-            {isSubmitting ? 'Saving...' : 'Save Entry'}
+            {isCreating ? 'Saving...' : 'Save Entry'}
           </button>
         </div>
       </div>

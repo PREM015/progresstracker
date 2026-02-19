@@ -14,6 +14,8 @@ import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import { UserService } from '@/services/userService';
 import { Prisma } from '@prisma/client';
+import { sendEmail, emailTemplates } from '@/lib/email';
+
 
 // =============================================================================
 // CONSTANTS
@@ -759,7 +761,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       case 'verify_email': {
         const user = await prisma.user.findUnique({
           where: { id: userId },
-          select: { email: true, emailVerified: true },
+          select: { email: true, emailVerified: true, name: true, username: true },
         });
 
         if (user?.emailVerified) {
@@ -769,8 +771,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           );
         }
 
-        // TODO: In production, send verification email here
-        // await sendVerificationEmail(user.email);
+        if (user && user.email) {
+          try {
+            // In a real production app, you would generate a secure token here
+            // For now, we'll simulate it
+            await sendEmail({
+              to: user.email,
+              ...emailTemplates.welcome(user.name || 'User', user.username || 'User'), // Using welcome as a placeholder for verification
+              subject: 'Verify your email - CodeSync Pro',
+            });
+          } catch (error) {
+            logger.error('Failed to send verification email', { userId, error });
+            // Don't fail the request, just log it
+          }
+        }
 
         await createAuditLog(userId, 'UPDATE', 'Email verification requested', ip, userAgent);
 

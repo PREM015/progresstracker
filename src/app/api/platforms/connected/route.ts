@@ -244,14 +244,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const query = queryValidation.data;
 
-    // Get connected platforms
-    const { connections, customPlatforms } = await PlatformService.getUserConnectedPlatforms(
-      userId,
-      {
+    // Get connected platforms and stats in parallel
+    const [payload, stats] = await Promise.all([
+      PlatformService.getUserConnectedPlatforms(userId, {
         activeOnly: query.activeOnly,
         includeCustom: query.includeCustom,
-      }
-    );
+      }),
+      PlatformService.getConnectionStats(userId),
+    ]);
+
+    const { connections, customPlatforms } = payload;
 
     // Type assertion for connections
     let filteredConnections = connections as unknown as ConnectionWithPlatform[];
@@ -310,8 +312,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       updatedAt: conn.updatedAt,
     }));
 
-    // Get connection stats
-    const stats = await PlatformService.getConnectionStats(userId);
+
 
     log.info('Connected platforms fetched', {
       userId,

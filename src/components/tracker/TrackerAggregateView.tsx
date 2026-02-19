@@ -1,6 +1,5 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 import type { TrackerEntry } from '@/types/tracker';
 import { formatTimeSpent } from '@/types/tracker';
 
@@ -32,45 +31,23 @@ export function TrackerAggregateView({
     groupBy = 'platform',
     className = ''
 }: TrackerAggregateViewProps) {
-    const [stats, setStats] = useState<AggregateStats[]>([]);
-    const [totals, setTotals] = useState<AggregateStats | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const filters = useMemo(() => ({
+        startDate,
+        endDate,
+        limit: 1000
+    }), [startDate, endDate]);
 
-    useEffect(() => {
-        fetchAggregateData();
-    }, [startDate, endDate, groupBy]);
+    const { entries, isLoading, error } = useTracker(filters);
 
-    const fetchAggregateData = async () => {
-        setLoading(true);
-        setError(null);
+    const stats = useMemo(() => {
+        if (!entries) return [];
+        return aggregateEntries(entries, groupBy);
+    }, [entries, groupBy]);
 
-        try {
-            const params = new URLSearchParams({
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                limit: '1000',
-            });
-
-            const res = await fetch(`/api/tracker?${params}`);
-            if (!res.ok) throw new Error('Failed to fetch tracker data');
-
-            const data = await res.json();
-            const entries: TrackerEntry[] = data.data || [];
-
-            // Group and aggregate
-            const aggregated = aggregateEntries(entries, groupBy);
-            setStats(aggregated);
-
-            // Calculate overall totals
-            const overall = calculateTotals(entries, 'Overall');
-            setTotals(overall);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const totals = useMemo(() => {
+        if (!entries || entries.length === 0) return null;
+        return calculateTotals(entries, 'Overall');
+    }, [entries]);
 
     const aggregateEntries = (entries: TrackerEntry[], groupType: string): AggregateStats[] => {
         const groups = new Map<string, TrackerEntry[]>();
@@ -143,7 +120,7 @@ export function TrackerAggregateView({
         return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className={`animate-pulse space-y-4 ${className}`}>
                 <div className="h-32 bg-gray-100 rounded-xl"></div>
@@ -156,13 +133,7 @@ export function TrackerAggregateView({
     if (error) {
         return (
             <div className={`bg-red-50 border border-red-200 rounded-xl p-6 ${className}`}>
-                <p className="text-red-600">{error}</p>
-                <button
-                    onClick={fetchAggregateData}
-                    className="mt-3 text-sm text-red-700 hover:text-red-800 font-medium"
-                >
-                    Try again
-                </button>
+                <p className="text-red-600">Failed to load statistics</p>
             </div>
         );
     }

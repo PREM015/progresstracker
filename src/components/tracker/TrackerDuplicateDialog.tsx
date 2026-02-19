@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 import type { TrackerEntry } from '@/types/tracker';
 
 interface TrackerDuplicateDialogProps {
@@ -16,6 +17,7 @@ export function TrackerDuplicateDialog({
     onClose,
     onDuplicate
 }: TrackerDuplicateDialogProps) {
+    const { createEntry } = useTracker();
     const [selectedDate, setSelectedDate] = useState<string>(
         new Date().toISOString().split('T')[0]
     );
@@ -31,7 +33,17 @@ export function TrackerDuplicateDialog({
 
         try {
             const date = new Date(selectedDate);
-            await onDuplicate(date);
+            if (onDuplicate) {
+                await onDuplicate(date);
+            } else {
+                await createEntry({
+                    ...entry,
+                    id: undefined,
+                    date: date,
+                    createdAt: undefined,
+                    updatedAt: undefined,
+                } as any);
+            }
             onClose();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to duplicate entry');

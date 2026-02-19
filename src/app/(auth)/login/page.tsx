@@ -1,12 +1,21 @@
+'use client';
+
+import { Suspense } from 'react';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { AuthLayout } from '@/components/layouts/AuthLayout';
-import { MetaTags } from '@/components/seo/MetaTags';
+import { Loader2 } from 'lucide-react';
+
+function LoginFallback() {
+  return (
+    <div className="flex justify-center py-8">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 export default function LoginPage() {
   return (
-    <AuthLayout>
-      <MetaTags title="Login" description="Sign in to your Progress Tracker account" />
+    <Suspense fallback={<LoginFallback />}>
       <LoginForm />
-    </AuthLayout>
+    </Suspense>
   );
 }

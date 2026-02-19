@@ -5,7 +5,9 @@
 
 import React, { createContext, useContext } from 'react';
 import { useSession } from 'next-auth/react';
-import useSWR from 'swr';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@/hooks/useUser';
+import { queryKeys } from '@/hooks/keys';
 
 interface User {
   id: string;
@@ -28,20 +30,20 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
-  const { data, error, mutate } = useSWR(
-    session?.user ? '/api/user' : null,
-    fetcher
-  );
+  const { status } = useSession();
+  const queryClient = useQueryClient();
+  const { user, isLoading, error } = useUser();
+
+  const mutate = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.user.all });
+  };
 
   return (
     <UserContext.Provider
       value={{
-        user: data?.user || null,
-        isLoading: status === 'loading' || (!data && !error),
+        user: user as User | null,
+        isLoading: status === 'loading' || isLoading,
         error,
         mutate,
       }}

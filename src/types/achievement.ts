@@ -86,7 +86,7 @@ export interface AchievementThreshold {
 export interface UserAchievement {
   id: string;
   oduserId: string;
- 
+
   userId: string;
   achievementId: string;
   achievement: Achievement;
@@ -113,6 +113,8 @@ export interface AchievementProgress {
   currentThreshold?: AchievementThreshold;
   nextThreshold?: AchievementThreshold;
   remainingToNext?: number;
+  isPinned?: boolean;
+  remaining?: number;
 }
 
 /** Achievement statistics */

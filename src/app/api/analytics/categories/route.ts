@@ -55,7 +55,7 @@ const CATEGORY_CONFIG: Record<PlatformCategory, { label: string; color: string; 
 // =============================================================================
 
 const querySchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).default(30),
+  days: z.coerce.number().int().min(1).max(3650).default(30),
   categories: z.string().optional().transform(v => v ? v.split(',') as PlatformCategory[] : undefined),
   sortBy: z.enum(['problems', 'time', 'commits', 'entries', 'name']).default('problems'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
@@ -126,7 +126,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
     const { error, session, rateLimitResult } = await validateSession(request, requestId);
 
     if (error) {
-      logger.info('user seesion not found',{session,requestId})
+      logger.info('user seesion not found', { session, requestId })
       return addHeaders(new NextResponse(null, { status: 401 }), requestId, rateLimitResult);
     }
 
@@ -158,10 +158,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse and validate query parameters
     const queryValidation = querySchema.safeParse({
       days: searchParams.get('days') || '30',
-      categories: searchParams.get('categories'),
+      categories: searchParams.get('categories') || undefined,
       sortBy: searchParams.get('sortBy') || 'problems',
       sortOrder: searchParams.get('sortOrder') || 'desc',
-      includeTimeline: searchParams.get('includeTimeline'),
+      includeTimeline: searchParams.get('includeTimeline') || undefined,
     });
 
     if (!queryValidation.success) {

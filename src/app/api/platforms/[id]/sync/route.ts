@@ -175,12 +175,13 @@ export async function HEAD(
       return new NextResponse(null, { status: 401 });
     }
 
-    const connection = await prisma.userPlatform.findUnique({
+    const connection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: {
-          userId: session.user.id,
-          platformId,
-        },
+        userId: session.user.id,
+        OR: [
+          { platformId },
+          { platform: { slug: platformId } }
+        ]
       },
       select: {
         syncStatus: true,
@@ -196,11 +197,11 @@ export async function HEAD(
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Sync-Status', connection.syncStatus);
     response.headers.set('X-Is-Syncing', String(connection.syncStatus === 'IN_PROGRESS'));
-    
+
     if (connection.lastSyncedAt) {
       response.headers.set('X-Last-Synced', connection.lastSyncedAt.toISOString());
     }
-    
+
     if (connection.nextSyncAt) {
       response.headers.set('X-Next-Sync', connection.nextSyncAt.toISOString());
     }
@@ -266,13 +267,18 @@ export async function GET(
     const query = queryValidation.data;
 
     // Get connection
-    const connection = await prisma.userPlatform.findUnique({
+    const connection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: { userId, platformId },
+        userId,
+        OR: [
+          { platformId },
+          { platform: { slug: platformId } }
+        ]
       },
       include: {
         platform: {
           select: {
+            id: true, // Needed for history query
             name: true,
             slug: true,
             supportsAutoSync: true,
@@ -289,7 +295,7 @@ export async function GET(
     // Build history query
     const historyWhere: Record<string, unknown> = {
       userId,
-      platformId,
+      platformId: connection.platformId, // Use the actual platform ID
     };
 
     if (query.status) {
@@ -324,12 +330,12 @@ export async function GET(
           createdAt: true,
         },
       }),
-      prisma.syncLog.count({ where: { userId, platformId } }),
+      prisma.syncLog.count({ where: { userId, platformId: connection.platformId } }),
       prisma.syncLog.count({
-        where: { userId, platformId, status: SyncStatus.SUCCESS },
+        where: { userId, platformId: connection.platformId, status: SyncStatus.SUCCESS },
       }),
       prisma.syncLog.aggregate({
-        where: { userId, platformId, duration: { not: null } },
+        where: { userId, platformId: connection.platformId, duration: { not: null } },
         _avg: { duration: true },
       }),
     ]);
@@ -423,7 +429,11 @@ export async function POST(
     }
 
     // Parse options
-    let options = { force: false, priority: 'normal' as const, waitForCompletion: false };
+    let options: z.infer<typeof SyncOptionsSchema> = {
+      force: false,
+      priority: 'normal',
+      waitForCompletion: false
+    };
     try {
       const body = await request.json();
       const validation = SyncOptionsSchema.safeParse(body);
@@ -435,9 +445,13 @@ export async function POST(
     }
 
     // Get connection
-    const connection = await prisma.userPlatform.findUnique({
+    const connection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: { userId, platformId },
+        userId,
+        OR: [
+          { platformId },
+          { platform: { slug: platformId } }
+        ]
       },
       include: {
         platform: {
@@ -490,7 +504,7 @@ export async function POST(
     }
 
     // Check cooldown
-    const cooldownCheck = await checkSyncCooldown(userId, platformId, options.force);
+    const cooldownCheck = await checkSyncCooldown(userId, connection.platformId, options.force);
     if (!cooldownCheck.allowed) {
       throw new ConflictError(cooldownCheck.reason!);
     }
@@ -498,15 +512,15 @@ export async function POST(
     // Trigger sync
     let result;
     if (options.waitForCompletion) {
-      result = await SyncService.syncPlatform(userId, platformId, {
+      result = await SyncService.syncPlatform(userId, connection.platformId, {
         triggeredBy: 'manual',
       });
     } else {
       // Start sync in background
-      SyncService.syncPlatform(userId, platformId, {
+      SyncService.syncPlatform(userId, connection.platformId, {
         triggeredBy: 'manual',
       }).catch(err => {
-        logger.error('Background sync failed', { userId, platformId }, err);
+        logger.error('Background sync failed', { userId, platformId: connection.platformId }, err);
       });
 
       result = {
@@ -589,9 +603,13 @@ export async function DELETE(
     }
 
     // Get connection
-    const connection = await prisma.userPlatform.findUnique({
+    const connection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: { userId, platformId },
+        userId,
+        OR: [
+          { platformId },
+          { platform: { slug: platformId } }
+        ]
       },
       include: {
         platform: {
@@ -620,7 +638,7 @@ export async function DELETE(
     }
 
     // Cancel sync
-    await SyncService.cancelSync(userId, platformId);
+    await SyncService.cancelSync(userId, connection.platformId);
 
     // Audit log
     await auditLogService.create({

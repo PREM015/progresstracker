@@ -31,14 +31,14 @@ import {
 import PlatformService from '@/services/platformService';
 import { auditLogService } from '@/services/auditLogService';
 import { encrypt, encryptJSON } from '@/lib/encryption';
-import { 
-  AuditAction, 
-  PlatformCategory, 
-  AuthType, 
+import {
+  AuditAction,
+  PlatformCategory as PrismaPlatformCategory,
+  AuthType as PrismaAuthType,
   SyncStatus,
   Prisma,
 } from '@prisma/client';
-import { getCategoryDisplayName } from '@/types/platform';
+import { getCategoryDisplayName, PlatformCategoryId, AuthType as ConfigAuthType } from '@/types/platform';
 
 // =============================================================================
 // CONSTANTS
@@ -76,49 +76,49 @@ interface PlatformDetails {
   name: string;
   displayName: string | null;
   description: string | null;
-  category: PlatformCategory;
+  category: PlatformCategoryId | string;
   categoryName: string;
   subcategory: string | null;
   tags: string[];
-  
+
   // Branding
   icon: string | null;
   logo: string | null;
   color: string | null;
   backgroundColor: string | null;
-  
+
   // Authentication
-  authType: AuthType;
+  authType: ConfigAuthType | string;
   supportsAutoSync: boolean;
   supportsOAuth: boolean;
   supportsApiKey: boolean;
   supportsWebhook: boolean;
   requiresCredentials: boolean;
-  
+
   // URLs
   website: string | null;
   apiEndpoint: string | null;
   profileUrlPattern: string | null;
   setupGuideUrl: string | null;
   helpArticleUrl: string | null;
-  
+
   // Status
   isActive: boolean;
   isBeta: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string | null;
   healthStatus: string | null;
-  
+
   // Stats
   totalUsers: number;
   successRate: number;
   avgSyncDuration: number | null;
-  
+
   // Configuration
   syncInterval: number;
   rateLimit: number | null;
   rateLimitWindow: number | null;
-  
+
   // Timestamps
   createdAt: Date;
   updatedAt: Date;
@@ -143,7 +143,7 @@ interface UserConnectionStatus {
     cachedStats: unknown;
     createdAt: Date;
     updatedAt: Date;
-  } | null;
+  } | null | undefined;
   canConnect: boolean;
   connectionReason?: string;
 }
@@ -182,18 +182,18 @@ const FullUpdatePlatformSchema = z.object({
   name: z.string().min(2).max(100),
   displayName: z.string().max(100).optional().nullable(),
   description: z.string().max(1000).optional().nullable(),
-  category: z.nativeEnum(PlatformCategory),
+  category: z.nativeEnum(PrismaPlatformCategory),
   subcategory: z.string().max(50).optional().nullable(),
   tags: z.array(z.string().max(30)).max(20).default([]),
-  
+
   // Branding
   icon: z.string().url().optional().nullable(),
   logo: z.string().url().optional().nullable(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
-  
+
   // Authentication
-  authType: z.nativeEnum(AuthType),
+  authType: z.nativeEnum(PrismaAuthType),
   supportsAutoSync: z.boolean().default(false),
   supportsOAuth: z.boolean().default(false),
   supportsApiKey: z.boolean().default(false),
@@ -201,20 +201,20 @@ const FullUpdatePlatformSchema = z.object({
   requiresCredentials: z.boolean().default(false),
   oauthConfig: z.record(z.unknown()).optional().nullable(),
   apiKeyConfig: z.record(z.unknown()).optional().nullable(),
-  
+
   // URLs
   website: z.string().url().optional().nullable(),
   apiEndpoint: z.string().url().optional().nullable(),
   profileUrlPattern: z.string().optional().nullable(),
   setupGuideUrl: z.string().url().optional().nullable(),
   helpArticleUrl: z.string().url().optional().nullable(),
-  
+
   // Status
   isActive: z.boolean().default(true),
   isBeta: z.boolean().default(false),
   maintenanceMode: z.boolean().default(false),
   maintenanceMessage: z.string().max(500).optional().nullable(),
-  
+
   // Configuration
   syncInterval: z.number().int().min(15).max(10080).default(1440), // 15min to 7days
   syncPriority: z.number().int().min(0).max(100).default(0),
@@ -230,7 +230,7 @@ const PartialUpdatePlatformSchema = FullUpdatePlatformSchema.partial();
 // User connection operation schema
 const ConnectionOperationSchema = z.object({
   action: z.enum(['connect', 'disconnect', 'update', 'verify', 'sync']),
-  
+
   // For connect/update
   username: z.string().min(1).max(100).optional(),
   profileUrl: z.string().url().optional(),
@@ -272,9 +272,9 @@ function generateRequestId(): string {
 }
 
 function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-         request.headers.get('x-real-ip') || 
-         'unknown';
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
 }
 
 function getUserAgent(request: NextRequest): string {
@@ -321,9 +321,7 @@ function addHeaders(
  * Validate platform ID and get platform
  */
 async function getPlatformOrThrow(id: string) {
-  const platform = await prisma.platform.findUnique({
-    where: { id },
-  });
+  const platform = await PlatformService.getPlatformById(id);
 
   if (!platform) {
     throw new NotFoundError('Platform');
@@ -339,12 +337,19 @@ async function checkConnectionEligibility(
   userId: string,
   platformId: string
 ): Promise<{ canConnect: boolean; reason?: string }> {
+  // Resolve DB ID for connection check
+  const dbId = await PlatformService.resolveDbId(platformId);
+
+  if (!dbId) {
+    // If no DB record, then certainly no connection exists yet.
+    // So we just check subscription limits.
+  }
+
   // Check if already connected
-  const existing = await prisma.userPlatform.findUnique({
-    where: {
-      userId_platformId: { userId, platformId },
-    },
-  });
+  // Note: if dbId is null, existing connection check is skipped (implicitly false)
+  // But we should check if PlatformService handles this.
+  // Actually PlatformService.getUserPlatformConnection handles the resolution.
+  const existing = await PlatformService.getUserPlatformConnection(userId, platformId);
 
   if (existing) {
     return { canConnect: false, reason: 'Already connected to this platform' };
@@ -363,9 +368,9 @@ async function checkConnectionEligibility(
   const current = subscription?.currentPlatformCount || 0;
 
   if (current >= limit) {
-    return { 
-      canConnect: false, 
-      reason: `Platform limit reached (${current}/${limit}). Upgrade for more.` 
+    return {
+      canConnect: false,
+      reason: `Platform limit reached (${current}/${limit}). Upgrade for more.`
     };
   }
 
@@ -380,6 +385,21 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
   const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+  // Resolve DB ID because stats tables rely on UUID
+  const dbId = await PlatformService.resolveDbId(platformId);
+
+  if (!dbId) {
+    return {
+      totalConnections: 0,
+      activeConnections: 0,
+      syncStats: {
+        last24Hours: { total: 0, successful: 0, failed: 0, successRate: 100 },
+        last7Days: { total: 0, successful: 0, failed: 0, successRate: 100 }
+      },
+      activityStats: { totalEntries: 0, totalProblems: 0, totalCommits: 0, avgEntriesPerUser: 0 }
+    };
+  }
+
   const [
     totalConnections,
     activeConnections,
@@ -388,15 +408,15 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
     activityStats,
   ] = await Promise.all([
     prisma.userPlatform.count({
-      where: { platformId },
+      where: { platformId: dbId },
     }),
     prisma.userPlatform.count({
-      where: { platformId, isActive: true },
+      where: { platformId: dbId, isActive: true },
     }),
     prisma.syncLog.groupBy({
       by: ['status'],
       where: {
-        platformId,
+        platformId: dbId,
         createdAt: { gte: last24Hours },
       },
       _count: true,
@@ -404,13 +424,13 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
     prisma.syncLog.groupBy({
       by: ['status'],
       where: {
-        platformId,
+        platformId: dbId,
         createdAt: { gte: last7Days },
       },
       _count: true,
     }),
     prisma.trackerEntry.aggregate({
-      where: { platformId },
+      where: { platformId: dbId },
       _count: true,
       _sum: {
         problemsSolved: true,
@@ -437,14 +457,14 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
     syncStats: {
       last24Hours: {
         ...calc24h,
-        successRate: calc24h.total > 0 
-          ? Math.round((calc24h.successful / calc24h.total) * 100 * 100) / 100 
+        successRate: calc24h.total > 0
+          ? Math.round((calc24h.successful / calc24h.total) * 100 * 100) / 100
           : 100,
       },
       last7Days: {
         ...calc7d,
-        successRate: calc7d.total > 0 
-          ? Math.round((calc7d.successful / calc7d.total) * 100 * 100) / 100 
+        successRate: calc7d.total > 0
+          ? Math.round((calc7d.successful / calc7d.total) * 100 * 100) / 100
           : 100,
       },
     },
@@ -452,8 +472,8 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
       totalEntries: activityStats._count,
       totalProblems: activityStats._sum.problemsSolved || 0,
       totalCommits: activityStats._sum.commits || 0,
-      avgEntriesPerUser: activeConnections > 0 
-        ? Math.round((activityStats._count / activeConnections) * 100) / 100 
+      avgEntriesPerUser: activeConnections > 0
+        ? Math.round((activityStats._count / activeConnections) * 100) / 100
         : 0,
     },
   };
@@ -464,33 +484,28 @@ async function getPlatformStats(platformId: string): Promise<PlatformStats> {
  */
 async function getRelatedPlatforms(
   platformId: string,
-  category: PlatformCategory,
+  category: PlatformCategoryId | PrismaPlatformCategory,
   tags: string[],
   limit: number = 5
 ) {
-  return prisma.platform.findMany({
-    where: {
-      id: { not: platformId },
-      isActive: true,
-      OR: [
-        { category },
-        { tags: { hasSome: tags } },
-      ],
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      displayName: true,
-      category: true,
-      icon: true,
-      color: true,
-      supportsAutoSync: true,
-      totalUsers: true,
-    },
-    orderBy: { totalUsers: 'desc' },
-    take: limit,
-  });
+  // Validate ID/Slug to filter out current
+  // PlatformService.getAllPlatforms handles the heavy lifting
+  // filtering in service is done via filters object
+  // But for related, we want filtering by category/tags AND exclude current ID
+
+  // Since getAllPlatforms doesn't support 'exclude' or 'tags' in current impl (Wait, I added tags support in service!)
+  // Yes, I added tags support.
+  // But not exclude ID.
+  // I will just fetch and filter manually.
+
+  const related = await PlatformService.getAllPlatforms({
+    category,
+    tags
+    // isActive: true (default)
+  }, { limit: limit + 1 }); // Fetch one extra just in case
+
+  // Filter out current
+  return (related.data || []).filter((p: any) => p.id !== platformId && p.slug !== platformId).slice(0, limit);
 }
 
 /**
@@ -501,10 +516,13 @@ async function getUserSyncHistory(
   platformId: string,
   limit: number = 10
 ) {
+  const dbId = await PlatformService.resolveDbId(platformId);
+  if (!dbId) return [];
+
   return prisma.syncLog.findMany({
     where: {
       userId,
-      platformId,
+      platformId: dbId,
     },
     select: {
       id: true,
@@ -545,16 +563,7 @@ export async function HEAD(
   const { id } = await params;
 
   try {
-    const platform = await prisma.platform.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        slug: true,
-        isActive: true,
-        maintenanceMode: true,
-        updatedAt: true,
-      },
-    });
+    const platform = await PlatformService.getPlatformById(id);
 
     if (!platform) {
       return new NextResponse(null, { status: 404 });
@@ -636,31 +645,71 @@ export async function GET(
     const { includeStats, includeRelated, includeSyncHistory } = queryValidation.data;
 
     // Get platform
-    const platform = await prisma.platform.findUnique({
-      where: { id },
-    });
+    let platform = await PlatformService.getPlatformById(id);
+    console.log('[DEBUG] getPlatformById result:', id, platform);
 
     if (!platform) {
       throw new NotFoundError('Platform');
     }
 
     // Build platform details
+    // Ensure we have a valid object structure matches PlatformDetails interface
     const platformDetails: PlatformDetails = {
-      ...platform,
-      categoryName: getCategoryDisplayName(platform.category),
+      id: platform.id,
+      slug: platform.slug,
+      name: platform.name,
+      displayName: platform.displayName || null,
+      description: platform.description || null,
+      category: platform.category,
+      categoryName: typeof platform.category === 'string' ? platform.category : 'Other',
+      subcategory: platform.subcategory || null,
+      tags: platform.tags || [],
+
+      icon: platform.icon || null,
+      logo: platform.logo || null,
+      color: platform.color || null,
+      backgroundColor: platform.backgroundColor || null,
+
+      authType: platform.authType,
+      supportsAutoSync: platform.supportsAutoSync,
+      supportsOAuth: platform.supportsOAuth || false,
+      supportsApiKey: platform.supportsApiKey || false,
+      supportsWebhook: platform.supportsWebhook || false,
+      requiresCredentials: platform.requiresCredentials || false,
+
+      website: platform.website || null,
+      apiEndpoint: platform.apiEndpoint || null,
+      profileUrlPattern: platform.profileUrlPattern || null,
+      setupGuideUrl: platform.setupGuideUrl || null,
+      helpArticleUrl: platform.helpArticleUrl || null,
+
+      isActive: platform.isActive,
+      isBeta: platform.isBeta || false,
+      maintenanceMode: platform.maintenanceMode || false,
+      maintenanceMessage: platform.maintenanceMessage || null,
+      healthStatus: platform.healthStatus || 'operational',
+
+      totalUsers: platform.totalUsers || 0,
+      successRate: platform.successRate || 100,
+      avgSyncDuration: platform.avgSyncDuration || null,
+
+      syncInterval: platform.syncInterval || 1440,
+      rateLimit: platform.rateLimit || null,
+      rateLimitWindow: platform.rateLimitWindow || null,
+
+      createdAt: platform.createdAt || new Date(),
+      updatedAt: platform.updatedAt || new Date(),
     };
 
     // Get user's connection status if authenticated
     let connectionStatus: UserConnectionStatus | null = null;
+    let resolvedDbId: string | null = null;
 
     if (isAuthenticated) {
-      const connection = await prisma.userPlatform.findUnique({
-        where: {
-          userId_platformId: { userId: userId!, platformId: id },
-        },
-      });
+      // Use service to find connection
+      const connection = await PlatformService.getUserPlatformConnection(userId!, id);
 
-      const eligibility = connection 
+      const eligibility = connection
         ? { canConnect: false, reason: 'Already connected' }
         : await checkConnectionEligibility(userId!, id);
 
@@ -708,7 +757,7 @@ export async function GET(
       responseData.relatedPlatforms = await getRelatedPlatforms(
         id,
         platform.category,
-        platform.tags
+        platform.tags,
       );
     }
 
@@ -725,6 +774,8 @@ export async function GET(
       hasConnection: connectionStatus?.isConnected,
       duration: Date.now() - startTime,
     });
+
+    console.log('[DEBUG] Response Data:', JSON.stringify(responseData));
 
     return addHeaders(
       apiResponse.success(responseData, {
@@ -839,7 +890,7 @@ export async function POST(
           accessToken: data.accessToken ? encrypt(data.accessToken) : null,
           refreshToken: data.refreshToken ? encrypt(data.refreshToken) : null,
           apiKey: data.apiKey ? encrypt(data.apiKey) : null,
-          credentials: data.credentials 
+          credentials: data.credentials
             ? encryptJSON(data.credentials) as unknown as Prisma.InputJsonValue
             : Prisma.DbNull,
         };
@@ -879,7 +930,7 @@ export async function POST(
         await prisma.subscription.update({
           where: { userId },
           data: { currentPlatformCount: { increment: 1 } },
-        }).catch(() => {});
+        }).catch(() => { });
 
         // Audit log
         await auditLogService.create({
@@ -934,7 +985,7 @@ export async function POST(
           await tx.subscription.update({
             where: { userId },
             data: { currentPlatformCount: { decrement: 1 } },
-          }).catch(() => {});
+          }).catch(() => { });
         });
 
         await auditLogService.create({
@@ -1510,7 +1561,7 @@ export async function DELETE(
       category: 'admin',
       entityType: 'platform',
       entityId: platformId,
-      description: result.deleted 
+      description: result.deleted
         ? `Deleted platform "${platform.name}"${result.connectionsMigrated ? ` (migrated ${result.connectionsMigrated} connections)` : ''}`
         : `Deactivated platform "${platform.name}"`,
       ipAddress: ip,
@@ -1539,7 +1590,7 @@ export async function DELETE(
       apiResponse.success(result, {
         meta: {
           requestId,
-          message: result.deleted 
+          message: result.deleted
             ? `Platform "${platform.name}" deleted successfully`
             : `Platform "${platform.name}" deactivated`,
         },

@@ -9,7 +9,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { AdminContentService } from '@/services/api/admin/content.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -35,11 +35,7 @@ export interface BlogPost {
     updatedAt: string;
 }
 
-interface ApiResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: string;
-}
+
 
 // =============================================================================
 // ADMIN BLOG HOOKS
@@ -61,23 +57,7 @@ export function useAdminContent(statusFilter: 'all' | 'published' | 'draft' = 'a
                 params.status = statusFilter.toUpperCase();
             }
 
-            const response = await apiClient.get<any>('/admin/blog', params);
-
-            // response is ApiResponse<any>. The actual data might be directly in response.data 
-            // or if apiClient logic differs, we handle potential shapes.
-
-            if (response.error) {
-                return [];
-            }
-
-            const payload = response.data;
-
-            // payload is the parsed JSON body
-            if (Array.isArray(payload)) return payload;
-            if (payload && payload.posts && Array.isArray(payload.posts)) return payload.posts;
-            if (payload && payload.data && Array.isArray(payload.data)) return payload.data;
-
-            return [];
+            return AdminContentService.getPosts(params);
         },
         enabled: isAdmin,
         staleTime: 5 * 60 * 1000,
@@ -88,13 +68,7 @@ export function useAdminContent(statusFilter: 'all' | 'published' | 'draft' = 'a
     // ==========================================================================
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const response = await apiClient.delete(`/admin/blog/${id}`);
-
-            if (response.error) {
-                throw new Error(response.error);
-            }
-
-            return response.data;
+            return AdminContentService.deletePost(id);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.admin.blog() });

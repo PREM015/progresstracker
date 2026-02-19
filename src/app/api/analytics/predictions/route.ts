@@ -268,8 +268,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
-      types: searchParams.get('types'),
-      includeFactors: searchParams.get('includeFactors'),
+      types: searchParams.get('types') || undefined,
+      includeFactors: searchParams.get('includeFactors') || undefined,
     });
 
     if (!queryValidation.success) {

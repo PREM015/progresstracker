@@ -1,6 +1,4 @@
-'use client';
-
-import { useState } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface VerifyEntryButtonProps {
     entryId: string;
@@ -15,43 +13,29 @@ export function VerifyEntryButton({
     onVerify,
     className = ''
 }: VerifyEntryButtonProps) {
-    const [verified, setVerified] = useState(isVerified);
-    const [isLoading, setIsLoading] = useState(false);
+    const { updateEntry, isUpdating } = useTracker();
 
     const toggleVerify = async () => {
-        setIsLoading(true);
-
         try {
-            const newVerified = !verified;
-
-            const res = await fetch(`/api/tracker/${entryId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isVerified: newVerified }),
-            });
-
-            if (!res.ok) throw new Error('Failed to update verification status');
-
-            setVerified(newVerified);
+            const newVerified = !isVerified;
+            await updateEntry(entryId, { isVerified: newVerified });
             if (onVerify) onVerify(newVerified);
         } catch (error) {
             console.error('Failed to toggle verification:', error);
-        } finally {
-            setIsLoading(false);
         }
     };
 
     return (
         <button
             onClick={toggleVerify}
-            disabled={isLoading}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${verified
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            disabled={isUpdating}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isVerified
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 } ${className}`}
-            title={verified ? 'Click to unverify' : 'Click to verify'}
+            title={isVerified ? 'Click to unverify' : 'Click to verify'}
         >
-            {verified ? (
+            {isVerified ? (
                 <>
                     <CheckIcon className="w-5 h-5" />
                     Verified

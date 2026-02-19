@@ -8,7 +8,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { ExportService } from '@/services/api/export.service';
 import { queryKeys } from './keys';
 
 // =============================================================================
@@ -79,15 +79,7 @@ export function useExport() {
   const jobsQuery = useQuery({
     queryKey: queryKeys.export.jobs(),
     queryFn: async (): Promise<ExportJob[]> => {
-      const response = await apiClient.get<ApiResponse<{ jobs: ExportJob[] }>>(
-        '/export/history'
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch export jobs');
-      }
-      
-      return response.data.data!.jobs;
+      return ExportService.getHistory() as any;
     },
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
@@ -99,15 +91,7 @@ export function useExport() {
   const scheduledQuery = useQuery({
     queryKey: queryKeys.export.scheduled(),
     queryFn: async (): Promise<ScheduledExport[]> => {
-      const response = await apiClient.get<ApiResponse<{ exports: ScheduledExport[] }>>(
-        '/export/scheduled'
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch scheduled exports');
-      }
-      
-      return response.data.data!.exports;
+      return ExportService.getScheduled() as any;
     },
     enabled: isAuthenticated,
     staleTime: 60 * 1000,
@@ -119,16 +103,7 @@ export function useExport() {
   const createMutation = useMutation({
     mutationKey: ['export', 'create'],
     mutationFn: async (request: CreateExportRequest): Promise<ExportJob> => {
-      const response = await apiClient.post<ApiResponse<{ job: ExportJob }>>(
-        '/export',
-        request
-      );
-      
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to create export');
-      }
-      
-      return response.data.data!.job;
+      return ExportService.generate(request) as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.export.jobs() });
@@ -175,21 +150,17 @@ export function useExport() {
   // DOWNLOAD EXPORT
   // ==========================================================================
   const download = useCallback(async (jobId: string) => {
-    const response = await apiClient.get<ApiResponse<{ url: string }>>(
-      `/export/download/${jobId}`
-    );
-    
-    if (response.error || !response.data?.success) {
-      throw new Error(response.error || 'Failed to get download URL');
-    }
-    
+    const blob = await ExportService.download(jobId);
+
     // Trigger download
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = response.data.data!.url;
-    link.download = '';
+    link.href = url;
+    link.download = `export_${jobId}.zip`; // Format might vary
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }, []);
 
   // ==========================================================================
@@ -198,13 +169,7 @@ export function useExport() {
   const cancelMutation = useMutation({
     mutationKey: ['export', 'cancel'],
     mutationFn: async (jobId: string) => {
-      const response = await apiClient.post(`/export/cancel/${jobId}`);
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      return jobId;
+      return ExportService.cancel(jobId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.export.jobs() });
@@ -224,13 +189,7 @@ export function useExport() {
   const deleteMutation = useMutation({
     mutationKey: ['export', 'delete'],
     mutationFn: async (jobId: string) => {
-      const response = await apiClient.delete(`/export/${jobId}`);
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      return jobId;
+      return ExportService.delete(jobId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.export.jobs() });
@@ -251,15 +210,15 @@ export function useExport() {
     // Data
     jobs: jobsQuery.data ?? [],
     scheduledExports: scheduledQuery.data ?? [],
-    
+
     // Loading states
     isLoading: jobsQuery.isLoading,
     isLoadingScheduled: scheduledQuery.isLoading,
-    
+
     // Error states
     error: jobsQuery.error,
     scheduledError: scheduledQuery.error,
-    
+
     // Actions
     createExport,
     exportAsCSV,
@@ -272,15 +231,15 @@ export function useExport() {
     refetch: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.export.all });
     },
-    
+
     // Mutation states
     isCreating: createMutation.isPending,
     isCancelling: cancelMutation.isPending,
     isDeleting: deleteMutation.isPending,
-    
+
     // Mutation errors
     createError: createMutation.error,
-    
+
     // Convenience
     pendingJobs: jobsQuery.data?.filter(j => ['queued', 'processing'].includes(j.status)) ?? [],
     completedJobs: jobsQuery.data?.filter(j => j.status === 'completed') ?? [],

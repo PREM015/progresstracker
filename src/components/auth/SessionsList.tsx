@@ -4,7 +4,22 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/lib/apiClient';
 import { formatLocationLabel, formatDeviceLabel, type ActiveSession } from '@/types/security';
-import { getRelativeTime } from '@/lib/utils';
+
+// Inline utility since getRelativeTime is not exported from @/lib/utils
+function getRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
 import { Button } from '@/components/ui/button';
 import { FormError } from '@/components/forms/FormError';
 import { Laptop, Smartphone, Globe, Clock, Loader2, Trash2 } from 'lucide-react';
@@ -26,7 +41,7 @@ export function SessionsList() {
       if (response.error) {
         setError(response.error);
       } else {
-        setSessions(response.data.sessions || []);
+        setSessions((response.data as { sessions?: ActiveSession[] })?.sessions || []);
       }
     } catch (err) {
       console.error('Fetch sessions error:', err);
@@ -153,3 +168,5 @@ export function SessionsList() {
     </div>
   );
 }
+
+export default SessionsList;

@@ -24,6 +24,8 @@ import {
 } from '@/lib/apiError';
 import PlatformService from '@/services/platformService';
 import { stripeService } from '@/services/stripeService';
+import auditLogService from '@/services/auditLogService';
+import { SyncService } from '@/services/syncService';
 
 // =============================================================================
 // CONSTANTS
@@ -55,7 +57,7 @@ const log = logger.child({ route: 'platforms/connect' });
 // =============================================================================
 
 const ConnectPlatformSchema = z.object({
-  platformId: z.string().cuid('Invalid platform ID'),
+  platformId: z.string().min(1, 'Platform ID is required'),
   username: z
     .string()
     .min(1, 'Username is required')
@@ -74,7 +76,7 @@ const ConnectPlatformSchema = z.object({
 });
 
 const UpdateConnectionSchema = z.object({
-  platformId: z.string().cuid('Invalid platform ID'),
+  platformId: z.string().min(1, 'Platform ID is required'),
   username: z.string().min(1).max(100).optional(),
   profileUrl: z.string().url().optional(),
   autoSync: z.boolean().optional(),
@@ -311,20 +313,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const data = validation.data;
 
-    // Check if platform exists and is active
-    const platform = await prisma.platform.findUnique({
-      where: { id: data.platformId },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        isActive: true,
-        authType: true,
-        supportsAutoSync: true,
-        profileUrlPattern: true,
-        requiresCredentials: true,
-      },
-    });
+    // Validate platform exists
+    const platform = await PlatformService.getPlatformById(data.platformId);
 
     if (!platform) {
       throw new NotFoundError('Platform');
@@ -334,54 +324,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw new ValidationError('Platform is currently unavailable');
     }
 
-    // Check if already connected
-    const existingConnection = await prisma.userPlatform.findUnique({
-      where: {
-        userId_platformId: { userId, platformId: data.platformId },
-      },
-    });
-
-    if (existingConnection) {
-      throw new ConflictError('Platform already connected');
+    // Check maintenance mode (safeguard)
+    if ((platform as any).maintenanceMode) {
+      throw new ValidationError(`${platform.name} is under maintenance`);
     }
 
-    // Validate required credentials based on auth type
-    if (platform.authType === 'OAUTH' && !data.accessToken) {
-      throw new ValidationError('Access token required for OAuth platforms');
+    // Relaxed token requirement for OAuth platforms (allow username fallback for scraping)
+    if (platform.authType === 'oauth' && !data.accessToken && !data.username) {
+      throw new ValidationError('Access token or username required for OAuth platforms');
     }
 
-    if (platform.authType === 'API_KEY' && !data.apiKey) {
+    if (platform.authType === 'api_key' && !data.apiKey) {
       throw new ValidationError('API key required for this platform');
     }
 
     if (
-      (platform.authType === 'SCRAPING' || platform.authType === 'MANUAL') &&
+      (platform.authType === 'scraping' || platform.authType === 'manual') &&
       !data.username &&
       platform.requiresCredentials
     ) {
       throw new ValidationError('Username required for this platform');
     }
 
-    // Check subscription limits
-    const canAdd = await stripeService.canAddPlatform(userId);
-    if (!canAdd) {
-      return addHeaders(
-        apiResponse.error(
-          {
-            message: 'Platform limit reached. Upgrade your plan to connect more platforms.',
-            statusCode: 403,
-            code: 'PLATFORM_LIMIT_REACHED',
-          },
-          requestId
-        ),
-        requestId,
-        rateLimitResult
-      );
-    }
-
     // Connect platform
-    const connection = await PlatformService.connectPlatform(
-      data.platformId,
+    const { connection, scraperStatus } = await PlatformService.connectPlatform(
+      userId,
       data.platformId,
       data.username,
       data.accessToken,
@@ -400,21 +367,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     );
 
-    // Update subscription platform count
-    await stripeService.incrementPlatformCount(userId);
+    // Initial Sync
+    let syncResult = null;
+    if (scraperStatus.hasAutoSync) {
+      try {
+        syncResult = await SyncService.syncPlatform(userId, connection.platformId, {
+          triggeredBy: 'manual',
+        });
+      } catch (syncError) {
+        log.error('Initial sync failed', { userId, platformId: data.platformId }, syncError);
+      }
+    }
 
     // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'CREATE',
-        category: 'platform',
-        entityType: 'user_platform',
-        entityId: connection.id,
-        description: `Connected platform: ${platform.name}`,
-        ipAddress: getClientIp(request),
-        userAgent: request.headers.get('user-agent') || undefined,
-      },
+    await auditLogService.create({
+      userId,
+      action: 'CREATE',
+      category: 'platform',
+      entityType: 'user_platform',
+      entityId: connection.id,
+      description: `Connected platform: ${platform.name}`,
+      ipAddress: getClientIp(request),
+      userAgent: request.headers.get('user-agent') || undefined,
     });
 
     log.info('Platform connected', {
@@ -447,7 +421,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             createdAt: connection.createdAt,
           },
         },
-        { requestId, message: `Successfully connected ${platform.name}` }
+        {
+          requestId,
+          message: syncResult?.success
+            ? `Successfully connected ${platform.name} and fetched latest data.`
+            : scraperStatus.isImplemented
+              ? `Connected ${platform.name}. Initial data sync is pending.`
+              : `Connected ${platform.name}. Note: Automated sync is not yet available for this platform (Manual tracking only).`
+        }
       ),
       requestId,
       rateLimitResult
@@ -507,9 +488,13 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     const data = validation.data;
 
     // Check if connection exists
-    const existingConnection = await prisma.userPlatform.findUnique({
+    const existingConnection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: { userId, platformId: data.platformId },
+        userId,
+        OR: [
+          { platformId: data.platformId },
+          { platform: { slug: data.platformId } }
+        ]
       },
       include: {
         platform: {
@@ -524,9 +509,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     // Update connection
     const connection = await prisma.userPlatform.update({
-      where: {
-        userId_platformId: { userId, platformId: data.platformId },
-      },
+      where: { id: existingConnection.id },
       data: {
         username: data.username ?? existingConnection.username,
         profileUrl: data.profileUrl ?? existingConnection.profileUrl,
@@ -612,9 +595,13 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     }
 
     // Check if connection exists
-    const connection = await prisma.userPlatform.findUnique({
+    const connection = await prisma.userPlatform.findFirst({
       where: {
-        userId_platformId: { userId, platformId },
+        userId,
+        OR: [
+          { platformId },
+          { platform: { slug: platformId } }
+        ]
       },
       include: {
         platform: {
@@ -628,23 +615,21 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     }
 
     // Delete connection using service (handles cleanup)
-    await PlatformService.disconnectPlatform(userId, platformId);
+    await PlatformService.disconnectPlatform(userId, connection.platformId);
 
     // Update subscription platform count
     await stripeService.decrementPlatformCount(userId);
 
     // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'DELETE',
-        category: 'platform',
-        entityType: 'user_platform',
-        entityId: connection.id,
-        description: `Disconnected platform: ${connection.platform.name}`,
-        ipAddress: getClientIp(request),
-        userAgent: request.headers.get('user-agent') || undefined,
-      },
+    await auditLogService.create({
+      userId,
+      action: 'DELETE',
+      category: 'platform',
+      entityType: 'user_platform',
+      entityId: connection.id,
+      description: `Disconnected platform: ${connection.platform.name}`,
+      ipAddress: getClientIp(request),
+      userAgent: request.headers.get('user-agent') || undefined,
     });
 
     log.info('Platform disconnected', {

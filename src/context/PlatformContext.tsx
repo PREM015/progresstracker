@@ -4,28 +4,13 @@
 'use client';
 
 import React, { createContext, useContext, useCallback } from 'react';
-import useSWR from 'swr';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePlatforms } from '@/hooks/usePlatforms';
+import { queryKeys } from '@/hooks/keys';
+import type { Platform, PlatformConnection } from '@/types/platform';
 
-interface Platform {
-  id: string;
-  name: string;
-  category: string;
-  logoUrl: string;
-  description: string;
-  websiteUrl: string;
-  apiAvailable: boolean;
-  oauthAvailable: boolean;
-}
-
-interface UserPlatform {
-  id: string;
-  platformId: string;
-  userId: string;
-  isActive: boolean;
-  credentials?: any;
-  lastSyncedAt?: Date;
-  platform: Platform;
-}
+// Legacy type aliases for backward compatibility
+type UserPlatform = PlatformConnection;
 
 interface PlatformContextType {
   platforms: Platform[];
@@ -39,60 +24,48 @@ interface PlatformContextType {
 
 const PlatformContext = createContext<PlatformContextType | undefined>(undefined);
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
 export function PlatformProvider({ children }: { children: React.ReactNode }) {
-  const { data: platformsData, error: platformsError } = useSWR('/api/platforms', fetcher);
-  const { data: connectedData, error: connectedError, mutate } = useSWR(
-    '/api/platforms/connected',
-    fetcher
-  );
+  const queryClient = useQueryClient();
+  const { platforms, connectedPlatforms, isLoading, error, connect, disconnect } = usePlatforms();
+
+  const refetch = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.platforms.all });
+  }, [queryClient]);
 
   const connectPlatform = useCallback(
     async (platformId: string, credentials?: any) => {
-      const response = await fetch('/api/platforms/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platformId, credentials }),
+      await new Promise<void>((resolve, reject) => {
+        connect(
+          { platformId, data: credentials || {} },
+          {
+            onSuccess: () => resolve(),
+            onError: (err: Error) => reject(err),
+          }
+        );
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to connect platform');
-      }
-
-      await mutate();
     },
-    [mutate]
+    [connect]
   );
 
   const disconnectPlatform = useCallback(
     async (platformId: string) => {
-      const response = await fetch('/api/platforms/disconnect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platformId }),
+      await new Promise<void>((resolve, reject) => {
+        disconnect(platformId, {
+          onSuccess: () => resolve(),
+          onError: (err: Error) => reject(err),
+        });
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to disconnect platform');
-      }
-
-      await mutate();
     },
-    [mutate]
+    [disconnect]
   );
-
-  const refetch = useCallback(() => {
-    mutate();
-  }, [mutate]);
 
   return (
     <PlatformContext.Provider
       value={{
-        platforms: platformsData?.platforms || [],
-        connectedPlatforms: connectedData?.connectedPlatforms || [],
-        isLoading: !platformsData && !platformsError,
-        error: platformsError || connectedError,
+        platforms: platforms || [],
+        connectedPlatforms: connectedPlatforms || [],
+        isLoading,
+        error,
         refetch,
         connectPlatform,
         disconnectPlatform,

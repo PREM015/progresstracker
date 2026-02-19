@@ -39,8 +39,18 @@ export const CategoryBreakdown: React.FC<CategoryBreakdownProps> = ({
     const fetchCategories = async () => {
       try {
         const res = await fetch('/api/analytics/categories?days=30');
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch categories: ${res.status}`);
+        }
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Received non-JSON response from API");
+        }
+
         const json = (await res.json()) as ApiSuccess<CategoriesResponse>;
-        if (!res.ok || !json?.success) throw new Error('Failed to fetch categories');
+        if (!json?.success) throw new Error('API reported failure');
 
         const mapped = (json.data?.categories || []).map((cat) => ({
           name: cat.label,

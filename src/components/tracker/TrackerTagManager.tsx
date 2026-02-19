@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTracker } from '@/hooks/useTracker';
 
 interface TrackerTagManagerProps {
     entryId: string;
@@ -19,6 +20,7 @@ export function TrackerTagManager({
     onUpdate,
     className = '',
 }: TrackerTagManagerProps) {
+    const { updateEntry } = useTracker();
     const [tags, setTags] = useState<string[]>(initialTags);
     const [topics, setTopics] = useState<string[]>(initialTopics);
     const [languages, setLanguages] = useState<string[]>(initialLanguages);
@@ -72,11 +74,7 @@ export function TrackerTagManager({
 
     const updateBackend = async (data: { tags: string[]; topics: string[]; languages: string[] }) => {
         try {
-            await fetch(`/api/tracker/${entryId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-            });
+            await updateEntry(entryId, data);
             if (onUpdate) onUpdate(data);
         } catch (error) {
             console.error('Failed to update tags:', error);

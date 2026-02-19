@@ -8,7 +8,7 @@ interface GoalTemplate {
   description: string;
   category: string;
   targetValue: number;
-  suggestedDeadlineDays: number;
+  estimatedDays: number;
   icon: string;
 }
 
@@ -28,7 +28,18 @@ export const GoalTemplates: React.FC<GoalTemplatesProps> = ({
   useEffect(() => {
     fetch('/api/goals/templates')
       .then(r => r.json())
-      .then(data => setTemplates(data))
+      .then(data => {
+        if (data.success && data.data?.templates) {
+          setTemplates(data.data.templates);
+        } else {
+          console.error('Failed to load templates:', data);
+          setTemplates([]);
+        }
+      })
+      .catch(err => {
+        console.error('Error loading templates:', err);
+        setTemplates([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -72,7 +83,7 @@ export const GoalTemplates: React.FC<GoalTemplatesProps> = ({
             <p className="text-sm text-gray-600 mb-4">{template.description}</p>
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span className="px-2 py-1 bg-gray-100 rounded capitalize">{template.category}</span>
-              <span>{template.suggestedDeadlineDays} days</span>
+              <span>{template.estimatedDays} days</span>
             </div>
           </div>
         ))}

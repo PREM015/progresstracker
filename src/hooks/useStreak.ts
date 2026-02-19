@@ -8,19 +8,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { StreakService } from '@/services/api/streak.service';
 import { queryKeys } from './keys';
 import type { StreakHistory } from '@/types/tracker';
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 interface StreakData {
   current: number;
@@ -60,17 +54,7 @@ export function useStreak() {
   // ==========================================================================
   const streakQuery = useQuery({
     queryKey: queryKeys.streak.current(),
-    queryFn: async (): Promise<StreakData> => {
-      const response = await apiClient.get<ApiResponse<{ streak: StreakData }>>(
-        '/streak'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch streak');
-      }
-
-      return response.data.data!.streak;
-    },
+    queryFn: () => StreakService.getCurrent(),
     enabled: isAuthenticated,
     staleTime: 1 * 60 * 1000, // 1 minute
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
@@ -81,17 +65,7 @@ export function useStreak() {
   // ==========================================================================
   const historyQuery = useQuery({
     queryKey: queryKeys.streak.history(),
-    queryFn: async (): Promise<StreakHistory[]> => {
-      const response = await apiClient.get<ApiResponse<{ history: StreakHistory[] }>>(
-        '/streak/history'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch streak history');
-      }
-
-      return response.data.data!.history;
-    },
+    queryFn: () => StreakService.getHistory(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -101,17 +75,7 @@ export function useStreak() {
   // ==========================================================================
   const statsQuery = useQuery({
     queryKey: queryKeys.streak.stats(),
-    queryFn: async (): Promise<StreakStats> => {
-      const response = await apiClient.get<ApiResponse<{ stats: StreakStats }>>(
-        '/streak/stats'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch streak stats');
-      }
-
-      return response.data.data!.stats;
-    },
+    queryFn: () => StreakService.getStats(),
     enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000,
   });
@@ -121,18 +85,7 @@ export function useStreak() {
   // ==========================================================================
   const freezeMutation = useMutation({
     mutationKey: ['streak', 'freeze'],
-    mutationFn: async (): Promise<{ success: boolean; freezesRemaining: number }> => {
-      const response = await apiClient.post<ApiResponse<{
-        success: boolean;
-        freezesRemaining: number
-      }>>('/streak/freeze');
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to use streak freeze');
-      }
-
-      return response.data.data!;
-    },
+    mutationFn: () => StreakService.useFreeze(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.streak.all });
     },
@@ -147,17 +100,7 @@ export function useStreak() {
   // ==========================================================================
   const checkMutation = useMutation({
     mutationKey: ['streak', 'check'],
-    mutationFn: async (): Promise<StreakData> => {
-      const response = await apiClient.post<ApiResponse<{ streak: StreakData }>>(
-        '/streak/check'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to check streak');
-      }
-
-      return response.data.data!.streak;
-    },
+    mutationFn: () => StreakService.check(),
     onSuccess: (newStreak) => {
       queryClient.setQueryData(queryKeys.streak.current(), newStreak);
     },

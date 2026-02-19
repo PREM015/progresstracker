@@ -221,6 +221,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       avgProblemsPerDay: 0,
       avgTimePerDay: 0,
       avgCommitsPerDay: 0,
+      lifetime: {
+        problems: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalProblems || (p.cachedStats as any)?.problemsSolved || 0), 0);
+          return Math.max(cachedTotal, (entries.reduce((sum, e) => sum + e.problemsSolved, 0))); // simplified for context
+        })(),
+        commits: await (async () => {
+          const platforms = await prisma.userPlatform.findMany({
+            where: { userId },
+            select: { cachedStats: true }
+          });
+          const cachedTotal = platforms.reduce((sum, p) => sum + ((p.cachedStats as any)?.totalCommits || (p.cachedStats as any)?.commits || 0), 0);
+          return Math.max(cachedTotal, (entries.reduce((sum, e) => sum + e.commits, 0)));
+        })(),
+      }
     };
 
     // Calculate averages

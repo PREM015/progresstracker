@@ -55,10 +55,10 @@ export class CodeforcesScraper extends BaseScraper {
       const user = userResponse.result[0];
 
       // Fetch submissions
-      const { start } = this.getDateRange(90);
+      const { start } = this.getDateRange(365); // Fetch last 1 year
       const submissionsResponse = await this.get<CodeforcesResponse<CodeforcesSubmission[]>>(
         `${this.baseUrl}/user.status`,
-        { handle, from: 1, count: 1000 }
+        { handle, from: 1, count: 5000 }
       );
 
       if (submissionsResponse.status !== 'OK') {

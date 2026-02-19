@@ -1,51 +1,13 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import React from 'react';
+import { useStreak } from '@/hooks/useStreak';
 
 interface TrackerStreakProps {
     userId?: string;
     className?: string;
 }
 
-interface StreakData {
-    currentStreak: number;
-    longestStreak: number;
-    streakStartDate?: string;
-    lastActivityDate?: string;
-    streakFreezeCount: number;
-}
-
 export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
-    const [streak, setStreak] = useState<StreakData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetchStreakData();
-    }, [userId]);
-
-    const fetchStreakData = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const res = await fetch('/api/user/stats');
-            if (!res.ok) throw new Error('Failed to fetch streak data');
-
-            const data = await res.json();
-            setStreak({
-                currentStreak: data.currentStreak || 0,
-                longestStreak: data.longestStreak || 0,
-                streakStartDate: data.streakStartDate,
-                lastActivityDate: data.lastActivityDate,
-                streakFreezeCount: data.streakFreezeCount || 0,
-            });
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An error occurred');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { streak, isLoading } = useStreak();
 
     const getDaysUntilStreakBreak = () => {
         if (!streak?.lastActivityDate) return null;
@@ -63,18 +25,18 @@ export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
         return 'active';
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className={`animate-pulse ${className}`}>
-                <div className="h-48 bg-gray-100 rounded-xl"></div>
+                <div className="h-48 bg-gray-100 dark:bg-zinc-800 rounded-xl"></div>
             </div>
         );
     }
 
-    if (error || !streak) {
+    if (!streak) {
         return (
-            <div className={`bg-red-50 border border-red-200 rounded-xl p-6 ${className}`}>
-                <p className="text-red-600">{error || 'No streak data available'}</p>
+            <div className={`bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl p-6 ${className}`}>
+                <p className="text-red-600 dark:text-red-400">No streak data available</p>
             </div>
         );
     }
@@ -88,7 +50,7 @@ export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
                 {/* Current Streak */}
                 <div className="text-center mb-6">
                     <div className="text-6xl mb-2">🔥</div>
-                    <div className="text-5xl font-bold mb-2">{streak.currentStreak}</div>
+                    <div className="text-5xl font-bold mb-2">{streak.current}</div>
                     <div className="text-xl opacity-90">Day Streak</div>
                 </div>
 
@@ -109,19 +71,19 @@ export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-white/10 backdrop-blur rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold">{streak.longestStreak}</div>
+                        <div className="text-2xl font-bold">{streak.longest}</div>
                         <div className="text-sm opacity-75">Longest</div>
                     </div>
                     <div className="bg-white/10 backdrop-blur rounded-lg p-4 text-center">
-                        <div className="text-2xl font-bold">{streak.streakFreezeCount}</div>
+                        <div className="text-2xl font-bold">{streak.freezeCount}</div>
                         <div className="text-sm opacity-75">Freezes Left</div>
                     </div>
                 </div>
 
                 {/* Streak Info */}
-                {streak.streakStartDate && (
+                {streak.startDate && (
                     <div className="text-center text-sm opacity-75">
-                        Started {new Date(streak.streakStartDate).toLocaleDateString('en-US', {
+                        Started {new Date(streak.startDate).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric'
@@ -137,14 +99,14 @@ export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
                     {Array.from({ length: 14 }, (_, i) => {
                         const date = new Date();
                         date.setDate(date.getDate() - (13 - i));
-                        const hasActivity = i >= 13 - streak.currentStreak;
+                        const hasActivity = i >= 13 - streak.current;
 
                         return (
                             <div
                                 key={i}
                                 className={`flex-shrink-0 w-8 h-8 rounded ${hasActivity
-                                        ? 'bg-orange-500'
-                                        : 'bg-gray-100'
+                                    ? 'bg-orange-500'
+                                    : 'bg-gray-100'
                                     }`}
                                 title={date.toLocaleDateString()}
                             />
@@ -160,11 +122,11 @@ export function TrackerStreak({ userId, className = '' }: TrackerStreakProps) {
             {/* Motivational Message */}
             <div className="mt-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4">
                 <p className="text-sm text-gray-700 text-center">
-                    {streak.currentStreak === 0 && "Start your streak today! 🚀"}
-                    {streak.currentStreak > 0 && streak.currentStreak < 7 && "Great start! Keep it going 💪"}
-                    {streak.currentStreak >= 7 && streak.currentStreak < 30 && "Amazing dedication! 🌟"}
-                    {streak.currentStreak >= 30 && streak.currentStreak < 100 && "You're on fire! 🔥"}
-                    {streak.currentStreak >= 100 && "Legendary streak! 👑"}
+                    {streak.current === 0 && "Start your streak today! 🚀"}
+                    {streak.current > 0 && streak.current < 7 && "Great start! Keep it going 💪"}
+                    {streak.current >= 7 && streak.current < 30 && "Amazing dedication! 🌟"}
+                    {streak.current >= 30 && streak.current < 100 && "You're on fire! 🔥"}
+                    {streak.current >= 100 && "Legendary streak! 👑"}
                 </p>
             </div>
         </div>

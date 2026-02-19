@@ -14,7 +14,7 @@ import {
 } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
 import { useCallback, useMemo } from 'react';
-import { apiClient } from '@/lib/apiClient';
+import { NotificationService } from '@/services/api/notification.service';
 import { queryKeys } from './keys';
 import type {
   Notification,
@@ -25,12 +25,6 @@ import type {
 // =============================================================================
 // TYPES
 // =============================================================================
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
 
 interface PaginatedResponse<T> {
   items: T[];
@@ -54,31 +48,9 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const notificationsQuery = useInfiniteQuery({
     queryKey: queryKeys.notifications.list(filters),
-    queryFn: async ({ pageParam = 1 }): Promise<PaginatedResponse<Notification>> => {
-      const params: Record<string, string> = {
-        page: String(pageParam),
-        limit: '20',
-      };
-
-      if (filters.type) {
-        params.type = Array.isArray(filters.type) ? filters.type.join(',') : filters.type;
-      }
-      if (filters.isRead !== undefined) params.isRead = String(filters.isRead);
-      if (filters.isArchived !== undefined) params.isArchived = String(filters.isArchived);
-
-      const response = await apiClient.get<ApiResponse<PaginatedResponse<Notification>>>(
-        '/notifications',
-        params
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch notifications');
-      }
-
-      return response.data.data!;
-    },
+    queryFn: ({ pageParam = 1 }) => NotificationService.getList(filters, pageParam, 20),
     getNextPageParam: (lastPage) => {
-      if (!lastPage.hasMore) return undefined;
+      if (!lastPage?.hasMore) return undefined;
       return lastPage.page + 1;
     },
     initialPageParam: 1,
@@ -97,17 +69,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const unreadCountQuery = useQuery({
     queryKey: queryKeys.notifications.unreadCount(),
-    queryFn: async (): Promise<number> => {
-      const response = await apiClient.get<ApiResponse<{ count: number }>>(
-        '/notifications/unread-count'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch unread count');
-      }
-
-      return response.data.data!.count;
-    },
+    queryFn: () => NotificationService.getUnreadCount(),
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000, // Refetch every 30 seconds
@@ -118,17 +80,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const preferencesQuery = useQuery({
     queryKey: queryKeys.notifications.preferences(),
-    queryFn: async (): Promise<NotificationPreferences> => {
-      const response = await apiClient.get<ApiResponse<{ preferences: NotificationPreferences }>>(
-        '/notifications/preferences'
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to fetch preferences');
-      }
-
-      return response.data.data!.preferences;
-    },
+    queryFn: () => NotificationService.getPreferences(),
     enabled: isAuthenticated,
     staleTime: 10 * 60 * 1000,
   });
@@ -138,17 +90,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const markReadMutation = useMutation({
     mutationKey: ['notifications', 'markRead'],
-    mutationFn: async (ids: string | string[]) => {
-      const idsArray = Array.isArray(ids) ? ids : [ids];
-
-      const response = await apiClient.post('/notifications/mark-read', { ids: idsArray });
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return idsArray;
-    },
+    mutationFn: (ids: string | string[]) => NotificationService.markAsRead(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.unreadCount() });
@@ -167,15 +109,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const markAllReadMutation = useMutation({
     mutationKey: ['notifications', 'markAllRead'],
-    mutationFn: async () => {
-      const response = await apiClient.post('/notifications/mark-all-read');
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return response.data;
-    },
+    mutationFn: () => NotificationService.markAllAsRead(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
       queryClient.setQueryData(queryKeys.notifications.unreadCount(), 0);
@@ -191,15 +125,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const archiveMutation = useMutation({
     mutationKey: ['notifications', 'archive'],
-    mutationFn: async (id: string) => {
-      const response = await apiClient.post(`/notifications/${id}/archive`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return id;
-    },
+    mutationFn: (id: string) => NotificationService.archive(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
     },
@@ -217,15 +143,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const deleteMutation = useMutation({
     mutationKey: ['notifications', 'delete'],
-    mutationFn: async (id: string) => {
-      const response = await apiClient.delete(`/notifications/${id}`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return id;
-    },
+    mutationFn: (id: string) => NotificationService.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.unreadCount() });
@@ -244,18 +162,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const updatePreferencesMutation = useMutation({
     mutationKey: ['notifications', 'updatePreferences'],
-    mutationFn: async (data: Partial<NotificationPreferences>): Promise<NotificationPreferences> => {
-      const response = await apiClient.put<ApiResponse<{ preferences: NotificationPreferences }>>(
-        '/notifications/preferences',
-        data
-      );
-
-      if (response.error || !response.data?.success) {
-        throw new Error(response.error || 'Failed to update preferences');
-      }
-
-      return response.data.data!.preferences;
-    },
+    mutationFn: (data: Partial<NotificationPreferences>) => NotificationService.updatePreferences(data),
     onSuccess: (updatedPreferences) => {
       queryClient.setQueryData(queryKeys.notifications.preferences(), updatedPreferences);
     },
@@ -273,15 +180,7 @@ export function useNotifications(filters: NotificationFilter & { [key: string]: 
   // ==========================================================================
   const dismissMutation = useMutation({
     mutationKey: ['notifications', 'dismiss'],
-    mutationFn: async (id: string) => {
-      const response = await apiClient.post(`/notifications/${id}/dismiss`);
-
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      return id;
-    },
+    mutationFn: (id: string) => NotificationService.dismiss(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
     },
@@ -373,17 +272,7 @@ export function useNotificationBadge() {
 
   const query = useQuery({
     queryKey: queryKeys.notifications.unreadCount(),
-    queryFn: async (): Promise<number> => {
-      const response = await apiClient.get<ApiResponse<{ count: number }>>(
-        '/notifications/unread-count'
-      );
-
-      if (response.error || !response.data?.success) {
-        return 0;
-      }
-
-      return response.data.data!.count;
-    },
+    queryFn: () => NotificationService.getUnreadCount(),
     enabled: isAuthenticated,
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,

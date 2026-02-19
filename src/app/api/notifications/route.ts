@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { NotificationType } from '@prisma/client';
 
 const RATE_LIMIT = 50;
 const SECURITY_HEADERS = {
@@ -66,9 +67,32 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where.isRead = false;
     }
 
-    // If type is a valid enum value, add it. ignoring for now to avoid validation complexity over enum
+    // Map frontend filters to Prisma Enum types
     if (type) {
-      where.type = type;
+      switch (type) {
+        case 'ACHIEVEMENT':
+          where.type = 'ACHIEVEMENT_UNLOCKED';
+          break;
+        case 'GOAL':
+          where.type = { in: ['GOAL_REMINDER', 'GOAL_COMPLETED', 'GOAL_FAILED'] };
+          break;
+        case 'STREAK':
+          where.type = { in: ['STREAK_AT_RISK', 'STREAK_BROKEN', 'STREAK_MILESTONE'] };
+          break;
+        case 'SYSTEM':
+          where.type = { in: ['SYSTEM', 'NEW_FEATURE', 'SECURITY_ALERT', 'BILLING_ALERT', 'WELCOME'] };
+          break;
+        case 'PLATFORM':
+          where.type = { in: ['SYNC_COMPLETE', 'SYNC_FAILED'] };
+          break;
+        default:
+          // If it matches a valid enum, use it, otherwise ignore or return empty
+          // For safety, let's ignore invalid types to avoid Prisma errors
+          const isValidEnum = Object.values(NotificationType).includes(type as any);
+          if (isValidEnum) {
+            where.type = type;
+          }
+      }
     }
 
     const [notifications, total] = await Promise.all([

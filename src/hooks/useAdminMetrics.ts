@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import apiClient from '@/lib/apiClient';
+import { AdminMetricsService } from '@/services/api/admin/metrics.service';
 import { queryKeys } from './keys';
 
 // Interfaces based on component usage. 
@@ -49,9 +49,7 @@ export function useAdminMetrics() {
     const dashboardQuery = useQuery({
         queryKey: queryKeys.admin.metrics.dashboard(),
         queryFn: async () => {
-            const response = await apiClient.get<any>('/admin/metrics/dashboard');
-            if (response.error) return null;
-            return response.data;
+            return AdminMetricsService.getDashboardMetrics();
         },
         enabled: isAdmin,
         refetchInterval: 30000,
@@ -60,10 +58,7 @@ export function useAdminMetrics() {
     const apiQuery = useQuery({
         queryKey: queryKeys.admin.metrics.api(),
         queryFn: async () => {
-            const response = await apiClient.get<ApiMetric>('/admin/metrics/api'); // ApiMetric might need adjustment if response is wrapped
-            // Actually components use response directly. 
-            if (response.error) return null;
-            return response.data;
+            return AdminMetricsService.getApiMetrics();
         },
         enabled: isAdmin,
         refetchInterval: 60000,
@@ -72,9 +67,7 @@ export function useAdminMetrics() {
     const systemQuery = useQuery({
         queryKey: queryKeys.admin.metrics.system(),
         queryFn: async () => {
-            const response = await apiClient.get<SystemMetric>('/admin/metrics/system');
-            if (response.error) return null;
-            return response.data;
+            return AdminMetricsService.getSystemMetrics();
         },
         enabled: isAdmin,
         refetchInterval: 60000,
@@ -83,9 +76,7 @@ export function useAdminMetrics() {
     const usersQuery = useQuery({
         queryKey: queryKeys.admin.metrics.users(),
         queryFn: async () => {
-            const response = await apiClient.get<UserMetric>('/admin/metrics/users');
-            if (response.error) return null;
-            return response.data;
+            return AdminMetricsService.getUserMetrics();
         },
         enabled: isAdmin,
         refetchInterval: 60000,
@@ -94,9 +85,7 @@ export function useAdminMetrics() {
     const performanceQuery = useQuery({
         queryKey: queryKeys.admin.metrics.performance(),
         queryFn: async () => {
-            const response = await apiClient.get<PerformanceMetric>('/admin/metrics/performance');
-            if (response.error) return null;
-            return response.data;
+            return AdminMetricsService.getPerformanceMetrics();
         },
         enabled: isAdmin,
         refetchInterval: 60000,
