@@ -37,3 +37,11 @@
 // - Calculate if streak is at risk (no activity today)
 // - Include freeze information
 // - Calculate next milestone (7, 30, 100, 365 days)
+
+export async function GET() {
+    return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
+}
+
+export async function OPTIONS() {
+    return new Response(null, { status: 204 });
+}

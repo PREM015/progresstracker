@@ -162,29 +162,29 @@ const CreateCustomPlatformSchema = z.object({
     .min(2, 'Name must be at least 2 characters')
     .max(LIMITS.MAX_NAME_LENGTH, `Name cannot exceed ${LIMITS.MAX_NAME_LENGTH} characters`)
     .regex(/^[a-zA-Z0-9\s-_]+$/, 'Name can only contain letters, numbers, spaces, hyphens, and underscores'),
-  
+
   displayName: z.string()
     .max(100, 'Display name cannot exceed 100 characters')
     .optional(),
-  
+
   description: z.string()
     .max(LIMITS.MAX_DESCRIPTION_LENGTH, `Description cannot exceed ${LIMITS.MAX_DESCRIPTION_LENGTH} characters`)
     .optional(),
-  
+
   category: z.string(),
-  
+
   icon: z.string()
     .max(10, 'Icon cannot exceed 10 characters')
     .optional(),
-  
+
   color: z.string()
     .regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (e.g., #FF5733)')
     .optional(),
-  
+
   website: z.string()
     .url('Website must be a valid URL')
     .optional(),
-  
+
   trackingFields: z.record(FieldConfigSchema)
     .optional()
     .refine((fields) => {
@@ -193,7 +193,7 @@ const CreateCustomPlatformSchema = z.object({
     }, {
       message: `Cannot have more than ${LIMITS.MAX_TRACKING_FIELDS} tracking fields`,
     }),
-  
+
   templateId: z.string().cuid().optional(), // Create from template
 });
 
@@ -253,9 +253,9 @@ function generateRequestId(): string {
 }
 
 function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-         request.headers.get('x-real-ip') || 
-         'unknown';
+  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
 }
 
 function getUserAgent(request: NextRequest): string {
@@ -292,12 +292,12 @@ function normalizeCategory(category: string): PlatformCategory {
   if (Object.values(PlatformCategory).includes(upperCategory as PlatformCategory)) {
     return upperCategory as PlatformCategory;
   }
-  
+
   const mapped = CATEGORY_MAP[category.toLowerCase() as PlatformCategoryId];
   if (!mapped) {
     throw new ValidationError(`Invalid category: ${category}`);
   }
-  
+
   return mapped;
 }
 
@@ -313,8 +313,8 @@ async function checkCustomPlatformLimits(
     select: { tier: true },
   });
 
-  let limit = LIMITS.MAX_CUSTOM_PLATFORMS_FREE;
-  
+  let limit: number = LIMITS.MAX_CUSTOM_PLATFORMS_FREE;
+
   if (subscription?.tier === 'PRO' || subscription?.tier === 'STARTER') {
     limit = LIMITS.MAX_CUSTOM_PLATFORMS_PRO;
   } else if (subscription?.tier === 'ENTERPRISE' || subscription?.tier === 'TEAM') {
@@ -361,25 +361,25 @@ async function getCustomPlatformStats(platformId: string, userId: string) {
  */
 function validateTrackingFields(fields: Record<string, FieldConfig>): void {
   const fieldNames = Object.keys(fields);
-  
+
   // Check for duplicate labels
   const labels = fieldNames
     .map(name => fields[name].label || name)
     .filter(Boolean);
-  
-  const duplicateLabels = labels.filter((label, index) => 
+
+  const duplicateLabels = labels.filter((label, index) =>
     labels.indexOf(label) !== index
   );
-  
+
   if (duplicateLabels.length > 0) {
     throw new ValidationError(`Duplicate field labels: ${duplicateLabels.join(', ')}`);
   }
 
   // Validate field names
-  const invalidNames = fieldNames.filter(name => 
+  const invalidNames = fieldNames.filter(name =>
     !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)
   );
-  
+
   if (invalidNames.length > 0) {
     throw new ValidationError(
       `Invalid field names (must start with letter/underscore, contain only alphanumeric/underscore): ${invalidNames.join(', ')}`
@@ -532,7 +532,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Enhance with stats if requested
     const enhancedPlatforms: CustomPlatformWithStats[] = await Promise.all(
       platforms.map(async (platform) => {
-        const stats = query.includeStats 
+        const stats = query.includeStats
           ? await getCustomPlatformStats(platform.id, userId)
           : undefined;
 
@@ -691,7 +691,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         icon: data.icon,
         color: data.color,
         website: data.website,
-        trackingFields: data.trackingFields as Prisma.InputJsonValue,
+        trackingFields: data.trackingFields as unknown as Prisma.InputJsonValue,
         isActive: true,
       },
     });
@@ -926,8 +926,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       }
 
       // Prepare update data
+      const { category, trackingFields, ...otherUpdates } = updates;
       const updateData: Prisma.CustomPlatformUpdateInput = {
-        ...updates,
+        ...otherUpdates,
         updatedAt: new Date(),
       };
 
@@ -936,7 +937,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       }
 
       if (updates.trackingFields) {
-        updateData.trackingFields = updates.trackingFields as Prisma.InputJsonValue;
+        updateData.trackingFields = updates.trackingFields as unknown as Prisma.InputJsonValue;
       }
 
       // Update platform

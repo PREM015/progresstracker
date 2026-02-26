@@ -36,7 +36,7 @@ export default function StreakPage() {
     // Transform history for calendar
     const calendarHistory = (history || []).map((h: any) => ({
         date: typeof h.date === 'string' ? h.date : new Date(h.date).toISOString().split('T')[0],
-        active: h.active ?? h.length > 0 ?? true,
+        active: h.active ?? (h.length > 0 ? true : false),
     }));
 
     return (

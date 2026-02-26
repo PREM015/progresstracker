@@ -1,31 +1,21 @@
-// ============================================================================
-// FILE: app/(dashboard)/streak/history/page.tsx
-// PURPOSE: Streak history page showing past streaks
-// ============================================================================
+"use client";
 
-// REFERENCE FILES TO LOOK AT:
-// -----------------------------------------------------------------------------
-// 1. app/(dashboard)/streak/page.tsx - Parent streak page
-// 2. app/(dashboard)/tracker/history/page.tsx - History page pattern
-// 3. app/(dashboard)/sync/history/page.tsx - Sync history page
-// 4. app/(dashboard)/activity-log/page.tsx - Activity log page
-// 5. components/streak/StreakHistory.tsx - Streak history component
-// 6. components/common/Pagination.tsx - Pagination
-// 7. components/common/DataTable.tsx - Table display
-// 8. app/api/streak/history/route.ts - History API
-// 9. services/streakHistoryService.ts - Streak history service
-// 10. types/streak.ts - Streak history types
-// 11. prisma/schema.prisma - StreakHistory model
-// -----------------------------------------------------------------------------
+import React from "react";
 
-// PAGE STRUCTURE:
-// - Header with page title and stats summary
-// - Filters (date range, sort order)
-// - History list/table
-// - Pagination
-// - Export option
-
-// FEATURES:
-// - Server component for initial data
-// - Filtering and sorting
-// - Stats comparison across streaks
+export default function StreakHistoryPage() {
+    return (
+        <div className="min-h-screen p-6 lg:p-8 space-y-8">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Streak History</h1>
+                    <p className="text-zinc-400 max-w-2xl">
+                        View your past streaks and activity history.
+                    </p>
+                </div>
+            </div>
+            <div className="text-center py-12 px-4 border border-dashed border-white/10 rounded-xl bg-black/20 text-zinc-400">
+                History feature is coming soon.
+            </div>
+        </div>
+    );
+}

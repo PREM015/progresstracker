@@ -1,33 +1,22 @@
-// ============================================================================
-// FILE: app/(public)/platforms/page.tsx
-// PURPOSE: Public platforms list page
-// ============================================================================
+"use client";
 
-// REFERENCE FILES TO LOOK AT:
-// -----------------------------------------------------------------------------
-// 1. app/(public)/integrations/page.tsx - Integrations page (similar)
-// 2. app/(public)/features/page.tsx - Features page layout
-// 3. app/(dashboard)/platforms/page.tsx - Dashboard platforms page
-// 4. app/(dashboard)/platforms/available/page.tsx - Available platforms
-// 5. components/platforms/PlatformList.tsx - Platform list component
-// 6. components/platforms/PlatformCard.tsx - Platform card
-// 7. components/platforms/PlatformCategories.tsx - Categories filter
-// 8. components/platforms/PlatformSearch.tsx - Search component
-// 9. app/api/platforms/available/route.ts - Available platforms API
-// 10. services/platformService.ts - Platform service
-// 11. types/platform.ts - Platform types
-// 12. config/platforms.ts - Platform configuration
-// -----------------------------------------------------------------------------
+import React from "react";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-// PAGE STRUCTURE:
-// - Hero section explaining platform integrations
-// - Category filters
-// - Search functionality
-// - Grid of platform cards
-// - CTA to sign up
-
-// FEATURES:
-// - Server component for SEO
-// - All available platforms (public info only)
-// - Filter by category
-// - Link to individual platform pages
+export default function DeletedPlatformsPage() {
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
+            <AlertTriangle className="w-16 h-16 text-amber-500 mb-6" />
+            <h1 className="text-3xl font-bold text-white mb-4">Platforms Unavailable</h1>
+            <p className="text-zinc-400 max-w-md mb-8">
+                The platforms you are looking for have been removed or are no longer supported.
+            </p>
+            <Button variant="outline" className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" asChild>
+                <a href="/">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Return Home
+                </a>
+            </Button>
+        </div>
+    );
+}

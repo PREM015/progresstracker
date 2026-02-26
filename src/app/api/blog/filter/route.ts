@@ -58,7 +58,7 @@ export const GET = withErrorHandling(async (req: Request) => {
             orderBy: { [sortBy]: order as 'asc' | 'desc' },
             skip,
             take: limit,
-            include: { author: { select: { name: true } } }
+
         }),
         prisma.blogPost.count({ where })
     ]);
@@ -70,7 +70,7 @@ export const GET = withErrorHandling(async (req: Request) => {
         const { content, ...rest } = post;
         return {
             ...rest,
-            authorName: post.author?.name,
+
             readingTime
         };
     });

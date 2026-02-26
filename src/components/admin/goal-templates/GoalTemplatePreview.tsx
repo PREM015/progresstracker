@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminGoalTemplate, GoalTemplate } from '@/hooks/useAdminTemplates';
 
 interface GoalTemplatePreviewProps {

@@ -9,8 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
-import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
+import { Button } from '@/components/ui/button';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -136,25 +135,23 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
     );
   }
 
-  // Dropdown variant - shows all options
+  // Dropdown variant - shows all options as simple buttons
   if (variant === 'dropdown') {
-    const items: DropdownItem[] = [
-      { label: 'Light', value: 'light', icon: <SunIcon /> },
-      { label: 'Dark', value: 'dark', icon: <MoonIcon /> },
-      { label: 'System', value: 'system', icon: <ComputerIcon /> },
-    ];
-
     return (
-      <Dropdown
-        trigger={
-          <Button variant="ghost" size="icon" className={className}>
-            {themeIcons[theme]}
+      <div className={cn('flex flex-col gap-1', className)}>
+        {(['light', 'dark', 'system'] as Theme[]).map((t) => (
+          <Button
+            key={t}
+            variant={theme === t ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => updateTheme(t)}
+            className="justify-start gap-2"
+          >
+            {themeIcons[t]}
+            <span>{themeLabels[t]}</span>
           </Button>
-        }
-        items={items}
-        onSelect={(value) => updateTheme(value as Theme)}
-        className={className}
-      />
+        ))}
+      </div>
     );
   }
 

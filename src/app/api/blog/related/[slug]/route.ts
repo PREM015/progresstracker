@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrorHandling } from "@/lib/apiHandler";
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "5");
 
@@ -30,7 +30,7 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
             ]
         },
         take: 20, // get more to score
-        include: { author: { select: { name: true } } }
+
     });
 
     // 3. Score

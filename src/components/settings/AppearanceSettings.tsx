@@ -11,7 +11,7 @@ interface AppearanceSettingsProps {
 export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   className = '',
 }) => {
-  const { settings, theme, updateSettings, isUpdating } = useSettings();
+  const { settings, theme, updateSettings, isUpdating } = useSettings() as any; // Cast for now if types not synced
   const fontSize = settings?.fontSize;
 
   const handleUpdate = async (key: string, value: any) => {

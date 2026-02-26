@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -35,12 +35,12 @@ export async function GET(request: NextRequest) {
     const activeCount = subscriptions.filter((s) => s.isActive).length;
     const totalSuccessRate = subscriptions.length > 0
       ? subscriptions.reduce((acc, s) => {
-          const total = s.successCount + s.failureCount;
-          return acc + (total > 0 ? s.successCount / total : 1);
-        }, 0) / subscriptions.length
+        const total = s.successCount + s.failureCount;
+        return acc + (total > 0 ? s.successCount / total : 1);
+      }, 0) / subscriptions.length
       : 0;
 
-    return apiResponse({
+    return apiResponse.success({
       devices: subscriptions,
       activeCount,
       totalCount: subscriptions.length,
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -67,7 +67,7 @@ export async function DELETE(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       success: true,
       deletedCount: result.count,
     });

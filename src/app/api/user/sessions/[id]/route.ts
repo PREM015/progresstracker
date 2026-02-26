@@ -16,7 +16,7 @@ import apiResponse from '@/lib/apiResponse';
 // =============================================================================
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 
@@ -224,16 +224,16 @@ export async function DELETE(
     const userId = session!.user.id;
 
     // Verify session belongs to user
-   const activeSession = await prisma.activeSession.findFirst({
-  where: { id, userId },
-  select: {
-    id: true,
-    token: true,
-    device: true,
-    browser: true,
-    country: true,
-  },
-});
+    const activeSession = await prisma.activeSession.findFirst({
+      where: { id, userId },
+      select: {
+        id: true,
+        token: true,
+        device: true,
+        browser: true,
+        country: true,
+      },
+    });
 
     if (!activeSession) {
       return addHeaders(apiResponse.notFound('Session', requestId), requestId);
@@ -249,7 +249,7 @@ export async function DELETE(
       );
     }
 
-  
+
     // Audit log
     await prisma.auditLog.create({
       data: {

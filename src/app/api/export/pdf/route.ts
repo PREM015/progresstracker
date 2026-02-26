@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
 
     const options: ExportOptions = {
       format: 'pdf',
+      type: body.type || 'full',
+      dateRange: body.dateRange || 'custom',
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       includeGoals,
@@ -40,8 +42,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return PDF as downloadable file
-    return new NextResponse(result.data as Buffer, {
+    return new NextResponse(result.data as any, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${result.fileName}"`,

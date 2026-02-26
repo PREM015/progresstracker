@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/email-admin.ts
 import { Resend } from 'resend';
 import { prisma } from './prisma';
 import { logger } from './logger';
 import { render } from '@react-email/components';
-import { NotificationEmail} from '@/emails/notification-email';
-import { string } from 'zod';
+import { NotificationEmail } from '@/emails/notification-email';
+
 
 if (!process.env.RESEND_API_KEY) {
   throw new Error('RESEND_API_KEY is not set');
@@ -38,19 +39,22 @@ export async function sendEmail(options: EmailOptions) {
   try {
     const { to, subject, html, react, text, replyTo, cc, bcc, attachments } = options;
 
-    const emailHtml = react ? render(react) : html;
+    const emailHtml = react ? await render(react) : html;
 
-    const result = await resend.emails.send({
+    const payload: any = {
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: Array.isArray(to) ? to : [to],
       subject,
-      html: string,
-      text,
-      reply: replyTo,
+      replyTo,
       cc,
       bcc,
       attachments,
-    });
+    };
+
+    if (emailHtml) payload.html = emailHtml;
+    if (text) payload.text = text;
+
+    const result = await resend.emails.send(payload);
 
     logger.info('Email sent successfully', {
       to: Array.isArray(to) ? to.length : 1,
@@ -268,9 +272,8 @@ export const EMAIL_TEMPLATES = {
                     <p style="margin: 0 0 20px; color: #333333; font-size: 16px; line-height: 1.6;">
                       ${message}
                     </p>
-                    ${
-                      actionUrl && actionLabel
-                        ? `
+                    ${actionUrl && actionLabel
+      ? `
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                       <tr>
                         <td align="center">
@@ -281,8 +284,8 @@ export const EMAIL_TEMPLATES = {
                       </tr>
                     </table>
                     `
-                        : ''
-                    }
+      : ''
+    }
                   </td>
                 </tr>
                 <tr>

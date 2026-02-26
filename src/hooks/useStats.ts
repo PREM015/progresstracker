@@ -1,184 +1,94 @@
-// ============================================================================
-// FILE: src/hooks/useStats.ts
-// PURPOSE: Dashboard stats hook - overview, trends, analytics
-// ============================================================================
-
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSession } from 'next-auth/react';
+import { useAnalyticsDashboard } from './useAnalyticsDashboard';
 import { useMemo } from 'react';
-import { DashboardService } from '@/services/api/dashboard.service';
-import { DashboardStats, OverviewStats, TrendStats, HeatmapStats } from '@/types/dashboard';
-import { queryKeys } from './keys';
+import useSWR from 'swr';
+import { httpClient } from '@/lib/http-client';
+import { useSession } from 'next-auth/react';
+import { SWR_CONFIG } from '@/lib/swr-config';
 
-// =============================================================================
-// HOOK IMPLEMENTATION
-// =============================================================================
-
+/**
+ * Legacy hook wrapper around useAnalyticsDashboard for backward compatibility.
+ * Consumes the unified endpoint data and maps it to the old structure expected by components.
+ */
 export function useStats() {
-  const { status } = useSession();
-  const queryClient = useQueryClient();
-  const isAuthenticated = status === 'authenticated';
+  const { data: dashboard, isLoading, error, refresh } = useAnalyticsDashboard();
 
-  // ==========================================================================
-  // FETCH DASHBOARD STATS
-  // ==========================================================================
-  const dashboardQuery = useQuery({
-    queryKey: queryKeys.stats.dashboard(),
-    queryFn: () => DashboardService.getDashboardStats(),
-    enabled: isAuthenticated,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-
-  // ==========================================================================
-  // FETCH OVERVIEW STATS
-  // ==========================================================================
-  const overviewQuery = useQuery({
-    queryKey: queryKeys.stats.overview('7d'),
-    queryFn: () => DashboardService.getOverview('7d'),
-    enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // ==========================================================================
-  // FETCH WEEKLY STATS
-  // ==========================================================================
-  const weeklyQuery = useQuery({
-    queryKey: queryKeys.stats.weekly(),
-    queryFn: () => DashboardService.getWeekly(),
-    enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // ==========================================================================
-  // FETCH MONTHLY STATS
-  // ==========================================================================
-  const monthlyQuery = useQuery({
-    queryKey: queryKeys.stats.monthly(),
-    queryFn: () => DashboardService.getMonthly(),
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // ==========================================================================
-  // FETCH TRENDS
-  // ==========================================================================
-  const trendsQuery = useQuery({
-    queryKey: queryKeys.stats.trends('30d'),
-    queryFn: () => DashboardService.getTrends('30d'),
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // ==========================================================================
-  // FETCH HEATMAP
-  // ==========================================================================
-  const heatmapQuery = useQuery({
-    queryKey: queryKeys.stats.heatmap(new Date().getFullYear()),
-    queryFn: () => DashboardService.getHeatmap(new Date().getFullYear()),
-    enabled: isAuthenticated,
-    staleTime: 10 * 60 * 1000,
-  });
-
-  // ==========================================================================
-  // RETURN
-  // ==========================================================================
   return useMemo(() => ({
-    // Data
-    dashboard: dashboardQuery.data ?? null,
-    overview: overviewQuery.data ?? null,
-    weekly: weeklyQuery.data ?? null,
-    monthly: monthlyQuery.data ?? null,
-    trends: trendsQuery.data ?? null,
-    heatmap: heatmapQuery.data?.points ?? [],
-    heatmapStats: heatmapQuery.data ?? null,
+    // mapped data
+    dashboard,
+    overview: {
+      platforms: dashboard?.platforms.map(p => ({
+        name: p.name,
+        problems: p.stats.problems,
+        commits: 0, // Not split in new API
+        points: p.stats.points
+      })) || [],
+      // ... other overview fields if needed
+    },
+    weekly: null, // Legacy, use dashboard.stats.week
+    monthly: null, // Legacy, use dashboard.stats.month
+    trends: {
+      trend: dashboard?.chart || []
+    },
+    heatmap: dashboard?.chart.map(c => ({ date: c.date, count: c.problems + c.commits })) || [],
+    heatmapStats: null,
 
-    // Loading states
-    isLoading: dashboardQuery.isLoading,
-    isLoadingOverview: overviewQuery.isLoading,
-    isLoadingWeekly: weeklyQuery.isLoading,
-    isLoadingMonthly: monthlyQuery.isLoading,
-    isLoadingTrends: trendsQuery.isLoading,
-    isLoadingHeatmap: heatmapQuery.isLoading,
+    // Loading states - unified
+    isLoading,
+    isLoadingOverview: isLoading,
+    isLoadingWeekly: isLoading,
+    isLoadingMonthly: isLoading,
+    isLoadingTrends: isLoading,
+    isLoadingHeatmap: isLoading,
 
     // Error states
-    error: dashboardQuery.error,
-    overviewError: overviewQuery.error,
-    trendsError: trendsQuery.error,
+    error,
+    overviewError: error,
+    trendsError: error,
 
-    // Refetch
-    refetch: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all });
-    },
-    refetchDashboard: dashboardQuery.refetch,
+    // Actions
+    refetch: refresh,
+    refetchDashboard: refresh,
 
     // Quick accessors
-    streak: dashboardQuery.data?.streak ?? { current: 0, longest: 0, isAtRisk: false },
-    todayStats: dashboardQuery.data?.today ?? { problems: 0, commits: 0, time: 0, points: 0 },
-    weekStats: dashboardQuery.data?.thisWeek ?? { problems: 0, commits: 0, time: 0, points: 0, change: 0 },
-    monthStats: dashboardQuery.data?.thisMonth ?? { problems: 0, commits: 0, time: 0, points: 0, change: 0 },
-    goalStats: dashboardQuery.data?.goals ?? { active: 0, completed: 0, completionRate: 0 },
-    achievementStats: dashboardQuery.data?.achievements ?? { total: 0, unlocked: 0, points: 0, recent: [] },
-    platformStats: dashboardQuery.data?.platforms ?? { connected: 0, total: 0, lastSync: null, connectedPlatforms: [] },
-    rankStats: dashboardQuery.data?.rank ?? { current: null, percentile: null, change: null },
-  }), [
-    dashboardQuery.data,
-    dashboardQuery.isLoading,
-    dashboardQuery.error,
-    dashboardQuery.refetch,
-    overviewQuery.data,
-    overviewQuery.isLoading,
-    overviewQuery.error,
-    weeklyQuery.data,
-    weeklyQuery.isLoading,
-    monthlyQuery.data,
-    monthlyQuery.isLoading,
-    trendsQuery.data,
-    trendsQuery.isLoading,
-    trendsQuery.error,
-    heatmapQuery.data,
-    heatmapQuery.isLoading,
-    queryClient,
-  ]);
+    streak: dashboard?.user.streak ?? { current: 0, longest: 0, isAtRisk: false },
+    todayStats: dashboard?.stats.today ?? { problems: 0, commits: 0, time: 0, points: 0 },
+    weekStats: dashboard?.stats.week ?? { problems: 0, commits: 0, time: 0, activeDays: 0 },
+    monthStats: dashboard?.stats.month ?? { problems: 0, commits: 0, time: 0 },
+    goalStats: { active: dashboard?.goals.length || 0, completed: 0, completionRate: 0 }, // Simplified
+    achievementStats: { total: 0, unlocked: 0, points: 0, recent: [] }, // Not in dashboard yet
+    platformStats: {
+      connected: dashboard?.meta.connectedPlatformsCount || 0,
+      total: dashboard?.meta.connectedPlatformsCount || 0,
+      lastSync: null,
+      connectedPlatforms: dashboard?.platforms
+    },
+    rankStats: { current: dashboard?.user.rank || 0, percentile: null, change: null },
+  }), [dashboard, isLoading, error, refresh]);
 }
 
-// =============================================================================
-// PERIOD-SPECIFIC HOOKS
-// =============================================================================
-
+// Keep separate hooks if they fetch distinct data not in dashboard
 export function useStatsForPeriod(period: '7d' | '30d' | '90d' | '1y') {
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
 
-  const query = useQuery({
-    queryKey: queryKeys.stats.overview(period),
-    queryFn: () => DashboardService.getOverview(period),
-    enabled: isAuthenticated,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: stats, error, isLoading, mutate } = useSWR(
+    isAuthenticated ? `/api/stats/overview?days=${period === '7d' ? 7 : period === '30d' ? 30 : period === '90d' ? 90 : 365}` : null,
+    (url: string) => httpClient.get<any>(url), // Using any for now, better to import OverviewStats
+    SWR_CONFIG
+  );
 
   return {
-    stats: query.data ?? null,
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
+    stats,
+    isLoading,
+    error,
+    refetch: mutate,
   };
 }
 
-// =============================================================================
-// COMPARISON HOOK
-// =============================================================================
-
 export function useStatsComparison() {
-  // Placeholder - DashboardService comparison not implemented in first pass
-  // but hook structure remains for consistency
-  return {
-    comparison: null,
-    isLoading: false,
-    error: null,
-    refetch: async () => { },
-  };
+  return { comparison: null, isLoading: false, error: null, refetch: async () => { } };
 }
 
 export default useStats;

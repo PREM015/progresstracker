@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return apiError("notificationIds or unarchiveAll is required", 400);
     }
 
-    return apiResponse({
+    return apiResponse.success({
       success: true,
       unarchivedCount: updateResult.count,
     });

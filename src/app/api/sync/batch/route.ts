@@ -135,7 +135,7 @@ export async function OPTIONS(): Promise<NextResponse> {
 
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-  
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -148,7 +148,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Total-Batches', String(userBatches.length));
     response.headers.set('X-Running-Batches', String(userBatches.filter(b => b.status === 'running').length));
-    
+
     return addHeaders(response, requestId);
   } catch (error) {
     log.error('HEAD request failed', { requestId }, error);
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 60, `sync:batch:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // If specific batch requested
     if (batchId) {
       const batch = batchJobs.get(batchId);
-      
+
       if (!batch || batch.userId !== userId) {
         return addHeaders(
           apiResponse.notFound('Batch job', requestId),
@@ -300,7 +300,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(syncRateLimiter, 10, `sync:batch:post:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(300, requestId), requestId, rateLimitResult);
     }
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const userId = session.user.id;
     let body: unknown;
-    
+
     try {
       body = await request.json();
     } catch {
@@ -349,7 +349,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (excludePlatformIds && excludePlatformIds.length > 0) {
-      platformWhere.platformId = { 
+      platformWhere.platformId = {
         ...(platformWhere.platformId as object || {}),
         notIn: excludePlatformIds,
       };
@@ -464,7 +464,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 10, `sync:batch:delete:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
@@ -480,7 +480,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     const userId = session.user.id;
     let body: unknown;
-    
+
     try {
       body = await request.json();
     } catch {
@@ -518,7 +518,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       await SyncService.cancelSync(userId);
     } else if (batchId) {
       const batch = batchJobs.get(batchId);
-      
+
       if (!batch || batch.userId !== userId) {
         return addHeaders(
           apiResponse.notFound('Batch job', requestId),
@@ -613,7 +613,7 @@ async function processBatchSync(
       // Process one at a time
       for (let i = 0; i < platforms.length; i++) {
         const platform = platforms[i];
-        
+
         // Check if cancelled
         if (batch.status === 'running') break;
 
@@ -621,6 +621,8 @@ async function processBatchSync(
           const result = await SyncService.syncPlatform(userId, platform.platformId, {
             triggeredBy: 'manual',
           });
+
+          if ('queued' in result) continue;
 
           if (result.success) {
             batch.completedPlatformIds.push(platform.platformId);
@@ -662,7 +664,7 @@ async function processBatchSync(
         if (batch.status === 'running') break;
 
         const chunk = platforms.slice(i, i + CONCURRENCY);
-        
+
         const results = await Promise.allSettled(
           chunk.map(async (platform) => {
             const result = await SyncService.syncPlatform(userId, platform.platformId, {
@@ -675,6 +677,8 @@ async function processBatchSync(
         for (const result of results) {
           if (result.status === 'fulfilled') {
             const { platform, result: syncResult } = result.value;
+            if ('queued' in syncResult) continue;
+
             if (syncResult.success) {
               batch.completedPlatformIds.push(platform.platformId);
             } else {
@@ -682,7 +686,7 @@ async function processBatchSync(
             }
           } else {
             // Find which platform failed
-            const failedPlatform = chunk.find(p => 
+            const failedPlatform = chunk.find(p =>
               !batch.completedPlatformIds.includes(p.platformId) &&
               !batch.failedPlatformIds.includes(p.platformId)
             );

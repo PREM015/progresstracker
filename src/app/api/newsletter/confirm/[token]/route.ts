@@ -31,7 +31,7 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { token: string } }
+    { params }: { params: Promise<{ token: string }> }
 ): Promise<NextResponse> {
     const requestId = generateRequestId();
     const startTime = Date.now();
@@ -44,7 +44,7 @@ export async function GET(
             return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
         }
 
-        const { token } = params;
+        const { token } = await params;
 
         const subscriber = await prisma.newsletterSubscriber.findUnique({
             where: { unsubscribeToken: token }, // Using unsubscribeToken as confirmation token for simplicity, or add specific field?

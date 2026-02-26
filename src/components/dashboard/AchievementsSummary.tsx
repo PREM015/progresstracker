@@ -86,18 +86,18 @@ export const AchievementsSummary: React.FC<AchievementsSummaryProps> = ({
 
   const getTierColor = (tier: string) => tierColors[tier] || 'from-indigo-500 to-indigo-600';
 
-  if (loading) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
+  if (loading) return <div className="h-64 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl animate-pulse" />;
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+    <div className={`glass-card bg-white dark:bg-zinc-900/50 border border-black/5 dark:border-white/5 rounded-xl p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900">Recent Achievements</h3>
-        <button className="text-sm text-indigo-600 hover:text-indigo-700">View All</button>
+        <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Recent Achievements</h3>
+        <button className="text-sm font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">View All</button>
       </div>
 
       {achievements.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          <div className="text-sm uppercase tracking-widest mb-2">No achievements</div>
+        <div className="text-center py-12 text-zinc-500 dark:text-zinc-400">
+          <div className="text-sm uppercase tracking-widest mb-2 font-bold">No achievements</div>
           Keep building and your achievements will appear here.
         </div>
       ) : (

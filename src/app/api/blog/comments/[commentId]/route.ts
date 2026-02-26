@@ -25,3 +25,21 @@
 // - Validate comment ownership for updates
 // - Soft delete preferred
 // - Return updated/deleted comment
+
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ commentId: string }> }): Promise<NextResponse> {
+    return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ commentId: string }> }): Promise<NextResponse> {
+    return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ commentId: string }> }): Promise<NextResponse> {
+    return NextResponse.json({ message: 'Not implemented' }, { status: 501 });
+}
+
+export async function OPTIONS() {
+    return new NextResponse(null, { status: 204 });
+}

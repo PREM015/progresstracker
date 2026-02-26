@@ -3,9 +3,6 @@
 // PURPOSE: Webhook-related type definitions
 // ============================================================================
 
-import type { Platform } from './platform';
-import type { SyncStatus, SyncResult } from './sync';
-
 // =============================================================================
 // ENUMS & CONSTANTS
 // =============================================================================
@@ -185,7 +182,7 @@ export interface WebhookEvent {
 export interface WebhookPayload {
   platform: WebhookProvider;
   event: string;
-  data: any;
+  data: Record<string, unknown>;
   signature?: string;
   timestamp?: string;
   
@@ -312,6 +309,7 @@ export interface BitbucketWebhookPayload extends WebhookPayload {
   
   // Bitbucket-specific fields
   repository?: {
+    id: string;
     uuid: string;
     name: string;
     full_name: string;
@@ -371,8 +369,8 @@ export interface StripeWebhookPayload extends WebhookPayload {
   
   // Event data
   data: {
-    object: any; // Varies by event type
-    previous_attributes?: any;
+    object: Record<string, unknown>;
+    previous_attributes?: Record<string, unknown>;
   };
 }
 
@@ -407,13 +405,13 @@ export interface WebhookLog {
     method: string;
     url: string;
     headers: Record<string, string>;
-    body: any;
+    body: Record<string, unknown>;
   };
   
   response?: {
     status: number;
     headers: Record<string, string>;
-    body: any;
+    body: Record<string, unknown>;
   };
   
   // Error
@@ -433,7 +431,7 @@ export interface WebhookResult {
   message: string;
   syncTriggered?: boolean;
   syncLogId?: string;
-  dataProcessed?: any;
+  dataProcessed?: Record<string, unknown>;
   error?: string;
 }
 
@@ -563,7 +561,7 @@ export interface UpdateWebhookInput {
 export interface ProcessWebhookInput {
   provider: WebhookProvider;
   headers: Record<string, string>;
-  body: any;
+  body: Record<string, unknown>;
   signature?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -582,7 +580,7 @@ export interface VerifySignatureInput {
 export interface TestWebhookInput {
   webhookId: string;
   eventType?: string;
-  payload?: any;
+  payload?: Record<string, unknown>;
 }
 
 /** Replay webhook input */
@@ -656,7 +654,7 @@ export interface WebhookHealthResponse {
 export interface TestWebhookResponse {
   success: boolean;
   delivered: boolean;
-  response?: any;
+  response?: Record<string, unknown>;
   duration?: number;
   error?: string;
 }
@@ -950,7 +948,7 @@ export async function verifyWebhookSignature(input: VerifySignatureInput): Promi
     const computedSignature = hash.digest('hex');
     
     return computedSignature === input.signature;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

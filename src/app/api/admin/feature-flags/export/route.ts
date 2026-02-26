@@ -38,7 +38,7 @@ const exportSchema = z.object({
 async function checkAdminExportAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
   const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  
+
   if (!session?.user?.id) {
     return { error: apiResponse.unauthorized('Authentication required', requestId) };
   }
@@ -75,17 +75,17 @@ async function checkAdminExportAuth(request: NextRequest, requestId: string) {
 
 function sanitizeFlag(flag: any, sanitize: boolean) {
   if (!sanitize) return flag;
-  
+
   // Remove sensitive information
   const sanitized = { ...flag };
   delete sanitized.enabledUserIds; // Don't export user IDs for privacy
-  
+
   // Sanitize metadata
   if (sanitized.metadata && typeof sanitized.metadata === 'object') {
     const { apiKeys, secrets, ...cleanMetadata } = sanitized.metadata;
     sanitized.metadata = cleanMetadata;
   }
-  
+
   return sanitized;
 }
 
@@ -109,7 +109,7 @@ function formatAsCSV(flags: any[]) {
     'key', 'name', 'description', 'isEnabled', 'enabledForAll',
     'enabledTiers', 'enabledPercentage', 'createdAt', 'updatedAt'
   ];
-  
+
   const rows = flags.map(flag => [
     flag.key,
     flag.name,
@@ -122,7 +122,7 @@ function formatAsCSV(flags: any[]) {
     flag.updatedAt
   ]);
 
-  return [headers, ...rows].map(row => 
+  return [headers, ...rows].map(row =>
     row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 }
@@ -306,7 +306,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Build query
     const where: any = {};
-    
+
     if (!config.includeDisabled) {
       where.isEnabled = true;
     }
@@ -328,7 +328,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           }
         }
       })
-    });
+    } as any);
 
     if (flags.length === 0) {
       return apiResponse.success(
@@ -340,11 +340,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Process and sanitize data
     const processedFlags = flags.map(flag => {
       const processed = sanitizeFlag(flag, config.sanitize);
-      
+
       if (!config.includeMetadata) {
         delete processed.metadata;
       }
-      
+
       return processed;
     });
 

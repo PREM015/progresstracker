@@ -1,4 +1,6 @@
+'use client';
 import { useAdminGrowth } from '@/hooks/useAdminGrowth';
+
 import { useDebounce } from '@/hooks/useDebounce';
 import { useState, useEffect } from 'react';
 

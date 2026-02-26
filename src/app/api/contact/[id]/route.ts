@@ -36,10 +36,11 @@ const addReplySchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  const ticketId = (await params).id;
 
   try {
     // ✅ Authentication Required
@@ -59,8 +60,6 @@ export async function GET(
       logger.warn('Rate limit exceeded', { userId: session.user.id, requestId });
       return apiResponse.rateLimited(60, requestId);
     }
-
-    const ticketId = params.id;
 
     logger.debug('Fetching ticket', {
       userId: session.user.id,
@@ -105,10 +104,11 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  const ticketId = (await params).id;
 
   try {
     // ✅ Authentication Required
@@ -132,8 +132,6 @@ export async function PATCH(
     // ✅ Parse Body
     const body = await req.json();
     const { action } = body;
-
-    const ticketId = params.id;
 
     logger.info('Updating ticket', {
       userId: session.user.id,
@@ -248,10 +246,11 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
+  const ticketId = (await params).id;
 
   try {
     // ✅ Authentication Required
@@ -271,8 +270,6 @@ export async function DELETE(
       logger.warn('Rate limit exceeded', { userId: session.user.id, requestId });
       return apiResponse.rateLimited(60, requestId);
     }
-
-    const ticketId = params.id;
 
     logger.info('Closing ticket', {
       userId: session.user.id,

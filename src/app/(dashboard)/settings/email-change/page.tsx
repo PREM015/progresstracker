@@ -1,19 +1,32 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import { authOptions } from "@/lib/auth";
 
-async function getEmailChangeRequest() {
-  // Fetch any pending email change request
-  return null;
+async function getEmailChangeRequest(userId: string) {
+  try {
+    return await prisma.emailChangeRequest.findFirst({
+      where: {
+        userId,
+        completedAt: null,
+        cancelledAt: null,
+        expiresAt: { gt: new Date() }
+      },
+      orderBy: { expiresAt: 'desc' }
+    });
+  } catch (e) {
+    return null;
+  }
 }
 
 export default async function EmailChangePage() {
-  const session = await getServerSession();
-  
-  if (!session) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.id) {
     redirect('/login');
   }
 
-  const pendingRequest = await getEmailChangeRequest();
+  const pendingRequest = await getEmailChangeRequest(session.user.id);
 
   return (
     <div className="max-w-2xl mx-auto p-6">

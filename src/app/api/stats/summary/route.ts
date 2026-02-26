@@ -1,13 +1,14 @@
-// src/app/api/stats/summary/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { StatsService } from '@/services/statsService';
-import { 
-  startOfDay, 
-  endOfDay, 
-  startOfWeek, 
+import { withCache } from '@/lib/withCache';
+import {
+  startOfDay,
+  endOfDay,
+  startOfWeek,
   endOfWeek,
   startOfMonth,
   endOfMonth,
@@ -70,7 +71,6 @@ interface SummaryResponse {
   };
   meta: {
     generatedAt: string;
-    cached: boolean;
   };
 }
 
@@ -93,12 +93,12 @@ function formatNumber(num: number): string {
 }
 
 function calculateChange(
-  current: number, 
+  current: number,
   previous: number
 ): { value: number; percent: number; trend: 'up' | 'down' | 'stable' } {
   const value = current - previous;
   let percent = 0;
-  
+
   if (previous > 0) {
     percent = Math.round((value / previous) * 100);
   } else if (current > 0) {
@@ -116,15 +116,15 @@ function calculateChange(
 // GET - Quick Summary Stats
 // =============================================================================
 
-export async function GET(request: NextRequest) {
+const handler = async (request: NextRequest): Promise<NextResponse> => {
   try {
     // Authentication check
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Unauthorized',
           message: `You must be logged in to view summary stats. Session ID: ${session?.user?.id}`
         },
@@ -153,16 +153,25 @@ export async function GET(request: NextRequest) {
 
     const thirtyDaysAgo = subDays(now, 30);
 
-    // Parallel queries for efficiency
+    // Helper: aggregate sums for a period (replaces findMany → in-memory reduce)
+    const periodAgg = (gte: Date, lte: Date) =>
+      prisma.trackerEntry.aggregate({
+        where: { userId, date: { gte, lte } },
+        _sum: { problemsSolved: true, commits: true, timeSpent: true },
+        _count: true,
+      });
+
+    // Parallel queries — all lightweight aggregates + counts
     const [
       user,
-      todayEntries,
-      yesterdayEntries,
-      thisWeekEntries,
-      lastWeekEntries,
-      thisMonthEntries,
-      lastMonthEntries,
-      thirtyDayEntries,
+      todayAgg,
+      yesterdayAgg,
+      thisWeekAgg,
+      lastWeekAgg,
+      thisMonthAgg,
+      lastMonthAgg,
+      thirtyDayAgg,
+      thirtyDayActiveDays,
       connectedPlatforms,
       activeGoals,
       completedGoals,
@@ -181,68 +190,41 @@ export async function GET(request: NextRequest) {
           lastActivityDate: true,
         },
       }),
-      // Today's entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: todayStart, lte: todayEnd } },
-      }),
-      // Yesterday's entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: yesterdayStart, lte: yesterdayEnd } },
-      }),
-      // This week entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: thisWeekStart, lte: thisWeekEnd } },
-      }),
-      // Last week entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: lastWeekStart, lte: lastWeekEnd } },
-      }),
-      // This month entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: thisMonthStart, lte: thisMonthEnd } },
-      }),
-      // Last month entries
-      prisma.trackerEntry.findMany({
-        where: { userId, date: { gte: lastMonthStart, lte: lastMonthEnd } },
-      }),
-      // Last 30 days
+      periodAgg(todayStart, todayEnd),
+      periodAgg(yesterdayStart, yesterdayEnd),
+      periodAgg(thisWeekStart, thisWeekEnd),
+      periodAgg(lastWeekStart, lastWeekEnd),
+      periodAgg(thisMonthStart, thisMonthEnd),
+      periodAgg(lastMonthStart, lastMonthEnd),
+      periodAgg(thirtyDaysAgo, now),
+      // Active days (30d) — lightweight: only fetch dates
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: thirtyDaysAgo } },
+        select: { date: true },
+        distinct: ['date'],
       }),
-      // Connected platforms
-      prisma.userPlatform.count({
-        where: { userId, isActive: true },
-      }),
-      // Active goals
-      prisma.goal.count({
-        where: { userId, status: 'ACTIVE' },
-      }),
-      // Completed goals
-      prisma.goal.count({
-        where: { userId, status: 'COMPLETED' },
-      }),
-      // Achievements
-      prisma.userAchievement.count({
-        where: { userId },
-      }),
+      prisma.userPlatform.count({ where: { userId, isActive: true } }),
+      prisma.goal.count({ where: { userId, status: 'ACTIVE' } }),
+      prisma.goal.count({ where: { userId, status: 'COMPLETED' } }),
+      prisma.userAchievement.count({ where: { userId } }),
     ]);
 
-    // Calculate totals
-    const todayProblems = todayEntries.reduce((s, e) => s + e.problemsSolved, 0);
-    const yesterdayProblems = yesterdayEntries.reduce((s, e) => s + e.problemsSolved, 0);
-    
-    const thisWeekProblems = thisWeekEntries.reduce((s, e) => s + e.problemsSolved, 0);
-    const lastWeekProblems = lastWeekEntries.reduce((s, e) => s + e.problemsSolved, 0);
-    
-    const thisMonthProblems = thisMonthEntries.reduce((s, e) => s + e.problemsSolved, 0);
-    const lastMonthProblems = lastMonthEntries.reduce((s, e) => s + e.problemsSolved, 0);
+    // Extract sums
+    const todayProblems = todayAgg._sum.problemsSolved || 0;
+    const yesterdayProblems = yesterdayAgg._sum.problemsSolved || 0;
 
-    const todayTime = todayEntries.reduce((s, e) => s + e.timeSpent, 0);
-    const todayCommits = todayEntries.reduce((s, e) => s + e.commits, 0);
+    const thisWeekProblems = thisWeekAgg._sum.problemsSolved || 0;
+    const lastWeekProblems = lastWeekAgg._sum.problemsSolved || 0;
 
-    const thirtyDayTime = thirtyDayEntries.reduce((s, e) => s + e.timeSpent, 0);
-    const thirtyDayActiveDays = new Set(
-      thirtyDayEntries.map((e) => format(e.date, 'yyyy-MM-dd'))
+    const thisMonthProblems = thisMonthAgg._sum.problemsSolved || 0;
+    const lastMonthProblems = lastMonthAgg._sum.problemsSolved || 0;
+
+    const todayTime = todayAgg._sum.timeSpent || 0;
+    const todayCommits = todayAgg._sum.commits || 0;
+
+    const thirtyDayTime = thirtyDayAgg._sum.timeSpent || 0;
+    const activeDaysCount = new Set(
+      thirtyDayActiveDays.map((e) => format(e.date, 'yyyy-MM-dd'))
     ).size;
 
     // Calculate streak info
@@ -257,14 +239,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if streak is at risk (no activity today)
-    const hasActivityToday = todayEntries.length > 0;
+    const hasActivityToday = todayAgg._count > 0;
     const isAtRisk = currentStreak > 0 && !hasActivityToday;
 
     // Get user rank (simplified - in production, calculate from leaderboard)
     const userRank = user?.rank ?? null;
 
     // Build response
-    const response: SummaryResponse = {
+    const responseData = {
       success: true,
       data: {
         cards: {
@@ -315,8 +297,8 @@ export async function GET(request: NextRequest) {
           },
           activeDays: {
             label: 'Active Days (30d)',
-            value: thirtyDayActiveDays,
-            displayValue: `${thirtyDayActiveDays}/30`,
+            value: activeDaysCount,
+            displayValue: `${activeDaysCount}/30`,
             icon: 'check',
             color: 'green',
           },
@@ -349,34 +331,45 @@ export async function GET(request: NextRequest) {
         },
         lastUpdated: now.toISOString(),
       },
+    };
+
+    // Update last active (fire-and-forget) - only on cache MISS
+    prisma.user.update({
+      where: { id: userId },
+      data: { lastActiveAt: new Date() },
+    }).catch(() => { });
+
+    const response: SummaryResponse = {
+      ...responseData,
       meta: {
         generatedAt: new Date().toISOString(),
-        cached: false,
       },
     };
 
-    // Update last active
-    await prisma.user.update({
-      where: { id: userId },
-      data: { lastActiveAt: new Date() },
-    }).catch(() => {});
-
-    // Cache headers - short cache for dashboard
-    const headers = new Headers();
-    headers.set('Cache-Control', 'private, max-age=30'); // 30 seconds
-
-    return NextResponse.json(response, { headers });
+    // Cache headers are handled by withCache (X-Cache, etc)
+    // We just return JSON
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('Error fetching summary stats:', error);
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Failed to fetch summary stats' 
+        message: error instanceof Error ? error.message : 'Failed to fetch summary stats'
       },
       { status: 500 }
     );
   }
-}
+};
+
+export const GET = withCache(handler, {
+  keyGenerator: async (req) => {
+    const session = await getServerSession(authOptions);
+    return session ? `stats:summary:${session.user.id}` : null;
+  },
+  ttl: 180,       // 3 minutes (matching original)
+  staleTtl: 300,  // 5 min stale
+  timingLabel: 'GET /api/stats/summary',
+});

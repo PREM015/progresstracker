@@ -6,14 +6,14 @@ import { withErrorHandling, unauthorizedError, notFoundError, forbiddenError } f
 import { prisma } from "@/lib/prisma";
 
 // GET: Get specific bookmark details
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return unauthorizedError();
     }
 
     const userId = session.user.id;
-    const bookmarkId = params.id;
+    const bookmarkId = (await params).id;
 
     const bookmark = await prisma.bookmark.findUnique({
         where: { id: bookmarkId }
@@ -72,14 +72,14 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
 });
 
 // DELETE: Delete specific bookmark
-export const DELETE = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const DELETE = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
         return unauthorizedError();
     }
 
     const userId = session.user.id;
-    const bookmarkId = params.id;
+    const bookmarkId = (await params).id;
 
     const bookmark = await prisma.bookmark.findUnique({
         where: { id: bookmarkId }
@@ -106,7 +106,7 @@ export const DELETE = withErrorHandling(async (req: Request, { params }: { param
 });
 
 // HEAD: Check bookmark existence
-export const HEAD = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const HEAD = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user?.id) {
@@ -114,7 +114,7 @@ export const HEAD = withErrorHandling(async (req: Request, { params }: { params:
     }
 
     const userId = session.user.id;
-    const bookmarkId = params.id;
+    const bookmarkId = (await params).id;
 
     const bookmark = await prisma.bookmark.findUnique({
         where: { id: bookmarkId }

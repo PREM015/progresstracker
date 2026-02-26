@@ -29,8 +29,7 @@ export async function generateCSV(data: ExportData): Promise<ExportResult> {
       success: true,
       format: 'csv',
       fileName,
-      data: csv,
-  
+      content: csv,
     };
   } catch (error) {
     log.error('Error generating CSV export', {}, error);

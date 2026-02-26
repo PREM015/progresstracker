@@ -12,9 +12,6 @@ import { useCallback, useMemo } from 'react';
 import { GoalService } from '@/services/api/goal.service';
 import { queryKeys } from './keys';
 import type {
-  Goal,
-  GoalWithProgress,
-  GoalTemplate,
   GoalReminder,
   CreateGoalRequest,
   UpdateGoalRequest,
@@ -46,7 +43,7 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const activeQuery = useQuery({
     queryKey: queryKeys.goals.active(),
-    queryFn: () => GoalService.getActiveGoals(),
+    queryFn: () => GoalService.getGoals({ status: 'active' as GoalStatus }),
     enabled: isAuthenticated,
     staleTime: 1 * 60 * 1000,
   });
@@ -99,7 +96,14 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
     }: {
       templateId: string;
       overrides?: Partial<CreateGoalRequest>
-    }) => GoalService.createFromTemplate(templateId, overrides),
+    }) => {
+      // Build goal data from template ID and overrides
+      const goalData: CreateGoalRequest = {
+        ...overrides,
+        templateId,
+      } as CreateGoalRequest;
+      return GoalService.createGoal(goalData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -168,7 +172,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const completeMutation = useMutation({
     mutationKey: ['goals', 'complete'],
-    mutationFn: (id: string) => GoalService.completeGoal(id),
+    mutationFn: (id: string) =>
+      GoalService.updateGoal(id, { status: 'completed' as GoalStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.achievements.all });
@@ -188,7 +193,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const archiveMutation = useMutation({
     mutationKey: ['goals', 'archive'],
-    mutationFn: (id: string) => GoalService.archiveGoal(id),
+    mutationFn: (id: string) =>
+      GoalService.updateGoal(id, { status: 'archived' as GoalStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -206,7 +212,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const unarchiveMutation = useMutation({
     mutationKey: ['goals', 'unarchive'],
-    mutationFn: (id: string) => GoalService.unarchiveGoal(id),
+    mutationFn: (id: string) =>
+      GoalService.updateGoal(id, { status: 'active' as GoalStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -224,7 +231,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
   // ==========================================================================
   const pauseMutation = useMutation({
     mutationKey: ['goals', 'pause'],
-    mutationFn: (id: string) => GoalService.pause(id),
+    mutationFn: (id: string) =>
+      GoalService.updateGoal(id, { status: 'paused' as GoalStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -239,7 +247,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
 
   const resumeMutation = useMutation({
     mutationKey: ['goals', 'resume'],
-    mutationFn: (id: string) => GoalService.resume(id),
+    mutationFn: (id: string) =>
+      GoalService.updateGoal(id, { status: 'active' as GoalStatus }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
     },
@@ -320,8 +329,8 @@ export function useGoals(filters: GoalFilter & { [key: string]: any } = {}) {
 
     // Convenience getters
     getGoalById: (id: string) => goalsQuery.data?.find(g => g.id === id),
-    getGoalsByStatus: (status: GoalStatus) =>
-      goalsQuery.data?.filter(g => g.status === status) ?? [],
+    getGoalsByStatus: (goalStatus: GoalStatus) =>
+      goalsQuery.data?.filter(g => g.status === goalStatus) ?? [],
     activeCount: activeQuery.data?.length ?? 0,
     completedCount: statsQuery.data?.completed ?? 0,
   }), [
@@ -371,7 +380,7 @@ export function useGoal(id: string) {
 
   return {
     goal: query.data ?? null,
-    progressInfo: query.data?.progressInfo ?? null,
+    progressInfo: query.data?.progress ?? null,
     isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
@@ -387,19 +396,42 @@ export function useGoalReminders(goalId?: string) {
 
   const query = useQuery({
     queryKey: queryKeys.goals.reminders(),
-    queryFn: () => GoalService.getReminders(goalId),
+    queryFn: async () => {
+      // Fetch reminders via the goal endpoint
+      if (goalId) {
+        const goal = await GoalService.getGoal(goalId);
+        return (goal as any).reminders ?? [];
+      }
+      // Return all goals' reminders
+      const goals = await GoalService.getGoals({});
+      return goals.flatMap((g: any) => g.reminders ?? []);
+    },
   });
 
   const createReminderMutation = useMutation({
-    mutationFn: (data: Partial<GoalReminder> & { goalId: string }) => GoalService.createReminder(data),
+    mutationFn: async (data: Partial<GoalReminder> & { goalId: string }) => {
+      // Create reminder by updating the goal
+      const goal = await GoalService.getGoal(data.goalId);
+      const existingReminders = (goal as any).reminders ?? [];
+      return GoalService.updateGoal(data.goalId, {
+        reminders: [...existingReminders, data],
+      } as any);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.reminders() });
     },
   });
 
   const deleteReminderMutation = useMutation({
-    mutationFn: ({ goalId, reminderId }: { goalId: string; reminderId: string }) =>
-      GoalService.deleteReminder(goalId, reminderId),
+    mutationFn: async ({ goalId: gId, reminderId }: { goalId: string; reminderId: string }) => {
+      // Delete reminder by updating the goal
+      const goal = await GoalService.getGoal(gId);
+      const existingReminders: GoalReminder[] = (goal as any).reminders ?? [];
+      const filtered = existingReminders.filter((r: any) => r.id !== reminderId);
+      return GoalService.updateGoal(gId, {
+        reminders: filtered,
+      } as any);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.goals.reminders() });
     },
@@ -410,8 +442,8 @@ export function useGoalReminders(goalId?: string) {
     isLoading: query.isLoading,
     error: query.error,
     createReminder: createReminderMutation.mutateAsync,
-    deleteReminder: (goalId: string, reminderId: string) =>
-      deleteReminderMutation.mutateAsync({ goalId, reminderId }),
+    deleteReminder: (reminderGoalId: string, reminderId: string) =>
+      deleteReminderMutation.mutateAsync({ goalId: reminderGoalId, reminderId }),
     isCreating: createReminderMutation.isPending,
     isDeleting: deleteReminderMutation.isPending,
   };

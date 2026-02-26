@@ -41,9 +41,10 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
+  const { id } = await params;
   const startTime = Date.now();
 
   try {
@@ -60,7 +61,7 @@ export async function GET(
     }
 
     const ticket = await prisma.supportTicket.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         replies: {
           orderBy: { createdAt: 'asc' },
@@ -82,7 +83,7 @@ export async function GET(
       return addHeaders(apiResponse.forbidden('Access denied', requestId), requestId, rateLimitResult);
     }
 
-    logger.info('GET support ticket detail completed', { id: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('GET support ticket detail completed', { id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success(ticket, { meta: { requestId } }), requestId, rateLimitResult);
 
@@ -94,9 +95,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
+  const { id } = await params;
   const startTime = Date.now();
 
   try {
@@ -121,7 +123,7 @@ export async function PATCH(
 
     // Verify ownership
     const ticket = await prisma.supportTicket.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { userId: true, status: true }
     });
 
@@ -145,11 +147,11 @@ export async function PATCH(
     }
 
     const updatedTicket = await prisma.supportTicket.update({
-      where: { id: params.id },
+      where: { id },
       data: updates
     });
 
-    logger.info('PATCH support ticket detail completed', { id: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('PATCH support ticket detail completed', { id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success(updatedTicket, { meta: { requestId } }), requestId, rateLimitResult);
 

@@ -22,7 +22,7 @@ export type { ChartWidgetProps, ChartDataPoint } from './ChartWidget';
 export { CountdownWidget } from './CountdownWidget';
 export type { CountdownWidgetProps } from './CountdownWidget';
 
-export { TimeAgo, timeAgo } from './TimeAgo';
+export { TimeAgo } from './TimeAgo';
 export type { TimeAgoProps } from './TimeAgo';
 
 // ===== ACTION WIDGETS =====

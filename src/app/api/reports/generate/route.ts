@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import { AuditAction, PlatformCategory } from '@prisma/client';
+import { sanitizeText } from '@/lib/sanitize';
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -43,7 +44,7 @@ const generateReportSchema = z.object({
 
   // Report configuration
   config: z.object({
-    title: z.string().min(1).max(200).optional(),
+    title: z.string().min(1).max(200).optional().transform(val => val ? sanitizeText(val) : val),
     includeCharts: z.boolean().default(true),
     includeComparisons: z.boolean().default(true),
     includeInsights: z.boolean().default(true),

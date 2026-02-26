@@ -1,5 +1,6 @@
 // src/services/platformService.ts
 import { prisma, paginationArgs, buildPaginationResponse, withTransaction } from "@/lib/prisma";
+import { cache } from "@/lib/redis";
 import { Prisma, PlatformCategory, AuthType as PrismaAuthType, SyncStatus } from "@prisma/client";
 import { encrypt, encryptJSON } from "@/lib/encryption";
 import {
@@ -213,14 +214,35 @@ export class PlatformService {
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
     if (isUuid) return idOrSlug;
 
-    const platform = await prisma.platform.findUnique({
-      where: { slug: idOrSlug },
-      select: { id: true }
-    });
+    const cacheKey = `platform:slug:${idOrSlug}`;
 
-    // If not in DB, but matches a static platform ID, return null (it means not connected yet)
-    // But for the purpose of "resolving", if it's not in DB, it's not in DB.
-    return platform ? platform.id : null;
+    try {
+      // Check cache first
+      const cachedId = await cache.get<string>(cacheKey);
+      if (cachedId) return cachedId;
+
+      // Check DB
+      const platform = await prisma.platform.findUnique({
+        where: { slug: idOrSlug },
+        select: { id: true }
+      });
+
+      if (platform) {
+        // Cache result for 24 hours (platforms are stable)
+        await cache.set(cacheKey, platform.id, 86400);
+        return platform.id;
+      }
+    } catch (error) {
+      console.error('[PlatformService] resolveDbId error:', error);
+      // Fallback to DB if cache fails
+      const platform = await prisma.platform.findUnique({
+        where: { slug: idOrSlug },
+        select: { id: true }
+      });
+      return platform ? platform.id : null;
+    }
+
+    return null;
   }
 
   /**
@@ -239,6 +261,13 @@ export class PlatformService {
     } = {}
   ) {
     const { page = 1, limit = 100, sortBy = "popularity", sortOrder = "desc" } = options;
+
+    // Generate cache key based on options
+    const cacheKey = `platforms:all:${JSON.stringify(filters)}:${JSON.stringify(options)}`;
+
+    // Check cache
+    const cached = await cache.get<any>(cacheKey);
+    if (cached) return cached;
 
     let allPlatforms = (await this.getAllPlatformsList()).map(p => this.mapConfigToPrisma(p));
 
@@ -298,10 +327,15 @@ export class PlatformService {
     const start = (page - 1) * limit;
     const paginated = filtered.slice(start, start + limit);
 
-    return {
+    const result = {
       data: paginated,
       total
     };
+
+    // Cache for 5 minutes
+    await cache.set(cacheKey, result, 300);
+
+    return result;
   }
 
 
@@ -316,6 +350,37 @@ export class PlatformService {
       platforms = platforms.filter(p => p.isActive !== false);
     }
     return platforms.map(p => this.mapConfigToPrisma(p));
+  }
+
+  /**
+   * Get cached platform list from DB (for routes that query prisma.platform directly).
+   * Returns lightweight platform records with 10-min Redis cache.
+   */
+  static async getCachedDbPlatforms(options?: { activeOnly?: boolean }) {
+    const activeOnly = options?.activeOnly ?? true;
+    const cacheKey = `platforms:db:${activeOnly ? 'active' : 'all'}`;
+
+    const cached = await cache.get<Array<{
+      id: string; slug: string; name: string; displayName: string | null;
+      icon: string | null; color: string | null; category: PlatformCategory;
+      supportsAutoSync: boolean; isActive: boolean;
+    }>>(cacheKey);
+    if (cached) return cached;
+
+    const where = activeOnly ? { isActive: true } : {};
+    const platforms = await prisma.platform.findMany({
+      where,
+      select: {
+        id: true, slug: true, name: true, displayName: true,
+        icon: true, color: true, category: true,
+        supportsAutoSync: true, isActive: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // Cache for 10 minutes (platforms rarely change)
+    await cache.set(cacheKey, platforms, 600);
+    return platforms;
   }
 
   /**
@@ -604,9 +669,12 @@ export class PlatformService {
     }
 
     // Get scraper status
+    // Ensure scraper is loaded to check implementation status
+    const scraper = await ScraperFactory.getOrLoadScraper(configPlatform.slug);
+
     const scraperStatus = {
       hasAutoSync: configPlatform.supportsAutoSync && ScraperFactory.isScraperWorking(configPlatform.slug),
-      isImplemented: ScraperFactory.hasScraper(configPlatform.slug) && !(ScraperFactory.getScraper(configPlatform.slug) instanceof StubScraper),
+      isImplemented: !!scraper && !(scraper instanceof StubScraper),
     };
 
     return {

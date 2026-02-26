@@ -9,12 +9,12 @@ import { signJwt } from "@/lib/jwt";
 import { AuditAction } from "@prisma/client";
 import { getToken } from "next-auth/jwt";
 
-export const POST = async (req: NextRequest, { params }: { params: { id: string } }) => { // Updated
+export const POST = async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => { // Updated
   try {
     const authRes = await adminAuth(req);
     if (authRes) return authRes;
 
-    const { id } = params;
+    const { id } = await params;
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const adminId = token?.sub;
 
@@ -80,7 +80,7 @@ export const POST = async (req: NextRequest, { params }: { params: { id: string 
   }
 };
 
-export const DELETE = async (req: NextRequest, { params }: { params: { id: string } }) => { // Updated
+export const DELETE = async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => { // Updated
   try {
     // End session (revoke)
     const authRes = await adminAuth(req);

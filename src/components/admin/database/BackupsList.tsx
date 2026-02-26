@@ -1,4 +1,6 @@
+'use client';
 import { useAdminDatabase } from '@/hooks/useAdminDatabase';
+
 
 export function BackupsList() {
     const { backups, isLoadingBackups: loading, deleteBackup } = useAdminDatabase();

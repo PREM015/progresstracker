@@ -6,12 +6,13 @@ import { logger } from "@/lib/logger";
 // GET /api/public/blog/[slug] - Get single published blog post by slug (public)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
     const post = await prisma.blogPost.findFirst({
       where: {
-        slug: params.slug,
+        slug,
         status: "published",
         publishedAt: { lte: new Date() },
       },
@@ -31,17 +32,17 @@ export async function GET(
         data: { viewCount: { increment: 1 } },
       })
       .catch((error) => {
-        logger.error("Error incrementing blog post view count", { slug: params.slug }, error);
+        logger.error("Error incrementing blog post view count", { slug }, error);
       });
 
     logger.info("Public blog post fetched", {
-      slug: params.slug,
+      slug,
       postId: post.id,
     });
 
     return NextResponse.json(post);
   } catch (error) {
-    logger.error("Error fetching public blog post", { slug: params.slug }, error);
+    logger.error("Error fetching public blog post", { slug }, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -52,8 +53,9 @@ export async function GET(
 // POST /api/public/blog/[slug] - Like a blog post (public)
 export async function POST(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
     const body = await req.json();
     const { action } = body;
@@ -67,7 +69,7 @@ export async function POST(
 
     const post = await prisma.blogPost.findFirst({
       where: {
-        slug: params.slug,
+        slug,
         status: "published",
       },
     });
@@ -91,7 +93,7 @@ export async function POST(
     });
 
     logger.info("Blog post liked", {
-      slug: params.slug,
+      slug,
       postId: post.id,
       newLikeCount: updated.likeCount,
     });
@@ -101,7 +103,7 @@ export async function POST(
       likeCount: updated.likeCount,
     });
   } catch (error) {
-    logger.error("Error liking blog post", { slug: params.slug }, error);
+    logger.error("Error liking blog post", { slug }, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

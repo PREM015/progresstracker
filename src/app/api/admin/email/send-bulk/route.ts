@@ -5,7 +5,7 @@ import { success, validationError } from "@/lib/apiResponse";
 import { adminAuth } from "@/middleware/adminAuth";
 import prisma from "@/lib/prisma";
 import auditLogService from "@/services/auditLogService";
-import { queueEmailBroadcast } from "@/lib/queue";
+import { emailsQueue } from "@/lib/bullmq";
 import { AuditAction, SubscriptionTier } from "@prisma/client";
 import { getToken } from "next-auth/jwt";
 
@@ -74,12 +74,13 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   // Create chunks if too many recipients (Queue handles it but safer to batch here if millions)
   // For now assuming reasonable size handled by queue processor
 
-  const jobId = await queueEmailBroadcast({
+  const job = await emailsQueue.add(`bulk-email-${Date.now()}`, {
     userIds,
     subject: testMode ? `[TEST] ${subject}` : subject,
     htmlTemplate: htmlContent,
     variables: {} // variables support if needed
   });
+  const jobId = job.id;
 
   // 3. Log Action
   if (adminId) {

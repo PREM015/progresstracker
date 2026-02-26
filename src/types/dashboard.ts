@@ -271,3 +271,81 @@ export interface MonthlyStats {
         monthsIncluded: number;
     };
 }
+
+// =============================================================================
+// UNIFIED DASHBOARD API CONTRACT
+// =============================================================================
+// This is the canonical shared type for the /api/dashboard/full endpoint.
+// Backend (AnalyticsService) produces this shape, frontend consumes it.
+
+export interface UnifiedDashboardData {
+    user: {
+        name: string;
+        rank: number | string;
+        streak: {
+            current: number;
+            longest: number;
+            lastActivity: string | null;
+        };
+        totals: {
+            problems: number;
+            commits: number;
+            points: number;
+        };
+    };
+    stats: {
+        today: { problems: number; commits: number; time: number; points: number };
+        week: { problems: number; commits: number; time: number; activeDays: number };
+        month: { problems: number; commits: number; time: number };
+    };
+    chart: Array<{
+        date: string;
+        label: string;
+        problems: number;
+        commits: number;
+        time: number;
+    }>;
+    goals: Array<{
+        id: string;
+        title: string;
+        progress: number;
+        target: number;
+        deadline: string | null;
+        category: string;
+        percentage: number;
+    }>;
+    activity: Array<{
+        id: string;
+        date: string;
+        platform: string;
+        icon?: string | null;
+        color?: string | null;
+        problems: number;
+        commits: number;
+        time: number;
+    }>;
+    platforms: Array<{
+        name: string;
+        icon?: string | null;
+        color?: string | null;
+        stats: { problems: number; time: number; points: number };
+    }>;
+    categories: Array<{
+        name: string;
+        count: number;
+        color?: string;
+        percentage: number;
+    }>;
+    insights: Array<{
+        id: string;
+        type: string;
+        title: string;
+        message: string;
+        priority: string;
+        color?: string;
+    }>;
+    meta: {
+        connectedPlatformsCount: number;
+        generatedAt: string;
+    };
+}

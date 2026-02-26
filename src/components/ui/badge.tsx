@@ -18,8 +18,16 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
-        pulse: "bg-primary text-primary-foreground animate-pulse hover:animate-none",
+        pulse: "bg-primary text-primary-foreground animate-pulse hover:animate-none shadow-lg shadow-primary/20",
+        glass: "glass border-white/20 text-foreground",
+        premium: "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white border-none shadow-sm",
+        bronze: "bg-amber-600/20 text-amber-600 border-amber-600/30 dark:bg-amber-600/10 dark:text-amber-500",
+        silver: "bg-slate-400/20 text-slate-400 border-slate-400/30 dark:bg-slate-400/10 dark:text-slate-300",
+        gold: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-400 font-bold",
+        platinum: "bg-cyan-500/20 text-cyan-600 border-cyan-500/30 dark:bg-cyan-500/10 dark:text-cyan-400",
+        diamond: "bg-blue-500/20 text-blue-600 border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-400 font-bold animate-glow-pulse",
       },
+
     },
     defaultVariants: {
       variant: "default",

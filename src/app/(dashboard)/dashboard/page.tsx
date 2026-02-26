@@ -1,146 +1,198 @@
 'use client';
 
-import { OverviewStats } from '@/components/dashboard/OverviewStats';
-import { ConnectedPlatformsStats } from '@/components/dashboard/ConnectedPlatformsStats';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { BentoGrid } from '@/components/ui/BentoGrid';
-import { ActivityHeatmap } from '@/components/dashboard/ActivityHeatmap';
-import { RecentActivityList } from '@/components/dashboard/RecentActivityList';
-import { QuickActions } from '@/components/dashboard/QuickActions';
-import { GoalsSummary } from '@/components/dashboard/GoalsSummary';
-import { DifficultyDistribution } from '@/components/dashboard/DifficultyDistribution';
-import { PlatformBreakdown } from '@/components/dashboard/PlatformBreakdown';
-import { MetaTags } from '@/components/seo/MetaTags';
-import { ActivityTrendChart } from '@/components/dashboard/ActivityTrendChart';
-import { useStats } from '@/hooks/useStats';
-import { useGoals } from '@/hooks/useGoals';
-import { useTracker } from '@/hooks/useTracker';
+import { Suspense } from 'react';
+import { useAnalyticsDashboard } from '@/hooks/useAnalyticsDashboard';
 import { useUser } from '@/hooks/useUser';
+import { motion } from 'framer-motion';
+import { Zap } from 'lucide-react';
+
+import {
+  DashboardErrorBoundary,
+  WelcomeBanner,
+  OverviewStats,
+  ContributionGraph,
+  ActivityTrendChart,
+  WeeklyProgressWidget,
+  TodaysFocusWidget,
+  UpcomingDeadlinesWidget,
+  PlatformBreakdown,
+  SkillsRadarWidget,
+  GoalsSummary,
+  AchievementsSummary,
+  RecentActivityList,
+  LeaderboardWidget,
+  SyncStatusWidget,
+  QuickActions,
+  MotivationWidget,
+  DifficultyDistribution,
+} from '@/components/dashboard';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function DashboardPage() {
-  const { user } = useUser();
-  const {
-    streak,
-    todayStats,
-    weekStats,
-    monthStats,
-    dashboard,
+// ---------------------------------------------------------------------------
+// Stagger animation variants
+// ---------------------------------------------------------------------------
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+  },
+};
 
-heatmap,
-    overview,
-    trends,
-    isLoading: isLoadingStats
-  } = useStats();
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
+} satisfies import('framer-motion').Variants;
 
-  const { activeGoals, isLoadingActive: isLoadingGoals } = useGoals();
-  const { recentEntries, isLoadingRecent: isLoadingActivity } = useTracker();
-
-  // Helper for loading state skeleton
-  if (isLoadingStats || isLoadingGoals || isLoadingActivity) {
-    return (
-      <div className="space-y-6">
-        <div className="h-20 w-1/3 bg-gray-100 rounded animate-pulse" />
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 w-full">
-          {[0, 1, 2, 3].map(i => <div key={i} className="h-32 bg-gray-100 rounded animate-pulse" />)}
-        </div>
+// ---------------------------------------------------------------------------
+// Loading skeleton (dark themed)
+// ---------------------------------------------------------------------------
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <Skeleton className="h-32 w-full rounded-2xl bg-zinc-900/50 border border-white/5" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-32 rounded-xl bg-zinc-900/50 border border-white/5" />
+        ))}
       </div>
+      <Skeleton className="h-64 w-full rounded-xl bg-zinc-900/50 border border-white/5" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Skeleton className="lg:col-span-2 h-96 rounded-xl bg-zinc-900/50 border border-white/5" />
+        <Skeleton className="h-96 rounded-xl bg-zinc-900/50 border border-white/5" />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main dashboard content
+// ---------------------------------------------------------------------------
+function DashboardContent() {
+  const { user: authUser } = useUser();
+  const { data, isLoading, error } = useAnalyticsDashboard();
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+        className="p-8 text-center rounded-2xl bg-red-500/[0.06] border border-red-500/20"
+      >
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+          <Zap className="w-6 h-6 text-red-500" />
+        </div>
+        <p className="font-bold text-white text-lg">Connection Lost</p>
+        <p className="text-zinc-400 text-sm mt-2 max-w-md mx-auto">
+          {error.message || 'Failed to load dashboard data. Check your connection and try again.'}
+        </p>
+        <button onClick={() => window.location.reload()}
+          className="mt-6 px-6 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-red-400 text-xs font-bold uppercase tracking-widest transition-all">
+          Retry Connection
+        </button>
+      </motion.div>
     );
   }
 
-  // Transform data for PlatformBreakdown
-  // Use overview.platforms for detailed activity breakdown, fallback to empty
-  const platformData = overview?.platforms?.length
-    ? overview.platforms.map((p, i) => ({
-      name: p.name,
-      value: p.problems + p.commits, // Combine metrics for general activity
-      color: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i % 5]
-    }))
-    : [];
+  if (isLoading || !data) {
+    return <DashboardSkeleton />;
+  }
+
+  const user = data.user || authUser;
+  const d = data;
 
   return (
-    <>
-      <MetaTags title="Dashboard" description="Your progress overview" />
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
 
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-muted-foreground">
-            Welcome back, {user?.name || 'Developer'}! Here's an overview of your progress.
-          </p>
-        </div>
+      {/* Welcome Section */}
+      <motion.div variants={itemVariants}>
+        <Suspense fallback={<Skeleton className="h-32 w-full rounded-2xl" />}>
+          <WelcomeBanner userName={user?.name || 'Developer'} />
+        </Suspense>
+      </motion.div>
 
-        {/* Top Stats Row */}
+      {/* Overview Stats */}
+      <motion.div variants={itemVariants}>
         <OverviewStats
-          totalSolved={dashboard?.lifetime?.problems || 0}
-          streak={streak.current}
-          streakLongest={streak.longest}
-          monthlyGoalProgress={monthStats?.change || 0}
-          totalPoints={dashboard?.lifetime?.points || 0}
-          totalSolvedTrend={monthStats?.change}
-          pointsTrend={dashboard?.thisMonth?.change}
+          totalSolved={d.user?.totals?.problems ?? 0}
+          streak={d.user?.streak?.current ?? 0}
+          streakLongest={d.user?.streak?.longest ?? 0}
+          monthlyGoalProgress={d.stats?.month?.problems ?? 0}
+          totalPoints={d.user?.totals?.points ?? 0}
+          totalSolvedTrend={0}
+          pointsTrend={0}
         />
+      </motion.div>
 
-        {/* Dense Bento Grid Layout */}
-        <BentoGrid className="max-w-full auto-rows-[minmax(12rem,auto)]">
-          {/* Heatmap: Prominent, spans 2 cols */}
-          <ActivityHeatmap
-            activityData={heatmap.reduce((acc, curr) => ({ ...acc, [curr.date]: curr.count }), {})}
-            className="md:col-span-2 min-h-[14rem]"
-          />
+      {/* Contribution Graph - Full Width */}
+      <motion.div variants={itemVariants}>
+        <Suspense fallback={<Skeleton className="h-64 w-full rounded-xl" />}>
+          <ContributionGraph />
+        </Suspense>
+      </motion.div>
 
+      {/* Main Grid - 3 Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
+        {/* Left Column - 2/3 width */}
+        <div className="lg:col-span-2 space-y-6">
+          <motion.div variants={itemVariants} className="h-full">
+            <ActivityTrendChart />
+          </motion.div>
 
-          {/* Difficulty Breakdown: 1 col */}
-          <DifficultyDistribution
-            data={dashboard?.lifetime?.difficulty}
-            className="md:col-span-1 min-h-[14rem]"
-          />
-
-          {/* Activity Trend Chart: Spans 2 cols */}
-          <ActivityTrendChart
-            data={trends?.trend || []}
-            className="md:col-span-2 min-h-[14rem]"
-            loading={isLoadingStats}
-          />
-
-          {/* Connected Platforms Detail: Full width or large span */}
-          <div className="md:col-span-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">My Platforms</h3>
-              <Link href="/platforms" className="text-sm text-indigo-600 hover:text-indigo-500 font-medium">Manage Connections &rarr;</Link>
-            </div>
-            <ConnectedPlatformsStats
-              platforms={dashboard?.platforms?.connectedPlatforms?.map(p => ({
-                ...p,
-                lastSyncedAt: p.lastSyncedAt ? p.lastSyncedAt.toString() : null
-              }))}
-            />
+          {/* Two Column Sub-grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <motion.div variants={itemVariants} className="h-full">
+              <PlatformBreakdown />
+            </motion.div>
+            <motion.div variants={itemVariants} className="h-full">
+              <DifficultyDistribution
+                data={{
+                  easy: (d.categories ?? []).find((c: any) => c.name === 'Easy')?.count ?? 0,
+                  medium: (d.categories ?? []).find((c: any) => c.name === 'Medium')?.count ?? 0,
+                  hard: (d.categories ?? []).find((c: any) => c.name === 'Hard')?.count ?? 0,
+                }}
+              />
+            </motion.div>
           </div>
 
-          {/* Recent Activity: Tall list, spans 2 cols */}
-          <RecentActivityList
-            activities={recentEntries.map(entry => ({
-              id: entry.id,
-              type: entry.problemsSolved > 0 ? 'solve' : entry.commits > 0 ? 'post' : 'achievement',
-              title: entry.problemsSolved > 0 ? `Solved ${entry.problemsSolved} Problems` : 'Activity',
-              description: entry.platform?.name || 'General Activity',
-              timestamp: new Date(entry.date),
-              platform: entry.platform?.name,
-              points: entry.points
-            }))}
-            className="md:col-span-2 min-h-[24rem]"
-          />
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
+              <WeeklyProgressWidget />
+            </Suspense>
+          </motion.div>
 
-          {/* Right Column Stack */}
-          <div className="md:col-span-1 space-y-4">
-            {/* Quick Actions */}
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+              <SkillsRadarWidget />
+            </Suspense>
+          </motion.div>
+        </div>
+
+        {/* Right Column - 1/3 width */}
+        <div className="space-y-6">
+          <motion.div variants={itemVariants}>
+            <SyncStatusWidget />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
             <QuickActions />
+          </motion.div>
 
-            {/* Goals */}
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+              <TodaysFocusWidget />
+            </Suspense>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+              <UpcomingDeadlinesWidget />
+            </Suspense>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
             <GoalsSummary
-              goals={activeGoals.map((g: any) => ({
+              goals={(d.goals ?? []).map((g: any) => ({
                 id: g.id,
                 title: g.title,
                 current: g.progress,
@@ -148,18 +200,60 @@ heatmap,
                 dueDate: g.deadline ? new Date(g.deadline).toLocaleDateString() : 'No deadline'
               }))}
             />
+          </motion.div>
 
-            {/* Platform Activity Breakdown */}
-            <PlatformBreakdown
-              data={platformData.map(p => ({
-                platform: p.name,
-                count: p.value,
-                color: p.color
-              }))}
-            />
-          </div>
-        </BentoGrid>
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
+              <AchievementsSummary />
+            </Suspense>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+              <LeaderboardWidget />
+            </Suspense>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Suspense fallback={<Skeleton className="h-48 rounded-xl" />}>
+              <MotivationWidget />
+            </Suspense>
+          </motion.div>
+        </div>
       </div>
-    </>
+
+      {/* Recent Activity - Full Width */}
+      <motion.div variants={itemVariants}>
+        <RecentActivityList
+          activities={(d.activity ?? [])
+            .filter((entry: any) => (entry.problems || 0) > 0 || (entry.commits || 0) > 0)
+            .map((entry: any) => ({
+              id: entry.id,
+              type: (entry.problems ?? 0) > 0 ? 'solve' as const : 'post' as const,
+              title: (entry.problems ?? 0) > 0 ? `Solved ${entry.problems} Problems` : `Committed ${entry.commits} times`,
+              description: entry.platform || 'General Activity',
+              timestamp: new Date(entry.date),
+              platform: entry.platform,
+              points: entry.pointsEarned || 0
+            }))}
+        />
+      </motion.div>
+
+      {/* Footer spacing */}
+      <div className="h-8" />
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page export with error boundary
+// ---------------------------------------------------------------------------
+export default function DashboardPage() {
+  return (
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-white p-6 lg:p-8">
+      <DashboardErrorBoundary>
+        <DashboardContent />
+      </DashboardErrorBoundary>
+    </div>
   );
 }

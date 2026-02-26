@@ -2,20 +2,21 @@
 // Complete goal service matching Prisma schema
 
 import { prisma } from '@/lib/prisma';
-import { 
-  GoalStatus, 
-  GoalType, 
-  GoalMetric, 
+import {
+  GoalStatus,
+  GoalType,
+  GoalMetric,
   PlatformCategory,
   Prisma
 } from '@prisma/client';
-import { 
-  startOfDay, 
-  endOfDay, 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
+import { CacheService } from '@/services/cacheService';
+import {
+  startOfDay,
+  endOfDay,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
   differenceInDays,
   addDays
 } from 'date-fns';
@@ -304,6 +305,9 @@ export class GoalService {
       },
     });
 
+    // Invalidate stats cache
+    await CacheService.invalidateStats(userId);
+
     return this.formatGoalWithProgress(goal);
   }
 
@@ -322,6 +326,7 @@ export class GoalService {
       limit?: number;
       sortBy?: string;
       sortOrder?: 'asc' | 'desc';
+      select?: Prisma.GoalSelect;
     }
   ): Promise<{ goals: GoalWithProgress[]; total: number; page: number; limit: number }> {
     const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = options || {};
@@ -385,18 +390,25 @@ export class GoalService {
       }
     }
 
-    const [goals, total] = await Promise.all([
-      prisma.goal.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          platform: {
-            select: { id: true, name: true, slug: true, icon: true, color: true },
-          },
+    const findManyArgs: Prisma.GoalFindManyArgs = {
+      where,
+      orderBy: { [sortBy]: sortOrder as Prisma.SortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+    };
+
+    if (options?.select) {
+      findManyArgs.select = options.select;
+    } else {
+      findManyArgs.include = {
+        platform: {
+          select: { id: true, name: true, slug: true, icon: true, color: true },
         },
-      }),
+      };
+    }
+
+    const [goals, total] = await Promise.all([
+      prisma.goal.findMany(findManyArgs),
       prisma.goal.count({ where }),
     ]);
 
@@ -587,6 +599,9 @@ export class GoalService {
       },
     });
 
+    // Invalidate stats cache
+    await CacheService.invalidateStats(userId);
+
     return this.formatGoalWithProgress(goal);
   }
 
@@ -671,6 +686,9 @@ export class GoalService {
       await AchievementService.checkGoalAchievements(userId).catch(console.error);
     }
 
+    // Invalidate stats cache
+    await CacheService.invalidateStats(userId);
+
     return this.formatGoalWithProgress(updatedGoal);
   }
 
@@ -731,6 +749,9 @@ export class GoalService {
     const { AchievementService } = await import('./achievementService');
     await AchievementService.checkGoalAchievements(userId).catch(console.error);
 
+    // Invalidate stats cache
+    await CacheService.invalidateStats(userId);
+
     return this.formatGoalWithProgress(updatedGoal);
   }
 
@@ -789,6 +810,9 @@ export class GoalService {
       where: { id: goalId },
     });
 
+    // Invalidate stats cache
+    await CacheService.invalidateStats(userId);
+
     return true;
   }
 
@@ -833,32 +857,53 @@ export class GoalService {
    * Get goal statistics
    */
   static async getGoalStats(userId: string): Promise<GoalStats> {
+    // Check cache first
+    const cacheKey = `goals:stats:${userId}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) return cached as GoalStats;
+
     const now = new Date();
     const weekStart = startOfWeek(now);
     const weekEnd = endOfWeek(now);
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
 
-    const [allGoals, weeklyGoals, monthlyGoals, recentCompleted, upcomingDeadlines] =
+    const [allGoals, weeklyCount, weeklyCompleted, monthlyCount, monthlyCompleted, recentCompleted, upcomingDeadlines] =
       await Promise.all([
         prisma.goal.findMany({
           where: { userId },
-          include: {
-            platform: {
-              select: { id: true, name: true, slug: true, icon: true, color: true },
-            },
+          select: {
+            status: true,
+            category: true,
+            goalType: true,
+            startDate: true,
+            completedAt: true,
           },
         }),
-        prisma.goal.findMany({
+        prisma.goal.count({
           where: {
             userId,
             createdAt: { gte: weekStart, lte: weekEnd },
           },
         }),
-        prisma.goal.findMany({
+        prisma.goal.count({
+          where: {
+            userId,
+            status: GoalStatus.COMPLETED,
+            completedAt: { gte: weekStart, lte: weekEnd },
+          },
+        }),
+        prisma.goal.count({
           where: {
             userId,
             createdAt: { gte: monthStart, lte: monthEnd },
+          },
+        }),
+        prisma.goal.count({
+          where: {
+            userId,
+            status: GoalStatus.COMPLETED,
+            completedAt: { gte: monthStart, lte: monthEnd },
           },
         }),
         prisma.goal.findMany({
@@ -917,14 +962,12 @@ export class GoalService {
     const streak = await this.calculateStreak(userId);
 
     // Weekly stats
-    const weeklyCompleted = weeklyGoals.filter((g) => g.status === GoalStatus.COMPLETED).length;
-    const weeklyTotal = weeklyGoals.length;
+    const weeklyTotal = weeklyCount;
     const weeklyProgress =
       weeklyTotal > 0 ? Math.round((weeklyCompleted / weeklyTotal) * 100) : 0;
 
     // Monthly stats
-    const monthlyCompleted = monthlyGoals.filter((g) => g.status === GoalStatus.COMPLETED).length;
-    const monthlyTotal = monthlyGoals.length;
+    const monthlyTotal = monthlyCount;
     const monthlyProgress =
       monthlyTotal > 0 ? Math.round((monthlyCompleted / monthlyTotal) * 100) : 0;
 
@@ -966,7 +1009,7 @@ export class GoalService {
           : 0;
     }
 
-    return {
+    const result: GoalStats = {
       total,
       active,
       completed,
@@ -994,6 +1037,11 @@ export class GoalService {
       recentCompleted: recentCompleted.map((g) => this.formatGoalWithProgress(g)),
       upcomingDeadlines: upcomingDeadlines.map((g) => this.formatGoalWithProgress(g)),
     };
+
+    // Cache for 5 minutes
+    await CacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   /**

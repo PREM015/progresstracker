@@ -8,13 +8,13 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(request.url);
-    
+
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const platformId = searchParams.get("platformId");
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     // Group entries by date
     const groupedEntries: Record<string, any[]> = {};
-    
+
     entries.forEach((entry) => {
       const dateKey = entry.date.toISOString().split("T")[0];
       if (!groupedEntries[dateKey]) {
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       startDate,
       endDate,
       entries,

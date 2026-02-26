@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminMaintenance } from '@/hooks/useAdminMaintenance';
 
 export function CacheClearButton({ cacheKey }: { cacheKey?: string }) {

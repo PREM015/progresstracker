@@ -5,21 +5,21 @@ import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/apiResponse";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 // GET /api/notifications/push/[id] - Get specific push subscription
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const subscription = await prisma.pushSubscription.findFirst({
       where: {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return apiError("Push subscription not found", 404);
     }
 
-    return apiResponse(subscription);
+    return apiResponse.success(subscription);
   } catch (error) {
     console.error("Error fetching push subscription:", error);
     return apiError("Failed to fetch push subscription", 500);
@@ -43,12 +43,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { deviceName, isActive } = body;
 
@@ -71,7 +71,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return apiResponse(updated);
+    return apiResponse.success(updated);
   } catch (error) {
     console.error("Error updating push subscription:", error);
     return apiError("Failed to update push subscription", 500);
@@ -82,12 +82,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const subscription = await prisma.pushSubscription.findFirst({
       where: {
@@ -104,7 +104,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       where: { id },
     });
 
-    return apiResponse({ success: true, message: "Push subscription removed" });
+    return apiResponse.success({ success: true, message: "Push subscription removed" });
   } catch (error) {
     console.error("Error deleting push subscription:", error);
     return apiError("Failed to delete push subscription", 500);

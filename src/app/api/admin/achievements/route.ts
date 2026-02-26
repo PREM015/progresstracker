@@ -304,7 +304,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const achievement = await prisma.achievement.create({ data });
+    const achievement = await prisma.achievement.create({ data: data as any });
 
     // Audit log
     await prisma.auditLog.create({

@@ -28,7 +28,7 @@ export function TwoFactorSetup() {
 
   const fetchSetupData = async () => {
     try {
-      const response = await apiClient.post('/auth/2fa/setup');
+      const response = await apiClient.post('/auth/2fa/setup') as { data: { secret: string; qrCodeUrl: string; backupCodes: string[] }; error?: string };
 
       if (response.error) {
         setError(response.error);

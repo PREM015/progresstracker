@@ -279,7 +279,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const flag = await prisma.featureFlag.create({ data });
+    const flag = await prisma.featureFlag.create({ data: data as any });
 
     // Audit log
     await prisma.auditLog.create({

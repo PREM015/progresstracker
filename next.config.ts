@@ -4,7 +4,30 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
-  serverExternalPackages: ['bull'],
+  serverExternalPackages: ['ioredis', 'bullmq'],
+  async headers() {
+    return [
+      {
+        source: '/:all*(svg|jpg|png)',
+        locale: false,
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/fonts/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

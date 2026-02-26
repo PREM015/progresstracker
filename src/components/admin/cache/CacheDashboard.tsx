@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminMaintenance } from '@/hooks/useAdminMaintenance';
 
 export function CacheDashboard() {

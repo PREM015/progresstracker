@@ -1,7 +1,7 @@
-// src/lib/prisma.ts
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { performanceTracking } from "./performanceTracking";
 
 // =============================================================================
 // PRISMA CLIENT CONFIGURATION
@@ -23,6 +23,8 @@ function createPrismaClient(): PrismaClient {
     idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
     connectionTimeoutMillis: 10000, // Fail after 10 seconds if can't connect
     allowExitOnIdle: true,
+    // Kill any single query after 5s to prevent runaway queries
+    statement_timeout: 5000,
   });
 
   // Handle pool errors
@@ -39,11 +41,62 @@ function createPrismaClient(): PrismaClient {
     adapter,
     log:
       process.env.NODE_ENV === "development"
-        ? ["query", "info", "warn", "error"]
-        : ["error"],
+        ? ["warn", "error"]
+        : [
+          { level: "error", emit: "stdout" },
+          { level: "warn", emit: "stdout" },
+        ],
+    errorFormat: process.env.NODE_ENV === "development" ? "pretty" : "minimal",
   });
 
-  return prisma;
+  // Note: Prisma with driver adapters (PrismaPg) does not support $on('query') events.
+  // For slow query tracking in production, use Prisma's $extends middleware:
+  // https://www.prisma.io/docs/concepts/components/prisma-client/client-extensions/query
+  // Or use pg pool's 'query' event for raw SQL timing.
+  if (process.env.NODE_ENV === "production" && globalForPrisma.pool) {
+    const pool = globalForPrisma.pool;
+    pool.on('connect', (client) => {
+      const originalQuery = client.query.bind(client);
+      // @ts-expect-error - wrapping pg client query for timing
+      client.query = (...args: unknown[]) => {
+        const start = Date.now();
+        // @ts-expect-error - spread args to original query
+        const result = originalQuery(...args);
+        // pg query returns a Submittable which is promise-like at runtime
+        Promise.resolve(result).then(() => {
+          const duration = Date.now() - start;
+          if (duration > 500) {
+            console.warn(`[SLOW QUERY] ${duration}ms`, {
+              query: typeof args[0] === 'string' ? args[0].substring(0, 200) : 'prepared',
+              duration,
+            });
+          }
+        }).catch(() => { /* query error handled elsewhere */ });
+        return result;
+      };
+    });
+  }
+
+  // Add performance tracking extension
+  const extendedPrisma = prisma.$extends({
+    query: {
+      async $allOperations({ model, operation, args, query }) {
+        const start = performance.now();
+        try {
+          return await query(args);
+        } finally {
+          const duration = performance.now() - start;
+          // Use dynamic import or optional call to avoid circular dependency issues if any
+          // (Though here we import at top level, assuming safe)
+          if (model) {
+            performanceTracking.trackDbQuery(operation, model, duration);
+          }
+        }
+      },
+    },
+  });
+
+  return extendedPrisma as unknown as PrismaClient;
 }
 
 // Create or reuse Prisma client
@@ -118,10 +171,10 @@ export async function withTransaction<T>(
       });
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       // Don't retry on validation errors
       if (lastError.message.includes("Unique constraint") ||
-          lastError.message.includes("Foreign key constraint")) {
+        lastError.message.includes("Foreign key constraint")) {
         throw lastError;
       }
 
@@ -150,10 +203,21 @@ export function softDeleteFilter(
 export function paginationArgs(page = 1, limit = 20): { skip: number; take: number } {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(100, Math.max(1, limit));
-  
+
   return {
     skip: (safePage - 1) * safeLimit,
     take: safeLimit,
+  };
+}
+
+/**
+ * Cursor-based pagination helper (efficient for large tables)
+ */
+export function cursorPaginationArgs(limit = 20, cursor?: string) {
+  const safeLimit = Math.min(100, Math.max(1, limit));
+  return {
+    take: safeLimit,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   };
 }
 
@@ -167,7 +231,7 @@ export function buildPaginationResponse<T>(
   limit: number
 ) {
   const totalPages = Math.ceil(total / limit);
-  
+
   return {
     data,
     pagination: {

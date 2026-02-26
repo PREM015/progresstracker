@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminMetrics } from '@/hooks/useAdminMetrics';
 
 export function PerformanceMetrics() {

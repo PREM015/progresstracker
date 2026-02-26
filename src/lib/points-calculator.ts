@@ -6,10 +6,10 @@
 // ============================================================================
 
 import { prisma } from '@/lib/prisma';
-import { 
-  STREAK_REWARD_TIERS, 
+import {
+  STREAK_REWARD_TIERS,
   STREAK_MILESTONES,
-  isDoublePointsDay 
+  isDoublePointsDay
 } from '@/config/streak';
 
 import type { SubscriptionTier, PlatformCategory } from '@prisma/client';
@@ -104,7 +104,7 @@ export interface PointsConfig {
   EASY_PROBLEM: number;
   MEDIUM_PROBLEM: number;
   HARD_PROBLEM: number;
-  
+
   // Development
   COMMIT: number;
   PULL_REQUEST: number;
@@ -113,30 +113,30 @@ export interface PointsConfig {
   ISSUE_CLOSED: number;
   CODE_REVIEW: number;
   LINES_OF_CODE: number;
-  
+
   // Projects
   PROJECT_STARTED: number;
   PROJECT_COMPLETED: number;
-  
+
   // Learning
   COURSE_COMPLETED: number;
   CERTIFICATION_EARNED: number;
   LESSON_COMPLETED: number;
-  
+
   // Career
   APPLICATION_SUBMITTED: number;
   INTERVIEW_COMPLETED: number;
-  
+
   // Competitions
   CONTEST_PARTICIPATED: number;
   HACKATHON_PARTICIPATED: number;
   HACKATHON_COMPLETED: number;
   HACKATHON_WON: number;
-  
+
   // Time bonus
   TIME_BONUS_PER_HOUR: number;
   TIME_BONUS_MAX: number;
-  
+
   // Streak
   STREAK_BASE: number;
   STREAK_MULTIPLIER: number;
@@ -155,7 +155,7 @@ export const POINT_VALUES: PointsConfig = {
   EASY_PROBLEM: 5,
   MEDIUM_PROBLEM: 10,
   HARD_PROBLEM: 20,
-  
+
   // Development
   COMMIT: 5,
   PULL_REQUEST: 15,
@@ -164,30 +164,30 @@ export const POINT_VALUES: PointsConfig = {
   ISSUE_CLOSED: 10,
   CODE_REVIEW: 10,
   LINES_OF_CODE: 0.01, // Per line
-  
+
   // Projects
   PROJECT_STARTED: 10,
   PROJECT_COMPLETED: 50,
-  
+
   // Learning
   COURSE_COMPLETED: 100,
   CERTIFICATION_EARNED: 200,
   LESSON_COMPLETED: 5,
-  
+
   // Career
   APPLICATION_SUBMITTED: 5,
   INTERVIEW_COMPLETED: 20,
-  
+
   // Competitions
   CONTEST_PARTICIPATED: 25,
   HACKATHON_PARTICIPATED: 50,
   HACKATHON_COMPLETED: 100,
   HACKATHON_WON: 500,
-  
+
   // Time bonus (per hour of focused coding)
   TIME_BONUS_PER_HOUR: 5,
   TIME_BONUS_MAX: 50, // Max per day
-  
+
   // Streak
   STREAK_BASE: 5,
   STREAK_MULTIPLIER: 0.5, // Increases with streak length
@@ -277,7 +277,7 @@ export function calculateActivityPoints(entry: TrackerEntryForPoints): number {
   points += entry.issuesOpened * POINT_VALUES.ISSUE_OPENED;
   points += entry.issuesClosed * POINT_VALUES.ISSUE_CLOSED;
   points += entry.codeReviews * POINT_VALUES.CODE_REVIEW;
-  
+
   // Lines of code bonus (capped)
   const locBonus = Math.min(entry.linesOfCode * POINT_VALUES.LINES_OF_CODE, 50);
   points += Math.floor(locBonus);
@@ -344,7 +344,7 @@ export function calculateStreakBonus(streakDays: number): number {
 
   // Progressive streak bonus
   const progressiveBonus = Math.floor(
-    POINT_VALUES.STREAK_BASE + 
+    POINT_VALUES.STREAK_BASE +
     (streakDays * POINT_VALUES.STREAK_MULTIPLIER)
   );
 
@@ -500,11 +500,11 @@ export async function getPointsBreakdown(userId: string): Promise<PointsBreakdow
     const thisMonthPoints = calculateEntriesPoints(thisMonthEntries);
 
     // Calculate total
-    const baseTotal = 
-      activityBreakdown.total + 
-      streakBreakdown.total + 
+    const baseTotal =
+      activityBreakdown.total +
+      streakBreakdown.total +
       achievementBreakdown.total;
-    
+
     const total = Math.floor(baseTotal * effectiveMultiplier);
 
     return {
@@ -582,9 +582,9 @@ function calculateActivityBreakdown(entries: any[]): PointsBreakdown['activity']
     timeBonus += entryTimeBonus;
   }
 
-  const total = problems + commits + pullRequests + projects + 
-                courses + certifications + applications + 
-                contests + hackathons + timeBonus;
+  const total = problems + commits + pullRequests + projects +
+    courses + certifications + applications +
+    contests + hackathons + timeBonus;
 
   return {
     problems: Math.floor(problems),
@@ -738,7 +738,7 @@ function getStartOfMonth(): Date {
  */
 export async function updateUserPoints(userId: string): Promise<number> {
   const total = await calculateTotalPoints(userId);
-  
+
   await prisma.user.update({
     where: { id: userId },
     data: { totalPoints: total },
@@ -790,7 +790,9 @@ export async function getPointsLeaderboard(limit: number = 100): Promise<Array<{
     where: {
       isActive: true,
       isPublic: true,
-      showInLeaderboard: true,
+      settings: {
+        showInLeaderboard: true,
+      },
     },
     orderBy: { totalPoints: 'desc' },
     take: limit,
@@ -816,7 +818,7 @@ export async function getPointsLeaderboard(limit: number = 100): Promise<Array<{
 // ============================================================================
 
 const pointsCalculator = {
- // Core functions
+  // Core functions
   calculateTotalPoints,
   calculateActivityPoints,
   calculateStreakBonus,
@@ -824,12 +826,12 @@ const pointsCalculator = {
   calculateDailyPoints,
   getPointsBreakdown,
   getPointsMultiplier,
-  
+
   // Utility functions
   updateUserPoints,
   awardBonusPoints,
   getPointsLeaderboard,
-  
+
   // Constants
   POINT_VALUES,
   RARITY_MULTIPLIERS,

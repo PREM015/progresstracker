@@ -14,7 +14,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export function SyncDashboard() {
     // Real hooks
-    const { platformsWithConnection, isLoading: platformsLoading } = usePlatforms();
+    const { platforms, isLoading: platformsLoading } = usePlatforms();
     const {
         history,
         lastSyncAt,
@@ -23,8 +23,8 @@ export function SyncDashboard() {
         recentFailures
     } = useSync();
 
-    const connectedCount = platformsWithConnection.filter(p => p.isConnected).length;
-    const totalCount = platformsWithConnection.length;
+    const connectedCount = platforms.filter((p: any) => p.isConnected).length;
+    const totalCount = platforms.length;
 
     const handleSyncAll = async () => {
         try {
@@ -101,7 +101,7 @@ export function SyncDashboard() {
                         Let's assume we map it to be safe.
                     */}
                     <PlatformList
-                        platforms={platformsWithConnection.map(p => ({
+                        platforms={platforms.map((p: any) => ({
                             id: p.platform.id,
                             name: p.platform.name,
                             description: `Sync progress from ${p.platform.name}`,

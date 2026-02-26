@@ -7,13 +7,13 @@ import { prisma } from "@/lib/prisma";
 
 // NOTE: Assumes BlogPostLike model and likeCount field exist
 
-export const POST = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
+export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
     // NOTE: BlogPostLike model is missing from schema.
     return NextResponse.json({ error: "Liking posts is currently disabled" }, { status: 501 });
 });
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
 
     const post = await prisma.blogPost.findUnique({
         where: { slug },

@@ -80,20 +80,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -106,20 +106,20 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.unauthorized('Authentication required', requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
@@ -147,7 +147,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   try {
     // TODO: Return appropriate headers for resource
     // Example: X-Total-Count, X-Resource-Status, etc.
-    
+
     const response = new NextResponse(null, { status: 200 });
     return addHeaders(response, requestId);
   } catch (error) {
@@ -178,7 +178,7 @@ export async function GET(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // Parse query parameters
@@ -207,7 +207,7 @@ export async function GET(
     // 2. Execute query with pagination
     // 3. Transform data as needed
     // -------------------------------------------------------------------------
-    
+
     const data: unknown[] = []; // TODO: Replace with actual query
     const total = 0; // TODO: Get actual count
 
@@ -229,7 +229,7 @@ export async function GET(
         hasNextPage: page < Math.ceil(total / limit),
         hasPreviousPage: page > 1,
       },
-      { meta: { requestId } }
+      { meta: { requestId } as any }
     );
 
     return addHeaders(response, requestId, rateLimitResult);
@@ -261,7 +261,7 @@ export async function POST(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // Parse request body
@@ -296,21 +296,21 @@ export async function POST(
     // 4. Create audit log if needed
     // 5. Trigger side effects (notifications, etc.)
     // -------------------------------------------------------------------------
-    
+
     const result = {}; // TODO: Replace with actual creation
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('POST export/templates completed', {
       userId,
@@ -318,7 +318,7 @@ export async function POST(
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.created(result, { requestId });
+    const response = apiResponse.created(result, { meta: { requestId } as any });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('POST export/templates failed', { requestId }, error);
@@ -348,7 +348,7 @@ export async function PUT(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // Parse request body
@@ -384,7 +384,7 @@ export async function PUT(
     // 5. Create audit log with changes
     // 6. Trigger side effects if needed
     // -------------------------------------------------------------------------
-    
+
     const result = {}; // TODO: Replace with actual update
 
     logger.info('PUT export/templates completed', {
@@ -393,7 +393,7 @@ export async function PUT(
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.success(result, { requestId });
+    const response = apiResponse.success(result, { meta: { requestId } as any });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('PUT export/templates failed', { requestId }, error);
@@ -423,7 +423,7 @@ export async function DELETE(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
+
     const userId = session!.user.id;
 
     // TODO: Implement deletion logic
@@ -436,18 +436,18 @@ export async function DELETE(
     // 6. Clean up related data if needed
     // -------------------------------------------------------------------------
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('DELETE export/templates completed', {
       userId,
@@ -455,7 +455,7 @@ export async function DELETE(
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.success({ deleted: true }, { requestId });
+    const response = apiResponse.success({ deleted: true }, { meta: { requestId } as any });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('DELETE export/templates failed', { requestId }, error);

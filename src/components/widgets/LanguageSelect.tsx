@@ -9,8 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 export interface Language {
   code: string;
@@ -26,7 +25,7 @@ export interface LanguageSelectProps {
   showFlag?: boolean;
   showNativeName?: boolean;
   variant?: 'dropdown' | 'buttons';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'default' | 'lg';
   className?: string;
 }
 
@@ -57,9 +56,9 @@ export const LanguageSelect: React.FC<LanguageSelectProps> = ({
   value: controlledValue,
   onChange,
   showFlag = true,
-  showNativeName = false,
+  showNativeName: _showNativeName = false,
   variant = 'dropdown',
-  size = 'md',
+  size = 'default',
   className,
 }) => {
   const [mounted, setMounted] = useState(false);
@@ -101,8 +100,8 @@ export const LanguageSelect: React.FC<LanguageSelectProps> = ({
         {languages.map((lang) => (
           <Button
             key={lang.code}
-            variant={value === lang.code ? 'primary' : 'ghost'}
-            size={size === 'sm' ? 'sm' : 'md'}
+            variant={value === lang.code ? 'default' : 'ghost'}
+            size={size === 'sm' ? 'sm' : 'default'}
             onClick={() => handleChange(lang.code)}
             className="min-w-0"
           >
@@ -114,25 +113,39 @@ export const LanguageSelect: React.FC<LanguageSelectProps> = ({
     );
   }
 
-  // Dropdown variant
-  const items: DropdownItem[] = languages.map((lang) => ({
-    value: lang.code,
-    label: showNativeName && lang.nativeName ? `${lang.name} (${lang.nativeName})` : lang.name,
-    icon: showFlag && lang.flag ? <span className="text-base">{lang.flag}</span> : undefined,
-  }));
+  // Dropdown variant - rendered as a simple popover-like list
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Dropdown
-      trigger={
-        <Button variant="ghost" size={size === 'sm' ? 'sm' : 'md'} className={className}>
-          {showFlag && selectedLanguage?.flag && <span className="mr-2">{selectedLanguage.flag}</span>}
-          {size !== 'sm' && <span>{selectedLanguage?.code.toUpperCase()}</span>}
-          {size === 'sm' && !selectedLanguage?.flag && <GlobeIcon />}
-        </Button>
-      }
-      items={items}
-      onSelect={handleChange}
-    />
+    <div className="relative">
+      <Button
+        variant="ghost"
+        size={size === 'sm' ? 'sm' : 'default'}
+        className={className}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {showFlag && selectedLanguage?.flag && <span className="mr-2">{selectedLanguage.flag}</span>}
+        {size !== 'sm' && <span>{selectedLanguage?.code.toUpperCase()}</span>}
+        {size === 'sm' && !selectedLanguage?.flag && <GlobeIcon />}
+      </Button>
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-1 z-50 min-w-[160px] bg-popover rounded-md border shadow-md p-1">
+          {languages.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => { handleChange(lang.code); setIsOpen(false); }}
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-accent transition-colors',
+                value === lang.code && 'bg-accent font-medium'
+              )}
+            >
+              {showFlag && lang.flag && <span>{lang.flag}</span>}
+              <span>{lang.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 

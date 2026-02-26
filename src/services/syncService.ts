@@ -1,11 +1,11 @@
-// src/services/syncService.ts
-// Complete rewrite with proper error handling and batch processing
-
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { ScraperFactory } from './scrapers';
+import { ScraperFactory, StubScraper } from './scrapers';
 import { nanoid } from 'nanoid';
-import { SyncStatus, Prisma } from '@prisma/client';
+import { Prisma, SyncStatus, NotificationType, NotificationPriority } from '@prisma/client';
+import { NotificationService } from './notificationService';
+import { CacheService } from './cacheService';
+import { scraperQueues } from '@/lib/bullmq';
 
 // =============================================================================
 // TYPES
@@ -138,7 +138,15 @@ export class SyncService {
     const userPlatforms = await prisma.userPlatform.findMany({
       where: whereClause,
       include: {
-        platform: true,
+        platform: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            syncInterval: true,
+            category: true,
+          }
+        },
         user: {
           select: { id: true, email: true }
         }
@@ -222,12 +230,28 @@ export class SyncService {
           { triggeredBy }
         );
 
-        results.push(result);
-
-        if (result.success) {
+        if ('queued' in result) {
+          // Handle queued job (mostly for syncAllPlatforms if it ever uses async: true)
+          // For now, sequentially we expect PlatformSyncResult
+          results.push({
+            platformId: userPlatform.platformId,
+            platformSlug,
+            platformName: userPlatform.platform.name,
+            success: true,
+            status: SyncStatus.IN_PROGRESS,
+            entriesAdded: 0,
+            entriesUpdated: 0,
+            entriesSkipped: 0,
+            duration: 0,
+          });
           successCount++;
         } else {
-          failCount++;
+          results.push(result);
+          if (result.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
         }
       } catch (error) {
         failCount++;
@@ -284,6 +308,59 @@ export class SyncService {
   static async syncPlatform(
     userId: string,
     platformId: string,
+    options: { triggeredBy?: string; async?: boolean } = {}
+  ): Promise<PlatformSyncResult | { queued: boolean; jobId: string }> {
+    const { triggeredBy = 'manual', async = false } = options;
+
+    if (!async) {
+      return this.internalSync(userId, platformId, { triggeredBy });
+    }
+
+    // Async execution via BullMQ
+    try {
+      const userPlatform = await prisma.userPlatform.findUnique({
+        where: { userId_platformId: { userId, platformId } },
+        include: { platform: { select: { slug: true } } },
+      });
+
+      if (!userPlatform) throw new Error('Platform not connected');
+
+      const platformSlug = userPlatform.platform.slug;
+      const isHeavy = ScraperFactory.isHeavy(platformSlug);
+
+      // Determine Queue
+      const queue = triggeredBy === 'manual'
+        ? scraperQueues.priority
+        : (isHeavy ? scraperQueues.heavy : scraperQueues.light);
+
+      const job = await queue.add(`sync-${platformSlug}-${userId}`, {
+        userId,
+        platformId,
+        userPlatformId: userPlatform.id,
+        triggeredBy
+      }, {
+        removeOnComplete: true,
+        removeOnFail: false,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      });
+
+      return { queued: true, jobId: job.id! };
+    } catch (error) {
+      logger.error('Failed to enqueue sync job', { userId, platformId, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Internal core sync logic (Scraping + Processing)
+   */
+  static async internalSync(
+    userId: string,
+    platformId: string,
     options: { triggeredBy?: string } = {}
   ): Promise<PlatformSyncResult> {
     const { triggeredBy = 'manual' } = options;
@@ -323,12 +400,38 @@ export class SyncService {
       },
     });
 
+    // Acquire concurrency lock
+    if (!ScraperFactory.acquireLock(platformSlug)) {
+      logger.warn(`Sync already in progress for ${platformSlug}, user ${userId}. Skipping internal sync.`);
+      return {
+        platformId,
+        platformSlug,
+        platformName: platform.name,
+        success: false,
+        status: SyncStatus.CANCELLED,
+        entriesAdded: 0,
+        entriesUpdated: 0,
+        entriesSkipped: 0,
+        duration: 0,
+        error: 'Sync already in progress'
+      };
+    }
+
     try {
       // Get scraper
       const scraper = await ScraperFactory.getOrLoadScraper(platformSlug);
 
       if (!scraper) {
         throw new Error(`No scraper available for ${platform.name}`);
+      }
+
+      // Check if it's a stub (load failed)
+      // We import StubScraper via require/import at top to check instanceof?
+      // Or just check a property. BaseScraper probably doesn't have isStub.
+      // Dynamic import of StubScraper might be needed if not imported.
+      // Assuming StubScraper is imported or we use name check.
+      if (scraper instanceof StubScraper) {
+        throw new Error(`Scraper module for ${platform.name} could not be loaded`);
       }
 
       if (!ScraperFactory.isScraperWorking(platformSlug)) {
@@ -376,62 +479,95 @@ export class SyncService {
         throw new Error(scraperResult.error || 'Sync failed');
       }
 
-      // Process entries
+      // Process entries (Directive 4: Batch updates)
       let entriesAdded = 0;
       let entriesUpdated = 0;
       let entriesSkipped = 0;
 
-      const entries = scraperResult.entries || [];
+      const rawEntries = scraperResult.entries || [];
+
+      // Aggregate entries by normalized date to prevent unique constraint violations
+      const aggregatedEntriesMap = new Map<number, typeof rawEntries[0]>();
+
+      for (const entry of rawEntries) {
+        const normalizedTime = normalizeDate(entry.date).getTime();
+        const existing = aggregatedEntriesMap.get(normalizedTime);
+
+        if (existing) {
+          existing.problems = (existing.problems || 0) + (entry.problems || 0);
+          existing.commits = (existing.commits || 0) + (entry.commits || 0);
+          existing.pullRequests = (existing.pullRequests || 0) + (entry.pullRequests || 0);
+          existing.issues = (existing.issues || 0) + (entry.issues || 0);
+          existing.timeSpent = (existing.timeSpent || 0) + (entry.timeSpent || 0);
+          if (entry.rating) existing.rating = entry.rating;
+          if (entry.points) existing.points = entry.points;
+        } else {
+          aggregatedEntriesMap.set(normalizedTime, { ...entry, date: new Date(normalizedTime) });
+        }
+      }
+
+      const entries = Array.from(aggregatedEntriesMap.values());
+      const entryDates = entries.map(e => e.date);
+
+      // Fetch existing entries in one query
+      const existingEntries = await prisma.trackerEntry.findMany({
+        where: {
+          userId,
+          platformId,
+          date: { in: entryDates }
+        }
+      });
+
+      const existingEntriesMap = new Map(
+        existingEntries.map(e => [e.date.toISOString().split('T')[0], e])
+      );
+
+      // Prepare operations
+      const updates = [];
+      const creates = [];
 
       for (const entry of entries) {
         const normalizedDate = normalizeDate(entry.date);
-
-        // Check for existing entry
-        const existingEntry = await prisma.trackerEntry.findFirst({
-          where: {
-            userId,
-            date: normalizedDate,
-            platformId,
-          },
-        });
+        const dateKey = normalizedDate.toISOString().split('T')[0];
+        const existingEntry = existingEntriesMap.get(dateKey);
 
         if (existingEntry) {
           // Check if there's actually new data
           const hasChanges =
-            (entry.problems ?? 0) !== existingEntry.problemsSolved ||
-            (entry.commits ?? 0) !== existingEntry.commits ||
-            (entry.pullRequests ?? 0) !== existingEntry.pullRequests;
+            (entry.problems ?? 0) !== (existingEntry as any).problemsSolved ||
+            (entry.commits ?? 0) !== (existingEntry as any).commits ||
+            (entry.pullRequests ?? 0) !== (existingEntry as any).pullRequests;
 
           if (!hasChanges) {
             entriesSkipped++;
             continue;
           }
 
-          // Update existing entry - merge values
-          await prisma.trackerEntry.update({
+          // Queue update
+          updates.push(prisma.trackerEntry.update({
             where: { id: existingEntry.id },
             data: {
-              problemsSolved: Math.max(entry.problems ?? 0, existingEntry.problemsSolved),
-              commits: Math.max(entry.commits ?? 0, existingEntry.commits),
-              pullRequests: Math.max(entry.pullRequests ?? 0, existingEntry.pullRequests),
-              pullRequestsMerged: Math.max(entry.pullRequests ?? 0, existingEntry.pullRequestsMerged),
-              issuesOpened: Math.max(entry.issues ?? 0, existingEntry.issuesOpened),
-              timeSpent: Math.max(entry.timeSpent ?? 0, existingEntry.timeSpent),
-              rating: entry.rating ?? existingEntry.rating,
-              ratingChange: entry.ratingChange ?? existingEntry.ratingChange,
-              rank: entry.rank ?? existingEntry.rank,
-              points: entry.points ?? existingEntry.points,
-              xpEarned: entry.xp ?? existingEntry.xpEarned,
+              problemsSolved: Math.max(entry.problems ?? 0, (existingEntry as any).problemsSolved ?? 0),
+              commits: Math.max(entry.commits ?? 0, (existingEntry as any).commits ?? 0),
+              pullRequests: Math.max(entry.pullRequests ?? 0, (existingEntry as any).pullRequests ?? 0),
+              pullRequestsMerged: Math.max(entry.pullRequests ?? 0, (existingEntry as any).pullRequestsMerged ?? 0),
+              issuesOpened: Math.max(entry.issues ?? 0, (existingEntry as any).issuesOpened ?? 0),
+              timeSpent: Math.max(entry.timeSpent ?? 0, existingEntry.timeSpent ?? 0),
+              rating: entry.rating ?? (existingEntry as any).rating,
+              ratingChange: entry.ratingChange ?? (existingEntry as any).ratingChange,
+              rank: entry.rank ?? (existingEntry as any).rank,
+              points: entry.points ?? (existingEntry as any).points,
+              xpEarned: entry.xp ?? (existingEntry as any).xpEarned,
               notes: entry.notes || existingEntry.notes,
               source: 'sync',
               syncLogId: syncLog.id,
               updatedAt: new Date(),
             },
-          });
+          }));
           entriesUpdated++;
         } else {
-          // Create new entry
-          await prisma.trackerEntry.create({
+          // Queue create
+          creates.push(prisma.trackerEntry.create({
             data: {
               userId,
               date: normalizedDate,
@@ -453,9 +589,16 @@ export class SyncService {
               syncLogId: syncLog.id,
               isAutoGenerated: true,
             },
-          });
+          }));
           entriesAdded++;
         }
+      }
+
+      // Execute all db operations using transaction
+      if (updates.length > 0 || creates.length > 0) {
+        await prisma.$transaction([...updates, ...creates]);
+        // Invalidate Redis cache to ensure the UI updates correctly
+        await CacheService.invalidateStats(userId, 'entry');
       }
 
       const duration = Date.now() - startTime;
@@ -501,6 +644,24 @@ export class SyncService {
         entriesSkipped,
         duration,
       });
+
+      // Send notification if enabled
+      if (userPlatform.notifyOnSync) {
+        await NotificationService.createNotification(userId, {
+          type: NotificationType.SYNC_COMPLETE,
+          priority: NotificationPriority.LOW,
+          title: `Sync Complete: ${platform.name}`,
+          message: `Successfully synced data from ${platform.name}. ${entriesAdded} new, ${entriesUpdated} updated.`,
+          shortMessage: `${platform.name} synced`,
+          actionUrl: '/tracker',
+          actionLabel: 'View Activity',
+          entityType: 'platform',
+          entityId: platformId,
+        });
+      }
+
+      // Invalidate stats cache after successful sync
+      await CacheService.invalidateStats(userId);
 
       return {
         platformId,
@@ -551,6 +712,22 @@ export class SyncService {
         error instanceof Error ? error : new Error(errorMessage)
       );
 
+      // Send notification on error if enabled
+      if (userPlatform.notifyOnError) {
+        await NotificationService.createNotification(userId, {
+          type: NotificationType.SYNC_FAILED,
+          priority: NotificationPriority.HIGH,
+          title: `Sync Failed: ${platform.name}`,
+          message: `Failed to sync data from ${platform.name}. ${errorMessage}`,
+          shortMessage: `${platform.name} sync failed`,
+          actionUrl: '/platforms',
+          actionLabel: 'Check Connection',
+          entityType: 'platform',
+          entityId: platformId,
+          metadata: { error: errorMessage }
+        });
+      }
+
       return {
         platformId,
         platformSlug,
@@ -563,6 +740,9 @@ export class SyncService {
         duration,
         error: errorMessage,
       };
+    } finally {
+      // Always release the lock
+      ScraperFactory.releaseLock(platformSlug);
     }
   }
 
@@ -615,7 +795,7 @@ export class SyncService {
       p.syncStatus === SyncStatus.SUCCESS &&
       p.consecutiveFailures === 0
     ).length;
-    const failingPlatforms = platforms.filter(p =>
+    const failingPlatforms = platforms.filter((p: any) =>
       p.consecutiveFailures >= 3
     ).length;
 
@@ -624,7 +804,7 @@ export class SyncService {
       activeSyncs,
       lastSync,
       recentLogs,
-      platforms: platforms.map(p => ({
+      platforms: platforms.map((p: any) => ({
         platformId: p.platformId,
         name: p.platform.name,
         slug: p.platform.slug,
@@ -830,7 +1010,7 @@ export class SyncService {
       },
     });
 
-    return platforms.map(p => ({
+    return platforms.map((p: any) => ({
       userId: p.userId,
       platformId: p.platformId,
       platformSlug: p.platform.slug,

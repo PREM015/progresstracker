@@ -1,68 +1,73 @@
-// src/services/scrapers/topcoderScraper.ts
+
 import { BaseScraper } from './baseScraper';
 import type { ScraperCredentials, ScraperResult } from './types';
-
-interface TopCoderMember {
-  handle: string;
-  maxRating?: { rating?: number };
-  photoURL?: string;
-}
-
-interface TopCoderStats {
-  DATA_SCIENCE?: {
-    SRM?: { rating?: number; challenges?: number };
-  };
-  DEVELOP?: { rating?: number };
-}
+import { BrowserService } from '../browserService';
 
 export class TopCoderScraper extends BaseScraper {
   platformName = 'TopCoder';
   platformSlug = 'topcoder';
-  protected baseUrl = 'https://api.topcoder.com/v5';
+  protected baseUrl = 'https://www.topcoder.com';
 
   async fetchData(credentials: ScraperCredentials): Promise<ScraperResult> {
     try {
       this.validateCredentials(credentials, ['username']);
-      const handle = credentials.username!;
+      const username = credentials.username!;
+      const profileUrl = `${this.baseUrl}/members/${username}`;
 
-      // TopCoder has a public API
-      const memberResponse = await this.get<TopCoderMember>(`${this.baseUrl}/members/${handle}`);
-
-      if (!memberResponse || !memberResponse.handle) {
-        return this.failure(`TopCoder user "${handle}" not found`);
-      }
-
-      // Get stats
-      let statsResponse: TopCoderStats | null = null;
+      let page;
       try {
-        statsResponse = await this.get<TopCoderStats>(`${this.baseUrl}/members/${handle}/stats`);
-      } catch {
-        // Stats might not be available
+        page = await BrowserService.getPage();
+
+        console.log(`[TopCoderScraper] Navigating to ${profileUrl}`);
+        const response = await page.goto(profileUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+
+        // TopCoder SPA might return 200 even for 404 page content
+
+        try {
+          await page.waitForSelector('div[class*="styles__rating"]', { timeout: 15000 });
+        } catch (e) {
+          // Check if 404
+          const content = await page.content();
+          if (content.includes("Member not found")) {
+            return this.failure(`TopCoder user "${username}" not found`);
+          }
+          console.log('[TopCoderScraper] Timeout waiting for rating, proceeding to scrape what we can');
+        }
+
+        const data = await page.evaluate(() => {
+          // Extract Rating
+          const ratingEl = document.querySelector('div[class*="styles__rating"]');
+          const ratingText = ratingEl?.textContent || '0';
+          const rating = parseInt(ratingText.replace(/\D/g, ''), 10) || 0;
+
+          // Extract "Track" wins or activity if clear
+          // For now, rating is the main stat
+
+          return { rating };
+        });
+
+        // Topcoder doesn't show "problems solved" directly in a simple way on the new profile
+        // We'll track rating as the primary metric
+
+        const entries = data.rating > 0 ? [{
+          date: new Date(),
+          rating: data.rating,
+          notes: `TopCoder Rating: ${data.rating}`
+        }] : [];
+
+        return this.success(entries, {
+          username,
+          profileUrl,
+          rating: data.rating,
+          rank: data.rating.toString() // Use rating as rank proxy
+        });
+
+      } catch (error: any) {
+        return this.handleError(error);
+      } finally {
+        if (page) await page.close();
       }
 
-      const algorithmRating =
-        statsResponse?.DATA_SCIENCE?.SRM?.rating || statsResponse?.DEVELOP?.rating || 0;
-
-      const challenges = statsResponse?.DATA_SCIENCE?.SRM?.challenges || 0;
-
-      const entries =
-        challenges > 0
-          ? [
-              {
-                date: new Date(),
-                problems: challenges,
-                notes: `TopCoder profile synced. Rating: ${algorithmRating}`,
-              },
-            ]
-          : [];
-
-      return this.success(entries, {
-        username: handle,
-        profileUrl: `https://www.topcoder.com/members/${handle}`,
-        avatarUrl: memberResponse.photoURL,
-        rating: algorithmRating,
-        rank: memberResponse.maxRating?.rating?.toString(),
-      });
     } catch (error) {
       return this.handleError(error);
     }

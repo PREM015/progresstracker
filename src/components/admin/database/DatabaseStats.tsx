@@ -1,4 +1,6 @@
+'use client';
 import { useAdminDatabase } from '@/hooks/useAdminDatabase';
+
 
 export function DatabaseStats() {
     const { stats, isLoadingStats: loading } = useAdminDatabase();

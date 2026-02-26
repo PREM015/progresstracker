@@ -6,23 +6,23 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 import { PlatformCategory } from "@prisma/client";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     category: string;
-  };
+  }>;
 }
 
 // GET /api/tracker/category/[category] - Get entries for a specific category
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { category } = params;
+    const { category } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const startDate = searchParams.get("startDate");
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       category: category.toUpperCase(),
       entries,
       stats,

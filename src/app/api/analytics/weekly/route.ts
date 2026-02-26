@@ -15,13 +15,13 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-import { 
-  startOfWeek, 
-  endOfWeek, 
-  subWeeks, 
-  format, 
-  eachDayOfInterval, 
-  getDay 
+import {
+  startOfWeek,
+  endOfWeek,
+  subWeeks,
+  format,
+  eachDayOfInterval,
+  getDay
 } from 'date-fns';
 
 // =============================================================================
@@ -149,8 +149,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
       weeksBack: searchParams.get('weeksBack') || '0',
-      includeComparison: searchParams.get('includeComparison'),
-      includeDailyBreakdown: searchParams.get('includeDailyBreakdown'),
+      includeComparison: searchParams.get('includeComparison') ?? undefined,
+      includeDailyBreakdown: searchParams.get('includeDailyBreakdown') ?? undefined,
     });
 
     if (!queryValidation.success) {
@@ -277,17 +277,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           commits: calculateChange(weekStats.commits, prevStats.commits),
           time: calculateChange(weekStats.time, prevStats.time),
         },
-        trend: weekStats.problems > prevStats.problems ? 'up' : 
-               weekStats.problems < prevStats.problems ? 'down' : 'stable',
+        trend: weekStats.problems > prevStats.problems ? 'up' :
+          weekStats.problems < prevStats.problems ? 'down' : 'stable',
       };
     }
 
     // Calculate averages
-    const avgProblemsPerDay = weekStats.activeDays > 0 
-      ? Math.round((weekStats.problems / weekStats.activeDays) * 10) / 10 
+    const avgProblemsPerDay = weekStats.activeDays > 0
+      ? Math.round((weekStats.problems / weekStats.activeDays) * 10) / 10
       : 0;
-    const avgTimePerDay = weekStats.activeDays > 0 
-      ? Math.round(weekStats.time / weekStats.activeDays) 
+    const avgTimePerDay = weekStats.activeDays > 0
+      ? Math.round(weekStats.time / weekStats.activeDays)
       : 0;
 
     // Find best day
@@ -316,8 +316,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       averages: {
         problemsPerDay: avgProblemsPerDay,
         timePerDay: avgTimePerDay,
-        commitsPerDay: weekStats.activeDays > 0 
-          ? Math.round((weekStats.commits / weekStats.activeDays) * 10) / 10 
+        commitsPerDay: weekStats.activeDays > 0
+          ? Math.round((weekStats.commits / weekStats.activeDays) * 10) / 10
           : 0,
       },
       daily: dailyBreakdown,

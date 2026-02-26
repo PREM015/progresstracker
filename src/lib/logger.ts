@@ -123,6 +123,10 @@ class Logger {
    * Format log entry
    */
   private formatLog(entry: LogEntry): string {
+    if (!this.isDevelopment) {
+      return JSON.stringify(entry);
+    }
+
     const { level, message, timestamp, context, error, requestId, userId, duration } = entry;
 
     const parts: string[] = [
@@ -223,7 +227,7 @@ class Logger {
    * Send to error tracking service (Sentry, etc.)
    */
   private sendToErrorTracking(entry: LogEntry): void {
- 
+
     if (typeof Sentry !== 'undefined') {
       Sentry.captureException(
         entry.error instanceof Error ? entry.error : new Error(String(entry.error)),
@@ -329,7 +333,7 @@ class ChildLogger {
   constructor(
     private parent: Logger,
     private context: Record<string, any>
-  ) {}
+  ) { }
 
   debug(message: string, context?: Record<string, any>): void {
     this.parent.debug(message, { ...this.context, ...context });

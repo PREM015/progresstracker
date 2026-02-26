@@ -39,9 +39,10 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
     const requestId = generateRequestId();
+    const { id } = await params;
     const startTime = Date.now();
 
     try {
@@ -66,7 +67,7 @@ export async function POST(
 
         // Verify ticket exists and user owns it
         const ticket = await prisma.supportTicket.findUnique({
-            where: { id: params.id },
+            where: { id },
             select: { userId: true, status: true }
         });
 
@@ -81,7 +82,7 @@ export async function POST(
         // Create reply
         const reply = await prisma.ticketReply.create({
             data: {
-                ticketId: params.id,
+                ticketId: id,
                 userId: session.user.id,
                 message: validation.data.message,
                 isStaffReply: false,
@@ -91,14 +92,14 @@ export async function POST(
         // Update ticket updated time and maybe status to OPEN if it was closed?
         // Usually replying re-opens it.
         await prisma.supportTicket.update({
-            where: { id: params.id },
+            where: { id },
             data: {
                 updatedAt: new Date(),
                 status: ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' ? 'OPEN' : undefined // Re-open
             }
         });
 
-        logger.info('POST support ticket reply completed', { ticketId: params.id, replyId: reply.id, requestId, duration: Date.now() - startTime });
+        logger.info('POST support ticket reply completed', { ticketId: id, replyId: reply.id, requestId, duration: Date.now() - startTime });
 
         return addHeaders(apiResponse.created(reply, { meta: { requestId } }), requestId, rateLimitResult);
 

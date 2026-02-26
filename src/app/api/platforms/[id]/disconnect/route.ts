@@ -47,6 +47,8 @@ const DisconnectOptionsSchema = z.object({
   confirm: z.boolean().optional(),
 });
 
+type DisconnectOptions = z.infer<typeof DisconnectOptionsSchema>;
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -116,7 +118,7 @@ async function handleDisconnect(
     }
 
     // Parse options
-    let options = { deleteData: false, deleteSyncLogs: false };
+    let options: DisconnectOptions = { deleteData: false, deleteSyncLogs: false };
     try {
       const body = await request.json();
       const validation = DisconnectOptionsSchema.safeParse(body);
@@ -155,8 +157,7 @@ async function handleDisconnect(
 
     // Require confirmation if deleting data
     if ((options.deleteData || options.deleteSyncLogs) && entryCount > 0) {
-      const { confirm } = options as { confirm?: boolean };
-      if (!confirm) {
+      if (!options.confirm) {
         return addHeaders(
           apiResponse.validationError(
             'Confirmation required',

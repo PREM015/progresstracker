@@ -1,33 +1,40 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/apiResponse";
+import { Prisma } from "@prisma/client";
 
 // POST /api/notifications/cleanup - Clean old notifications
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
     const body = await request.json();
-    const { 
-      olderThanDays = 90, 
-      onlyRead = true, 
+
+    const {
+      olderThanDays = 90,
+      onlyRead = true,
       onlyArchived = false,
       onlyDismissed = false,
       deleteExpired = true,
+    }: {
+      olderThanDays?: number;
+      onlyRead?: boolean;
+      onlyArchived?: boolean;
+      onlyDismissed?: boolean;
+      deleteExpired?: boolean;
     } = body;
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    const whereConditions: any[] = [];
+    const whereConditions: Prisma.NotificationWhereInput[] = [];
 
-    // Delete old read notifications
     if (onlyRead) {
       whereConditions.push({
         userId: session.user.id,
@@ -36,7 +43,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Delete old archived notifications
     if (onlyArchived) {
       whereConditions.push({
         userId: session.user.id,
@@ -45,7 +51,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Delete old dismissed notifications
     if (onlyDismissed) {
       whereConditions.push({
         userId: session.user.id,
@@ -54,7 +59,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Delete expired notifications
     if (deleteExpired) {
       whereConditions.push({
         userId: session.user.id,
@@ -69,21 +73,20 @@ export async function POST(request: NextRequest) {
       const result = await prisma.notification.deleteMany({
         where: condition,
       });
+
       totalDeleted += result.count;
-      
-      // Track what was deleted
+
       if (condition.isRead) details.read = result.count;
       if (condition.isArchived) details.archived = result.count;
       if (condition.isDismissed) details.dismissed = result.count;
       if (condition.expiresAt) details.expired = result.count;
     }
 
-    // Get remaining counts
     const remainingCount = await prisma.notification.count({
       where: { userId: session.user.id },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       success: true,
       deletedCount: totalDeleted,
       details,

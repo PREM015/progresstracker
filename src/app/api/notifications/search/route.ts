@@ -8,13 +8,13 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(request.url);
-    
+
     const query = searchParams.get("q") || searchParams.get("query");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       prisma.notification.count({ where: whereClause }),
     ]);
 
-    return apiResponse({
+    return apiResponse.success({
       query,
       notifications,
       pagination: {

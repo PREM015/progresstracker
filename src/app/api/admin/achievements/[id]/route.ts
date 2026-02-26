@@ -208,7 +208,7 @@ export async function PUT(request: NextRequest, context: RouteContext): Promise<
 
     const updated = await prisma.achievement.update({
       where: { id },
-      data: { ...validation.data, updatedAt: new Date() },
+      data: { ...(validation.data as any), updatedAt: new Date() },
     });
 
     // Audit log

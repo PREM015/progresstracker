@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrorHandling } from "@/lib/apiHandler";
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
 
     const post = await prisma.blogPost.findUnique({
         where: { slug },
@@ -49,7 +49,7 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
     });
 });
 
-export const POST = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
+export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
     // Optional analytics tracking for shares
     // req.body: { platform: string }
     return NextResponse.json({ success: true });

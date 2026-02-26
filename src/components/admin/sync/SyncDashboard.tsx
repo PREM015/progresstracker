@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminSync } from '@/hooks/useAdminSync';
 
 export function SyncDashboard() {
@@ -34,7 +36,7 @@ export function SyncDashboard() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Platform Sync Status</h3>
                 <div className="space-y-3">
-                    {syncData?.platformStatus?.map((platform) => (
+                    {syncData?.platformStatus?.map((platform: { id: string; name: string; status: string; lastSync: Date | string | null }) => (
                         <div key={platform.id} className="flex items-center justify-between p-3 bg-zinc-950 rounded-lg">
                             <div className="flex items-center gap-3">
                                 <div className={`w-2 h-2 rounded-full ${platform.status === 'ACTIVE' ? 'bg-green-400' :

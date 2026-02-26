@@ -39,11 +39,12 @@ const LEGAL_DOCS: Record<string, any> = {
     }
 };
 
-export async function GET(request: NextRequest, { params }: { params: { type: string } }): Promise<NextResponse> {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ type: string }> }): Promise<NextResponse> {
     const requestId = generateRequestId();
 
     try {
-        const type = params.type.toLowerCase();
+        const { type: rawType } = await params;
+        const type = rawType.toLowerCase();
         const doc = LEGAL_DOCS[type];
 
         if (!doc) {

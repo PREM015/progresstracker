@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       low: notifications.filter((n) => n.priority === "LOW").length,
     };
 
-    return apiResponse({
+    return apiResponse.success({
       notifications,
       unreadCount,
       totalCount,

@@ -61,6 +61,7 @@ export const NOTIFICATION_TYPE_MAP: Record<PrismaNotificationType, NotificationT
   BILLING_ALERT: 'billing_alert',
   WELCOME: 'welcome',
   CUSTOM: 'custom',
+  REFERRAL: 'custom'
 };
 
 // =============================================================================

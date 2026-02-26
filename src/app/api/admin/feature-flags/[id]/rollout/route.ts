@@ -26,9 +26,10 @@ export async function OPTIONS(): Promise<NextResponse> {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
+  const { id } = await params;
 
   try {
     // Auth check
@@ -53,14 +54,14 @@ export async function POST(
 
     // Update feature flag
     const flag = await prisma.featureFlag.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         enabledPercentage: percentage,
         metadata: {
           rolloutStrategy: strategy,
           rolloutUpdatedAt: new Date().toISOString(),
           rolloutUpdatedBy: session.user.id,
-        }
+        } as any
       }
     });
 
@@ -71,7 +72,7 @@ export async function POST(
         action: 'UPDATE',
         category: 'feature_flags',
         entityType: 'feature_flag',
-        entityId: params.id,
+        entityId: id,
         description: `Updated rollout percentage to ${percentage}% using ${strategy} strategy`,
         newValue: { percentage, strategy },
         ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
@@ -82,7 +83,7 @@ export async function POST(
     logger.info('Feature flag rollout updated', {
       requestId,
       adminId: session.user.id,
-      flagId: params.id,
+      flagId: id,
       percentage,
       strategy
     });

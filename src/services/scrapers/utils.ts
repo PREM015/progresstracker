@@ -197,18 +197,24 @@ export async function retryWithBackoff<T>(
   initialDelay: number = 1000,
   maxDelay: number = 30000
 ): Promise<T> {
-  let lastError: Error | undefined;
+  let lastError: any;
   let delay = initialDelay;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+    } catch (error: any) {
+      lastError = error;
+
+      // Don't retry on client errors (4xx) except for rate limits (429) and timeouts (408)
+      const status = error?.response?.status || error?.status;
+      if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429 && status !== 408) {
+        throw error;
+      }
 
       if (attempt < maxRetries) {
         logger.warn(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`, {
-          error: lastError.message,
+          error: lastError?.message || String(lastError),
         });
         await sleep(delay);
         delay = Math.min(delay * 2, maxDelay);
@@ -216,7 +222,7 @@ export async function retryWithBackoff<T>(
     }
   }
 
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /**

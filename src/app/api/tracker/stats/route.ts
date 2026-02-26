@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 export async function GET(
   request: NextRequest
 ) {
+  const requestId = `req_${Date.now().toString(36)}`;
   try {
     const session = await getServerSession(authOptions);
 
@@ -25,6 +26,19 @@ export async function GET(
     }
 
     const userId = session.user.id;
+    const cacheKey = `tracker:stats:${userId}`;
+
+    // Try to get from cache
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cachedStats = await import('@/lib/redis').then(m => m.cache.get<any>(cacheKey));
+      if (cachedStats) {
+        return NextResponse.json(cachedStats);
+      }
+    } catch (error) {
+      // Ignore cache errors
+    }
+
     const now = new Date();
     const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -45,11 +59,20 @@ export async function GET(
       }),
     ]);
 
-    return NextResponse.json({
+    const stats = {
       total,
       thisWeek,
       today,
-    });
+    };
+
+    // Cache for 5 minutes
+    try {
+      await import('@/lib/redis').then(m => m.cache.set(cacheKey, stats, 300));
+    } catch (error) {
+      // Ignore cache errors
+    }
+
+    return NextResponse.json(stats);
   } catch (error) {
     console.error('[TRACKER_STATS_GET]', error);
     return NextResponse.json(

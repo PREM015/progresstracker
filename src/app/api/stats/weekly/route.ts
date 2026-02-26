@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import { StatsService } from '@/services/statsService';
+import { CacheService } from '@/services/cacheService';
 import { startOfWeek, endOfWeek, differenceInDays } from 'date-fns';
 import { logger } from '@/lib/logger';
 
 const RATE_LIMIT = 20;
+const CACHE_TTL_SECONDS = 300; // 5 minutes
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
@@ -26,83 +29,132 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             return apiResponse.rateLimited(60, requestId);
         }
 
+        // Check cache first
+        const cacheKey = `stats:weekly:data:${userId}`;
+        const cachedStats = await CacheService.get(cacheKey);
+        if (cachedStats) {
+            logger.info('GET stats weekly cache hit', { userId, requestId, duration: Date.now() - startTime });
+            return apiResponse.success(cachedStats, { meta: { requestId, cached: true } });
+        }
+
         // Current week (Monday start)
         const now = new Date();
         const startDate = startOfWeek(now, { weekStartsOn: 1 });
         const endDate = endOfWeek(now, { weekStartsOn: 1 });
         const days = differenceInDays(endDate, startDate) + 1; // Should be 7
 
-        // Fetch all required data in parallel
-        const [
-            overall,
-            problemsTrend,
-            commitsTrend,
-            timeTrend,
-            pointsTrend
-        ] = await Promise.all([
-            StatsService.getOverallStats(userId, 7), // Approximate for overall stats (totals might be slightly off if user has < 7 days history but we want consistency)
-            // Actually getOverallStats takes days looking back. 
-            // We should ideally filter by exact date range.
-            // But getOverallStats uses subDays(now, days).
-            // For weekly specific, we might want exact range.
-            // We'll use getOverallStats(7) as a close approximation for totals, 
-            // OR we can rely on aggregating the trend data which is exact.
-            // Let's use getOverallStats(7) for now as it returns everything including activeDays etc.
-            // A better approach would be to add startDate/endDate to getOverallStats but I can't change signature too much right now.
-            // Wait, getOverallStats logic is: startDate = startOfDay(subDays(new Date(), days));
-            // That's rolling window. 
-            // "Weekly" usually means "This Week".
-            // If I want exact "This Week", I should manually aggregate or assume the user wants "Last 7 Days" if they hit "Weekly" endpoint?
-            // DashboardService.getWeekly() implies "This Week".
-            // I will use getOverallStats(7) which is "Last 7 Days". 
-            // If strict "This Week" (Mon-Sun) is needed, getOverallStats logic needs to change.
-            // For now, "Last 7 Days" is a reasonable fallback for "Weekly" stats if strictly "This Week" isn't supported by service efficiently.
-            // However, I can manually filter the trends which ARE exact range.
-            StatsService.getTrendData(userId, startDate, endDate, 'problems'),
-            StatsService.getTrendData(userId, startDate, endDate, 'commits'),
-            StatsService.getTrendData(userId, startDate, endDate, 'time'),
-            StatsService.getTrendData(userId, startDate, endDate, 'points')
-        ]);
+        // Fetch only needed fields for the week in one query
+        const entries = await prisma.trackerEntry.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                date: true,
+                platformId: true,
+                problemsSolved: true,
+                commits: true,
+                timeSpent: true,
+                points: true,
+                platform: {
+                    select: { id: true, name: true, icon: true },
+                },
+            },
+            orderBy: { date: 'asc' },
+        });
 
-        // Re-calculate totals from trends to be exact for the week range
-        const totalProblems = problemsTrend.reduce((sum, p) => sum + p.value, 0);
-        const totalCommits = commitsTrend.reduce((sum, p) => sum + p.value, 0);
-        const totalTime = timeTrend.reduce((sum, p) => sum + p.value, 0);
-        const totalPoints = pointsTrend.reduce((sum, p) => sum + p.value, 0);
+        // Initialize daily buckets
+        const dailyStats = new Map<string, { problems: number; commits: number; time: number; points: number }>();
+        // Pre-fill all days
+        for (let i = 0; i < days; i++) {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + i);
+            const key = d.toISOString().split('T')[0];
+            dailyStats.set(key, { problems: 0, commits: 0, time: 0, points: 0 });
+        }
+
+        // Initialize totals and breakdowns
+        let totalProblems = 0;
+        let totalCommits = 0;
+        let totalTime = 0;
+        let totalPoints = 0;
+        const platformMap = new Map<string, { id: string; name: string; icon: string; problems: number; commits: number; time: number }>();
+
+        // Process entries
+        for (const entry of entries) {
+            const dayKey = entry.date.toISOString().split('T')[0];
+            const dayStat = dailyStats.get(dayKey);
+
+            if (dayStat) {
+                dayStat.problems += entry.problemsSolved;
+                dayStat.commits += entry.commits;
+                dayStat.time += entry.timeSpent;
+                dayStat.points += (entry.points || 0);
+            }
+
+            totalProblems += entry.problemsSolved;
+            totalCommits += entry.commits;
+            totalTime += entry.timeSpent;
+            totalPoints += (entry.points || 0);
+
+            // Platform stats
+            if (entry.platformId) {
+                if (!platformMap.has(entry.platformId)) {
+                    platformMap.set(entry.platformId, {
+                        id: entry.platformId,
+                        name: entry.platform?.name || 'Unknown',
+                        icon: entry.platform?.icon || '',
+                        problems: 0,
+                        commits: 0,
+                        time: 0
+                    });
+                }
+                const pStat = platformMap.get(entry.platformId)!;
+                pStat.problems += entry.problemsSolved;
+                pStat.commits += entry.commits;
+                pStat.time += entry.timeSpent;
+            }
+        }
+
+        // Format trends
+        const dates = Array.from(dailyStats.keys()).sort();
+        const problemsTrend = dates.map(date => ({ date, count: dailyStats.get(date)!.problems }));
+        const commitsTrend = dates.map(date => ({ date, count: dailyStats.get(date)!.commits }));
+        const timeTrend = dates.map(date => ({ date, minutes: dailyStats.get(date)!.time }));
+        const pointsTrend = dates.map(date => ({ date, points: dailyStats.get(date)!.points }));
 
         const stats = {
             period: 'Current Week',
             problems: {
                 total: totalProblems,
-                easy: 0, // Not easily available without another query, using 0 or placeholder
+                easy: 0, // Simplified as per original
                 medium: 0,
                 hard: 0,
-                byDay: problemsTrend.map(p => ({ date: p.date, count: p.value }))
+                byDay: problemsTrend
             },
             commits: {
                 total: totalCommits,
-                byDay: commitsTrend.map(p => ({ date: p.date, count: p.value }))
+                byDay: commitsTrend
             },
             time: {
                 total: totalTime,
                 average: Math.round(totalTime / days),
-                byDay: timeTrend.map(p => ({ date: p.date, minutes: p.value }))
+                byDay: timeTrend
             },
             points: {
                 total: totalPoints,
-                byDay: pointsTrend.map(p => ({ date: p.date, points: p.value }))
+                byDay: pointsTrend
             },
-            platforms: overall.platformStats.map(p => ({
-                id: p.platformId,
-                name: p.platformName || 'Unknown Platform',
-                icon: p.icon || '',
-                problems: p.problems, // Note: these are from last 7 days rolling, not strictly this week
-                commits: p.commits,
-                time: p.time
-            }))
+            platforms: Array.from(platformMap.values())
         };
 
         logger.info('GET stats weekly completed', { userId, requestId, duration: Date.now() - startTime });
+
+        // Cache for 5 minutes
+        await CacheService.set(cacheKey, stats, CACHE_TTL_SECONDS);
 
         return apiResponse.success(stats, { meta: { requestId } });
 

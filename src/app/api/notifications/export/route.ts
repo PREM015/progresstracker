@@ -3,25 +3,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/apiResponse";
+import { Prisma, NotificationType } from "@prisma/client";
 
 // GET /api/notifications/export - Export notification history
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(request.url);
-    const format = searchParams.get("format") || "json"; // json, csv
+    const format = searchParams.get("format") || "json";
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const type = searchParams.get("type");
+    const typeParam = searchParams.get("type");
     const includeArchived = searchParams.get("includeArchived") === "true";
     const limit = parseInt(searchParams.get("limit") || "1000");
 
-    const whereClause: any = {
+    const whereClause: Prisma.NotificationWhereInput = {
       userId: session.user.id,
     };
 
@@ -32,8 +33,16 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    if (type) {
-      whereClause.type = type;
+    if (typeParam) {
+      if (
+        Object.values(NotificationType).includes(
+          typeParam as NotificationType
+        )
+      ) {
+        whereClause.type = typeParam as NotificationType;
+      } else {
+        return apiError("Invalid notification type", 400);
+      }
     }
 
     if (!includeArchived) {
@@ -77,7 +86,7 @@ export async function GET(request: NextRequest) {
         "Is Archived",
         "Created At",
       ];
-      
+
       const csvRows = [
         headers.join(","),
         ...notifications.map((n) =>
@@ -101,12 +110,14 @@ export async function GET(request: NextRequest) {
       return new NextResponse(csv, {
         headers: {
           "Content-Type": "text/csv",
-          "Content-Disposition": `attachment; filename="notifications-${new Date().toISOString().split("T")[0]}.csv"`,
+          "Content-Disposition": `attachment; filename="notifications-${
+            new Date().toISOString().split("T")[0]
+          }.csv"`,
         },
       });
     }
 
-    return apiResponse({
+    return apiResponse.success({
       notifications,
       exportedAt: new Date().toISOString(),
       count: notifications.length,

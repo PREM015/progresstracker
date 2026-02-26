@@ -78,9 +78,9 @@ const bulkDeleteSchema = z.object({
 
 async function checkSuperAdminAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
-  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
-                   request.headers.get('x-real-ip') || 'unknown';
-  
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') || 'unknown';
+
   if (!session?.user?.id) {
     logger.warn('Unauthorized bulk operation attempt', { requestId, ip: clientIp });
     return { error: apiResponse.unauthorized('Authentication required', requestId) };
@@ -92,7 +92,7 @@ async function checkSuperAdminAuth(request: NextRequest, requestId: string) {
       requestId,
       ip: clientIp
     });
-    
+
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
@@ -104,7 +104,7 @@ async function checkSuperAdminAuth(request: NextRequest, requestId: string) {
         userAgent: request.headers.get('user-agent'),
       }
     });
-    
+
     return { error: apiResponse.forbidden('Super admin access required for bulk operations', requestId) };
   }
 
@@ -149,9 +149,9 @@ async function checkSuperAdminAuth(request: NextRequest, requestId: string) {
 }
 
 async function logBulkOperation(
-  userId: string, 
-  action: AuditAction, 
-  operation: string, 
+  userId: string,
+  action: AuditAction,
+  operation: string,
   result: any,
   clientIp: string,
   userAgent: string | null
@@ -245,13 +245,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     const existingKeys = existingFlags.map(f => f.key);
-    
+
     if (existingKeys.length > 0 && !skipDuplicates) {
       return apiResponse.validationError(
         'Some feature flags already exist',
-        [{ 
-          path: ['flags'], 
-          message: `Existing keys: ${existingKeys.join(', ')}. Use skipDuplicates=true to ignore.` 
+        [{
+          path: ['flags'],
+          message: `Existing keys: ${existingKeys.join(', ')}. Use skipDuplicates=true to ignore.`
         }],
         requestId
       );
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Dry run mode
     if (dryRun) {
       return apiResponse.success(
-        { 
+        {
           wouldCreate: flagsToCreate.length,
           wouldSkip: existingKeys.length,
           flags: flagsToCreate.map(f => ({ key: f.key, name: f.name }))
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Execute bulk create in transaction
     const result = await withTransaction(async (tx) => {
       const createdFlags = [];
-      
+
       for (const flagData of flagsToCreate) {
         const flag = await tx.featureFlag.create({
           data: {
@@ -294,10 +294,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             enabledUserIds: flagData.enabledUserIds,
             enabledTiers: flagData.enabledTiers,
             enabledPercentage: flagData.enabledPercentage,
-            metadata: flagData.metadata || {},
+            metadata: (flagData.metadata || {}) as any,
           }
         });
-        
+
         createdFlags.push(flag);
       }
 
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       session!.user.id,
       AuditAction.CREATE,
       `Bulk created ${result.length} feature flags`,
-      { 
+      {
         created: result.map(f => ({ id: f.id, key: f.key })),
         skipped: existingKeys
       },
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     return apiResponse.created(
-      { 
+      {
         created: result,
         skipped: existingKeys,
         summary: {
@@ -393,9 +393,9 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     if (missingIds.length > 0) {
       return apiResponse.validationError(
         'Some feature flags not found',
-        [{ 
-          path: ['operations'], 
-          message: `Missing IDs: ${missingIds.join(', ')}` 
+        [{
+          path: ['operations'],
+          message: `Missing IDs: ${missingIds.join(', ')}`
         }],
         requestId
       );
@@ -404,10 +404,10 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     // Dry run mode
     if (dryRun) {
       return apiResponse.success(
-        { 
+        {
           wouldUpdate: operations.length,
-          operations: operations.map(op => ({ 
-            id: op.id, 
+          operations: operations.map(op => ({
+            id: op.id,
             key: existingFlags.find(f => f.id === op.id)?.key,
             changes: Object.keys(op.data)
           }))
@@ -419,11 +419,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     // Execute bulk update in transaction
     const result = await withTransaction(async (tx) => {
       const updatedFlags = [];
-      
+
       for (const operation of operations) {
         const updated = await tx.featureFlag.update({
           where: { id: operation.id },
-          data: operation.data
+          data: operation.data as any
         });
         updatedFlags.push(updated);
       }
@@ -436,7 +436,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       session!.user.id,
       AuditAction.UPDATE,
       `Bulk updated ${result.length} feature flags`,
-      { 
+      {
         updated: result.map(f => ({ id: f.id, key: f.key })),
         operations: operations.map(op => ({ id: op.id, changes: Object.keys(op.data) }))
       },
@@ -452,7 +452,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     });
 
     return apiResponse.success(
-      { 
+      {
         updated: result,
         summary: {
           total: operations.length,
@@ -516,9 +516,9 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     if (missingIds.length > 0) {
       return apiResponse.validationError(
         'Some feature flags not found',
-        [{ 
-          path: ['ids'], 
-          message: `Missing IDs: ${missingIds.join(', ')}` 
+        [{
+          path: ['ids'],
+          message: `Missing IDs: ${missingIds.join(', ')}`
         }],
         requestId
       );
@@ -537,11 +537,11 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     // Dry run mode
     if (dryRun) {
       return apiResponse.success(
-        { 
+        {
           wouldDelete: existingFlags.length,
-          flags: existingFlags.map(f => ({ 
-            id: f.id, 
-            key: f.key, 
+          flags: existingFlags.map(f => ({
+            id: f.id,
+            key: f.key,
             isEnabled: f.isEnabled,
             warning: f.isEnabled ? 'This flag is currently enabled!' : undefined
           }))
@@ -569,7 +569,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       session!.user.id,
       AuditAction.DELETE,
       `Bulk deleted ${deletedFlags.length} feature flags`,
-      { 
+      {
         deleted: deletedFlags.map(f => ({ id: f.id, key: f.key, isEnabled: f.isEnabled }))
       },
       clientIp!,
@@ -585,7 +585,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     });
 
     return apiResponse.success(
-      { 
+      {
         deleted: deletedFlags.map(f => ({ id: f.id, key: f.key })),
         summary: {
           total: ids.length,

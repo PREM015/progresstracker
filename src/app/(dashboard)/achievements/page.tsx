@@ -62,9 +62,10 @@ export default function AchievementsPage() {
       {selectedAchievement && (
         <AchievementModal
           achievement={selectedAchievement}
+          isOpen={true}
           onClose={() => setSelectedAchievement(null)}
-          onPin={() => console.log('Pin toggled')}
-          onShare={() => console.log('Shared')}
+          onPin={async (id: string) => { console.log('Pin toggled', id); }}
+          onShare={(achievement: any) => { console.log('Shared', achievement.id); }}
         />
       )}
     </div>

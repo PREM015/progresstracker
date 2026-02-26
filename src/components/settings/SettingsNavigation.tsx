@@ -16,7 +16,7 @@ interface SettingsSection {
 }
 
 const SECTIONS: SettingsSection[] = [
-    { id: 'profile', title: 'Profile', description: 'Manage your personal information', icon: User, href: '/settings/profile' },
+    { id: 'profile', title: 'Profile', description: 'Manage your personal information', icon: User, href: '/settings' },
     { id: 'account', title: 'Account', description: 'Security and preferences', icon: Shield, href: '/settings/account' },
     { id: 'notifications', title: 'Notifications', description: 'Email and push settings', icon: Bell, href: '/settings/notifications' },
     { id: 'privacy', title: 'Privacy', description: 'Data and visibility controls', icon: Lock, href: '/settings/privacy' },

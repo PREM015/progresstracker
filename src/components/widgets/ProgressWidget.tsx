@@ -9,8 +9,8 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/Card';
-import { Progress, CircularProgress } from '@/components/ui/Progress';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 export interface ProgressWidgetProps {
   title: string;
@@ -25,11 +25,37 @@ export interface ProgressWidgetProps {
   className?: string;
 }
 
-const variantMap = {
-  default: 'default' as const,
-  success: 'success' as const,
-  warning: 'warning' as const,
-  error: 'error' as const,
+// Simple inline CircularProgress since it's not exported from the UI lib
+const CircularProgress: React.FC<{ value: number; size?: number }> = ({ value, size = 48 }) => {
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (value / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} className="rotate-[-90deg]">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        className="text-muted opacity-20"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        className="text-primary transition-all duration-500"
+      />
+    </svg>
+  );
 };
 
 export const ProgressWidget: React.FC<ProgressWidgetProps> = ({
@@ -38,7 +64,7 @@ export const ProgressWidget: React.FC<ProgressWidgetProps> = ({
   max = 100,
   subtitle,
   type = 'linear',
-  variant = 'default',
+  variant: _variant = 'default',
   showValue = true,
   icon,
   loading = false,
@@ -73,7 +99,7 @@ export const ProgressWidget: React.FC<ProgressWidgetProps> = ({
             loading ? (
               <div className="h-2 rounded-full bg-[var(--sidebar-bg)] animate-pulse" />
             ) : (
-              <Progress value={value} max={max} variant={variantMap[variant]} animated={false} />
+              <Progress value={percentage} />
             )
           )}
 
@@ -95,7 +121,7 @@ export const ProgressItem: React.FC<{ label: string; value: number; max?: number
       <span className="text-sm text-[var(--foreground)]">{label}</span>
       <span className="text-xs text-[var(--text-muted)]">{Math.round((value / max) * 100)}%</span>
     </div>
-    <Progress value={value} max={max} size="sm" animated={false} />
+    <Progress value={Math.round((value / max) * 100)} />
   </div>
 );
 

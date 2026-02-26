@@ -4,6 +4,7 @@ import { prisma, paginationArgs, buildPaginationResponse, withTransaction } from
 import { hash, compare } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { logger } from "@trigger.dev/sdk/v3";
+import { cache } from "@/lib/redis";
 import { Role } from '@prisma/client';
 
 // =============================================================================
@@ -284,6 +285,28 @@ export class UserService {
   }
 
   /**
+   * Get lean user profile for global context (Identity only)
+   */
+  static async getLeanUserProfile(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        image: true,
+        role: true,
+        isAdmin: true,
+        isVerified: true,
+        currentStreak: true,
+        totalPoints: true,
+        rank: true,
+      },
+    });
+  }
+
+  /**
    * Get user profile with settings and counts
    */
   static async getUserProfileWithDetails(userId: string) {
@@ -308,7 +331,7 @@ export class UserService {
     }
     // Remove sensitive data
     const { password, ...userWithoutPassword } = user;
-   logger.info("User with details fetched", { userId: user.id });
+    logger.info("User with details fetched", { userId: user.id });
 
     return userWithoutPassword;
   }
@@ -482,83 +505,86 @@ export class UserService {
       return null;
     }
 
-    // Get activity data based on visibility settings
-    const activityData: {
-      platforms?: unknown[];
-      recentActivity?: unknown[];
-      achievements?: unknown[];
-      goals?: unknown[];
-    } = {};
-
-    if (profile.visibility.showPlatforms) {
-      activityData.platforms = await prisma.userPlatform.findMany({
-        where: { userId: profile.id, isActive: true },
-        include: {
-          platform: {
-            select: {
-              id: true,
-              name: true,
-              icon: true,
-              color: true,
+    // Parallelize independent data fetching
+    const [platforms, recentActivity, achievements, goals] = await Promise.all([
+      // 1. Platforms
+      profile.visibility.showPlatforms
+        ? prisma.userPlatform.findMany({
+          where: { userId: profile.id, isActive: true },
+          include: {
+            platform: {
+              select: {
+                id: true,
+                name: true,
+                icon: true,
+                color: true,
+              },
             },
           },
-        },
-        take: 10,
-      });
-    }
+          take: 10,
+        })
+        : Promise.resolve(undefined),
 
-    if (profile.visibility.showActivity) {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      activityData.recentActivity = await prisma.trackerEntry.findMany({
-        where: {
-          userId: profile.id,
-          date: { gte: thirtyDaysAgo },
-        },
-        orderBy: { date: "desc" },
-        take: 30,
-        select: {
-          date: true,
-          problemsSolved: true,
-          commits: true,
-          timeSpent: true,
-          platform: {
-            select: {
-              name: true,
-              icon: true,
+      // 2. Recent Activity
+      profile.visibility.showActivity
+        ? (async () => {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return prisma.trackerEntry.findMany({
+            where: {
+              userId: profile.id,
+              date: { gte: thirtyDaysAgo },
             },
+            orderBy: { date: "desc" },
+            take: 30,
+            select: {
+              date: true,
+              problemsSolved: true,
+              commits: true,
+              timeSpent: true,
+              platform: {
+                select: {
+                  name: true,
+                  icon: true,
+                },
+              },
+            },
+          });
+        })()
+        : Promise.resolve(undefined),
+
+      // 3. Achievements
+      profile.visibility.showAchievements
+        ? prisma.userAchievement.findMany({
+          where: { userId: profile.id },
+          include: {
+            achievement: true,
           },
-        },
-      });
-    }
+          orderBy: { unlockedAt: "desc" },
+          take: 10,
+        })
+        : Promise.resolve(undefined),
 
-    if (profile.visibility.showAchievements) {
-      activityData.achievements = await prisma.userAchievement.findMany({
-        where: { userId: profile.id },
-        include: {
-          achievement: true,
-        },
-        orderBy: { unlockedAt: "desc" },
-        take: 10,
-      });
-    }
-
-    if (profile.visibility.showGoals) {
-      activityData.goals = await prisma.goal.findMany({
-        where: {
-          userId: profile.id,
-          isPublic: true,
-          status: { in: ["ACTIVE", "COMPLETED"] },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      });
-    }
+      // 4. Goals
+      profile.visibility.showGoals
+        ? prisma.goal.findMany({
+          where: {
+            userId: profile.id,
+            isPublic: true,
+            status: { in: ["ACTIVE", "COMPLETED"] },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+        : Promise.resolve(undefined),
+    ]);
 
     return {
       ...profile,
-      ...activityData,
+      platforms,
+      recentActivity,
+      achievements,
+      goals,
     };
   }
 
@@ -648,6 +674,14 @@ export class UserService {
         discordUsername: true,
         updatedAt: true,
       },
+    }).then(async (user) => {
+      // Invalidate session cache
+      try {
+        await cache.del(`session:response:${userId}`);
+      } catch (e) {
+        // ignore
+      }
+      return user;
     });
   }
 
@@ -798,6 +832,20 @@ export class UserService {
   }
 
   // ===========================================================================
+  // DATA MANAGEMENT
+  // ===========================================================================
+
+  /**
+   * Update user last active timestamp (optimized)
+   */
+  static async updateLastActive(userId: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { lastActiveAt: new Date() },
+      select: { id: true }, // Minimal selection
+    });
+  }
+
   // NOTIFICATION PREFERENCES
   // ===========================================================================
 
@@ -1544,7 +1592,7 @@ export class UserService {
       await tx.user.update({
         where: { id: userId },
         data: {
-         role: Role.user,
+          role: Role.user,
           isAdmin: role === "admin",
           updatedAt: new Date(),
         },

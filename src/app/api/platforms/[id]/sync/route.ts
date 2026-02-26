@@ -340,6 +340,7 @@ export async function GET(
       }),
     ]);
 
+    const avg = avgDuration as { _avg: { duration: number | null } };
     const successRate = totalSyncs > 0
       ? Math.round((successfulSyncs / totalSyncs) * 100 * 100) / 100
       : 100;
@@ -487,7 +488,7 @@ export async function POST(
     }
 
     // Check if already syncing
-    if (connection.syncStatus === SyncStatus.IN_PROGRESS) {
+    if (connection.syncStatus === SyncStatus.IN_PROGRESS && !options.force) {
       return addHeaders(
         apiResponse.success(
           {
@@ -514,19 +515,14 @@ export async function POST(
     if (options.waitForCompletion) {
       result = await SyncService.syncPlatform(userId, connection.platformId, {
         triggeredBy: 'manual',
+        async: false,
       });
     } else {
-      // Start sync in background
-      SyncService.syncPlatform(userId, connection.platformId, {
+      // Start sync in background using BullMQ
+      result = await SyncService.syncPlatform(userId, connection.platformId, {
         triggeredBy: 'manual',
-      }).catch(err => {
-        logger.error('Background sync failed', { userId, platformId: connection.platformId }, err);
+        async: true, // Use BullMQ!
       });
-
-      result = {
-        status: 'started',
-        message: 'Sync started in background',
-      };
     }
 
     // Audit log

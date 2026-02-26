@@ -122,7 +122,7 @@ async function regenerateReportData(reportId: string, userId: string, config?: a
 
   // Generate insights
   const insights = [];
-  
+
   const consistencyRate = stats.totalDays > 0 ? (stats.daysActive / stats.totalDays) * 100 : 0;
   insights.push({
     type: 'consistency',
@@ -133,8 +133,8 @@ async function regenerateReportData(reportId: string, userId: string, config?: a
 
   if (Object.keys(platformBreakdown).length > 0) {
     const topPlatform = Object.entries(platformBreakdown)
-      .sort(([,a], [,b]) => (b as any).problems - (a as any).problems)[0];
-    
+      .sort(([, a], [, b]) => (b as any).problems - (a as any).problems)[0];
+
     insights.push({
       type: 'platform',
       title: 'Most Active Platform',
@@ -179,13 +179,13 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
-  
+
   try {
     // Validate params
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid report ID',
@@ -204,8 +204,8 @@ export async function GET(
 
     // Rate limiting
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      50, 
+      apiRateLimiter,
+      50,
       `report-view:${session.user.id}`
     );
 
@@ -215,7 +215,7 @@ export async function GET(
 
     // Check ownership and get report
     const report = await checkReportOwnership(id, session.user.id);
-    
+
     if (!report) {
       return apiResponse.notFound('Report', requestId);
     }
@@ -243,7 +243,7 @@ export async function GET(
     return apiResponse.success(report, { meta: { requestId } });
 
   } catch (error) {
-    logger.error('GET report failed', { requestId, reportId: params.id }, error);
+    logger.error('GET report failed', { requestId }, error);
     return apiResponse.internalError('Failed to fetch report', requestId);
   }
 }
@@ -253,12 +253,12 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
-  
+
   try {
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid report ID',
@@ -275,8 +275,8 @@ export async function PATCH(
     }
 
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      30, 
+      apiRateLimiter,
+      30,
       `report-update:${session.user.id}`
     );
 
@@ -319,10 +319,10 @@ export async function PATCH(
         entityType: 'report',
         entityId: id,
         description: `Updated report: ${existingReport.title}`,
-        oldValue: { 
-          title: existingReport.title, 
-          summary: existingReport.summary, 
-          status: existingReport.status 
+        oldValue: {
+          title: existingReport.title,
+          summary: existingReport.summary,
+          status: existingReport.status
         },
         newValue: updateData,
         ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
@@ -340,7 +340,7 @@ export async function PATCH(
     return apiResponse.success(updatedReport, { meta: { requestId } });
 
   } catch (error) {
-    logger.error('PATCH report failed', { requestId, reportId: params.id }, error);
+    logger.error('PATCH report failed', { requestId }, error);
     return apiResponse.internalError('Failed to update report', requestId);
   }
 }
@@ -350,13 +350,13 @@ export async function PATCH(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
-  
+
   try {
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid report ID',
@@ -374,8 +374,8 @@ export async function POST(
 
     // Stricter rate limiting for regeneration
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      5, 
+      apiRateLimiter,
+      5,
       `report-regenerate:${session.user.id}`
     );
 
@@ -424,8 +424,8 @@ export async function POST(
     try {
       // Regenerate report data
       const newReportData = await regenerateReportData(
-        id, 
-        session.user.id, 
+        id,
+        session.user.id,
         updateConfig
       );
 
@@ -452,10 +452,10 @@ export async function POST(
           entityType: 'report',
           entityId: id,
           description: `Regenerated report: ${existingReport.title}`,
-          newValue: { 
-            regenerated: true, 
+          newValue: {
+            regenerated: true,
             stats: newReportData.stats,
-            force 
+            force
           },
           ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
           userAgent: request.headers.get('user-agent'),
@@ -493,7 +493,7 @@ export async function POST(
     }
 
   } catch (error) {
-    logger.error('POST report regenerate failed', { requestId, reportId: params.id }, error);
+    logger.error('POST report regenerate failed', { requestId }, error);
     return apiResponse.internalError('Failed to regenerate report', requestId);
   }
 }
@@ -503,12 +503,12 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
-  
+
   try {
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid report ID',
@@ -525,8 +525,8 @@ export async function DELETE(
     }
 
     const rateLimitResult = await checkLimit(
-      apiRateLimiter, 
-      20, 
+      apiRateLimiter,
+      20,
       `report-delete:${session.user.id}`
     );
 
@@ -578,7 +578,7 @@ export async function DELETE(
     );
 
   } catch (error) {
-    logger.error('DELETE report failed', { requestId, reportId: params.id }, error);
+    logger.error('DELETE report failed', { requestId }, error);
     return apiResponse.internalError('Failed to delete report', requestId);
   }
 }

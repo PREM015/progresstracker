@@ -7,8 +7,9 @@ export const UserService = {
     /**
      * Get current user profile
      */
-    getProfile: async (): Promise<User> => {
-        const data = await httpClient.get<{ user: User }>(`${BASE_URL}/profile`);
+    getProfile: async (options?: { lean?: boolean }): Promise<User> => {
+        const query = options?.lean ? '?lean=true' : '';
+        const data = await httpClient.get<{ user: User }>(`${BASE_URL}/profile${query}`);
         if (!data?.user) throw new Error('User profile missing');
         return data.user;
     },

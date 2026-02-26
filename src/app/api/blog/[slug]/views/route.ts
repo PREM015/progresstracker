@@ -4,8 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { withErrorHandling } from "@/lib/apiHandler";
 import { redis } from "@/lib/redis"; // If available, otherwise we use DB directly or skip dedupe
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
     const post = await prisma.blogPost.findUnique({
         where: { slug },
         select: { viewCount: true }
@@ -24,8 +24,8 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
     });
 });
 
-export const POST = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
 
     // NOTE: Deduplication usually requires IP or session.
     // For simplicity, we just increment here, or check redis if described in stack.

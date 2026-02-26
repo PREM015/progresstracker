@@ -1,17 +1,18 @@
 // app/callback/[provider]/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
 interface CallbackPageProps {
-  params: {
+  params: Promise<{
     provider: string;
-  };
+  }>;
 }
 
 export default function CallbackPage({ params }: CallbackPageProps) {
+  const { provider } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState('');
@@ -37,7 +38,7 @@ export default function CallbackPage({ params }: CallbackPageProps) {
     }
 
     try {
-      const result = await signIn(params.provider, {
+      const result = await signIn(provider, {
         callbackUrl,
         redirect: false,
       });
@@ -98,7 +99,7 @@ export default function CallbackPage({ params }: CallbackPageProps) {
             </h2>
 
             <p className="text-gray-600 dark:text-gray-400">
-              Please wait while we complete your {params.provider} authentication...
+              Please wait while we complete your {provider} authentication...
             </p>
           </div>
         </div>

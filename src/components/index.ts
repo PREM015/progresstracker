@@ -4,9 +4,10 @@
  */
 
 export * from './achievements';
-export * from './activity';
+// Avoid wildcard conflicts
+export { ActivityItem } from './activity';
 export * as Admin from './admin';
-export * from './analytics';
+export { OverviewStats as AnalyticsOverviewStats } from './analytics';
 export * from './api-keys';
 export * from './auth';
 export * from './billing';
@@ -29,7 +30,7 @@ export * from './onboarding';
 export * from './platforms';
 export * from './profile';
 export * from './providers';
-export * from './public';
+export { AboutPage, BlogList, BlogPost, BlogSidebar, PrivacyPage, TermsPage, WaitlistPage } from './public';
 export * from './referral';
 export * from './reports';
 export * from './seo/MetaTags';

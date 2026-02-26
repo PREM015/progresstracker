@@ -32,8 +32,9 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
     return response;
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     const requestId = generateRequestId();
+    const { id } = await params;
     const startTime = Date.now();
 
     try {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             return addHeaders(apiResponse.notFound('No customer found', requestId), requestId, rateLimitResult);
         }
 
-        const invoice = await stripe.invoices.retrieve(params.id);
+        const invoice = await stripe.invoices.retrieve(id);
 
         if (invoice.customer !== subscription.stripeCustomerId) {
             return addHeaders(apiResponse.forbidden('Access denied', requestId), requestId, rateLimitResult);

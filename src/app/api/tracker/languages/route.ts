@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       categories: Set<string>;
       platforms: Set<string>;
     }> = {};
-    
+
     entries.forEach((entry) => {
       entry.languages.forEach((language) => {
         if (!languageStats[language]) {
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     // Get trending languages (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const recentEntries = entries.filter((e) => e.date >= thirtyDaysAgo);
-    
+
     const trendingLanguages: Record<string, number> = {};
     recentEntries.forEach((entry) => {
       entry.languages.forEach((lang) => {
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
       .map(([name, count]) => ({ name, count }));
 
-    return apiResponse({
+    return apiResponse.success({
       languages,
       trending,
       languageByCategory,
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return apiResponse(updatedEntry);
+    return apiResponse.success(updatedEntry);
   } catch (error) {
     console.error("Error updating languages:", error);
     return apiError("Failed to update languages", 500);

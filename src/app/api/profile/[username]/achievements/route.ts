@@ -33,7 +33,7 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { username: string } }
+    { params }: { params: Promise<{ username: string }> }
 ): Promise<NextResponse> {
     const requestId = generateRequestId();
     const startTime = Date.now();
@@ -47,7 +47,8 @@ export async function GET(
             return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
         }
 
-        const username = params.username.replace(/^@/, '');
+        const { username: rawUsername } = await params;
+        const username = rawUsername.replace(/^@/, '');
 
         // Check user existence and visibility first
         const user = await prisma.user.findUnique({

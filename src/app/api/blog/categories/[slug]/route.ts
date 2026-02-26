@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrorHandling } from "@/lib/apiHandler";
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -34,7 +34,7 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
             orderBy: { [sortBy]: order as 'asc' | 'desc' },
             skip,
             take: limit,
-            include: { author: { select: { name: true } } } // Include author name
+
         }),
         prisma.blogPost.count({
             where: {
@@ -60,7 +60,7 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
         const { content, ...rest } = post;
         return {
             ...rest,
-            authorName: post.author?.name,
+
             readingTime
         };
     });

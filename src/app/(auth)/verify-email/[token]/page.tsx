@@ -1,18 +1,19 @@
 // app/(auth)/verify-email/[token]/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/apiClient';
 import Link from 'next/link';
 
 interface VerifyEmailTokenPageProps {
-  params: {
+  params: Promise<{
     token: string;
-  };
+  }>;
 }
 
 export default function VerifyEmailTokenPage({ params }: VerifyEmailTokenPageProps) {
+  const { token } = use(params);
   const router = useRouter();
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
   const [error, setError] = useState('');
@@ -25,7 +26,7 @@ export default function VerifyEmailTokenPage({ params }: VerifyEmailTokenPagePro
   const verifyEmail = async () => {
     try {
       const response = await apiClient.post('/auth/verify-email', {
-        token: params.token,
+        token,
       });
 
       if (response.error) {

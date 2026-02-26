@@ -15,90 +15,95 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, heading, description }: AuthLayoutProps) {
   return (
-    <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0 overflow-hidden">
+    <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0 overflow-hidden noise-overlay">
 
       {/* Background Elements for Mobile/Tablet */}
-      <div className="absolute inset-0 bg-zinc-50 dark:bg-zinc-950 lg:hidden">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-yellow-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+      <div className="absolute inset-0 bg-background lg:hidden">
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-500/20 rounded-full blur-[120px] animate-pulse animation-delay-2000" />
       </div>
 
       {/* Left Side: Brand & Visuals */}
-      <div className="relative hidden h-full flex-col bg-zinc-900 p-10 text-white lg:flex dark:border-r border-zinc-800">
+      <div className="relative hidden h-full flex-col bg-zinc-950 p-12 text-white lg:flex border-r border-white/5">
         {/* Animated Background Mesh */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/50 via-zinc-900 to-zinc-900 z-0" />
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/80 via-zinc-950 to-zinc-950 z-0" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center bg-[size:40px_40px] opacity-20 [mask-image:linear-gradient(180deg,white,transparent)]" />
+
+        {/* Floating Halo */}
+        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/10 rounded-full blur-[120px] animate-pulse" />
 
         {/* Brand Logo */}
-        <div className="relative z-20 flex items-center text-lg font-bold tracking-tight">
-          <div className="h-8 w-8 rounded-lg bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center mr-3 shadow-xl">
-            <Terminal className="h-5 w-5 text-white" />
+        <div className="relative z-20 flex items-center text-2xl font-black tracking-tighter">
+          <div className="h-10 w-10 rounded-xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center mr-4 shadow-2xl">
+            <Terminal className="h-6 w-6 text-white" />
           </div>
-          Progress Tracker
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">Progress Tracker</span>
         </div>
 
         {/* Feature Highlights (Mid-section) */}
-        <div className="relative z-20 mt-auto mb-auto space-y-8 max-w-md">
-          <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10 hover:scale-[1.02]">
-            <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300">
-              <Zap className="h-6 w-6" />
+        <div className="relative z-20 mt-auto mb-auto space-y-10 max-w-md">
+          <div className="flex items-start gap-6 p-6 rounded-2xl glass border-white/10 transition-all hover:bg-white/10 hover:scale-[1.02] hover:shadow-2xl group">
+            <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-400 group-hover:scale-110 transition-transform">
+              <Zap className="h-7 w-7" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">Track Everything</h3>
-              <p className="text-zinc-400 text-sm mt-1">Sync data from LeetCode, GitHub, and more automatically.</p>
+              <h3 className="text-xl font-bold text-white tracking-tight">Track Everything</h3>
+              <p className="text-zinc-400 mt-2 leading-relaxed">Sync data from LeetCode, GitHub, and more automatically.</p>
             </div>
           </div>
-          <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10 hover:scale-[1.02]">
-            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-300">
-              <ShieldCheck className="h-6 w-6" />
+          <div className="flex items-start gap-6 p-6 rounded-2xl glass border-white/10 transition-all hover:bg-white/10 hover:scale-[1.02] hover:shadow-2xl group">
+            <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:scale-110 transition-transform">
+              <ShieldCheck className="h-7 w-7" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">Secure by Default</h3>
-              <p className="text-zinc-400 text-sm mt-1">Your data is encrypted and safe with enterprise-grade security.</p>
+              <h3 className="text-xl font-bold text-white tracking-tight">Secure by Default</h3>
+              <p className="text-zinc-400 mt-2 leading-relaxed">Your data is encrypted and safe with enterprise-grade security.</p>
             </div>
           </div>
         </div>
 
         {/* Testimonial Footer */}
         <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-4">
-            <div className="flex gap-1 text-yellow-500">
-              {[1, 2, 3, 4, 5].map(i => <Star key={i} className="h-4 w-4 fill-current" />)}
+          <blockquote className="space-y-6">
+            <div className="flex gap-1.5 text-yellow-500">
+              {[1, 2, 3, 4, 5].map(i => <Star key={i} className="h-5 w-5 fill-current" />)}
             </div>
-            <p className="text-lg font-medium leading-relaxed">
+            <p className="text-2xl font-bold leading-tight tracking-tight text-white/90">
               &ldquo;This platform revolutionized how I track my coding journey. The analytics are simply unmatched.&rdquo;
             </p>
-            <footer className="text-sm">
-              <div className="font-semibold text-white">Sofia Davis</div>
-              <div className="text-zinc-500">Senior Full Stack Developer</div>
+            <footer className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-zinc-800 border border-white/10" />
+              <div>
+                <div className="font-bold text-white text-lg">Sofia Davis</div>
+                <div className="text-zinc-500 font-medium">Senior Full Stack Developer</div>
+              </div>
             </footer>
           </blockquote>
         </div>
       </div>
 
       {/* Right Side: Form */}
-      <div className="relative z-10 lg:p-8 flex items-center justify-center h-full w-full">
-        <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
+      <div className="relative z-10 lg:p-12 flex items-center justify-center min-h-screen">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-8 sm:w-[440px] px-6">
           {(heading || description) && (
-            <div className="flex flex-col space-y-2 text-center">
-              {heading && <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">{heading}</h1>}
-              {description && <p className="text-base text-zinc-500 dark:text-zinc-400">{description}</p>}
+            <div className="flex flex-col space-y-3 text-center mb-4">
+              {heading && <h1 className="text-4xl font-black tracking-tight text-foreground">{heading}</h1>}
+              {description && <p className="text-lg text-muted-foreground font-medium">{description}</p>}
             </div>
           )}
 
           {/* Main Form Content */}
-          <div className="relative">
+          <div className="relative scale-in">
             {children}
           </div>
 
-          <p className="px-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-center text-sm text-muted-foreground font-medium max-w-[280px] mx-auto">
             By continuing, you agree to our{' '}
-            <Link href="/terms" className="underline underline-offset-4 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <Link href="/terms" className="text-primary hover:underline underline-offset-4">
               Terms of Service
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" className="underline underline-offset-4 hover:text-indigo-600 dark:hover:text-indigo-400">
+            <Link href="/privacy" className="text-primary hover:underline underline-offset-4">
               Privacy Policy
             </Link>
             .
@@ -106,6 +111,7 @@ export function AuthLayout({ children, heading, description }: AuthLayoutProps) 
         </div>
       </div>
     </div>
+
   );
 }
 export default AuthLayout;

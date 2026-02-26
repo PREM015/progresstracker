@@ -86,9 +86,9 @@ export function errorResponse(
     details,
   };
 
-  logger.error(`API Error [${code}]`, { 
-    status, 
-    message, 
+  logger.error(`API Error [${code}]`, {
+    status,
+    message,
     requestId,
     details,
   });
@@ -120,13 +120,13 @@ export function successResponse<T>(
  * API handler wrapper with comprehensive error handling
  */
 export function withErrorHandling(
-  handler: (req: NextRequest) => Promise<NextResponse>
+  handler: (req: any, context: any) => Promise<NextResponse> | NextResponse
 ) {
-  return async (req: NextRequest): Promise<NextResponse> => {
+  return async (req: NextRequest, context: any): Promise<NextResponse> => {
     const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
     const startTime = Date.now();
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
-      || req.headers.get('x-real-ip') 
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || req.headers.get('x-real-ip')
       || 'unknown';
     const userAgent = req.headers.get('user-agent') || 'unknown';
 
@@ -145,7 +145,7 @@ export function withErrorHandling(
         requestId,
       });
 
-      const response = await handler(req);
+      const response = await handler(req, context);
       const duration = Date.now() - startTime;
 
       logger.api(
@@ -169,7 +169,7 @@ export function withErrorHandling(
         req.nextUrl.pathname,
         apiError.statusCode,
         duration,
-        { 
+        {
           requestId,
           error: apiError.message,
           code: apiError.code,
@@ -261,7 +261,7 @@ export function internalError(
 // EXPORTS
 // =============================================================================
 
-const apiHandler= {
+const apiHandler = {
   errorResponse,
   successResponse,
   withErrorHandling,

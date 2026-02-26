@@ -243,9 +243,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // Replace the POST function's report generation section:
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // ... existing validation code ...
+  const requestId = generateRequestId();
+  const startTime = Date.now();
 
   try {
+    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
+    if (error) return addHeaders(error, requestId, rateLimitResult);
+
+    const body = await request.json();
+    const validation = generateSchema.safeParse(body);
+
+    if (!validation.success) {
+      return addHeaders(
+        apiResponse.validationError('Invalid request body', validation.error.errors, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
     const { type, periodStart, periodEnd, userIds } = validation.data;
 
     const start = new Date(periodStart);
@@ -260,7 +275,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const reportPromises = users.map(async (user) => {
       try {
         const result = await generateAndSaveReport(user.id, start, end, type);
-        
+
         // Update status to generated
         await prisma.report.update({
           where: { id: result.reportId },
@@ -270,7 +285,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return result.reportId;
       } catch (error) {
         logger.error('Report generation failed for user', { userId: user.id }, error);
-        
+
         // Create failed report record
         const failedReport = await prisma.report.create({
           data: {
@@ -294,8 +309,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     logger.info('Reports generation completed', {
       count: reportIds.length,
       type,
-      adminId: userIds,
-      request,
+      adminId: session!.user.id,
+      requestId,
       duration: Date.now() - startTime,
     });
 
@@ -305,13 +320,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         reportIds,
         count: reportIds.length,
       },
-      { meta: { request } }
+      { meta: { requestId } }
     );
 
-    return addHeaders(response, request, rateLimitResult);
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST admin reports failed', { request }, error);
-    return addHeaders(apiResponse.internalError('Failed to generate reports', request), request);
+    logger.error('POST admin reports failed', { requestId }, error);
+    return addHeaders(apiResponse.internalError('Failed to generate reports', requestId), requestId);
   }
 }
 export const dynamic = 'force-dynamic';

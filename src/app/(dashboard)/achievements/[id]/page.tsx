@@ -253,7 +253,7 @@ export default function AchievementDetailPage() {
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-3">How to Unlock</h2>
           <p className="text-gray-600">
-            {achievement.requirementText || `Reach ${achievement.requirement.value} ${achievement.requirement.metric.replace(/_/g, ' ')}`}
+            {`Reach ${achievement.requirement.value} ${achievement.requirement.metric.replace(/_/g, ' ')}`}
           </p>
         </div>
 
@@ -263,11 +263,10 @@ export default function AchievementDetailPage() {
             <button
               onClick={handlePinToggle}
               disabled={isPending}
-              className={`flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors ${
-                userAchievement?.isPinned
+              className={`flex-1 py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors ${userAchievement?.isPinned
                   ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              } disabled:opacity-50`}
+                } disabled:opacity-50`}
             >
               <PinIcon className="w-5 h-5" filled={userAchievement?.isPinned} />
               {userAchievement?.isPinned ? 'Pinned' : 'Pin to Profile'}

@@ -199,153 +199,174 @@ export const AUDIT_ACTION_CONFIG: Record<PrismaAuditAction, {
   severity: 'low' | 'medium' | 'high' | 'critical';
   category: string;
 }> = {
-  CREATE: { 
-    label: 'Create', 
-    icon: 'Plus', 
-    color: '#10B981', 
+  CREATE: {
+    label: 'Create',
+    icon: 'Plus',
+    color: '#10B981',
     severity: 'low',
     category: 'data'
   },
-  READ: { 
-    label: 'Read', 
-    icon: 'Eye', 
-    color: '#6B7280', 
+  READ: {
+    label: 'Read',
+    icon: 'Eye',
+    color: '#6B7280',
     severity: 'low',
     category: 'data'
   },
-  UPDATE: { 
-    label: 'Update', 
-    icon: 'Edit', 
-    color: '#3B82F6', 
+  UPDATE: {
+    label: 'Update',
+    icon: 'Edit',
+    color: '#3B82F6',
     severity: 'low',
     category: 'data'
   },
-  DELETE: { 
-    label: 'Delete', 
-    icon: 'Trash', 
-    color: '#EF4444', 
+  DELETE: {
+    label: 'Delete',
+    icon: 'Trash',
+    color: '#EF4444',
     severity: 'medium',
     category: 'data'
   },
-  LOGIN: { 
-    label: 'Login', 
-    icon: 'LogIn', 
-    color: '#10B981', 
+  LOGIN: {
+    label: 'Login',
+    icon: 'LogIn',
+    color: '#10B981',
     severity: 'low',
     category: 'auth'
   },
-  LOGOUT: { 
-    label: 'Logout', 
-    icon: 'LogOut', 
-    color: '#6B7280', 
+  LOGOUT: {
+    label: 'Logout',
+    icon: 'LogOut',
+    color: '#6B7280',
     severity: 'low',
     category: 'auth'
   },
-  LOGIN_FAILED: { 
-    label: 'Login Failed', 
-    icon: 'XCircle', 
-    color: '#F59E0B', 
+  LOGIN_FAILED: {
+    label: 'Login Failed',
+    icon: 'XCircle',
+    color: '#F59E0B',
     severity: 'medium',
     category: 'auth'
   },
-  PASSWORD_CHANGE: { 
-    label: 'Password Changed', 
-    icon: 'Key', 
-    color: '#8B5CF6', 
+  PASSWORD_CHANGE: {
+    label: 'Password Changed',
+    icon: 'Key',
+    color: '#8B5CF6',
     severity: 'high',
     category: 'security'
   },
-  PASSWORD_RESET: { 
-    label: 'Password Reset', 
-    icon: 'RefreshCw', 
-    color: '#8B5CF6', 
+  PASSWORD_RESET: {
+    label: 'Password Reset',
+    icon: 'RefreshCw',
+    color: '#8B5CF6',
     severity: 'high',
     category: 'security'
   },
-  EMAIL_CHANGE: { 
-    label: 'Email Changed', 
-    icon: 'Mail', 
-    color: '#8B5CF6', 
+  EMAIL_CHANGE: {
+    label: 'Email Changed',
+    icon: 'Mail',
+    color: '#8B5CF6',
     severity: 'high',
     category: 'security'
   },
-  SETTINGS_CHANGE: { 
-    label: 'Settings Changed', 
-    icon: 'Settings', 
-    color: '#3B82F6', 
+  SETTINGS_CHANGE: {
+    label: 'Settings Changed',
+    icon: 'Settings',
+    color: '#3B82F6',
     severity: 'low',
     category: 'settings'
   },
-  EXPORT_DATA: { 
-    label: 'Data Exported', 
-    icon: 'Download', 
-    color: '#6366F1', 
+  EXPORT_DATA: {
+    label: 'Data Exported',
+    icon: 'Download',
+    color: '#6366F1',
     severity: 'medium',
     category: 'data'
   },
-  IMPORT_DATA: { 
-    label: 'Data Imported', 
-    icon: 'Upload', 
-    color: '#6366F1', 
+  IMPORT_DATA: {
+    label: 'Data Imported',
+    icon: 'Upload',
+    color: '#6366F1',
     severity: 'medium',
     category: 'data'
   },
-  SYNC_TRIGGER: { 
-    label: 'Sync Triggered', 
-    icon: 'RefreshCw', 
-    color: '#10B981', 
+  SYNC_TRIGGER: {
+    label: 'Sync Triggered',
+    icon: 'RefreshCw',
+    color: '#10B981',
     severity: 'low',
     category: 'sync'
   },
-  SUBSCRIPTION_CHANGE: { 
-    label: 'Subscription Changed', 
-    icon: 'CreditCard', 
-    color: '#F59E0B', 
+  SUBSCRIPTION_CHANGE: {
+    label: 'Subscription Changed',
+    icon: 'CreditCard',
+    color: '#F59E0B',
     severity: 'high',
     category: 'billing'
   },
-  API_KEY_CREATE: { 
-    label: 'API Key Created', 
-    icon: 'Key', 
-    color: '#8B5CF6', 
+  API_KEY_CREATE: {
+    label: 'API Key Created',
+    icon: 'Key',
+    color: '#8B5CF6',
     severity: 'high',
     category: 'security'
   },
-  API_KEY_DELETE: { 
-    label: 'API Key Deleted', 
-    icon: 'Key', 
-    color: '#EF4444', 
+  API_KEY_DELETE: {
+    label: 'API Key Deleted',
+    icon: 'Key',
+    color: '#EF4444',
     severity: 'high',
     category: 'security'
   },
-  TWO_FACTOR_ENABLE: { 
-    label: '2FA Enabled', 
-    icon: 'Shield', 
-    color: '#10B981', 
+  TWO_FACTOR_ENABLE: {
+    label: '2FA Enabled',
+    icon: 'Shield',
+    color: '#10B981',
     severity: 'high',
     category: 'security'
   },
-  TWO_FACTOR_DISABLE: { 
-    label: '2FA Disabled', 
-    icon: 'ShieldOff', 
-    color: '#EF4444', 
+  TWO_FACTOR_DISABLE: {
+    label: '2FA Disabled',
+    icon: 'ShieldOff',
+    color: '#EF4444',
     severity: 'critical',
     category: 'security'
   },
-  ACCOUNT_DELETE: { 
-    label: 'Account Deleted', 
-    icon: 'UserX', 
-    color: '#EF4444', 
+  ACCOUNT_DELETE: {
+    label: 'Account Deleted',
+    icon: 'UserX',
+    color: '#EF4444',
     severity: 'critical',
     category: 'account'
   },
-  ADMIN_ACTION: { 
-    label: 'Admin Action', 
-    icon: 'Shield', 
-    color: '#8B5CF6', 
+  ADMIN_ACTION: {
+    label: 'Admin Action',
+    icon: 'Shield',
+    color: '#8B5CF6',
     severity: 'high',
     category: 'admin'
   },
+  WEBHOOK_TRIGGER: {
+    label: '',
+    icon: '',
+    color: '',
+    severity: 'low',
+    category: ''
+  },
+  SHARE_CREATE: {
+    label: '',
+    icon: '',
+    color: '',
+    severity: 'low',
+    category: ''
+  },
+  SHARE_ACCESS: {
+    label: '',
+    icon: '',
+    color: '',
+    severity: 'low',
+    category: ''
+  }
 };
 
 /** Status configuration */

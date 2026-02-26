@@ -283,10 +283,14 @@ export function RegisterForm() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Create Account
+        <Button type="submit" variant="premium" className="w-full h-12 text-base transition-all active:scale-[0.98]" disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            "Create Account"
+          )}
         </Button>
+
       </form>
     </AuthCard>
   );

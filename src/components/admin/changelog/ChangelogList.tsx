@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminChangelog, ChangelogEntry } from '@/hooks/useAdminChangelog';
 
 export function ChangelogList({ onEdit }: { onEdit?: (entry: ChangelogEntry) => void }) {
@@ -30,7 +32,7 @@ export function ChangelogList({ onEdit }: { onEdit?: (entry: ChangelogEntry) => 
                         <div className="flex items-center gap-2">
                             <span className="text-white font-semibold">v{e.version}</span>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${e.type === 'FEATURE' ? 'bg-green-500/20 text-green-400' :
-                                    e.type === 'BUGFIX' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                                e.type === 'BUGFIX' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
                                 }`}>{e.type}</span>
                             {e.publishedAt && <span className="text-xs text-zinc-500">Published</span>}
                         </div>

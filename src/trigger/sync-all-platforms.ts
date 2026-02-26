@@ -44,7 +44,7 @@ export const syncUserPlatformsTask = task({
 
         for (const platformId of platformIds) {
           try {
-            await SyncService.syncPlatform(userId, platformId);
+            await SyncService.syncPlatform(userId, platformId, { async: true });
             successCount++;
           } catch (error) {
             failedCount++;
@@ -118,10 +118,10 @@ export const dailySyncAllUsersTask = schedules.task({
         if (result.status === "fulfilled") {
           results.push(result.value);
         } else {
-          results.push({ 
-            userId: "unknown", 
-            success: false, 
-            error: result.reason?.message || "Unknown error" 
+          results.push({
+            userId: "unknown",
+            success: false,
+            error: result.reason?.message || "Unknown error"
           });
         }
       }
@@ -135,10 +135,10 @@ export const dailySyncAllUsersTask = schedules.task({
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    logger.info(`Daily sync task completed`, { 
-      totalUsers: users.length, 
-      successCount, 
-      failCount 
+    logger.info(`Daily sync task completed`, {
+      totalUsers: users.length,
+      successCount,
+      failCount
     });
 
     return {
@@ -179,7 +179,7 @@ export const syncSpecificPlatformsTask = task({
 
     for (const platform of platforms) {
       try {
-        await SyncService.syncPlatform(userId, platform.id);
+        await SyncService.syncPlatform(userId, platform.id, { async: true });
         results.push({ platform: platform.slug, success: true });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

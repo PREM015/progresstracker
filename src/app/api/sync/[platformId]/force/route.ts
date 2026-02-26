@@ -103,10 +103,10 @@ export async function HEAD(
   context: RouteContext
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
-  
+
   try {
     const { platformId } = await context.params;
-    
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return new NextResponse(null, { status: 401 });
@@ -124,7 +124,7 @@ export async function HEAD(
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Failure-Count', String(userPlatform.consecutiveFailures));
     response.headers.set('X-Current-Status', userPlatform.syncStatus);
-    
+
     return addHeaders(response, requestId);
   } catch (error) {
     log.error('HEAD request failed', { requestId }, error);
@@ -149,7 +149,7 @@ export async function POST(
     // Very strict rate limit for force sync
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(syncRateLimiter, 5, `sync:force:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       log.warn('Force sync rate limit exceeded', { ip, requestId });
       return addHeaders(apiResponse.rateLimited(3600, requestId), requestId, rateLimitResult);
@@ -188,10 +188,10 @@ export async function POST(
     // Get platform connection
     const userPlatform = await prisma.userPlatform.findUnique({
       where: { userId_platformId: { userId, platformId } },
-      include: { 
-        platform: { 
-          select: { name: true, slug: true, icon: true } 
-        } 
+      include: {
+        platform: {
+          select: { name: true, slug: true, icon: true }
+        }
       },
     });
 
@@ -220,7 +220,7 @@ export async function POST(
     if (resetFailureCount) {
       await prisma.userPlatform.update({
         where: { userId_platformId: { userId, platformId } },
-        data: { 
+        data: {
           consecutiveFailures: 0,
           lastSyncError: null,
         },
@@ -231,7 +231,7 @@ export async function POST(
     if (clearCache) {
       await prisma.userPlatform.update({
         where: { userId_platformId: { userId, platformId } },
-        data: { 
+        data: {
           cachedStats: undefined,
           statsUpdatedAt: null,
         },
@@ -262,9 +262,30 @@ export async function POST(
     // Execute force sync with high priority
     const result = await SyncService.syncPlatform(userId, platformId, {
       triggeredBy: 'manual',
-     
- 
     });
+
+    if ('queued' in result) {
+      const duration = Date.now() - startTime;
+      return addHeaders(
+        apiResponse.success(
+          {
+            syncId,
+            queued: true,
+            jobId: result.jobId,
+            platform: {
+              id: platformId,
+              name: userPlatform.platform.name,
+              slug: userPlatform.platform.slug,
+              icon: userPlatform.platform.icon,
+            },
+            options: { clearCache, resetFailureCount, fullSync },
+          },
+          { meta: { requestId, duration } }
+        ),
+        requestId,
+        rateLimitResult
+      );
+    }
 
     // Send completion notification
     if (notifyOnComplete) {
@@ -316,7 +337,7 @@ export async function POST(
             duration: result.duration,
             error: result.error,
           },
-          message: result.success 
+          message: result.success
             ? `Force sync completed: ${result.entriesAdded} new, ${result.entriesUpdated} updated entries`
             : `Force sync failed: ${result.error}`,
         },

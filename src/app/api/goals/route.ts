@@ -13,6 +13,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { redis } from '@/lib/redis';
+import { CacheService } from '@/services/cacheService';
 import { z } from 'zod';
 import {
   GoalStatus,
@@ -239,6 +241,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       endDate,
     } = queryValidation.data;
 
+    // Check cache for default view BEFORE running DB queries
+    const isDefaultView = page === 1 && !status && !type && !category && !platformId && !search && !includeArchived;
+    const cacheKey = `goals:list:${userId}:default`;
+
+    if (isDefaultView) {
+      const cached = await CacheService.get(cacheKey);
+      if (cached) {
+        return addHeaders(NextResponse.json(cached), requestId, rateLimitResult);
+      }
+    }
+
     // Build where clause
     const where: Prisma.GoalWhereInput = { userId };
 
@@ -276,52 +289,62 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Execute query with pagination
-    const [goals, total] = await Promise.all([
-      prisma.goal.findMany({
-        where,
-        orderBy: { [sortBy]: sortOrder },
-        skip: (page - 1) * limit,
-        take: limit,
-        include: {
-          platform: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              icon: true,
-              color: true,
-            },
-          },
-          reminders: {
-            where: { isActive: true },
-            select: {
-              id: true,
-              frequency: true,
-              time: true,
-              nextSendAt: true,
-            },
-          },
-          _count: {
-            select: { reminders: true },
-          },
+    const findManyArgs: Prisma.GoalFindManyArgs = {
+      where,
+      orderBy: { [sortBy]: sortOrder as Prisma.SortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        category: true,
+        goalType: true,
+        metric: true,
+        target: true,
+        progress: true,
+        progressPercentage: true,
+        unit: true,
+        status: true,
+        deadline: true,
+        startDate: true,
+        endDate: true,
+        completedAt: true,
+        failedAt: true,
+        daysActive: true,
+        avgDailyProgress: true,
+        isPublic: true,
+        color: true,
+        icon: true,
+        platform: {
+          select: { id: true, name: true, slug: true, icon: true, color: true },
         },
-      }),
+        _count: {
+          select: { reminders: true },
+        },
+      },
+    };
+
+    // Run paginated goals, total count, and status groupBy in parallel
+    const [goals, total, statusGroups] = await Promise.all([
+      prisma.goal.findMany(findManyArgs),
       prisma.goal.count({ where }),
+      prisma.goal.groupBy({
+        by: ['status'],
+        where: { userId },
+        _count: true,
+      }),
     ]);
 
-    // Calculate stats
-    const allGoals = await prisma.goal.findMany({
-      where: { userId },
-      select: { status: true },
-    });
-
+    // Build stats from groupBy (avoids separate findMany)
+    const statusMap = new Map(statusGroups.map(g => [g.status, g._count]));
     const stats = {
-      total: allGoals.length,
-      active: allGoals.filter((g) => g.status === GoalStatus.ACTIVE).length,
-      completed: allGoals.filter((g) => g.status === GoalStatus.COMPLETED).length,
-      failed: allGoals.filter((g) => g.status === GoalStatus.FAILED).length,
-      paused: allGoals.filter((g) => g.status === GoalStatus.PAUSED).length,
-      archived: allGoals.filter((g) => g.status === GoalStatus.ARCHIVED).length,
+      total: statusGroups.reduce((sum, g) => sum + g._count, 0),
+      active: statusMap.get(GoalStatus.ACTIVE) || 0,
+      completed: statusMap.get(GoalStatus.COMPLETED) || 0,
+      failed: statusMap.get(GoalStatus.FAILED) || 0,
+      paused: statusMap.get(GoalStatus.PAUSED) || 0,
+      archived: statusMap.get(GoalStatus.ARCHIVED) || 0,
     };
 
     logger.info('GET /api/goals completed', {
@@ -333,9 +356,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.paginated(
-      goals,
-      {
+    const responsePayload = {
+      success: true,
+      data: goals,
+      pagination: {
         page,
         limit,
         total,
@@ -343,15 +367,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         hasNextPage: page < Math.ceil(total / limit),
         hasPreviousPage: page > 1,
       },
-      {
-        meta: {
-          requestId,
-          stats,
-          executionTime: Date.now() - startTime,
-        },
-      }
-    );
+      meta: {
+        requestId,
+        stats,
+        executionTime: Date.now() - startTime,
+      },
+    };
 
+    if (isDefaultView) {
+      await CacheService.set(cacheKey, responsePayload, 120); // 2 min cache
+    }
+
+    const response = NextResponse.json(responsePayload);
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('GET /api/goals failed', { requestId }, error);

@@ -4,7 +4,7 @@ import { withErrorHandling } from "@/lib/apiHandler";
 import { success, validationError, rateLimited } from "@/lib/apiResponse";
 import { adminAuth } from "@/middleware/adminAuth";
 import prisma from "@/lib/prisma";
-import { queueNotifications, queueEmailBroadcast } from "@/lib/queue";
+import { notificationsQueue, emailsQueue } from "@/lib/bullmq";
 import { pushService } from "@/services/pushService";
 import auditLogService from "@/services/auditLogService";
 import { AuditAction, NotificationType, NotificationPriority, SubscriptionTier, Role } from "@prisma/client";
@@ -67,10 +67,11 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // IN_APP
   if (channels.includes('IN_APP')) {
-    // Use queue for batch creation
-    promises.push(queueNotifications({
-      userIds: recipientIds,
-      notification: {
+    // Use BullMQ addBulk for batch creation
+    const notificationJobs = recipientIds.map(userId => ({
+      name: `broadcast-notify-${userId}`,
+      data: {
+        userId,
         type: type || 'SYSTEM',
         title,
         message,
@@ -79,6 +80,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
         actionLabel
       }
     }));
+    promises.push(notificationsQueue.addBulk(notificationJobs));
   }
 
   // EMAIL
@@ -90,7 +92,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     // queueEmailBroadcast in lib/queue takes `userIds`.
 
     if (emailRecipients.length > 0) {
-      promises.push(queueEmailBroadcast({
+      promises.push(emailsQueue.add(`broadcast-email-${broadcastId}`, {
         userIds: emailRecipients,
         subject: title,
         htmlTemplate: `<h1>${title}</h1><p>${message}</p>${actionUrl ? `<a href="${actionUrl}">${actionLabel || 'View'}</a>` : ''}`,

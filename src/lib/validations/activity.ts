@@ -1,6 +1,7 @@
 
 import { z } from 'zod';
 import { PlatformCategory } from '@prisma/client';
+import { sanitizeHtml, sanitizeText } from '@/lib/sanitize';
 
 // Common Schemas
 export const idSchema = z.string().cuid('Invalid ID format');
@@ -9,7 +10,7 @@ export const idSchema = z.string().cuid('Invalid ID format');
 export const createActivitySchema = z.object({
     date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).transform(val => new Date(val).toISOString()),
     category: z.nativeEnum(PlatformCategory).default(PlatformCategory.OTHER),
-    description: z.string().max(2000).optional().nullable(),
+    description: z.string().max(2000).optional().nullable().transform(val => val ? sanitizeHtml(val) : val),
     timeSpent: z.number().int().min(0).default(0),
     platformId: z.string().optional().nullable(),
     customPlatformId: z.string().optional().nullable(),
@@ -19,8 +20,8 @@ export const createActivitySchema = z.object({
     linesOfCode: z.number().int().min(0).optional(),
     pagesRead: z.number().int().min(0).optional(), // mapped to customFields or existing fields if reliable
 
-    tags: z.array(z.string()).optional(),
-    mood: z.string().optional(),
+    tags: z.array(z.string()).optional().transform(val => val ? val.map(tag => sanitizeText(tag)) : val),
+    mood: z.string().optional().transform(val => val ? sanitizeText(val) : val),
     productivityRating: z.number().min(1).max(5).optional(),
 });
 

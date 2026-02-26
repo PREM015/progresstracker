@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     const syncStatus = userPlatforms.map((up) => {
       const platformLogs = syncLogsByPlatform[up.platformId] || [];
       const lastLog = platformLogs[0];
-      
+
       return {
         platformId: up.platformId,
         platform: up.platform,
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     // Get entries synced today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const entriesToday = await prisma.trackerEntry.count({
       where: {
         userId: session.user.id,
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       syncStatus,
       overallStats,
       entriesToday,

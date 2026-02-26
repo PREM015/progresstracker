@@ -37,11 +37,11 @@ export const POST = async (req: Request) => {
       for (const user of users) {
         usersChecked++;
         try {
-          // @ts-ignore - types mismatch might occur if service not exact match
           const result = await checkUserAchievements(user.id);
-          if (result && result.unlockedCount > 0) {
-            achievementsUnlocked += result.unlockedCount;
-            newUnlocks.push(...result.newAchievements);
+          if (Array.isArray(result) && result.length > 0) {
+            achievementsUnlocked += result.length;
+            // @ts-ignore - bypass deep array push type mismatch issues easily
+            newUnlocks.push(...result);
           }
         } catch (e) {
           errors++;

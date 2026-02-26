@@ -16,6 +16,7 @@ export interface ScraperCredentials {
   sessionId?: string;
   userId?: string;
   profileUrl?: string;
+  credentials?: Record<string, unknown>;
 }
 
 /**

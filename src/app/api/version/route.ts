@@ -57,7 +57,7 @@ interface VersionInfo {
     version: string;
     status: "stable" | "beta" | "deprecated";
   }[];
-  compatibility: {
+  environment: {
     browsers: {
       chrome: string;
       firefox: string;
@@ -101,7 +101,7 @@ const VERSION_DATA: VersionInfo = {
     { name: "API Keys", version: "1.0.0", status: "beta" },
     { name: "Webhooks", version: "0.9.0", status: "beta" },
   ],
-  compatibility: {
+  environment: {
     browsers: {
       chrome: "90+",
       firefox: "88+",
@@ -226,12 +226,12 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-  
+
   const response = new NextResponse(null, { status: 200 });
   response.headers.set("X-API-Version", VERSION_DATA.api.version);
   response.headers.set("X-App-Version", VERSION_DATA.app.version);
   response.headers.set("X-Min-Client-Version", VERSION_DATA.api.minClientVersion);
-  
+
   return addHeaders(response, requestId, { cacheTtl: CACHE_TTL });
 }
 

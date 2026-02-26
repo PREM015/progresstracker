@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import { AuditAction } from '@prisma/client';
+import { sanitizeText } from '@/lib/sanitize';
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -28,7 +29,7 @@ const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   type: z.enum(['weekly', 'monthly', 'yearly', 'custom']).optional(),
   status: z.enum(['generating', 'generated', 'sent', 'failed']).optional(),
-  search: z.string().max(200).optional(),
+  search: z.string().max(200).optional().transform(val => val ? sanitizeText(val) : val),
   sortBy: z.enum(['createdAt', 'periodStart', 'type', 'status']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   dateFrom: z.string().datetime().optional(),
@@ -39,7 +40,7 @@ const createReportSchema = z.object({
   type: z.enum(['weekly', 'monthly', 'yearly', 'custom']),
   periodStart: z.string().datetime(),
   periodEnd: z.string().datetime(),
-  title: z.string().min(1).max(200).optional(),
+  title: z.string().min(1).max(200).optional().transform(val => val ? sanitizeText(val) : val),
   includeCharts: z.boolean().default(true),
   includeComparisons: z.boolean().default(true),
   includeInsights: z.boolean().default(true),

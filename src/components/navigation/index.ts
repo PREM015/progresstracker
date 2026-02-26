@@ -9,5 +9,5 @@ export { AdminSidebar } from './AdminSidebar';
 export { Footer } from './Footer';
 export { Breadcrumbs } from './Breadcrumbs';
 export { MobileMenu } from './MobileMenu';
-export { UserMenu } from './UserMenu';
+export { default as UserMenu } from './UserMenu';
 export { NotificationBell } from './NotificationBell';

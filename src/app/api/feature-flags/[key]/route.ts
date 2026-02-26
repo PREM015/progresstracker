@@ -42,14 +42,14 @@ export async function OPTIONS(): Promise<NextResponse> {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { key: string } }
+  { params }: { params: Promise<{ key: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
   const startTime = Date.now();
 
   try {
     // Validate params
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid feature key',
@@ -152,7 +152,7 @@ export async function GET(
       meta: { requestId }
     });
   } catch (error) {
-    logger.error('GET feature-flags/[key] failed', { requestId, key: params.key }, error);
+    logger.error('GET feature-flags/[key] failed', { requestId }, error);
     return apiResponse.internalError('Failed to fetch feature flag', requestId);
   }
 }

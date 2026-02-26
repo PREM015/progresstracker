@@ -1,6 +1,6 @@
 // app/(auth)/reset-password/[token]/page.tsx
 import React from 'react';
-import ResetPasswordForm from '@/components/auth/ResetPasswordForm';
+import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
 
 export const metadata = {
   title: 'Reset Password - ProgressTracker',
@@ -8,12 +8,13 @@ export const metadata = {
 };
 
 interface ResetPasswordPageProps {
-  params: {
+  params: Promise<{
     token: string;
-  };
+  }>;
 }
 
-export default function ResetPasswordPage({ params }: ResetPasswordPageProps) {
+export default async function ResetPasswordPage({ params }: ResetPasswordPageProps) {
+  const { token } = await params;
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -25,7 +26,7 @@ export default function ResetPasswordPage({ params }: ResetPasswordPageProps) {
         </p>
       </div>
 
-      <ResetPasswordForm token={params.token} />
+      <ResetPasswordForm />
     </div>
   );
 }

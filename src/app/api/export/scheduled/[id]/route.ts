@@ -12,11 +12,11 @@ import { prisma } from '@/lib/prisma';
 
 // GET - Fetch data
 export async function GET(
-  request: NextRequest, { params }: { params: { id: string } }
+  request: NextRequest, { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -43,7 +43,7 @@ export async function GET(
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
 // PUT - Update data
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -85,7 +85,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { id } = params;
+    const { id } = await params;
 
     // TODO: Validate body
     // TODO: Implement PUT logic
@@ -106,11 +106,11 @@ export async function PUT(
 // DELETE - Remove data
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -118,7 +118,7 @@ export async function DELETE(
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // TODO: Implement DELETE logic
 

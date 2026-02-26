@@ -5,9 +5,9 @@ import { getSession } from "@/middleware/auth";
 import prisma from "@/lib/prisma";
 import { PlatformCategory } from "@prisma/client";
 
-export const GET = async (req: NextRequest, { params }: { params: { userId: string } }) => {
+export const GET = async (req: NextRequest, { params }: { params: Promise<{ userId: string }> }) => {
     try {
-        const targetUserId = params.userId;
+        const targetUserId = (await params).userId;
 
         // 1. Auth Check (Optional for public, but needed for private check)
         const session = await getSession(req);

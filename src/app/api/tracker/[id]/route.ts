@@ -13,8 +13,6 @@ import { PlatformCategory } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import { TrackerService } from '@/services/trackerService';
-import { AchievementService } from '@/services/achievementService';
-import { GoalService } from '@/services/goalService';
 import { auditLogService } from '@/services/auditLogService';
 import { getClientIp, generateRequestId } from '@/lib/utils';
 
@@ -71,6 +69,8 @@ const updateEntrySchema = z.object({
   customFields: z.record(z.unknown()).optional(),
 });
 
+type UpdateEntryData = z.infer<typeof updateEntrySchema>;
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -117,6 +117,18 @@ function addHeaders(
   }
 
   return response;
+}
+
+/**
+ * Convert validated Zod data to the format TrackerService expects,
+ * converting date string to Date object if present.
+ */
+function prepareUpdateData(data: UpdateEntryData): Omit<UpdateEntryData, 'date'> & { date?: Date } {
+  const { date, ...rest } = data;
+  if (date) {
+    return { ...rest, date: new Date(date) };
+  }
+  return rest;
 }
 
 // =============================================================================
@@ -197,7 +209,7 @@ export async function GET(
       requestId,
     });
 
-    const response = apiResponse.success(entry, { requestId });
+    const response = apiResponse.success(entry, { meta: { requestId } });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('GET /tracker/[id] failed', { requestId }, error);
@@ -245,9 +257,10 @@ export async function PUT(
     }
 
     const data = validation.data;
+    const updateData = prepareUpdateData(data);
 
     // Update entry
-    const entry = await TrackerService.updateEntry(id, data, userId);
+    const entry = await TrackerService.updateEntry(id, updateData, userId);
 
     // Audit log
     auditLogService.create({
@@ -257,7 +270,7 @@ export async function PUT(
       entityType: 'tracker_entry',
       entityId: id,
       description: 'Updated tracker entry',
-      newValue: data,
+      newValue: data as unknown as Record<string, unknown>,
       ipAddress: getClientIp(request),
       requestId,
     }).catch(console.error);
@@ -269,7 +282,7 @@ export async function PUT(
       requestId,
     });
 
-    const response = apiResponse.success(entry, { requestId });
+    const response = apiResponse.success(entry, { meta: { requestId } });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('PUT /tracker/[id] failed', { requestId }, error);
@@ -321,8 +334,17 @@ export async function PATCH(
     }
 
     const data = validation.data;
+    const updateData = prepareUpdateData(data);
 
-    const entry = await TrackerService.updateEntry(id, data, userId);
+    const entry = await TrackerService.updateEntry(id, updateData, userId);
+
+    // Build changes record for audit log
+    const changesRecord: Record<string, { old: unknown; new: unknown }> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        changesRecord[key] = { old: undefined, new: value };
+      }
+    }
 
     auditLogService.create({
       userId,
@@ -331,7 +353,7 @@ export async function PATCH(
       entityType: 'tracker_entry',
       entityId: id,
       description: 'Patched tracker entry',
-      changes: data,
+      changes: changesRecord,
       ipAddress: getClientIp(request),
       requestId,
     }).catch(console.error);
@@ -343,7 +365,7 @@ export async function PATCH(
       requestId,
     });
 
-    const response = apiResponse.success(entry, { requestId });
+    const response = apiResponse.success(entry, { meta: { requestId } });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('PATCH /tracker/[id] failed', { requestId }, error);
@@ -399,7 +421,7 @@ export async function DELETE(
 
     const response = apiResponse.success(
       { deleted: true, id },
-      { requestId, message: 'Entry deleted successfully' }
+      { meta: { requestId }, message: 'Entry deleted successfully' }
     );
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {

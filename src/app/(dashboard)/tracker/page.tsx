@@ -1,7 +1,7 @@
 
 'use client';
 
-import { ProblemList, Problem } from '@/components/tracker/ProblemList';
+import { ProblemList } from '@/components/tracker/ProblemList';
 import { ProblemFilters } from '@/components/tracker/ProblemFilters';
 import { TrackerDashboard } from '@/components/tracker/TrackerDashboard';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { MetaTags } from '@/components/seo/MetaTags';
 import { TrackerHeatmap } from '@/components/tracker/TrackerHeatmap';
 import { TrackerRecentActivity } from '@/components/tracker/TrackerRecentActivity';
 import { useTracker } from '@/hooks/useTracker';
-import type { TrackerFilter } from '@/types/tracker';
+import type { TrackerFilter, TrackerEntry } from '@/types/tracker';
 
 export default function TrackerPage() {
   const [filters, setFilters] = useState<TrackerFilter>({});
@@ -25,8 +25,10 @@ export default function TrackerPage() {
   const handleSearch = (search: string) => setFilters(prev => ({ ...prev, search }));
   const handlePlatform = (platform: string) => setFilters(prev => ({ ...prev, platformIds: platform ? [platform] : undefined }));
   const handleDifficulty = (difficulty: string) => setFilters(prev => ({ ...prev, difficulty }));
-  // Note: difficulty isn't in TrackerFilter type explicitly in some versions, but if the API supports it, we should add it.
-  // For now, assuming standard filters.
+  const handleCategory = (category: string) => setFilters(prev => ({
+    ...prev,
+    categories: category === 'all' ? undefined : [category as any]
+  }));
 
   const handleStatus = (status: string) => setFilters(prev => ({
     ...prev,
@@ -73,7 +75,7 @@ export default function TrackerPage() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold">Your Problems</h3>
+          <h3 className="text-xl font-semibold">Daily Activity</h3>
         </div>
 
         <ProblemFilters
@@ -81,6 +83,7 @@ export default function TrackerPage() {
           onPlatformChange={handlePlatform}
           onDifficultyChange={handleDifficulty}
           onStatusChange={handleStatus}
+          onCategoryChange={handleCategory}
         />
 
         {error ? (
@@ -89,9 +92,7 @@ export default function TrackerPage() {
           </div>
         ) : (
           <ProblemList
-            problems={isLoading ? [] : (entries as unknown as Problem[])}
-          // Casting entries because ProblemList expects Problem interface which might differ slightly from TrackerEntry
-          // Ideally we map it, but they should be compatible enough for display.
+            problems={isLoading ? [] : (entries as TrackerEntry[])}
           />
         )}
 

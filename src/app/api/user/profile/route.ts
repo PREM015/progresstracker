@@ -159,7 +159,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return addHeaders(apiResponse.unauthorized('Authentication required', requestId), requestId);
     }
 
-    const profile = await UserService.getUserProfile(session.user.id);
+    const { searchParams } = new URL(request.url);
+    const isLean = searchParams.get('lean') === 'true';
+
+    // Get user metadata first for conditional GET check
+    const userMeta = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, updatedAt: true }
+    });
+
+    if (!userMeta) {
+      return addHeaders(apiResponse.notFound('User', requestId), requestId);
+    }
+
+    const etag = `"profile-${userMeta.id}-${userMeta.updatedAt.getTime()}"`;
+    if (request.headers.get('if-none-match') === etag) {
+      return addHeaders(new NextResponse(null, { status: 304, headers: { 'ETag': etag } }), requestId);
+    }
+
+    const profile = isLean
+      ? await UserService.getLeanUserProfile(session.user.id)
+      : await UserService.getUserProfile(session.user.id);
 
     if (!profile) {
       return addHeaders(apiResponse.notFound('Profile', requestId), requestId);
@@ -168,6 +188,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     logger.info('Profile fetched', {
       userId: session.user.id,
       requestId,
+      isLean,
       duration: Date.now() - startTime,
     });
 
@@ -176,6 +197,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       headers: {
         'X-RateLimit-Limit': String(rateLimitResult.limit),
         'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+        'ETag': etag,
+        'Cache-Control': 'private, max-age=60'
       },
     });
 

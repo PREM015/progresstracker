@@ -13,24 +13,24 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
 }) => {
   const { preferences, updatePreferences, isLoadingPreferences } = useNotifications();
   const [localPrefs, setLocalPrefs] = useState({
-    email: true,
-    push: false,
-    goals: true,
-    achievements: true,
-    sync: false,
-    weekly: true,
+    emailEnabled: true,
+    pushEnabled: false,
+    goalReminders: true,
+    achievementAlerts: true,
+    syncComplete: false,
+    weeklyReport: true,
   });
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (preferences) {
       setLocalPrefs({
-        email: preferences.email ?? true,
-        push: preferences.push ?? false,
-        goals: preferences.goals ?? true,
-        achievements: preferences.achievements ?? true,
-        sync: preferences.sync ?? false,
-        weekly: preferences.weekly ?? true,
+        emailEnabled: preferences.emailEnabled ?? true,
+        pushEnabled: preferences.pushEnabled ?? false,
+        goalReminders: preferences.goalReminders ?? true,
+        achievementAlerts: preferences.achievementAlerts ?? true,
+        syncComplete: preferences.syncComplete ?? false,
+        weeklyReport: preferences.weeklyReport ?? true,
       });
     }
   }, [preferences]);
@@ -40,7 +40,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
     if (!updatePreferences) return;
     setIsSaving(true);
     try {
-      await updatePreferences(localPrefs);
+      await updatePreferences(localPrefs as any);
       toast.success('Notification preferences updated');
     } catch (error) {
       toast.error('Failed to update preferences');
@@ -67,8 +67,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           <label className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
             <input
               type="checkbox"
-              checked={localPrefs.email}
-              onChange={(e) => setLocalPrefs({ ...localPrefs, email: e.target.checked })}
+              checked={localPrefs.emailEnabled}
+              onChange={(e) => setLocalPrefs({ ...localPrefs, emailEnabled: e.target.checked })}
               className="w-5 h-5"
             />
             <div>
@@ -79,8 +79,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
           <label className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
             <input
               type="checkbox"
-              checked={localPrefs.push}
-              onChange={(e) => setLocalPrefs({ ...localPrefs, push: e.target.checked })}
+              checked={localPrefs.pushEnabled}
+              onChange={(e) => setLocalPrefs({ ...localPrefs, pushEnabled: e.target.checked })}
               className="w-5 h-5"
             />
             <div>
@@ -93,10 +93,10 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({
         <div className="border-t pt-4">
           <h4 className="font-semibold text-gray-900 mb-3">Activity</h4>
           {[
-            { key: 'goals', label: 'Goal Updates', desc: 'Milestones and deadlines' },
-            { key: 'achievements', label: 'Achievements', desc: 'New achievements unlocked' },
-            { key: 'sync', label: 'Sync Status', desc: 'Platform sync notifications' },
-            { key: 'weekly', label: 'Weekly Summary', desc: 'Weekly progress report' },
+            { key: 'goalReminders', label: 'Goal Updates', desc: 'Milestones and deadlines' },
+            { key: 'achievementAlerts', label: 'Achievements', desc: 'New achievements unlocked' },
+            { key: 'syncComplete', label: 'Sync Status', desc: 'Platform sync notifications' },
+            { key: 'weeklyReport', label: 'Weekly Summary', desc: 'Weekly progress report' },
           ].map((item) => (
             <label key={item.key} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
               <input

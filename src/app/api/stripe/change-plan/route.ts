@@ -88,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 id: itemId,
                 price: priceId,
             }],
-            coupon: coupon || undefined,
+            discounts: coupon ? [{ coupon }] : undefined,
             proration_behavior: 'always_invoice',
         });
 

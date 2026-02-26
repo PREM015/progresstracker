@@ -1,4 +1,6 @@
+'use client';
 import { useAdminGrowth } from '@/hooks/useAdminGrowth';
+
 
 export function WaitlistStats() {
   const { stats, isLoadingStats: loading } = useAdminGrowth();

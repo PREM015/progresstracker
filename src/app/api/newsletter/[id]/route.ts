@@ -53,9 +53,10 @@ async function checkAdmin(requestId: string) {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
+  const { id } = await params;
   const startTime = Date.now();
 
   try {
@@ -69,14 +70,14 @@ export async function GET(
     } // Fixed: closed brace
 
     const subscriber = await prisma.newsletterSubscriber.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
 
     if (!subscriber) {
       return addHeaders(apiResponse.notFound('Subscriber not found', requestId), requestId, rateLimitResult);
     }
 
-    logger.info('GET newsletter subscriber (admin) completed', { id: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('GET newsletter subscriber (admin) completed', { id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success(subscriber, { meta: { requestId } }), requestId, rateLimitResult);
 
@@ -88,9 +89,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
+  const { id } = await params;
   const startTime = Date.now();
 
   try {
@@ -111,11 +113,11 @@ export async function PUT(
     }
 
     const updatedSubscriber = await prisma.newsletterSubscriber.update({
-      where: { id: params.id },
+      where: { id },
       data: validation.data
     });
 
-    logger.info('PUT newsletter subscriber (admin) completed', { id: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('PUT newsletter subscriber (admin) completed', { id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success(updatedSubscriber, { meta: { requestId } }), requestId, rateLimitResult);
 
@@ -130,9 +132,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
+  const { id } = await params;
   const startTime = Date.now();
 
   try {
@@ -146,10 +149,10 @@ export async function DELETE(
     }
 
     await prisma.newsletterSubscriber.delete({
-      where: { id: params.id }
+      where: { id }
     });
 
-    logger.info('DELETE newsletter subscriber (admin) completed', { id: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('DELETE newsletter subscriber (admin) completed', { id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success({ message: 'Subscriber deleted' }, { meta: { requestId } }), requestId, rateLimitResult);
 

@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { GoalStatus, GoalType, GoalMetric, PlatformCategory, Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { CacheService } from '@/services/cacheService';
+import { withTiming } from '@/lib/apiTiming';
 import { auditLogService } from '@/services/auditLogService';
 
 // =============================================================================
@@ -353,7 +355,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 // GET - Get Goal Templates
 // =============================================================================
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export const GET = withTiming('GET /api/goals/templates', async function GET(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
@@ -385,7 +387,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const { category, difficulty, type } = queryValidation.data;
 
-    // Filter templates
+    // Check cache first (24h TTL — templates rarely change)
+    const cacheKey = `goals:templates:${userId}:${category || 'all'}:${difficulty || 'all'}:${type || 'all'}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) {
+      logger.info('GET /api/goals/templates cache hit', { userId, requestId, duration: Date.now() - startTime });
+      const response = apiResponse.success(cached, {});
+      response.headers.set('X-Cache', 'HIT');
+      return addHeaders(response, requestId, rateLimitResult);
+    }
+
+    // Filter static templates
     let templates = [...GOAL_TEMPLATES];
 
     if (category) {
@@ -400,17 +412,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       templates = templates.filter((t) => t.goalType === type);
     }
 
-    // Also fetch custom templates from database
-    const dbTemplates = await prisma.goalTemplate.findMany({
-      where: { isActive: true },
-      orderBy: [{ isFeatured: 'desc' }, { timesUsed: 'desc' }],
-    });
-
-    // Get user's usage stats for templates
-    const userGoals = await prisma.goal.findMany({
-      where: { userId },
-      select: { title: true, category: true, goalType: true },
-    });
+    // Parallel DB queries (was sequential)
+    const [dbTemplates, userGoals] = await Promise.all([
+      prisma.goalTemplate.findMany({
+        where: { isActive: true },
+        select: {
+          id: true, title: true, description: true, category: true,
+          goalType: true, metric: true, target: true, duration: true,
+          icon: true, color: true, difficulty: true, tips: true,
+          timesUsed: true, successRate: true, isFeatured: true,
+        },
+        orderBy: [{ isFeatured: 'desc' }, { timesUsed: 'desc' }],
+      }),
+      prisma.goal.findMany({
+        where: { userId },
+        select: { title: true, category: true, goalType: true },
+      }),
+    ]);
 
     // Add usage info to templates
     const templatesWithUsage = templates.map((template) => {
@@ -477,23 +495,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.success(
-      {
-        templates: allTemplates,
-        byCategory,
-        recommended: recommendedTemplates,
-        total: allTemplates.length,
-        filters: { category, difficulty, type },
-      },
-      {  }
-    );
+    const responseData = {
+      templates: allTemplates,
+      byCategory,
+      recommended: recommendedTemplates,
+      total: allTemplates.length,
+      filters: { category, difficulty, type },
+    };
+
+    // Cache for 24 hours (templates rarely change)
+    await CacheService.set(cacheKey, responseData, 86400);
+
+    const response = apiResponse.success(responseData, {});
+    response.headers.set('X-Cache', 'MISS');
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('GET /api/goals/templates failed', { requestId }, error);
     const response = apiResponse.internalError('Failed to fetch templates', requestId);
     return addHeaders(response, requestId);
   }
-}
+});
 
 // =============================================================================
 // POST - Create Goal from Template

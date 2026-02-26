@@ -8,8 +8,8 @@ import { prisma } from "@/lib/prisma";
 // NOTE: This implementation assumes a Comment model exists as per instructions.
 // If it doesn't, this code will fail type checking but fulfills the request "write route file as described".
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
-    const { slug } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
+    const { slug } = await params;
     // NOTE: Comment model is missing from schema, so we skip implementation as per instructions.
     // Returning empty comments list to prevent frontend breakage.
 
@@ -38,7 +38,7 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
     });
 });
 
-export const POST = withErrorHandling(async (req: Request, { params }: { params: { slug: string } }) => {
+export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ slug: string }> }) => {
     // NOTE: Comment model is missing from schema.
     return NextResponse.json({ error: "Comments are currently disabled" }, { status: 501 });
 });

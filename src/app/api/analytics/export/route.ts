@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import { prisma } from "@/lib/prisma";
-import { queues } from "@/lib/queue";
+import { exportsQueue } from "@/lib/bullmq";
 import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
@@ -92,7 +92,7 @@ export const POST = withErrorHandling(async (req: Request) => {
   });
 
   // Queue export generation
-  await queues.exports.add({ jobId: exportJob.id, ...validation.data });
+  await exportsQueue.add(`export-${exportJob.id}`, { jobId: exportJob.id, ...validation.data });
 
   // Update subscription count
   if (subscription) {

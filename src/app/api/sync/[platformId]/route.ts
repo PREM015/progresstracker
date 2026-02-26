@@ -99,10 +99,10 @@ export async function HEAD(
   context: RouteContext
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
-  
+
   try {
     const { platformId } = await context.params;
-    
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return new NextResponse(null, { status: 401 });
@@ -120,7 +120,7 @@ export async function HEAD(
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Sync-Status', userPlatform.syncStatus);
     response.headers.set('X-Last-Synced', userPlatform.lastSyncedAt?.toISOString() || 'never');
-    
+
     return addHeaders(response, requestId);
   } catch (error) {
     log.error('HEAD request failed', { requestId }, error);
@@ -144,7 +144,7 @@ export async function GET(
 
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 60, `sync:platform:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
@@ -267,7 +267,7 @@ export async function POST(
 
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(syncRateLimiter, 10, `sync:platform:post:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(300, requestId), requestId, rateLimitResult);
     }
@@ -349,6 +349,26 @@ export async function POST(
       triggeredBy: 'manual',
     });
 
+    if ('queued' in result) {
+      const duration = Date.now() - startTime;
+      return addHeaders(
+        apiResponse.success(
+          {
+            queued: true,
+            jobId: result.jobId,
+            platform: {
+              id: platformId,
+              name: userPlatform.platform.name,
+              slug: userPlatform.platform.slug,
+            },
+          },
+          { meta: { requestId, duration } }
+        ),
+        requestId,
+        rateLimitResult
+      );
+    }
+
     // Send completion notification
     sseSyncService.sendSyncCompleted(userId, {
       syncId: requestId,
@@ -412,7 +432,7 @@ export async function DELETE(
 
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 10, `sync:platform:delete:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }

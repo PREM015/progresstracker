@@ -135,93 +135,44 @@ interface PlatformDef {
   authType: 'none' | 'oauth' | 'api_key' | 'credentials' | 'scraping';
   priority: number;
   isExpectedWorking: boolean;
+  isHeavy: boolean; // Added for BullMQ routing
 }
 
 const PLATFORM_DEFINITIONS: PlatformDef[] = [
   // DSA Platforms
-  { slug: 'leetcode', name: 'LeetCode', className: 'LeetCodeScraper', modulePath: './leetcodeScraper', category: 'dsa', authType: 'scraping', priority: 100, isExpectedWorking: true },
-  { slug: 'codeforces', name: 'Codeforces', className: 'CodeforcesScraper', modulePath: './codeforcesScraper', category: 'dsa', authType: 'scraping', priority: 95, isExpectedWorking: true },
-  { slug: 'codechef', name: 'CodeChef', className: 'CodeChefScraper', modulePath: './codechefScraper', category: 'dsa', authType: 'scraping', priority: 90, isExpectedWorking: true },
-  { slug: 'hackerrank', name: 'HackerRank', className: 'HackerRankScraper', modulePath: './hackerrankScraper', category: 'dsa', authType: 'scraping', priority: 85, isExpectedWorking: true },
-  { slug: 'hackerearth', name: 'HackerEarth', className: 'HackerEarthScraper', modulePath: './hackerearthScraper', category: 'dsa', authType: 'scraping', priority: 70, isExpectedWorking: false },
-  { slug: 'atcoder', name: 'AtCoder', className: 'AtCoderScraper', modulePath: './atcoderScraper', category: 'dsa', authType: 'scraping', priority: 80, isExpectedWorking: true },
-  { slug: 'geeksforgeeks', name: 'GeeksforGeeks', className: 'GeeksForGeeksScraper', modulePath: './geeksforgeeksScraper', category: 'dsa', authType: 'scraping', priority: 85, isExpectedWorking: true },
-  { slug: 'interviewbit', name: 'InterviewBit', className: 'InterviewBitScraper', modulePath: './interviewbitScraper', category: 'dsa', authType: 'scraping', priority: 60, isExpectedWorking: false },
-  { slug: 'codewars', name: 'Codewars', className: 'CodewarsScraper', modulePath: './codewarsScraper', category: 'dsa', authType: 'scraping', priority: 75, isExpectedWorking: true },
-  { slug: 'exercism', name: 'Exercism', className: 'ExercismScraper', modulePath: './exercismScraper', category: 'dsa', authType: 'scraping', priority: 70, isExpectedWorking: true },
-  { slug: 'topcoder', name: 'TopCoder', className: 'TopCoderScraper', modulePath: './topcoderScraper', category: 'dsa', authType: 'scraping', priority: 65, isExpectedWorking: false },
-  { slug: 'spoj', name: 'SPOJ', className: 'SPOJScraper', modulePath: './spojScraper', category: 'dsa', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'projecteuler', name: 'Project Euler', className: 'ProjectEulerScraper', modulePath: './projecteulerScraper', category: 'dsa', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'binarysearch', name: 'Binary Search', className: 'BinarySearchScraper', modulePath: './binarysearchScraper', category: 'dsa', authType: 'scraping', priority: 30, isExpectedWorking: false },
-  { slug: 'algoexpert', name: 'AlgoExpert', className: 'AlgoExpertScraper', modulePath: './algoexpertScraper', category: 'dsa', authType: 'credentials', priority: 50, isExpectedWorking: false },
-  { slug: 'codingame', name: 'CodinGame', className: 'CodingGameScraper', modulePath: './codinGameScraper', category: 'dsa', authType: 'scraping', priority: 40, isExpectedWorking: false },
+  { slug: 'leetcode', name: 'LeetCode', className: 'LeetCodeScraper', modulePath: './leetcodeScraper', category: 'dsa', authType: 'scraping', priority: 100, isExpectedWorking: true, isHeavy: false },
+  { slug: 'codeforces', name: 'Codeforces', className: 'CodeforcesScraper', modulePath: './codeforcesScraper', category: 'dsa', authType: 'scraping', priority: 95, isExpectedWorking: true, isHeavy: false },
+  { slug: 'codechef', name: 'CodeChef', className: 'CodeChefScraper', modulePath: './codechefScraper', category: 'dsa', authType: 'scraping', priority: 90, isExpectedWorking: true, isHeavy: false },
+  { slug: 'hackerrank', name: 'HackerRank', className: 'HackerRankScraper', modulePath: './hackerrankScraper', category: 'dsa', authType: 'scraping', priority: 85, isExpectedWorking: true, isHeavy: false },
+  { slug: 'hackerearth', name: 'HackerEarth', className: 'HackerEarthScraper', modulePath: './hackerearthScraper', category: 'dsa', authType: 'scraping', priority: 70, isExpectedWorking: true, isHeavy: true },
+  { slug: 'atcoder', name: 'AtCoder', className: 'AtCoderScraper', modulePath: './atcoderScraper', category: 'dsa', authType: 'scraping', priority: 80, isExpectedWorking: true, isHeavy: false },
+  { slug: 'geeksforgeeks', name: 'GeeksforGeeks', className: 'GeeksForGeeksScraper', modulePath: './geeksforgeeksScraper', category: 'dsa', authType: 'scraping', priority: 85, isExpectedWorking: true, isHeavy: false },
+  { slug: 'interviewbit', name: 'InterviewBit', className: 'InterviewBitScraper', modulePath: './interviewbitScraper', category: 'dsa', authType: 'scraping', priority: 60, isExpectedWorking: true, isHeavy: true },
+  { slug: 'codewars', name: 'Codewars', className: 'CodewarsScraper', modulePath: './codewarsScraper', category: 'dsa', authType: 'scraping', priority: 75, isExpectedWorking: true, isHeavy: false },
+  { slug: 'exercism', name: 'Exercism', className: 'ExercismScraper', modulePath: './exercismScraper', category: 'dsa', authType: 'scraping', priority: 70, isExpectedWorking: true, isHeavy: false },
+  { slug: 'topcoder', name: 'TopCoder', className: 'TopCoderScraper', modulePath: './topcoderScraper', category: 'dsa', authType: 'scraping', priority: 65, isExpectedWorking: true, isHeavy: true },
+  { slug: 'spoj', name: 'SPOJ', className: 'SPOJScraper', modulePath: './spojScraper', category: 'dsa', authType: 'scraping', priority: 50, isExpectedWorking: true, isHeavy: true },
+  { slug: 'projecteuler', name: 'Project Euler', className: 'ProjectEulerScraper', modulePath: './projecteulerScraper', category: 'dsa', authType: 'scraping', priority: 40, isExpectedWorking: true, isHeavy: false },
 
   // Git Platforms
-  { slug: 'github', name: 'GitHub', className: 'GitHubScraper', modulePath: './githubScraper', category: 'git', authType: 'oauth', priority: 100, isExpectedWorking: true },
-  { slug: 'gitlab', name: 'GitLab', className: 'GitLabScraper', modulePath: './gitlabScraper', category: 'git', authType: 'oauth', priority: 90, isExpectedWorking: true },
-  { slug: 'bitbucket', name: 'Bitbucket', className: 'BitbucketScraper', modulePath: './bitbucketScraper', category: 'git', authType: 'oauth', priority: 85, isExpectedWorking: true },
-  { slug: 'sourceforge', name: 'SourceForge', className: 'SourceForgeScraper', modulePath: './sourceforgeScraper', category: 'git', authType: 'scraping', priority: 30, isExpectedWorking: false },
+  { slug: 'github', name: 'GitHub', className: 'GitHubScraper', modulePath: './githubScraper', category: 'git', authType: 'oauth', priority: 100, isExpectedWorking: true, isHeavy: false },
+  { slug: 'gitlab', name: 'GitLab', className: 'GitLabScraper', modulePath: './gitlabScraper', category: 'git', authType: 'oauth', priority: 90, isExpectedWorking: true, isHeavy: false },
+  { slug: 'bitbucket', name: 'Bitbucket', className: 'BitbucketScraper', modulePath: './bitbucketScraper', category: 'git', authType: 'oauth', priority: 85, isExpectedWorking: true, isHeavy: false },
+  { slug: 'sourceforge', name: 'SourceForge', className: 'SourceForgeScraper', modulePath: './sourceforgeScraper', category: 'git', authType: 'scraping', priority: 30, isExpectedWorking: true, isHeavy: false },
 
   // Learning Platforms
-  { slug: 'freecodecamp', name: 'freeCodeCamp', className: 'FreeCodeCampScraper', modulePath: './freecodecampScraper', category: 'learning', authType: 'scraping', priority: 80, isExpectedWorking: true },
-  { slug: 'codecademy', name: 'Codecademy', className: 'CodecademyScraper', modulePath: './codecademyScraper', category: 'learning', authType: 'credentials', priority: 60, isExpectedWorking: false },
-  { slug: 'coursera', name: 'Coursera', className: 'CourseraScraper', modulePath: './courseraScaper', category: 'learning', authType: 'credentials', priority: 70, isExpectedWorking: false },
-  { slug: 'udemy', name: 'Udemy', className: 'UdemyScraper', modulePath: './udemyScraper', category: 'learning', authType: 'credentials', priority: 65, isExpectedWorking: false },
-  { slug: 'udacity', name: 'Udacity', className: 'UdacityScraper', modulePath: './udacityScraper', category: 'learning', authType: 'credentials', priority: 60, isExpectedWorking: false },
-  { slug: 'edx', name: 'edX', className: 'EdXScraper', modulePath: './edxScraper', category: 'learning', authType: 'credentials', priority: 55, isExpectedWorking: false },
-  { slug: 'khanacademy', name: 'Khan Academy', className: 'KhanAcademyScraper', modulePath: './khanacademyScraper', category: 'learning', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'pluralsight', name: 'Pluralsight', className: 'PluralsightScraper', modulePath: './pluralsightScraper', category: 'learning', authType: 'credentials', priority: 55, isExpectedWorking: false },
-  { slug: 'skillshare', name: 'Skillshare', className: 'SkillshareScraper', modulePath: './skillshareScraper', category: 'learning', authType: 'credentials', priority: 40, isExpectedWorking: false },
-  { slug: 'linkedinlearning', name: 'LinkedIn Learning', className: 'LinkedInLearningScraper', modulePath: './linkedinlearningScraper', category: 'learning', authType: 'oauth', priority: 60, isExpectedWorking: false },
-  { slug: 'datacamp', name: 'DataCamp', className: 'DataCampScraper', modulePath: './datacampScraper', category: 'learning', authType: 'credentials', priority: 55, isExpectedWorking: false },
-  { slug: 'scrimba', name: 'Scrimba', className: 'ScrimbaScraper', modulePath: './scrimbaScraper', category: 'learning', authType: 'credentials', priority: 40, isExpectedWorking: false },
+  { slug: 'freecodecamp', name: 'freeCodeCamp', className: 'FreeCodeCampScraper', modulePath: './freecodecampScraper', category: 'learning', authType: 'scraping', priority: 80, isExpectedWorking: true, isHeavy: false },
+  { slug: 'codecademy', name: 'Codecademy', className: 'CodecademyScraper', modulePath: './codecademyScraper', category: 'learning', authType: 'scraping', priority: 75, isExpectedWorking: true, isHeavy: false },
 
-  // Data Science
-  { slug: 'kaggle', name: 'Kaggle', className: 'KaggleScraper', modulePath: './kaggleScraper', category: 'data_science', authType: 'scraping', priority: 85, isExpectedWorking: true },
-
-  // Job Platforms
-  { slug: 'linkedin', name: 'LinkedIn', className: 'LinkedInScraper', modulePath: './linkedinScraper', category: 'job', authType: 'oauth', priority: 90, isExpectedWorking: false },
-  { slug: 'indeed', name: 'Indeed', className: 'IndeedScraper', modulePath: './indeedScraper', category: 'job', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'glassdoor', name: 'Glassdoor', className: 'GlassdoorScraper', modulePath: './glassdoorScraper', category: 'job', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'naukri', name: 'Naukri', className: 'NaukriScraper', modulePath: './naukriScraper', category: 'job', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'monster', name: 'Monster', className: 'MonsterScraper', modulePath: './monsterScraper', category: 'job', authType: 'scraping', priority: 30, isExpectedWorking: false },
-  { slug: 'dice', name: 'Dice', className: 'DiceScraper', modulePath: './diceScraper', category: 'job', authType: 'scraping', priority: 35, isExpectedWorking: false },
-  { slug: 'ziprecruiter', name: 'ZipRecruiter', className: 'ZipRecruiterScraper', modulePath: './ziprecruiterScraper', category: 'job', authType: 'scraping', priority: 30, isExpectedWorking: false },
-  { slug: 'simplyhired', name: 'SimplyHired', className: 'SimplyHiredScraper', modulePath: './simplyhiredScraper', category: 'job', authType: 'scraping', priority: 25, isExpectedWorking: false },
-  { slug: 'hired', name: 'Hired', className: 'HiredScraper', modulePath: './hiredScraper', category: 'job', authType: 'credentials', priority: 40, isExpectedWorking: false },
-  { slug: 'wellfound', name: 'Wellfound', className: 'WellfoundScraper', modulePath: './wellfoundScraper', category: 'job', authType: 'scraping', priority: 45, isExpectedWorking: false },
-  { slug: 'angellist', name: 'AngelList', className: 'AngelListScraper', modulePath: './angellistScraper', category: 'job', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'instahyre', name: 'InstaHyre', className: 'InstaHyreScraper', modulePath: './instahyreScraper', category: 'job', authType: 'scraping', priority: 35, isExpectedWorking: false },
-  { slug: 'internshala', name: 'Internshala', className: 'IntershalaScraper', modulePath: './internshalaScaper', category: 'job', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'unstop', name: 'Unstop', className: 'UnstopScraper', modulePath: './unstopScraper', category: 'job', authType: 'scraping', priority: 55, isExpectedWorking: false },
-
-  // Hackathon Platforms  
-  { slug: 'devpost', name: 'Devpost', className: 'DevpostScraper', modulePath: './devpostScraper', category: 'hackathon', authType: 'scraping', priority: 80, isExpectedWorking: true },
-  { slug: 'mlh', name: 'MLH', className: 'MLHScraper', modulePath: './mlhScraper', category: 'hackathon', authType: 'scraping', priority: 70, isExpectedWorking: false },
-  { slug: 'hackathoncom', name: 'Hackathon.com', className: 'HackathonComScraper', modulePath: './hackathoncomScraper', category: 'hackathon', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'devfolio', name: 'Devfolio', className: 'DevfolioScraper', modulePath: './devfolioScraper', category: 'hackathon', authType: 'scraping', priority: 60, isExpectedWorking: false },
-
-  // Open Source
-  { slug: 'gssoc', name: 'GSSoC', className: 'GSSoCScraper', modulePath: './gssocScraper', category: 'opensource', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'hacktoberfest', name: 'Hacktoberfest', className: 'HacktoberfestScraper', modulePath: './hacktoberfestScraper', category: 'opensource', authType: 'oauth', priority: 60, isExpectedWorking: false },
-  { slug: 'outreachy', name: 'Outreachy', className: 'OutreachyScraper', modulePath: './outreachyScraper', category: 'opensource', authType: 'scraping', priority: 40, isExpectedWorking: false },
-  { slug: 'lfx', name: 'LFX Mentorship', className: 'LFXScraper', modulePath: './lfxScraper', category: 'opensource', authType: 'scraping', priority: 45, isExpectedWorking: false },
-  { slug: 'kwoc', name: 'KWoC', className: 'KWoCScraper', modulePath: './kwocScraper', category: 'opensource', authType: 'scraping', priority: 35, isExpectedWorking: false },
-  { slug: 'swoc', name: 'SWoC', className: 'SWoCScraper', modulePath: './swocScraper', category: 'opensource', authType: 'scraping', priority: 35, isExpectedWorking: false },
-
-  // Company Platforms
-  { slug: 'google', name: 'Google Careers', className: 'GoogleScraper', modulePath: './googleScraper', category: 'company', authType: 'oauth', priority: 70, isExpectedWorking: false },
-  { slug: 'meta', name: 'Meta Careers', className: 'MetaScraper', modulePath: './metaScraper', category: 'company', authType: 'scraping', priority: 60, isExpectedWorking: false },
-  { slug: 'amazon', name: 'Amazon Jobs', className: 'AmazonScraper', modulePath: './amazonScraper', category: 'company', authType: 'scraping', priority: 60, isExpectedWorking: false },
-  { slug: 'microsoft', name: 'Microsoft Careers', className: 'MicrosoftScraper', modulePath: './microsoftScraper', category: 'company', authType: 'oauth', priority: 65, isExpectedWorking: false },
-  { slug: 'apple', name: 'Apple Jobs', className: 'AppleScraper', modulePath: './appleScraper', category: 'company', authType: 'scraping', priority: 55, isExpectedWorking: false },
-  { slug: 'ibm', name: 'IBM Careers', className: 'IBMScraper', modulePath: './ibmScraper', category: 'company', authType: 'scraping', priority: 50, isExpectedWorking: false },
+  // Hackathon Platforms
+  { slug: 'devfolio', name: 'Devfolio', className: 'DevfolioScraper', modulePath: './devfolioScraper', category: 'hackathon', authType: 'scraping', priority: 85, isExpectedWorking: true, isHeavy: true },
 
   // Design Platforms
-  { slug: 'dribbble', name: 'Dribbble', className: 'DribbbleScraper', modulePath: './dribbbleScraper', category: 'design', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'behance', name: 'Behance', className: 'BehanceScraper', modulePath: './behanceScraper', category: 'design', authType: 'scraping', priority: 50, isExpectedWorking: false },
-  { slug: 'producthunt', name: 'Product Hunt', className: 'ProductHuntScraper', modulePath: './producthuntScraper', category: 'design', authType: 'scraping', priority: 40, isExpectedWorking: false },
+  { slug: 'dribbble', name: 'Dribbble', className: 'DribbbleScraper', modulePath: './dribbbleScraper', category: 'design', authType: 'scraping', priority: 55, isExpectedWorking: true, isHeavy: true },
+  { slug: 'behance', name: 'Behance', className: 'BehanceScraper', modulePath: './behanceScraper', category: 'design', authType: 'scraping', priority: 50, isExpectedWorking: true, isHeavy: true },
+  { slug: 'producthunt', name: 'Product Hunt', className: 'ProductHuntScraper', modulePath: './producthuntScraper', category: 'design', authType: 'scraping', priority: 45, isExpectedWorking: true, isHeavy: true },
 ];
+
 
 // =============================================================================
 // SCRAPER STATUS INTERFACE
@@ -246,6 +197,7 @@ interface PlatformInfo {
   isImplemented: boolean;
   isWorking: boolean;
   priority: number;
+  isHeavy: boolean;
 }
 
 interface ScraperCapabilities {
@@ -267,7 +219,35 @@ class ScraperFactoryClass {
   private scraperStatus: Map<string, ScraperStatus> = new Map();
   private platformInfo: Map<string, PlatformInfo> = new Map();
   private workingScrapers: Set<string> = new Set();
+  private activeSyncs: Map<string, boolean> = new Map();
   private initialized: boolean = false;
+
+  /**
+   * Acquire a lock for a platform sync to prevent concurrent execution
+   */
+  acquireLock(slug: string): boolean {
+    const normalizedSlug = slug.toLowerCase();
+    if (this.activeSyncs.get(normalizedSlug)) {
+      return false;
+    }
+    this.activeSyncs.set(normalizedSlug, true);
+    return true;
+  }
+
+  /**
+   * Release a lock for a platform sync
+   */
+  releaseLock(slug: string): void {
+    const normalizedSlug = slug.toLowerCase();
+    this.activeSyncs.delete(normalizedSlug);
+  }
+
+  /**
+   * Check if a platform is currently syncing
+   */
+  isSyncing(slug: string): boolean {
+    return this.activeSyncs.get(slug.toLowerCase()) || false;
+  }
 
 
   private async loadScraperDynamic(slug: string): Promise<BaseScraper | null> {
@@ -303,8 +283,12 @@ class ScraperFactoryClass {
 
       return scraper;
     } catch (err) {
-      logger.debug(`Dynamic scraper load failed for ${slug}: ${def.modulePath}`);
-      console.error(`[ScraperFactory] Load error for ${slug}:`, err);
+      logger.error(`Dynamic scraper load FAILED for ${slug}`, {
+        slug,
+        module: def.modulePath,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       return null;
     }
   }
@@ -345,7 +329,8 @@ class ScraperFactoryClass {
   }
 
   /**
-   * Synchronous initialization with dynamic imports handled later
+   * Synchronous initialization - LIGHTWEIGHT ONLY
+   * Does NOT load actual scraper modules to prevent cold start delays
    */
   private initializeSync(): void {
     // Initialize platform info and stubs
@@ -358,9 +343,10 @@ class ScraperFactoryClass {
         isImplemented: false, // Will be updated when scraper loads
         isWorking: def.isExpectedWorking,
         priority: def.priority,
+        isHeavy: def.isHeavy,
       });
 
-      // Initialize with stub scraper
+      // Initialize with stub scraper ONLY
       this.scrapers.set(def.slug, new StubScraper(def.name, def.slug));
 
       this.scraperStatus.set(def.slug, {
@@ -379,44 +365,18 @@ class ScraperFactoryClass {
       }
     }
 
-    // Load actual scrapers synchronously using require
-    this.loadScrapersSync();
     this.initialized = true;
-
-    logger.info(`ScraperFactory initialized with ${this.scrapers.size} scrapers (${this.workingScrapers.size} working)`);
-  }
-
-  /**
-   * Load scrapers synchronously
-   */
-  private loadScrapersSync(): void {
-    for (const def of PLATFORM_DEFINITIONS) {
-      try {
-
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const scraperModule = require(def.modulePath);
-        const ScraperClass = scraperModule[def.className] || scraperModule.default;
-
-        if (ScraperClass) {
-          const scraper = new ScraperClass();
-          this.scrapers.set(def.slug, scraper);
-
-          const info = this.platformInfo.get(def.slug);
-          if (info) {
-            info.isImplemented = true;
-          }
-        }
-      } catch {
-        // Scraper module doesn't exist or has errors - keep stub
-        logger.debug(`Using stub scraper for ${def.slug}`);
-      }
-    }
+    logger.info(`ScraperFactory initialized with ${this.scrapers.size} stubs. Real scrapers will be lazy loaded.`);
   }
 
   // =========================================================================
   // PUBLIC METHODS
   // =========================================================================
 
+  /**
+   * Get a scraper instance (returns Stub if not loaded)
+   * This is fast and synchronous for UI rendering
+   */
   getScraper(slug: string): BaseScraper | null {
     return this.scrapers.get(slug.toLowerCase()) || null;
   }
@@ -427,6 +387,10 @@ class ScraperFactoryClass {
 
   isScraperWorking(slug: string): boolean {
     return this.workingScrapers.has(slug.toLowerCase());
+  }
+
+  isHeavy(slug: string): boolean {
+    return this.platformInfo.get(slug.toLowerCase())?.isHeavy ?? false;
   }
 
   requiresOAuth(slug: string): boolean {
@@ -480,6 +444,9 @@ class ScraperFactoryClass {
       status.errorCount++;
       status.lastError = error || 'Unknown error';
 
+      // Log every error at warn level for visibility
+      logger.warn(`Scraper ${normalizedSlug} failed attempt ${status.errorCount}: ${status.lastError}`);
+
       if (status.errorCount >= 5) {
         this.workingScrapers.delete(normalizedSlug);
         status.isWorking = false;
@@ -487,7 +454,7 @@ class ScraperFactoryClass {
         const info = this.platformInfo.get(normalizedSlug);
         if (info) info.isWorking = false;
 
-        logger.warn(`Scraper ${slug} marked as not working after ${status.errorCount} consecutive errors`);
+        logger.error(`[CRITICAL] Scraper ${slug} marked as NOT WORKING after ${status.errorCount} consecutive errors. Last error: ${status.lastError}`);
       }
     }
 
@@ -574,6 +541,7 @@ class ScraperFactoryClass {
 // =============================================================================
 
 export const ScraperFactory = new ScraperFactoryClass();
+export const getScraperForPlatform = (slug: string) => ScraperFactory.getScraper(slug);
 
 export { BaseScraper } from './baseScraper';
 export { StubScraper } from './stubScraper';

@@ -9,10 +9,10 @@ export function useUser() {
   const queryClient = useQueryClient();
   const isAuthenticated = status === 'authenticated';
 
-  // Fetch full user profile
+  // Fetch lean user profile for global context
   const profileQuery = useQuery({
-    queryKey: queryKeys.user.profile(session?.user?.id || ''),
-    queryFn: () => UserService.getProfile(),
+    queryKey: queryKeys.user.profile(session?.user?.id || '', { lean: true }),
+    queryFn: () => UserService.getProfile({ lean: true }),
     enabled: isAuthenticated && !!session?.user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -28,9 +28,8 @@ export function useUser() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: (data: Partial<UserProfile>) => UserService.updateProfile(data),
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(queryKeys.user.profile(session?.user?.id || ''), updatedUser);
-      // Also update session if needed (requires session update strategy)
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.all });
     },
   });
 

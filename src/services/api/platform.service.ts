@@ -48,7 +48,10 @@ export const PlatformService = {
      * Force sync a platform
      */
     sync: async (platformId: string): Promise<PlatformStats> => {
-        return httpClient.post<PlatformStats>(`${BASE_URL}/${platformId}/sync`);
+        return httpClient.post<PlatformStats>(`${BASE_URL}/${platformId}/sync`, {
+            waitForCompletion: true,
+            force: true
+        });
     },
 
     /**

@@ -26,7 +26,7 @@ export async function OPTIONS(): Promise<NextResponse> {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -49,7 +49,7 @@ export async function POST(
     }
 
     // Validate params
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid feature flag ID',

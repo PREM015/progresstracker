@@ -11,7 +11,7 @@ interface PrivacySettingsProps {
 export const PrivacySettings: React.FC<PrivacySettingsProps> = ({
   className = '',
 }) => {
-  const { settings, updatePrivacy, isUpdatingPrivacy } = useSettings();
+  const { settings, updatePrivacy, isUpdatingPrivacy } = useSettings() as any;
 
   // We need to map the settings object (which might be flat or nested depending on API) 
   // to the PrivacySettings interface expected by updatePrivacy.

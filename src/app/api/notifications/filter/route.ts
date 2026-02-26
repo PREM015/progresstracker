@@ -8,13 +8,13 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const type = searchParams.get("type");
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (isArchived !== null) whereClause.isArchived = isArchived === "true";
     if (isDismissed !== null) whereClause.isDismissed = isDismissed === "true";
     if (entityType) whereClause.entityType = entityType;
-    
+
     if (startDate && endDate) {
       whereClause.createdAt = {
         gte: new Date(startDate),
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    return apiResponse({
+    return apiResponse.success({
       notifications,
       filterOptions: {
         types: types.map((t) => t.type),

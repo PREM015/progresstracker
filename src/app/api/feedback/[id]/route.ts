@@ -22,13 +22,14 @@ async function getUserFromSession(req: NextRequest) {
 // GET /api/feedback/[id] - Get single feedback
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const user = await getUserFromSession(req);
 
     const feedback = await prisma.feedback.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: {
           select: {
@@ -58,7 +59,7 @@ export async function GET(
 
     return NextResponse.json(feedback);
   } catch (error) {
-    logger.error("Error fetching feedback", { id: params.id }, error);
+    logger.error("Error fetching feedback", { id }, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -69,8 +70,9 @@ export async function GET(
 // PATCH /api/feedback/[id] - Update feedback (admin only)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const user = await getUserFromSession(req);
     if (!user?.isAdmin) {
@@ -84,7 +86,7 @@ export async function PATCH(
     const { status, response } = body;
 
     const feedback = await prisma.feedback.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!feedback) {
@@ -95,7 +97,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.feedback.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(status !== undefined && { status }),
         ...(response !== undefined && {
@@ -107,13 +109,13 @@ export async function PATCH(
 
     logger.info("Feedback updated", {
       adminId: user.id,
-      feedbackId: params.id,
+      feedbackId: id,
       changes: Object.keys(body),
     });
 
     return NextResponse.json(updated);
   } catch (error) {
-    logger.error("Error updating feedback", { id: params.id }, error);
+    logger.error("Error updating feedback", { id }, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -124,13 +126,14 @@ export async function PATCH(
 // DELETE /api/feedback/[id] - Delete feedback
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const user = await getUserFromSession(req);
 
     const feedback = await prisma.feedback.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!feedback) {
@@ -149,17 +152,17 @@ export async function DELETE(
     }
 
     await prisma.feedback.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     logger.info("Feedback deleted", {
       userId: user?.id,
-      feedbackId: params.id,
+      feedbackId: id,
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error("Error deleting feedback", { id: params.id }, error);
+    logger.error("Error deleting feedback", { id }, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

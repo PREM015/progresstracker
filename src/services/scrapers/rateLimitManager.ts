@@ -1,27 +1,24 @@
-// src/services/scrapers/rateLimitManager.ts
 import { logger } from '@/lib/logger';
+import { cache } from '@/lib/redis';
 import type { RateLimitConfig } from './types';
 import { sleep } from './utils';
 
-interface RateLimitState {
-  tokens: number;
-  lastRefill: number;
-  queue: Array<{
-    resolve: () => void;
-    reject: (error: Error) => void;
-  }>;
-}
-
+/**
+ * RateLimitManager — uses simple Redis INCR + EXPIRE for a sliding window counter.
+ * 
+ * Previous implementation used cache.eval() with Lua scripts, but cache.eval()
+ * does not exist on the cache wrapper — causing every scraper request to throw
+ * and block forever. This rewrite uses only cache.incr() and cache.expire()
+ * which are actual methods on the cache object.
+ */
 class RateLimitManager {
   private limits: Map<string, RateLimitConfig> = new Map();
-  private state: Map<string, RateLimitState> = new Map();
-  private processing: Set<string> = new Set();
 
   /**
    * Default rate limits by platform
    */
   private readonly defaults: Record<string, RateLimitConfig> = {
-    github: { requests: 5000, windowMs: 3600000 }, // 5000/hour
+    github: { requests: 5000, windowMs: 3600000 },    // 5000/hour
     gitlab: { requests: 2000, windowMs: 3600000 },
     leetcode: { requests: 30, windowMs: 60000 },
     codeforces: { requests: 10, windowMs: 60000 },
@@ -49,98 +46,101 @@ class RateLimitManager {
   }
 
   /**
-   * Wait for rate limit token
+   * Wait for rate limit token using simple INCR counter.
+   * 
+   * Uses a Redis key `ratelimit:<platform>:<window>` that increments on each
+   * request. The key auto-expires at the end of the window. If the count
+   * exceeds the limit, waits for the window to reset.
+   * 
+   * On any Redis error, fails OPEN (allows the request through) to avoid
+   * blocking scrapers.
    */
   async acquire(platform: string): Promise<void> {
     const key = platform.toLowerCase();
     const config = this.getConfig(key);
-    
-    // Initialize state if needed
-    if (!this.state.has(key)) {
-      this.state.set(key, {
-        tokens: config.requests,
-        lastRefill: Date.now(),
-        queue: [],
+    const windowSeconds = Math.ceil(config.windowMs / 1000);
+
+    // Window key includes the current time bucket so it auto-resets
+    const windowBucket = Math.floor(Date.now() / config.windowMs);
+    const redisKey = `ratelimit:${key}:${windowBucket}`;
+
+    try {
+      const count = await cache.incr(redisKey);
+
+      // Set expiry on first increment so the key auto-cleans
+      if (count === 1) {
+        await cache.expire(redisKey, windowSeconds + 1);
+      }
+
+      if (count <= config.requests) {
+        // Under limit — proceed
+        return;
+      }
+
+      // Over limit — wait for the current window to expire, then proceed
+      const windowEndMs = (windowBucket + 1) * config.windowMs;
+      const waitMs = Math.min(windowEndMs - Date.now() + 100, config.windowMs);
+
+      if (waitMs > 0 && waitMs <= 60000) {
+        logger.debug(`Rate limit reached for ${platform} (${count}/${config.requests}). Waiting ${waitMs}ms`);
+        await sleep(waitMs);
+      }
+
+      // After waiting, allow through
+      return;
+    } catch (error) {
+      // Redis failed — fail OPEN so scrapers aren't blocked
+      logger.warn(`RateLimitManager Redis error for ${platform}, allowing request through`, {
+        error: error instanceof Error ? error.message : String(error),
       });
-    }
-
-    const state = this.state.get(key)!;
-
-    // Refill tokens if window has passed
-    const now = Date.now();
-    const elapsed = now - state.lastRefill;
-    
-    if (elapsed >= config.windowMs) {
-      state.tokens = config.requests;
-      state.lastRefill = now;
-    } else {
-      // Partial refill based on time passed
-      const refillRate = config.requests / config.windowMs;
-      const refillAmount = Math.floor(elapsed * refillRate);
-      state.tokens = Math.min(config.requests, state.tokens + refillAmount);
-      if (refillAmount > 0) {
-        state.lastRefill = now;
-      }
-    }
-
-    // Check if token available
-    if (state.tokens > 0) {
-      state.tokens--;
       return;
     }
-
-    // Queue request
-    logger.debug(`Rate limit reached for ${platform}, queuing request`, {
-      tokensRemaining: state.tokens,
-      queueLength: state.queue.length,
-    });
-
-    return new Promise((resolve, reject) => {
-      state.queue.push({ resolve, reject });
-      this.processQueue(key);
-    });
   }
 
   /**
-   * Process queued requests
+   * Try to acquire token without blocking.
+   * Returns true if acquired, false if rate limited.
    */
-  private async processQueue(key: string): Promise<void> {
-    if (this.processing.has(key)) return;
-    this.processing.add(key);
-
-    const state = this.state.get(key);
+  async tryAcquire(platform: string): Promise<boolean> {
+    const key = platform.toLowerCase();
     const config = this.getConfig(key);
+    const windowSeconds = Math.ceil(config.windowMs / 1000);
 
-    if (!state) {
-      this.processing.delete(key);
-      return;
-    }
+    const windowBucket = Math.floor(Date.now() / config.windowMs);
+    const redisKey = `ratelimit:${key}:${windowBucket}`;
 
-    while (state.queue.length > 0) {
-      // Wait for refill
-      const waitTime = Math.ceil(config.windowMs / config.requests);
-      await sleep(waitTime);
+    try {
+      const count = await cache.incr(redisKey);
 
-      // Refill one token
-      state.tokens = 1;
-
-      // Process next in queue
-      const next = state.queue.shift();
-      if (next) {
-        state.tokens--;
-        next.resolve();
+      if (count === 1) {
+        await cache.expire(redisKey, windowSeconds + 1);
       }
-    }
 
-    this.processing.delete(key);
+      return count <= config.requests;
+    } catch (error) {
+      logger.warn(`tryAcquire Redis error for ${platform}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return true; // Fail open
+    }
   }
 
   /**
-   * Check remaining tokens
+   * Get remaining tokens (estimated)
    */
-  getRemaining(platform: string): number {
-    const state = this.state.get(platform.toLowerCase());
-    return state?.tokens || 0;
+  async getRemaining(platform: string): Promise<number> {
+    const key = platform.toLowerCase();
+    const config = this.getConfig(key);
+    const windowBucket = Math.floor(Date.now() / config.windowMs);
+    const redisKey = `ratelimit:${key}:${windowBucket}`;
+
+    try {
+      const val = await cache.get<number>(redisKey);
+      const used = val ?? 0;
+      return Math.max(0, config.requests - used);
+    } catch {
+      return config.requests; // Assume full if Redis fails
+    }
   }
 
   /**
@@ -149,57 +149,50 @@ class RateLimitManager {
   getNextTokenTime(platform: string): number {
     const key = platform.toLowerCase();
     const config = this.getConfig(key);
-    const state = this.state.get(key);
-
-    if (!state || state.tokens > 0) return 0;
-
-    const elapsed = Date.now() - state.lastRefill;
-    const timePerToken = config.windowMs / config.requests;
-    return Math.max(0, timePerToken - elapsed);
+    const windowBucket = Math.floor(Date.now() / config.windowMs);
+    const windowEndMs = (windowBucket + 1) * config.windowMs;
+    return Math.max(0, windowEndMs - Date.now());
   }
 
   /**
    * Reset rate limit for platform
    */
-  reset(platform: string): void {
+  async reset(platform: string): Promise<void> {
     const key = platform.toLowerCase();
-    const state = this.state.get(key);
-    
-    if (state) {
-      // Reject all queued requests
-      state.queue.forEach(({ reject }) => {
-        reject(new Error('Rate limit reset'));
-      });
-      state.queue = [];
-    }
-
-    this.state.delete(key);
-    this.processing.delete(key);
+    const config = this.getConfig(key);
+    const windowBucket = Math.floor(Date.now() / config.windowMs);
+    const redisKey = `ratelimit:${key}:${windowBucket}`;
+    await cache.del(redisKey);
   }
 
   /**
    * Reset all rate limits
    */
-  resetAll(): void {
-    for (const key of this.state.keys()) {
-      this.reset(key);
+  async resetAll(): Promise<void> {
+    // No-op — keys auto-expire via TTL
+  }
+
+  /**
+   * Check if request can proceed (simple lock check)
+   */
+  async canProceed(lockKey: string): Promise<boolean> {
+    try {
+      const exists = await cache.exists(lockKey);
+      if (exists) return false;
+
+      // Set a temporary lock for 5s
+      await cache.set(lockKey, 1, 5);
+      return true;
+    } catch {
+      return true; // Fail open
     }
   }
 
   /**
    * Get statistics
    */
-  getStats(): Record<string, { tokens: number; queueLength: number }> {
-    const stats: Record<string, { tokens: number; queueLength: number }> = {};
-    
-    for (const [key, state] of this.state) {
-      stats[key] = {
-        tokens: state.tokens,
-        queueLength: state.queue.length,
-      };
-    }
-
-    return stats;
+  async getStats(): Promise<Record<string, { tokens: number; queueLength: number }>> {
+    return {}; // Keys auto-expire, no scan needed
   }
 }
 

@@ -24,12 +24,19 @@ export function ProblemFilters({
     onPlatformChange,
     onDifficultyChange,
     onStatusChange,
-}: ProblemFiltersProps) {
+    onCategoryChange,
+}: ProblemFiltersProps & { onCategoryChange: (value: string) => void }) {
     const [searchValue, setSearchValue] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('all');
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchValue(e.target.value);
         onSearchChange(e.target.value);
+    };
+
+    const handleCategoryChange = (val: string) => {
+        setSelectedCategory(val);
+        onCategoryChange(val);
     };
 
     const clearFilters = () => {
@@ -38,9 +45,7 @@ export function ProblemFilters({
         onPlatformChange('all');
         onDifficultyChange('all');
         onStatusChange('all');
-        // Note: This won't reset Select components visually without controlling them fully.
-        // For MVP, we'll keep it simple or user can manually reset.
-        // To make it fully controlled, we'd need props for current values.
+        handleCategoryChange('all');
     };
 
     return (
@@ -49,7 +54,7 @@ export function ProblemFilters({
                 <div className="relative w-full md:w-[300px]">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search problems..."
+                        placeholder="Search activity..."
                         className="pl-8"
                         value={searchValue}
                         onChange={handleSearch}
@@ -58,30 +63,48 @@ export function ProblemFilters({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                <Select onValueChange={onPlatformChange} defaultValue="all">
+                <Select onValueChange={handleCategoryChange} value={selectedCategory}>
                     <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Platform" />
+                        <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All Platforms</SelectItem>
-                        <SelectItem value="leetcode">LeetCode</SelectItem>
-                        <SelectItem value="hackerrank">HackerRank</SelectItem>
-                        <SelectItem value="codeforces">Codeforces</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="DSA">DSA</SelectItem>
+                        <SelectItem value="GIT">Development</SelectItem>
+                        <SelectItem value="JOB">Jobs</SelectItem>
+                        <SelectItem value="LEARNING">Learning</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
                     </SelectContent>
                 </Select>
 
-                <Select onValueChange={onDifficultyChange} defaultValue="all">
-                    <SelectTrigger className="w-[130px]">
-                        <SelectValue placeholder="Difficulty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Difficulties</SelectItem>
-                        <SelectItem value="easy">Easy</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                </Select>
+                {(selectedCategory === 'all' || selectedCategory === 'DSA') && (
+                    <>
+                        <Select onValueChange={onPlatformChange} defaultValue="all">
+                            <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Platform" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Platforms</SelectItem>
+                                <SelectItem value="leetcode">LeetCode</SelectItem>
+                                <SelectItem value="hackerrank">HackerRank</SelectItem>
+                                <SelectItem value="codeforces">Codeforces</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select onValueChange={onDifficultyChange} defaultValue="all">
+                            <SelectTrigger className="w-[130px]">
+                                <SelectValue placeholder="Difficulty" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Difficulties</SelectItem>
+                                <SelectItem value="easy">Easy</SelectItem>
+                                <SelectItem value="medium">Medium</SelectItem>
+                                <SelectItem value="hard">Hard</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </>
+                )}
 
                 <Select onValueChange={onStatusChange} defaultValue="all">
                     <SelectTrigger className="w-[130px]">
@@ -89,8 +112,8 @@ export function ProblemFilters({
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="solved">Solved</SelectItem>
-                        <SelectItem value="attempted">Attempted</SelectItem>
+                        <SelectItem value="solved">Completed/Solved</SelectItem>
+                        <SelectItem value="attempted">In Progress</SelectItem>
                         <SelectItem value="todo">To Do</SelectItem>
                     </SelectContent>
                 </Select>

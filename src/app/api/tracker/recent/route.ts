@@ -38,7 +38,18 @@ export async function GET(req: NextRequest) {
                 date: 'desc',
             },
             take: limit,
-            include: {
+            select: {
+                id: true,
+                date: true,
+                platformId: true,
+                category: true,
+                problemsSolved: true,
+                commits: true,
+                pullRequests: true,
+                timeSpent: true,
+                points: true,
+                notes: true,
+                source: true,
                 platform: {
                     select: {
                         id: true,

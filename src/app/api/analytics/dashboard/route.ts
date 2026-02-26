@@ -44,7 +44,7 @@ const SECURITY_HEADERS = {
 
 const querySchema = z.object({
   widgets: z.string().optional().transform(v => v ? v.split(',') : undefined),
-  compact: z.enum(['true', 'false']).optional().transform(v => v === 'true'),
+  compact: z.string().optional().transform(v => v === 'true'),
 });
 
 const postBodySchema = z.object({
@@ -156,11 +156,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Parse query parameters
     const queryValidation = querySchema.safeParse({
-      widgets: searchParams.get('widgets'),
-      compact: searchParams.get('compact'),
+      widgets: searchParams.get('widgets') || undefined,
+      compact: searchParams.get('compact') || undefined,
     });
 
     if (!queryValidation.success) {
+      logger.warn('Dashboard validation failed', {
+        errors: queryValidation.error.errors,
+        params: {
+          widgets: searchParams.get('widgets'),
+          compact: searchParams.get('compact')
+        },
+        requestId
+      });
+
       return addHeaders(
         apiResponse.validationError('Invalid query parameters', queryValidation.error.errors, requestId),
         requestId,
@@ -188,6 +197,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       activeGoals,
       recentAchievements,
       connectedPlatforms,
+      difficultyStats
     ] = await Promise.all([
       // User data with streak info
       prisma.user.findUnique({
@@ -208,19 +218,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Today's entries
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: today } },
-        select: { problemsSolved: true, commits: true, timeSpent: true, pointsEarned: true },
+        select: { problemsSolved: true, commits: true, timeSpent: true, pointsEarned: true, platformId: true },
       }),
 
       // This week's entries
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: weekStart } },
-        select: { problemsSolved: true, commits: true, timeSpent: true, pointsEarned: true, date: true },
+        select: { problemsSolved: true, commits: true, timeSpent: true, pointsEarned: true, date: true, platformId: true },
       }),
 
       // This month's entries
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: monthStart } },
-        select: { problemsSolved: true, commits: true, timeSpent: true, date: true },
+        select: { problemsSolved: true, commits: true, timeSpent: true, date: true, platformId: true },
       }),
 
       // Recent entries for activity feed
@@ -258,10 +268,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         take: 5,
       }),
 
-      // Connected platforms count
-      prisma.userPlatform.count({
+      // Connected platforms with details
+      prisma.userPlatform.findMany({
         where: { userId, isActive: true },
+        include: {
+          platform: { select: { name: true, icon: true, color: true, slug: true } }
+        }
       }),
+
+      // Difficulty stats (all time)
+      prisma.trackerEntry.aggregate({
+        where: { userId },
+        _sum: {
+          easyProblems: true,
+          mediumProblems: true,
+          hardProblems: true,
+          problemsSolved: true
+        }
+      })
     ]);
 
     // Calculate stats
@@ -286,6 +310,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       activeDays: new Set(monthEntries.map(e => e.date.toDateString())).size,
     };
 
+    const totalProblems = (difficultyStats._sum.easyProblems || 0) +
+      (difficultyStats._sum.mediumProblems || 0) +
+      (difficultyStats._sum.hardProblems || 0);
+
+    const categories = [
+      {
+        name: 'Easy',
+        count: difficultyStats._sum.easyProblems || 0,
+        color: '#10B981', // Emerald-500
+        percentage: totalProblems > 0 ? Math.round(((difficultyStats._sum.easyProblems || 0) / totalProblems) * 100) : 0
+      },
+      {
+        name: 'Medium',
+        count: difficultyStats._sum.mediumProblems || 0,
+        color: '#F59E0B', // Amber-500
+        percentage: totalProblems > 0 ? Math.round(((difficultyStats._sum.mediumProblems || 0) / totalProblems) * 100) : 0
+      },
+      {
+        name: 'Hard',
+        count: difficultyStats._sum.hardProblems || 0,
+        color: '#EF4444', // Red-500
+        percentage: totalProblems > 0 ? Math.round(((difficultyStats._sum.hardProblems || 0) / totalProblems) * 100) : 0
+      }
+    ];
+
     // Build mini chart data (last 7 days)
     const chartData = Array.from({ length: 7 }, (_, i) => {
       const date = subDays(now, 6 - i);
@@ -298,6 +347,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         problems: dayEntries.reduce((sum, e) => sum + e.problemsSolved, 0),
         commits: dayEntries.reduce((sum, e) => sum + e.commits, 0),
         time: dayEntries.reduce((sum, e) => sum + e.timeSpent, 0),
+      };
+    });
+
+    // Calculate platform stats (based on month data for now)
+    const platformStatsMap = new Map<string, { problems: number; time: number }>();
+    monthEntries.forEach(entry => {
+      if (entry.platformId) {
+        const current = platformStatsMap.get(entry.platformId) || { problems: 0, time: 0 };
+        current.problems += entry.problemsSolved;
+        current.time += entry.timeSpent;
+        platformStatsMap.set(entry.platformId, current);
+      }
+    });
+
+    const platformsData = connectedPlatforms.map(up => {
+      const stats = platformStatsMap.get(up.platformId) || { problems: 0, time: 0 };
+      return {
+        name: up.platform.name,
+        icon: up.platform.icon,
+        color: up.platform.color,
+        stats: {
+          problems: stats.problems,
+          time: stats.time,
+          points: 0 // Points not always tracked per platform in aggregated view yet
+        }
       };
     });
 
@@ -336,6 +410,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           ? new Date(goal.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 && goal.progress < 80
           : false,
       })),
+      platforms: platformsData,
+      categories,
       achievements: recentAchievements.map(ua => ({
         id: ua.id,
         title: ua.achievement.title,
@@ -355,7 +431,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         time: entry.timeSpent,
       })),
       meta: {
-        connectedPlatforms,
+        connectedPlatforms: connectedPlatforms.length,
         lastUpdated: now.toISOString(),
       },
     };

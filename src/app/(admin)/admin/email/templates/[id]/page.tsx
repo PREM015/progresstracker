@@ -1,7 +1,8 @@
 import { EmailTemplateForm, EmailTemplatePreview } from '@/components/admin';
 import Link from 'next/link';
 
-export default function EmailTemplateDetailPage({ params }: { params: { id: string } }) {
+export default async function EmailTemplateDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -16,8 +17,8 @@ export default function EmailTemplateDetailPage({ params }: { params: { id: stri
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <EmailTemplateForm templateId={params.id} />
-        <EmailTemplatePreview templateId={params.id} />
+        <EmailTemplateForm template={undefined} />
+        <EmailTemplatePreview template={undefined} />
       </div>
     </div>
   );

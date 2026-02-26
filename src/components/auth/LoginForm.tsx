@@ -131,19 +131,23 @@ export function LoginForm() {
           {errors.password && <FormError message={errors.password.message} />}
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Sign In
+        <Button type="submit" variant="premium" className="w-full h-12 text-base transition-all active:scale-[0.98]" disabled={isLoading}>
+          {isLoading ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            "Sign In"
+          )}
         </Button>
 
-        <div className="text-center">
+        <div className="text-center pt-2">
           <Link
             href="/magic-link"
-            className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            className="text-sm font-medium text-zinc-400 hover:text-primary transition-colors hover:underline underline-offset-4"
           >
             Sign in with magic link instead
           </Link>
         </div>
+
       </form>
     </AuthCard>
   );

@@ -1,7 +1,8 @@
 import { SupportTicketDetail } from '@/components/admin';
 import Link from 'next/link';
 
-export default function SupportTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function SupportTicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -10,7 +11,7 @@ export default function SupportTicketDetailPage({ params }: { params: { id: stri
         </Link>
       </div>
 
-      <SupportTicketDetail ticketId={params.id} />
+      <SupportTicketDetail ticketId={id} />
     </div>
   );
 }

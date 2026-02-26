@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { subHours } from "date-fns";
-import { deleteFromStorage } from "@/lib/storage"; // Assumed
 
 export const POST = async (req: Request) => {
     const authHeader = req.headers.get('Authorization');

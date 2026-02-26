@@ -15,6 +15,7 @@ import apiResponse from '@/lib/apiResponse';
 import { TrackerService } from '@/services/trackerService';
 import { AchievementService } from '@/services/achievementService';
 import { GoalService } from '@/services/goalService';
+import { CacheService } from '@/services/cacheService';
 import { auditLogService } from '@/services/auditLogService';
 import { getClientIp, generateRequestId } from '@/lib/utils';
 
@@ -23,6 +24,24 @@ import { getClientIp, generateRequestId } from '@/lib/utils';
 // =============================================================================
 
 const RATE_LIMIT = 100; // requests per minute
+
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+interface TrackerEntriesResult {
+  data: Record<string, unknown>[];
+  pagination: PaginationInfo;
+}
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -201,9 +220,8 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
       startDate ? new Date(startDate) : new Date(0),
       endDate ? new Date(endDate) : new Date(),
       { platformId, category: category ?? undefined },
-
       { page: 1, limit: 1 }
-    );
+    ) as TrackerEntriesResult;
 
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Total-Count', String(count.pagination?.total || 0));
@@ -270,9 +288,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         limit,
         sortBy,
         sortOrder,
-        include: { platform: true, customPlatform: true },
+        select: {
+          id: true,
+          date: true,
+          platformId: true,
+          category: true,
+          problemsSolved: true,
+          commits: true,
+          timeSpent: true,
+          points: true,
+          isVerified: true,
+          source: true,
+          platform: {
+            select: { id: true, name: true, icon: true, color: true }
+          },
+          customPlatform: {
+            select: { id: true, name: true, icon: true, color: true }
+          }
+          // notes: false - excluded by default for list view performance
+        }
       }
-    );
+    ) as TrackerEntriesResult;
 
     logger.info('GET /tracker completed', {
       userId,
@@ -383,6 +419,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     Promise.all([
       AchievementService.checkAndUnlockAchievements(userId).catch(console.error),
       GoalService.autoUpdateGoals(userId).catch(console.error),
+      CacheService.invalidateStats(userId, 'daily').catch(console.error),
     ]);
 
     // Audit log
@@ -457,7 +494,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     const { ids, data } = validation.data;
 
     // Convert date string to Date object if present
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
     if (data.date) {
       updateData.date = new Date(data.date);
     }
@@ -465,7 +502,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
     // Bulk update
     const result = await TrackerService.bulkUpdateEntries(ids, updateData, userId);
 
-    // Audit log
+    // Audit log + cache invalidation
     auditLogService.create({
       userId,
       action: 'UPDATE',
@@ -475,6 +512,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       ipAddress: getClientIp(request),
       requestId,
     }).catch(console.error);
+    CacheService.invalidateStats(userId, 'entry').catch(console.error);
 
     logger.info('PUT /tracker completed', {
       userId,
@@ -528,7 +566,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const { ids, data } = validation.data;
 
     // Convert date string to Date object if present
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
     if (data.date) {
       updateData.date = new Date(data.date);
     }
@@ -544,6 +582,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       ipAddress: getClientIp(request),
       requestId,
     }).catch(console.error);
+    CacheService.invalidateStats(userId, 'entry').catch(console.error);
 
     logger.info('PATCH /tracker completed', {
       userId,
@@ -612,6 +651,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       ipAddress: getClientIp(request),
       requestId,
     }).catch(console.error);
+    CacheService.invalidateStats(userId, 'entry').catch(console.error);
 
     logger.info('DELETE /tracker completed', {
       userId,

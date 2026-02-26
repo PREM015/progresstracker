@@ -5,23 +5,23 @@ import { prisma } from "@/lib/prisma";
 import { apiResponse, apiError } from "@/lib/apiResponse";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     customPlatformId: string;
-  };
+  }>;
 }
 
 // GET /api/tracker/custom-platform/[customPlatformId] - Get entries for a custom platform
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { customPlatformId } = params;
+    const { customPlatformId } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const startDate = searchParams.get("startDate");
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       customPlatform,
       entries,
       stats,
@@ -119,12 +119,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { customPlatformId } = params;
+    const { customPlatformId } = await params;
     const body = await request.json();
 
     // Verify custom platform exists and belongs to user
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return apiResponse(entry, 201);
+    return apiResponse.created(entry);
   } catch (error) {
     console.error("Error creating custom platform entry:", error);
     return apiError("Failed to create entry", 500);

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +9,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
       prisma.notification.count({ where: whereClause }),
     ]);
 
-    return apiResponse({
+    return apiResponse.success({
       notifications,
       pagination: {
         page,
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -105,10 +106,13 @@ export async function POST(request: NextRequest) {
         },
       });
     } else {
-      return apiError("notificationIds, archiveAll, or archiveRead is required", 400);
+      return apiError(
+        "notificationIds, archiveAll, or archiveRead is required",
+        400
+      );
     }
 
-    return apiResponse({
+    return apiResponse.success({
       success: true,
       archivedCount: updateResult.count,
     });

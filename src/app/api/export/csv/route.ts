@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
 
     const options: ExportOptions = {
       format: 'csv',
+      type: body.type || 'full',
+      dateRange: body.dateRange || 'custom',
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       includeGoals,

@@ -1,7 +1,7 @@
 export { default as SearchBar } from './SearchBar';
 export { default as Pagination } from './Pagination';
-export { default as EmptyState } from './EmptyState';
-export { default as LoadingSpinner } from './LoadingSpinner';
+export { EmptyState } from './EmptyState';
+export { LoadingSpinner } from './LoadingSpinner';
 export { default as DataTable } from './DataTable';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as FileUpload } from './FileUpload';

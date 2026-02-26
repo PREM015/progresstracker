@@ -5,13 +5,13 @@ import { authOptions } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import { redis } from "@/lib/redis";
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const batchId = params.id;
+    const batchId = (await params).id;
     const batchKey = `batch:${batchId}`;
     const batchData = await redis.get(batchKey);
 
@@ -46,13 +46,13 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
 });
 
 // HEAD: Quick status check without full body
-export const HEAD = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const HEAD = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return new NextResponse(null, { status: 401 });
     }
 
-    const batchId = params.id;
+    const batchId = (await params).id;
     const batchKey = `batch:${batchId}`;
     const batchData = await redis.get(batchKey);
 

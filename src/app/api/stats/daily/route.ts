@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import { StatsService } from '@/services/statsService';
-import { startOfDay, subDays, endOfDay } from 'date-fns';
+import { startOfDay, subDays, endOfDay, format, eachDayOfInterval } from 'date-fns';
 import { logger } from '@/lib/logger';
 
 const RATE_LIMIT = 20;
@@ -31,20 +32,46 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const endDate = endOfDay(new Date());
         const startDate = startOfDay(subDays(endDate, days));
 
-        // Fetch all trends in parallel
-        const [problemsTrend, commitsTrend, timeTrend] = await Promise.all([
-            StatsService.getTrendData(userId, startDate, endDate, 'problems'),
-            StatsService.getTrendData(userId, startDate, endDate, 'commits'),
-            StatsService.getTrendData(userId, startDate, endDate, 'time'),
-        ]);
+        // Fetch entries directly
+        const entries = await prisma.trackerEntry.findMany({
+            where: {
+                userId,
+                date: { gte: startDate, lte: endDate },
+            },
+            select: {
+                date: true,
+                problemsSolved: true,
+                commits: true,
+                timeSpent: true,
+            },
+        });
 
-        // Merge data by date
-        const dailyStats = problemsTrend.map((item, index) => ({
-            date: item.date,
-            problems: item.value,
-            commits: commitsTrend[index]?.value || 0,
-            time: timeTrend[index]?.value || 0,
-        }));
+        // Group by date
+        const grouped = new Map<string, { problems: number; commits: number; time: number }>();
+
+        entries.forEach(entry => {
+            const dateKey = format(entry.date, 'yyyy-MM-dd');
+            if (!grouped.has(dateKey)) {
+                grouped.set(dateKey, { problems: 0, commits: 0, time: 0 });
+            }
+            const current = grouped.get(dateKey)!;
+            current.problems += entry.problemsSolved;
+            current.commits += entry.commits;
+            current.time += entry.timeSpent;
+        });
+
+        // Fill in all days
+        const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+        const dailyStats = allDays.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const data = grouped.get(dateKey) || { problems: 0, commits: 0, time: 0 };
+            return {
+                date: dateKey,
+                problems: data.problems,
+                commits: data.commits,
+                time: data.time,
+            };
+        });
 
         return apiResponse.success(dailyStats, { meta: { requestId } });
 

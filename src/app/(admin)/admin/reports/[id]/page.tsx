@@ -1,7 +1,8 @@
 import { ReportExport } from '@/components/admin';
 import Link from 'next/link';
 
-export default function ReportDetailPage({ params }: { params: { id: string } }) {
+export default async function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -15,7 +16,7 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
         <p className="text-zinc-400">View and export report data</p>
       </div>
 
-      <ReportExport reportType={params.id} />
+      <ReportExport reportType={id} />
     </div>
   );
 }

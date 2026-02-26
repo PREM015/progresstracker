@@ -6,23 +6,23 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 import { NotificationType } from "@prisma/client";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     type: string;
-  };
+  }>;
 }
 
 // GET /api/notifications/type/[type] - Get notifications by type
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { type } = params;
+    const { type } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const isRead = searchParams.get("isRead");
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }),
     ]);
 
-    return apiResponse({
+    return apiResponse.success({
       type: type.toUpperCase(),
       notifications,
       unreadCount,
@@ -87,12 +87,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { type } = params;
+    const { type } = await params;
 
     const validTypes = Object.values(NotificationType);
     if (!validTypes.includes(type.toUpperCase() as NotificationType)) {
@@ -106,7 +106,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       success: true,
       deletedCount: result.count,
     });

@@ -70,15 +70,15 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   }, [timeRange]);
 
   if (loading) {
-    return <div className="h-80 bg-gray-100 rounded-xl animate-pulse" />;
+    return <div className="h-80 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl animate-pulse" />;
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Activity Chart</h3>
-        <div className="h-64 flex flex-col items-center justify-center text-gray-500">
-          <div className="w-16 h-16 mb-4 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+      <div className={`glass-card bg-white dark:bg-zinc-900/50 border border-black/5 dark:border-white/5 rounded-xl p-6 ${className}`}>
+        <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-4">Activity Chart</h3>
+        <div className="h-64 flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400">
+          <div className="w-16 h-16 mb-4 rounded-full bg-zinc-100 dark:bg-zinc-800/50 flex items-center justify-center text-zinc-400 dark:text-zinc-500">
             NA
           </div>
           <p className="text-lg font-medium">No activity data yet</p>
@@ -107,17 +107,17 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
   );
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
+    <div className={`glass-card bg-white dark:bg-zinc-900/50 border border-black/5 dark:border-white/5 rounded-xl p-6 ${className}`}>
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900">Activity Chart</h3>
+        <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Activity Chart</h3>
         <div className="flex gap-2">
           {(['problems', 'commits', 'time'] as const).map((metric) => (
             <button
               key={metric}
               onClick={() => setSelectedMetric(metric)}
-              className={`px-3 py-1 rounded-lg text-sm ${selectedMetric === metric
+              className={`px-3 py-1 rounded-lg text-sm font-bold transition-all ${selectedMetric === metric
                 ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
                 }`}
             >
               {metric.charAt(0).toUpperCase() + metric.slice(1)}
@@ -141,7 +141,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
               <text
                 x="-5"
                 y={244 - (percentage / 100) * 220}
-                fill="#9ca3af"
+                fill="currentColor"
+                className="text-zinc-400 dark:text-zinc-500"
                 fontSize="10"
                 textAnchor="end"
               >
@@ -171,7 +172,8 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
                 <text
                   x={x + barWidth / 2}
                   y={245}
-                  fill="#6b7280"
+                  fill="currentColor"
+                  className="text-zinc-500 dark:text-zinc-400"
                   fontSize="10"
                   textAnchor="middle"
                 >
@@ -183,18 +185,18 @@ export const ActivityChart: React.FC<ActivityChartProps> = ({
         </svg>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+      <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-black/5 dark:border-white/5">
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{totals.problems}</div>
-          <div className="text-xs text-gray-600">Total Problems</div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-white">{totals.problems}</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-500">Total Problems</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{totals.commits}</div>
-          <div className="text-xs text-gray-600">Total Commits</div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-white">{totals.commits}</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-500">Total Commits</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-900">{totals.time}</div>
-          <div className="text-xs text-gray-600">Total Time</div>
+          <div className="text-2xl font-bold text-zinc-900 dark:text-white">{totals.time}</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-500">Total Time</div>
         </div>
       </div>
     </div>

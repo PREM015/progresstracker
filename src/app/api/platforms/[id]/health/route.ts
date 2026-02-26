@@ -61,6 +61,15 @@ interface HealthStatus {
   };
 }
 
+interface ScraperResult {
+  success: boolean;
+  error?: string;
+}
+
+interface Scraper {
+  fetchData: (options: { username: string }) => Promise<ScraperResult>;
+}
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -330,28 +339,39 @@ export async function POST(
 
     try {
       // Try to get scraper and perform test
-      const { getScraperForPlatform } = await import('@/services/scrapers');
-      const scraper = getScraperForPlatform(platform.slug);
+      // Using dynamic import with type assertion for flexibility
+      const scrapers = await import('@/services/scrapers') as Record<string, unknown>;
       
-      if (scraper) {
-        // Basic connectivity test
-        const result = await Promise.race([
-          scraper.fetchData({ username: 'test_connectivity_check' }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 10000)
-          ),
-        ]) as { success: boolean; error?: string };
+      // Check if getScraperForPlatform exists
+      const getScraperForPlatform = scrapers.getScraperForPlatform as 
+        ((slug: string) => Scraper | null) | undefined;
+      
+      if (typeof getScraperForPlatform === 'function') {
+        const scraper = getScraperForPlatform(platform.slug);
+        
+        if (scraper) {
+          // Basic connectivity test
+          const result = await Promise.race([
+            scraper.fetchData({ username: 'test_connectivity_check' }),
+            new Promise<ScraperResult>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 10000)
+            ),
+          ]);
 
-        // Even if user not found, platform is reachable
-        if (result.success || result.error?.includes('not found')) {
-          status = 'healthy';
-        } else if (result.error?.includes('rate limit')) {
-          status = 'degraded';
-          message = 'Rate limited';
-        } else {
-          status = 'degraded';
-          message = result.error;
+          // Even if user not found, platform is reachable
+          if (result.success || result.error?.includes('not found')) {
+            status = 'healthy';
+          } else if (result.error?.includes('rate limit')) {
+            status = 'degraded';
+            message = 'Rate limited';
+          } else {
+            status = 'degraded';
+            message = result.error ?? null;
+          }
         }
+      } else {
+        // Scraper service not available, assume healthy based on database status
+        logger.warn('getScraperForPlatform not available', { requestId, platformId });
       }
     } catch (error) {
       status = 'down';

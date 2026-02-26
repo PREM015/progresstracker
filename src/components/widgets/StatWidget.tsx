@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/card';
 
 export interface StatWidgetProps {
   title: string;

@@ -9,6 +9,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { UserService } from '@/services/userService';
 import { SessionService } from '@/services/sessionService';
 
 // =============================================================================
@@ -85,9 +86,30 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Get full user data
+    const userId = session.user.id;
+    const cacheKey = `session:response:${userId}`;
+
+    // Try to get from cache
+    // We only use cache if we are confident the session is still valid (NextAuth handles the JWT/Session check above)
+    // But we might want to check against a revocation list or relies on short TTL
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cachedResponse = await import('@/lib/redis').then(m => m.cache.get<any>(cacheKey));
+      if (cachedResponse) {
+        return secureResponse(
+          cachedResponse,
+          200,
+          requestId
+        );
+      }
+    } catch (error) {
+      // Redis failure shouldn't block the request
+      logger.warn('Redis cache get failed for session', { userId, error });
+    }
+
+    // Get optimzed user data
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -102,8 +124,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         currentStreak: true,
         longestStreak: true,
         totalPoints: true,
-        preferredLanguage: true,
-        timezone: true,
+        // preferredLanguage: true, // Reduced fields
+        // timezone: true,
         createdAt: true,
         lastActiveAt: true,
       },
@@ -118,39 +140,50 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Update last active timestamp (non-blocking)
-    prisma.user.update({
-      where: { id: user.id },
-      data: { lastActiveAt: new Date() },
-    }).catch(() => {
-      // Ignore errors
-    });
+    // Update last active timestamp (throttled to 5 mins)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    // Only update if not recently updated
+    if (!user.lastActiveAt || user.lastActiveAt < fiveMinutesAgo) {
+      UserService.updateLastActive(user.id).catch(() => {
+        // Ignore errors for background update
+      });
+    }
 
-    // Get active sessions count
-    const activeSessions = await SessionService.getUserSessions(user.id);
+    // Get active sessions count (optimized & cached)
+    const sessionCount = await SessionService.getCachedSessionCount(user.id);
+
+    const responseBody = {
+      authenticated: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        image: user.image,
+        role: user.role,
+        isAdmin: user.isAdmin,
+        emailVerified: !!user.emailVerified,
+        currentStreak: user.currentStreak,
+        longestStreak: user.longestStreak,
+        totalPoints: user.totalPoints,
+        // preferredLanguage: user.preferredLanguage,
+        // timezone: user.timezone,
+        createdAt: user.createdAt,
+      },
+      sessionCount,
+    };
+
+    // Cache response for 2 minutes (short TTL for responsiveness)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await import('@/lib/redis').then(m => m.cache.set(cacheKey, responseBody, 120));
+    } catch (error) {
+      // Ignore cache set errors
+    }
 
     await constantTimeDelay(start);
     return secureResponse(
-      {
-        authenticated: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          username: user.username,
-          image: user.image,
-          role: user.role,
-          isAdmin: user.isAdmin,
-          emailVerified: !!user.emailVerified,
-          currentStreak: user.currentStreak,
-          longestStreak: user.longestStreak,
-          totalPoints: user.totalPoints,
-          preferredLanguage: user.preferredLanguage,
-          timezone: user.timezone,
-          createdAt: user.createdAt,
-        },
-        sessionCount: activeSessions.length,
-      },
+      responseBody,
       200,
       requestId
     );
@@ -165,6 +198,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 }
+
 
 // =============================================================================
 // DELETE - End Session

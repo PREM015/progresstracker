@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       entries,
       bySource,
       pagination: {

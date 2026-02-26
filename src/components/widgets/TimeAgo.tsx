@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { formatDate, getRelativeTime } from '@/lib/utils';
+import { formatDate, formatRelativeTime as getRelativeTime } from '@/utils/formatters';
 
 export interface TimeAgoProps {
   date: Date | string;
@@ -36,7 +36,7 @@ export const TimeAgo: React.FC<TimeAgoProps> = ({
   return (
     <span
       className={cn('text-current', className)}
-      title={showTooltip ? formatDate(dateObj, 'long') : undefined}
+      title={showTooltip ? formatDate(dateObj, {}) : undefined}
     >
       {relativeTime}
     </span>

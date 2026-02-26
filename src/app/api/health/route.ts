@@ -150,20 +150,35 @@ async function checkCache(): Promise<ServiceHealth> {
   const startTime = Date.now();
 
   try {
-    // For now, return operational as we're using in-memory rate limiter
-    // In production, this would check Redis connection
+    // Verify in-memory cache is functional by doing a write/read/delete cycle
+    const testKey = `health_check_${Date.now()}`;
+    const { CacheService } = await import('@/services/cacheService');
+
+    // Write test value
+    await CacheService.set(testKey, 'ok', 10);
+
+    // Read back
+    const result = await CacheService.get(testKey);
+
+    // Clean up
+    await CacheService.delete(testKey);
+
     const latency = Date.now() - startTime;
+    const isHealthy = result === 'ok';
 
     return {
-      status: "operational",
+      status: isHealthy ? "operational" : "degraded",
       latency,
-      message: "In-memory cache operational",
+      message: isHealthy
+        ? `In-memory cache operational (${latency}ms)`
+        : "Cache read/write verification failed",
       lastCheck: new Date().toISOString(),
     };
   } catch (error) {
     return {
-      status: "down",
-      message: error instanceof Error ? error.message : "Cache check failed",
+      status: "degraded",
+      latency: Date.now() - startTime,
+      message: `Cache check error: ${error instanceof Error ? error.message : "Unknown"}. Falling back to direct DB queries.`,
       lastCheck: new Date().toISOString(),
     };
   }

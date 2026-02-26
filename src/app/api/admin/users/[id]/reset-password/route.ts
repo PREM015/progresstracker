@@ -11,12 +11,12 @@ import { getToken } from "next-auth/jwt";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
-export const POST = async (req: NextRequest, { params }: { params: { id: string } }) => { // Updated
+export const POST = async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => { // Updated
   try {
     const authRes = await adminAuth(req);
     if (authRes) return authRes;
 
-    const { id } = params;
+    const { id } = await params;
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const adminId = token?.sub;
 

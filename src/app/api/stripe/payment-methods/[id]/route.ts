@@ -32,7 +32,7 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
   return response;
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const requestId = generateRequestId();
   try {
     const session = await getServerSession(authOptions);
@@ -48,7 +48,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
@@ -74,9 +74,10 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     // Detach from customer
-    const paymentMethod = await stripe.paymentMethods.detach(params.id);
+    const { id } = await params;
+    const paymentMethod = await stripe.paymentMethods.detach(id);
 
-    logger.info('DELETE stripe payment method completed', { userId: session.user.id, paymentMethodId: params.id, requestId, duration: Date.now() - startTime });
+    logger.info('DELETE stripe payment method completed', { userId: session.user.id, paymentMethodId: id, requestId, duration: Date.now() - startTime });
 
     return addHeaders(apiResponse.success(paymentMethod, { meta: { requestId } }), requestId, rateLimitResult);
 

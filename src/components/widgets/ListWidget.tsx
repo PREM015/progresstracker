@@ -9,17 +9,16 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export interface ListItem {
   id: string;
   title: string;
   subtitle?: string;
-  badge?: { label: string; variant?: 'default' | 'primary' | 'success' | 'warning' | 'error' };
+  badge?: { label: string; variant?: 'default' | 'secondary' | 'destructive' | 'outline' };
   icon?: React.ReactNode;
   meta?: string;
   onClick?: () => void;
@@ -40,11 +39,18 @@ export interface ListWidgetProps {
 
 const ListItemSkeleton = () => (
   <div className="flex items-center gap-3 p-3 animate-pulse">
-    <Skeleton variant="circular" width={40} height={40} />
+    <Skeleton className="h-10 w-10 rounded-full" />
     <div className="flex-1">
-      <Skeleton variant="text" width="60%" height={16} className="mb-1" />
-      <Skeleton variant="text" width="40%" height={14} />
+      <Skeleton className="h-4 w-3/5 mb-1" />
+      <Skeleton className="h-3.5 w-2/5" />
     </div>
+  </div>
+);
+
+const EmptyState: React.FC<{ icon?: React.ReactNode; title: string }> = ({ icon, title }) => (
+  <div className="flex flex-col items-center justify-center py-8 text-center">
+    {icon && <div className="mb-4 text-muted-foreground">{icon}</div>}
+    <p className="text-sm text-muted-foreground">{title}</p>
   </div>
 );
 
@@ -102,7 +108,7 @@ export const ListWidget: React.FC<ListWidgetProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-[var(--foreground)] truncate">{item.title}</span>
                   {item.badge && (
-                    <Badge variant={item.badge.variant || 'default'} size="sm">
+                    <Badge variant={item.badge.variant || 'default'}>
                       {item.badge.label}
                     </Badge>
                   )}

@@ -11,9 +11,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { 
-  createSSEStream, 
-  getSSEHeaders, 
+import {
+  createSSEStream,
+  getSSEHeaders,
   SSEEventTypes,
   generateEventId,
   SSESyncProgressPayload,
@@ -36,8 +36,8 @@ const RETRY_INTERVAL = 5000; // 5 seconds
 
 function getRequestContext(req: NextRequest) {
   return {
-    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
-      || req.headers.get('x-real-ip') 
+    ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || req.headers.get('x-real-ip')
       || 'unknown',
     userAgent: req.headers.get('user-agent') || 'unknown',
     requestId: req.headers.get('x-request-id') || crypto.randomUUID(),
@@ -118,7 +118,7 @@ async function getCurrentSyncStatus(userId: string): Promise<SSESyncProgressPayl
       progress: 100,
       itemsProcessed: 0,
       totalItems: 0,
-      message: up.lastSyncedAt 
+      message: up.lastSyncedAt
         ? `Last synced: ${up.lastSyncedAt.toISOString()}`
         : 'Never synced',
       startedAt: up.lastSyncedAt?.toISOString() || '',
@@ -185,14 +185,14 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return new NextResponse(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: 'Authentication required',
           code: 'UNAUTHORIZED',
         }),
-        { 
+        {
           status: 401,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'X-Request-ID': requestId,
           },
@@ -211,7 +211,7 @@ export async function GET(req: NextRequest) {
     });
 
     // 2. Create SSE stream
-    const { stream, controller, send, close } = createSSEStream({
+    const { stream, controller, send, close, getStats } = createSSEStream({
       heartbeatInterval: HEARTBEAT_INTERVAL,
       retryInterval: RETRY_INTERVAL,
       onClose: () => {
@@ -233,6 +233,7 @@ export async function GET(req: NextRequest) {
       lastPing: new Date(),
       channel: CHANNEL,
       metadata: { userAgent, ip },
+      ...getStats(),
     });
 
     // 4. Send initial sync status
@@ -277,16 +278,16 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     log.error('SSE sync connection failed', {}, error);
-    
+
     return new NextResponse(
-      JSON.stringify({ 
-        success: false, 
+      JSON.stringify({
+        success: false,
         error: 'Failed to establish SSE connection',
         code: 'INTERNAL_ERROR',
       }),
-      { 
+      {
         status: 500,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'X-Request-ID': requestId,
         },

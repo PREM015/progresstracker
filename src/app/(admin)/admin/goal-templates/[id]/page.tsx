@@ -4,15 +4,17 @@ import { GoalTemplateForm, GoalTemplatePreview } from '@/components/admin';
 import Link from 'next/link';
 import { useAdminGoalTemplate, useAdminGoalTemplates } from '@/hooks/useAdminTemplates'; // Import updateTemplate from main hook
 import { useRouter } from 'next/navigation';
+import { use } from 'react';
 
-export default function GoalTemplateDetailPage({ params }: { params: { id: string } }) {
-  const { template, isLoading } = useAdminGoalTemplate(params.id);
+export default function GoalTemplateDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const { template, isLoading } = useAdminGoalTemplate(id);
   const { updateTemplate, isUpdating } = useAdminGoalTemplates();
   const router = useRouter();
 
   const handleSave = async (data: any) => {
     try {
-      await updateTemplate({ id: params.id, data });
+      await updateTemplate({ id, data });
       router.push('/admin/goal-templates');
     } catch (error) {
       console.error('Failed to update template:', error);

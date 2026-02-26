@@ -42,7 +42,7 @@ const updateSchema = z.object({
 
 async function checkAdminAuth(request: NextRequest, requestId: string) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session?.user?.id) {
     return { error: apiResponse.unauthorized('Authentication required', requestId) };
   }
@@ -74,7 +74,7 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -84,7 +84,7 @@ export async function GET(
     if (error) return error;
 
     // Validate params
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid feature flag ID',
@@ -154,7 +154,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -164,7 +164,7 @@ export async function PUT(
     if (error) return error;
 
     // Validate params
-    const paramsValidation = paramsSchema.safeParse(params);
+    const paramsValidation = paramsSchema.safeParse(await params);
     if (!paramsValidation.success) {
       return apiResponse.validationError(
         'Invalid feature flag ID',
@@ -210,7 +210,7 @@ export async function PUT(
         enabledUserIds: data.enabledUserIds,
         enabledTiers: data.enabledTiers,
         enabledPercentage: data.enabledPercentage,
-        metadata: data.metadata || {},
+        metadata: (data.metadata || {}) as any,
       }
     });
 
@@ -248,7 +248,7 @@ export async function PUT(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -258,7 +258,7 @@ export async function PATCH(
     if (error) return error;
 
     // Validate params
-    const paramsValidation = paramsSchema.safeParse(params);
+    const paramsValidation = paramsSchema.safeParse(await params);
     if (!paramsValidation.success) {
       return apiResponse.validationError(
         'Invalid feature flag ID',
@@ -295,7 +295,7 @@ export async function PATCH(
     // Update feature flag
     const flag = await prisma.featureFlag.update({
       where: { id },
-      data
+      data: data as any
     });
 
     // Log admin action
@@ -309,7 +309,7 @@ export async function PATCH(
         description: `Partially updated feature flag: ${existing.key}`,
         oldValue: existing,
         newValue: flag,
-        changes: data,
+        changes: data as any,
         ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
         userAgent: request.headers.get('user-agent'),
       }
@@ -334,7 +334,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -344,7 +344,7 @@ export async function DELETE(
     if (error) return error;
 
     // Validate params
-    const validation = paramsSchema.safeParse(params);
+    const validation = paramsSchema.safeParse(await params);
     if (!validation.success) {
       return apiResponse.validationError(
         'Invalid feature flag ID',

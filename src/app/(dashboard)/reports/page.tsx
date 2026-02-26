@@ -1,11 +1,15 @@
 'use client';
 
+import { useSession } from 'next-auth/react';
 import { ReportsList } from '@/components/reports/ReportsList';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import { ScheduledReports } from '@/components/reports/ScheduledReports';
 import { MetaTags } from '@/components/seo/MetaTags';
 
 export default function ReportsPage() {
+  const { data: session } = useSession();
+  const userId = session?.user?.id as string;
+
   return (
     <div className="space-y-8">
       <MetaTags title="Reports" description="Generate and view your progress reports." />
@@ -21,7 +25,7 @@ export default function ReportsPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <ReportGenerator />
+          {userId && <ReportGenerator userId={userId} />}
           <ReportsList />
         </div>
         <div>

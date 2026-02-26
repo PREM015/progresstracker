@@ -5,13 +5,13 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { StatsService } from '@/services/statsService';
 import { logger } from '@/lib/logger';
-import { 
-  startOfDay, 
-  endOfDay, 
-  subDays, 
-  parseISO, 
-  isValid, 
-  differenceInDays 
+import {
+  startOfDay,
+  endOfDay,
+  subDays,
+  parseISO,
+  isValid,
+  differenceInDays
 } from 'date-fns';
 import type { PlatformCategory } from '@prisma/client';
 
@@ -122,8 +122,8 @@ function validateCategory(category: string | undefined): PlatformCategory | null
     'DSA', 'JOB', 'GIT', 'LEARNING', 'HACKATHON',
     'OPENSOURCE', 'COMPANY', 'DESIGN', 'DATA_SCIENCE', 'OTHER'
   ];
-  return validCategories.includes(category as PlatformCategory) 
-    ? (category as PlatformCategory) 
+  return validCategories.includes(category as PlatformCategory)
+    ? (category as PlatformCategory)
     : null;
 }
 
@@ -142,10 +142,10 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
       log.warn('Unauthorized access attempt to stats endpoint');
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Unauthorized',
-          message: 'You must be logged in to view stats' 
+          message: 'You must be logged in to view stats'
         },
         { status: 401 }
       );
@@ -176,10 +176,10 @@ export async function GET(request: NextRequest) {
       if (!parsed) {
         log.warn('Invalid startDate format provided', { startDate: params.startDate });
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'Invalid startDate format',
-            message: 'Use ISO 8601 format (YYYY-MM-DD)' 
+            message: 'Use ISO 8601 format (YYYY-MM-DD)'
           },
           { status: 400 }
         );
@@ -195,10 +195,10 @@ export async function GET(request: NextRequest) {
       if (!parsed) {
         log.warn('Invalid endDate format provided', { endDate: params.endDate });
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'Invalid endDate format',
-            message: 'Use ISO 8601 format (YYYY-MM-DD)' 
+            message: 'Use ISO 8601 format (YYYY-MM-DD)'
           },
           { status: 400 }
         );
@@ -210,10 +210,10 @@ export async function GET(request: NextRequest) {
     if (startDate > endDate) {
       log.warn('Invalid date range provided', { startDate, endDate });
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Invalid date range',
-          message: 'startDate must be before endDate' 
+          message: 'startDate must be before endDate'
         },
         { status: 400 }
       );
@@ -223,10 +223,10 @@ export async function GET(request: NextRequest) {
     if (daysDiff > 365) {
       log.warn('Date range exceeds maximum allowed', { daysDiff });
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Date range too large',
-          message: 'Maximum date range is 365 days' 
+          message: 'Maximum date range is 365 days'
         },
         { status: 400 }
       );
@@ -241,10 +241,10 @@ export async function GET(request: NextRequest) {
       if (!platform) {
         log.warn('Platform not found', { platformId: params.platformId });
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'Platform not found',
-            message: 'The specified platform does not exist' 
+            message: 'The specified platform does not exist'
           },
           { status: 404 }
         );
@@ -256,10 +256,10 @@ export async function GET(request: NextRequest) {
     if (params.category && !category) {
       log.warn('Invalid category provided', { category: params.category });
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Invalid category',
-          message: 'Valid categories: DSA, JOB, GIT, LEARNING, HACKATHON, OPENSOURCE, COMPANY, DESIGN, DATA_SCIENCE, OTHER' 
+          message: 'Valid categories: DSA, JOB, GIT, LEARNING, HACKATHON, OPENSOURCE, COMPANY, DESIGN, DATA_SCIENCE, OTHER'
         },
         { status: 400 }
       );
@@ -284,17 +284,31 @@ export async function GET(request: NextRequest) {
       whereClause.category = category;
     }
 
-    // Fetch entries with platform info
-    log.debug('Fetching tracker entries from database', { userId });
-    const entries = await prisma.trackerEntry.findMany({
+    // 1. Aggregated Totals (Fast)
+    log.debug('Fetching aggregated stats from database', { userId });
+    const aggregations = await prisma.trackerEntry.aggregate({
       where: whereClause,
-      include: {
-        platform: {
-          select: { id: true, name: true, slug: true },
-        },
+      _sum: {
+        problemsSolved: true,
+        commits: true,
+        timeSpent: true,
+        points: true,
+        easyProblems: true,
+        mediumProblems: true,
+        hardProblems: true
       },
-      orderBy: { date: 'desc' },
+      _count: {
+        _all: true
+      }
     });
+
+    // 2. Active Days (Group By Date)
+    // Count distinct dates with activity
+    const activeDayGroups = await prisma.trackerEntry.groupBy({
+      by: ['date'],
+      where: whereClause,
+    });
+    const activeDays = activeDayGroups.length;
 
     // Get user's streak data
     const user = await prisma.user.findUnique({
@@ -308,24 +322,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Calculate overview stats
-    const totalProblems = entries.reduce((s, e) => s + e.problemsSolved, 0);
-    const totalCommits = entries.reduce((s, e) => s + e.commits, 0);
-    const totalPullRequests = entries.reduce((s, e) => s + e.pullRequests, 0);
-    const totalTimeSpent = entries.reduce((s, e) => s + e.timeSpent, 0);
-    const totalPoints = entries.reduce((s, e) => s + (e.points ?? 0), 0);
+    // Extract values
+    const totalProblems = aggregations._sum.problemsSolved || 0;
+    const totalCommits = aggregations._sum.commits || 0;
+    const totalPullRequests = 0; // Not aggregated in schema efficiently yet, or unused
+    const totalTimeSpent = aggregations._sum.timeSpent || 0;
+    const totalPoints = aggregations._sum.points || 0;
+    const totalEntriesCount = aggregations._count._all;
 
     // Difficulty breakdown
-    const easyProblems = entries.reduce((s, e) => s + e.easyProblems, 0);
-    const mediumProblems = entries.reduce((s, e) => s + e.mediumProblems, 0);
-    const hardProblems = entries.reduce((s, e) => s + e.hardProblems, 0);
+    const easyProblems = aggregations._sum.easyProblems || 0;
+    const mediumProblems = aggregations._sum.mediumProblems || 0;
+    const hardProblems = aggregations._sum.hardProblems || 0;
     const totalDifficultyProblems = easyProblems + mediumProblems + hardProblems;
-
-    // Unique active days
-    const uniqueDays = new Set(
-      entries.map((e) => e.date.toISOString().split('T')[0])
-    );
-    const activeDays = uniqueDays.size;
 
     // Get current streak (use cached or calculate)
     let currentStreak = user?.currentStreak ?? 0;
@@ -358,9 +367,7 @@ export async function GET(request: NextRequest) {
           problemsPerDay: activeDays > 0 ? Math.round(totalProblems / activeDays) : 0,
           commitsPerDay: activeDays > 0 ? Math.round(totalCommits / activeDays) : 0,
           timePerDay: activeDays > 0 ? Math.round(totalTimeSpent / activeDays) : 0,
-          problemsPerSession: entries.length > 0 
-            ? Math.round(totalProblems / entries.length) 
-            : 0,
+          problemsPerSession: 0, // Removed as it required scanning all entries
         },
         difficulty: {
           easy: easyProblems,
@@ -368,14 +375,14 @@ export async function GET(request: NextRequest) {
           hard: hardProblems,
           total: totalDifficultyProblems,
           distribution: {
-            easyPercent: totalDifficultyProblems > 0 
-              ? Math.round((easyProblems / totalDifficultyProblems) * 100) 
+            easyPercent: totalDifficultyProblems > 0
+              ? Math.round((easyProblems / totalDifficultyProblems) * 100)
               : 0,
-            mediumPercent: totalDifficultyProblems > 0 
-              ? Math.round((mediumProblems / totalDifficultyProblems) * 100) 
+            mediumPercent: totalDifficultyProblems > 0
+              ? Math.round((mediumProblems / totalDifficultyProblems) * 100)
               : 0,
-            hardPercent: totalDifficultyProblems > 0 
-              ? Math.round((hardProblems / totalDifficultyProblems) * 100) 
+            hardPercent: totalDifficultyProblems > 0
+              ? Math.round((hardProblems / totalDifficultyProblems) * 100)
               : 0,
           },
         },
@@ -393,68 +400,72 @@ export async function GET(request: NextRequest) {
 
     // Add detailed breakdowns if requested
     if (includeDetails) {
-      log.debug('Building detailed breakdown data');
+      log.debug('Building detailed breakdown data with groupBy');
 
       // Platform breakdown
-      const platformBreakdown = new Map<string, {
-        platformId: string;
-        platformName: string | null;
-        problems: number;
-        commits: number;
-        time: number;
-        entries: number;
-      }>();
-
-      entries.forEach((entry) => {
-        if (!entry.platformId) return;
-        const existing = platformBreakdown.get(entry.platformId) ?? {
-          platformId: entry.platformId,
-          platformName: entry.platform?.name ?? null,
-          problems: 0,
-          commits: 0,
-          time: 0,
-          entries: 0,
-        };
-        existing.problems += entry.problemsSolved;
-        existing.commits += entry.commits;
-        existing.time += entry.timeSpent;
-        existing.entries += 1;
-        platformBreakdown.set(entry.platformId, existing);
+      const platformGroups = await prisma.trackerEntry.groupBy({
+        by: ['platformId'],
+        where: { ...whereClause, platformId: { not: null } },
+        _sum: {
+          problemsSolved: true,
+          commits: true,
+          timeSpent: true
+        },
+        _count: {
+          id: true
+        }
       });
 
-      response.data.platforms = Array.from(platformBreakdown.values())
-        .sort((a, b) => b.problems - a.problems);
+      // Fetch platform names
+      const platformIds = platformGroups.map(g => g.platformId).filter((id): id is string => id !== null);
+      const platforms = await prisma.platform.findMany({
+        where: { id: { in: platformIds } },
+        select: { id: true, name: true }
+      });
+      const platformMap = new Map(platforms.map(p => [p.id, p.name]));
+
+      response.data.platforms = platformGroups.map(g => ({
+        platformId: g.platformId!,
+        platformName: platformMap.get(g.platformId!) ?? null,
+        problems: g._sum.problemsSolved || 0,
+        commits: g._sum.commits || 0,
+        time: g._sum.timeSpent || 0,
+        entries: g._count.id
+      })).sort((a, b) => b.problems - a.problems);
 
       // Category breakdown
-      const categoryBreakdown = new Map<PlatformCategory, {
-        category: PlatformCategory;
-        problems: number;
-        commits: number;
-        time: number;
-        entries: number;
-      }>();
-
-      entries.forEach((entry) => {
-        if (!entry.category) return;
-        const existing = categoryBreakdown.get(entry.category) ?? {
-          category: entry.category,
-          problems: 0,
-          commits: 0,
-          time: 0,
-          entries: 0,
-        };
-        existing.problems += entry.problemsSolved;
-        existing.commits += entry.commits;
-        existing.time += entry.timeSpent;
-        existing.entries += 1;
-        categoryBreakdown.set(entry.category, existing);
+      const categoryGroups = await prisma.trackerEntry.groupBy({
+        by: ['category'],
+        where: { ...whereClause, category: { not: null } },
+        _sum: {
+          problemsSolved: true,
+          commits: true,
+          timeSpent: true
+        },
+        _count: {
+          id: true
+        }
       });
 
-      response.data.categories = Array.from(categoryBreakdown.values())
-        .sort((a, b) => b.problems - a.problems);
+      response.data.categories = categoryGroups.map(g => ({
+        category: g.category!,
+        problems: g._sum.problemsSolved || 0,
+        commits: g._sum.commits || 0,
+        time: g._sum.timeSpent || 0,
+        entries: g._count.id
+      })).sort((a, b) => b.problems - a.problems);
 
-      // Recent activity (last 10)
-      response.data.recentActivity = entries.slice(0, 10).map((entry) => ({
+      // Recent activity (Last 10 ONLY)
+      const recentEntries = await prisma.trackerEntry.findMany({
+        where: whereClause,
+        orderBy: { date: 'desc' },
+        take: 10,
+        include: {
+          platform: { select: { name: true } }
+        }
+      });
+
+      response.data.recentActivity = recentEntries.map((entry) => ({
         id: entry.id,
         date: entry.date.toISOString(),
         platformName: entry.platform?.name ?? null,
@@ -480,11 +491,11 @@ export async function GET(request: NextRequest) {
     // Log successful stats retrieval
     log.info('Stats retrieved successfully', {
       userId,
-      period: { 
-        startDate: startDate.toISOString(), 
-        endDate: endDate.toISOString() 
+      period: {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
       },
-      entriesCount: entries.length,
+      entriesCount: totalEntriesCount,
       activeDays,
       totalProblems,
       totalCommits,
@@ -496,18 +507,18 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     log.error(
       'Failed to fetch stats',
-      { 
+      {
         duration: Date.now() - startTime,
         error: error instanceof Error ? error.message : String(error),
       },
       error
     );
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Failed to fetch stats' 
+        message: error instanceof Error ? error.message : 'Failed to fetch stats'
       },
       { status: 500 }
     );

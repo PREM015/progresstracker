@@ -18,7 +18,7 @@ interface ApiSuccess<T> {
 }
 
 interface TrendsResponse {
-  data: Array<{ date: string; value?: number }>;
+  data: Array<{ date: string; value?: number; label?: string }>;
 }
 
 export const TrendCharts: React.FC<TrendChartsProps> = ({

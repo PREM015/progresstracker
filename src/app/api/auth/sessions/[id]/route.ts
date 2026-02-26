@@ -65,12 +65,12 @@ function maskIP(ip: string | null): string | null {
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const start = Date.now();
   const requestId = generateRequestId();
   const clientIP = getClientIP(req);
-  const { id: sessionId } = params;
+  const { id: sessionId } = await params;
 
   try {
     const session = await getServerSession(authOptions);
@@ -180,13 +180,13 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const start = Date.now();
   const requestId = generateRequestId();
   const clientIP = getClientIP(req);
   const userAgent = req.headers.get('user-agent');
-  const { id: sessionId } = params;
+  const { id: sessionId } = await params;
 
   try {
     const session = await getServerSession(authOptions);

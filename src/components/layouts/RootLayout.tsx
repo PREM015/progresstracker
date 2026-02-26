@@ -9,14 +9,37 @@ import { cn } from '@/lib/utils';
 import '@/app/globals.css';
 import { CursorFollower } from '@/components/ui/motion/CursorFollower';
 
+import { Session } from 'next-auth';
+
 interface RootLayoutProps {
   children: React.ReactNode;
+  session?: Session | null;
 }
 
-export function RootLayout({ children }: RootLayoutProps) {
+export function RootLayout({ children, session }: RootLayoutProps) {
   return (
     <html lang="en" suppressHydrationWarning className={fontVariables}>
-      <head />
+      <head>
+        {/* Theme flash prevention — runs synchronously before paint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme') || 'dark';
+                  if (theme === 'system') {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  }
+                  document.documentElement.classList.toggle('dark', theme === 'dark');
+                  document.documentElement.style.colorScheme = theme;
+                } catch(e) {
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={cn(
@@ -24,7 +47,7 @@ export function RootLayout({ children }: RootLayoutProps) {
           fontVariables
         )}
       >
-        <Providers>
+        <Providers session={session}>
           <CursorFollower />
           {children}
         </Providers>

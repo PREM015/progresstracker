@@ -1,45 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// src/services/export/jsonExport.ts
 import { logger } from '@/lib/logger';
 import { format } from 'date-fns';
+import type { ExportData, ExportResult } from '@/types/export';
 
 const log = logger.child({ service: 'JSONExport' });
-
-export interface ExportData {
-  user: {
-    name: string | null;
-    email: string | null;
-    username: string | null;
-  };
-  exportDate: Date;
-  dateRange: {
-    start: Date;
-    end: Date;
-  };
-  stats: any;
-  trackerEntries: any[];
-  goals: any[];
-  achievements: any[];
-  platforms: any[];
-}
-
-export interface ExportResult {
-  success: boolean;
-  format: 'json';
-  fileName: string;
-  data?: string;
-  error?: string;
-  fileSize?: number;
-}
 
 /**
  * Generate JSON export of user data
  */
 export async function generateJSON(data: ExportData): Promise<ExportResult> {
   const startTime = Date.now();
-  
+
   try {
-    log.info('Generating JSON export', { userId: data.user.username });
+    log.info('Generating JSON export', { userId: data.user.id });
 
     // Create structured JSON export
     const exportData = {
@@ -61,42 +33,35 @@ export async function generateJSON(data: ExportData): Promise<ExportResult> {
       statistics: data.stats,
       trackerEntries: data.trackerEntries.map(entry => ({
         date: entry.date,
-        platform: entry.platform?.name,
+        platform: entry.platform,
         category: entry.category,
         problemsSolved: entry.problemsSolved,
         commits: entry.commits,
         timeSpent: entry.timeSpent,
         notes: entry.notes,
-        customFields: entry.customFields,
       })),
       goals: data.goals.map(goal => ({
         title: goal.title,
         description: goal.description,
         category: goal.category,
-        goalType: goal.goalType,
-        metric: goal.metric,
         target: goal.target,
         progress: goal.progress,
         status: goal.status,
-        startDate: goal.startDate,
-        endDate: goal.endDate,
+        deadline: goal.deadline,
         completedAt: goal.completedAt,
       })),
       achievements: data.achievements.map(achievement => ({
-        title: achievement.achievement?.title,
-        description: achievement.achievement?.description,
-        tier: achievement.achievement?.tier,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category,
         unlockedAt: achievement.unlockedAt,
         progress: achievement.progress,
       })),
       platforms: data.platforms.map(platform => ({
-        name: platform.platform?.name,
-        category: platform.platform?.category,
-        username: platform.username,
-        profileUrl: platform.profileUrl,
-        isActive: platform.isActive,
-        lastSyncedAt: platform.lastSyncedAt,
-        cachedStats: platform.cachedStats,
+        name: platform.name,
+        category: platform.category,
+        isConnected: platform.isConnected,
+        lastSynced: platform.lastSynced,
       })),
     };
 
@@ -114,14 +79,14 @@ export async function generateJSON(data: ExportData): Promise<ExportResult> {
       success: true,
       format: 'json',
       fileName,
-      data: json,
+      content: json,
       fileSize,
     };
 
   } catch (error) {
     const duration = Date.now() - startTime;
     log.error('JSON generation failed', { duration }, error);
-    
+
     return {
       success: false,
       format: 'json',
@@ -158,13 +123,13 @@ export async function generateCompactJSON(data: ExportData): Promise<ExportResul
       success: true,
       format: 'json',
       fileName,
-      data: json,
+      content: json,
       fileSize,
     };
 
   } catch (error) {
     log.error('Compact JSON generation failed', {}, error);
-    
+
     return {
       success: false,
       format: 'json',

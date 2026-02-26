@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminEmailTemplates } from '@/hooks/useAdminCommunication';
 import Link from 'next/link';
 

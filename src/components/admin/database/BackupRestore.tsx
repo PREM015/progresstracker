@@ -1,4 +1,6 @@
+'use client';
 import { useAdminDatabase } from '@/hooks/useAdminDatabase';
+
 
 export function BackupRestore({ backupId }: { backupId: string }) {
     const { restoreBackup, isRestoringBackup } = useAdminDatabase();

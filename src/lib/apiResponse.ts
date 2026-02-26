@@ -16,6 +16,8 @@ export interface ApiSuccessResponse<T> {
   success: true;
   data: T;
   meta?: ResponseMeta;
+  cached?: boolean;
+  source?: string;
 }
 
 export interface ApiErrorResponse {
@@ -59,7 +61,9 @@ export function success<T>(
     status?: number;
     meta?: ResponseMeta;
     headers?: Record<string, string>;
-    message?: string; // ✅ allow message
+    message?: string;
+    cached?: boolean;
+    source?: string;
   } = {}
 ): NextResponse<ApiSuccessResponse<T>> {
   const { status = 200, meta, headers = {}, message } = options;
@@ -72,7 +76,12 @@ export function success<T>(
       timestamp: new Date().toISOString(),
       ...(message ? { message } : {}),
     },
+    // Add optional standardized fields from options
+    // explicit cast or type extension needed if strict
   };
+
+  if (options.cached !== undefined) (response as any).cached = options.cached;
+  if (options.source !== undefined) (response as any).source = options.source;
 
   return NextResponse.json(response, {
     status,
@@ -310,10 +319,15 @@ export function withErrorHandler<T = unknown>(
 ): (req: NextRequest) => Promise<NextResponse<ApiSuccessResponse<T> | ApiErrorResponse>> {
   return async (req: NextRequest) => {
     const requestId = crypto.randomUUID();
+    const startTime = performance.now();
 
     try {
       const response = await handler(req);
+      const duration = performance.now() - startTime;
+
       response.headers.set('X-Request-ID', requestId);
+      response.headers.set('Server-Timing', `total;dur=${duration.toFixed(2)}`);
+
       return response;
     } catch (err) {
       return error(err, requestId);
@@ -339,6 +353,24 @@ const apiResponse = {
   withErrorHandler,
 };
 
-export { ApiError as apiError } from './apiError';
+export function apiError(message: string, status: number = 500, requestId?: string): NextResponse<ApiErrorResponse> {
+  let code = 'INTERNAL_ERROR';
+  if (status === 400) code = 'VALIDATION_ERROR';
+  if (status === 401) code = 'UNAUTHORIZED';
+  if (status === 403) code = 'FORBIDDEN';
+  if (status === 404) code = 'NOT_FOUND';
+  if (status === 429) code = 'RATE_LIMIT_EXCEEDED';
+
+  const response: ApiErrorResponse = {
+    success: false,
+    error: { message, code },
+    meta: {
+      requestId,
+      timestamp: new Date().toISOString(),
+    },
+  };
+
+  return NextResponse.json(response, { status });
+}
 export { apiResponse };
 export default apiResponse;

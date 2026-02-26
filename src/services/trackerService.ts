@@ -1,7 +1,9 @@
 // src/services/trackerService.ts
 import { prisma, paginationArgs, buildPaginationResponse, withTransaction } from "@/lib/prisma";
 import { Prisma, PlatformCategory } from "@prisma/client";
-import { UserService } from "@/services/userService";
+import { CacheService } from "@/services/cacheService";
+import { updateUserStats } from "@/trigger/user-stats";
+import { statsQueue } from "@/lib/queues/statsQueue";
 
 
 
@@ -477,6 +479,7 @@ export class TrackerService {
         customPlatform?: boolean;
         syncLog?: boolean;
       };
+      select?: Prisma.TrackerEntrySelect;
     }
   ) {
     const { page = 1, limit = 50, sortBy = "date", sortOrder = "desc", include } = options ?? {};
@@ -541,19 +544,49 @@ export class TrackerService {
 
     // Build include clause
     const includeClause: Prisma.TrackerEntryInclude = {};
-    if (include?.platform) includeClause.platform = true;
-    if (include?.customPlatform) includeClause.customPlatform = true;
-    if (include?.syncLog) includeClause.syncLog = true;
+
+    // Default includes if not specified to prevent N+1
+    if (!options?.select && !include) {
+      includeClause.platform = true;
+      includeClause.customPlatform = true;
+    } else {
+      if (include?.platform) includeClause.platform = true;
+      if (include?.customPlatform) includeClause.customPlatform = true;
+      if (include?.syncLog) includeClause.syncLog = true;
+    }
+
+    // Build findMany arguments
+    const findManyArgs: Prisma.TrackerEntryFindManyArgs = {
+      where,
+      orderBy: { [sortBy]: sortOrder as Prisma.SortOrder },
+      ...paginationArgs(page, limit),
+    };
+
+    if (options?.select) {
+      findManyArgs.select = options.select;
+    } else if (Object.keys(includeClause).length > 0) {
+      findManyArgs.include = includeClause;
+    }
+
+    // Generate cache key for dashboard view (page 1, default sort, no filters)
+    const isDashboardView = page === 1 && limit <= 20 && !filters && sortBy === 'date' && sortOrder === 'desc';
+    const cacheKey = `tracker:entries:${userId}:dashboard`;
+
+    if (isDashboardView) {
+      const cached = await CacheService.get(cacheKey);
+      if (cached) return cached;
+    }
 
     // Get entries
-    const entries = await prisma.trackerEntry.findMany({
-      where,
-      orderBy: { [sortBy]: sortOrder },
-      include: Object.keys(includeClause).length > 0 ? includeClause : undefined,
-      ...paginationArgs(page, limit),
-    });
+    const entries = await prisma.trackerEntry.findMany(findManyArgs);
 
-    return buildPaginationResponse(entries, total, page, limit);
+    const result = buildPaginationResponse(entries, total, page, limit);
+
+    if (isDashboardView) {
+      await CacheService.set(cacheKey, result, 60 * 5); // Cache for 5 mins
+    }
+
+    return result;
   }
 
   /**
@@ -563,7 +596,8 @@ export class TrackerService {
     userId: string,
     startDate: Date,
     endDate: Date,
-    platformId?: string | null
+    platformId?: string | null,
+    select?: Prisma.TrackerEntrySelect
   ) {
     const where: Prisma.TrackerEntryWhereInput = {
       userId,
@@ -577,14 +611,46 @@ export class TrackerService {
       where.platformId = platformId;
     }
 
-    return prisma.trackerEntry.findMany({
+    const findManyAllArgs: Prisma.TrackerEntryFindManyArgs = {
       where,
       orderBy: { date: "desc" },
-      include: {
-        platform: true,
-        customPlatform: true,
-      },
-    });
+    };
+
+    if (select) {
+      findManyAllArgs.select = select;
+    } else {
+      findManyAllArgs.select = {
+        id: true,
+        date: true,
+        platformId: true,
+        customPlatformId: true,
+        category: true,
+        problemsSolved: true,
+        easyProblems: true,
+        mediumProblems: true,
+        hardProblems: true,
+        commits: true,
+        pullRequests: true,
+        timeSpent: true,
+        points: true,
+        xpEarned: true,
+        rating: true,
+        ratingChange: true,
+        rank: true,
+        source: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+        platform: {
+          select: { id: true, name: true, slug: true, icon: true, color: true },
+        },
+        customPlatform: {
+          select: { id: true, name: true, icon: true, color: true },
+        },
+      };
+    }
+
+    return prisma.trackerEntry.findMany(findManyAllArgs);
   }
 
   /**
@@ -748,9 +814,11 @@ export class TrackerService {
     // Update daily stats
     await this.updateDailyStats(data.userId, normalizedDate);
 
-    // Update user totals
-    await UserService.updateUserTotals(data.userId);
+    // Update user totals (async)
+    await updateUserStats.trigger({ userId: data.userId });
 
+    // Invalidate stats cache for this user
+    await CacheService.invalidateStats(data.userId);
 
     return entry;
   }
@@ -781,12 +849,8 @@ export class TrackerService {
     });
 
     if (existing) {
-      // Need to cast to compatible type or ensure updateEntry handles it
-      // updateEntry takes TrackerEntryUpdateInput (Partial<Omit...>)
-      // We need to convert Input to UpdateInput
-      // For now, simpler to just pass what we have if compatible, 
-      // but TrackerEntryInput has userId which UpdateInput excludes.
-      const { userId, ...updateData } = data;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { userId: _userId, ...updateData } = data;
       // Also ensure platformId is the resolved one
       const updatePayload = { ...updateData, platformId: finalPlatformId };
       return this.updateEntry(existing.id, updatePayload, data.userId);
@@ -836,7 +900,8 @@ export class TrackerService {
     // Update stats for affected users
     const userIds = [...new Set(entries.map((e) => e.userId))];
     for (const userId of userIds) {
-      await UserService.updateUserTotals(userId);
+      await updateUserStats.trigger({ userId });
+      await CacheService.invalidateStats(userId);
     }
 
     return results;
@@ -874,8 +939,11 @@ export class TrackerService {
     // Update daily stats
     await this.updateDailyStats(entry.userId, entry.date);
 
-    // Update user totals
-    await UserService.updateUserTotals(entry.userId);
+    // Update user totals (async)
+    await updateUserStats.trigger({ userId: entry.userId });
+
+    // Invalidate stats cache for this user
+    await CacheService.invalidateStats(entry.userId);
 
     return entry;
   }
@@ -928,7 +996,7 @@ export class TrackerService {
       data: updateManyData,
     });
 
-    await UserService.updateUserTotals(userId);
+    await updateUserStats.trigger({ userId });
 
     return { updated: ids.length };
   }
@@ -1070,8 +1138,11 @@ export class TrackerService {
     // Update daily stats
     await this.updateDailyStats(entry.userId, entry.date);
 
-    // Update user totals
-    await UserService.updateUserTotals(entry.userId);
+    // Update user totals (async)
+    await updateUserStats.trigger({ userId: entry.userId });
+
+    // Invalidate stats cache for this user
+    await CacheService.invalidateStats(entry.userId);
 
     return { deleted: true };
   }
@@ -1106,7 +1177,10 @@ export class TrackerService {
       await this.updateDailyStats(userId, new Date(dateStr));
     }
 
-    await UserService.updateUserTotals(userId);
+    await updateUserStats.trigger({ userId });
+
+    // Invalidate stats cache for this user
+    await CacheService.invalidateStats(userId);
 
     return { deleted: deletedCount.count };
   }
@@ -1134,7 +1208,10 @@ export class TrackerService {
 
     const result = await prisma.trackerEntry.deleteMany({ where });
 
-    await UserService.updateUserTotals(userId);
+    await updateUserStats.trigger({ userId });
+
+    // Invalidate stats cache for this user
+    await CacheService.invalidateStats(userId);
 
     return { deleted: result.count };
   }
@@ -1439,56 +1516,106 @@ export class TrackerService {
   // ===========================================================================
 
   /**
-   * Update or create daily stats for a specific date
+   * Queue daily stats update
    */
   static async updateDailyStats(userId: string, date: Date) {
+    try {
+      await statsQueue.add(
+        'update-daily-stats',
+        { userId, date: date.toISOString() },
+        {
+          removeOnComplete: true,
+          jobId: `stats-${userId}-${date.toISOString().split('T')[0]}` // Debounce updates for same day
+        }
+      );
+    } catch (error) {
+      // Fallback to inline update if queue fails
+      console.error('Failed to queue stats update, running inline', error);
+      await this.processDailyStats(userId, date);
+    }
+  }
+
+  /**
+   * Process daily stats update (Logic moved from updateDailyStats)
+   * This is called by the worker
+   */
+  /**
+   * Process daily stats update (Logic moved from updateDailyStats)
+   * This is called by the worker
+   */
+  static async processDailyStats(userId: string, date: Date) {
     const normalizedDate = new Date(date);
     normalizedDate.setHours(0, 0, 0, 0);
 
-    // Get all entries for this date
-    const entries = await prisma.trackerEntry.findMany({
+    // Calculate totals using aggregate
+    const aggregates = await prisma.trackerEntry.aggregate({
       where: {
         userId,
         date: normalizedDate,
       },
+      _sum: {
+        problemsSolved: true,
+        commits: true,
+        pullRequests: true,
+        timeSpent: true,
+        points: true,
+        pointsEarned: true,
+      },
     });
 
-    // Calculate totals
-    const totals = entries.reduce(
-      (acc, entry) => ({
-        totalProblems: acc.totalProblems + (entry.problemsSolved ?? 0),
-        totalCommits: acc.totalCommits + (entry.commits ?? 0),
-        totalPullRequests: acc.totalPullRequests + (entry.pullRequests ?? 0),
-        totalTimeSpent: acc.totalTimeSpent + (entry.timeSpent ?? 0),
-        totalPoints: acc.totalPoints + (entry.points ?? 0) + (entry.pointsEarned ?? 0),
-      }),
-      {
-        totalProblems: 0,
-        totalCommits: 0,
-        totalPullRequests: 0,
-        totalTimeSpent: 0,
-        totalPoints: 0,
-      }
-    );
+    // Calculate breakdowns using groupBy
+    const platformStats = await prisma.trackerEntry.groupBy({
+      by: ['platformId'],
+      where: {
+        userId,
+        date: normalizedDate,
+        platformId: { not: null },
+      },
+      _sum: {
+        problemsSolved: true,
+        commits: true,
+      },
+    });
+
+    const categoryStats = await prisma.trackerEntry.groupBy({
+      by: ['category'],
+      where: {
+        userId,
+        date: normalizedDate,
+        category: { not: null },
+      },
+      _sum: {
+        problemsSolved: true,
+      },
+    });
 
     // Build platform breakdown
     const platformBreakdown: Record<string, { problems: number; commits: number }> = {};
-    const categoryBreakdown: Record<string, number> = {};
-
-    for (const entry of entries) {
-      if (entry.platformId) {
-        if (!platformBreakdown[entry.platformId]) {
-          platformBreakdown[entry.platformId] = { problems: 0, commits: 0 };
-        }
-        platformBreakdown[entry.platformId].problems += entry.problemsSolved ?? 0;
-        platformBreakdown[entry.platformId].commits += entry.commits ?? 0;
-      }
-
-      if (entry.category) {
-        categoryBreakdown[entry.category] =
-          (categoryBreakdown[entry.category] ?? 0) + (entry.problemsSolved ?? 0);
+    for (const stat of platformStats) {
+      if (stat.platformId) {
+        platformBreakdown[stat.platformId] = {
+          problems: stat._sum.problemsSolved ?? 0,
+          commits: stat._sum.commits ?? 0,
+        };
       }
     }
+
+    // Build category breakdown
+    const categoryBreakdown: Record<string, number> = {};
+    for (const stat of categoryStats) {
+      if (stat.category) {
+        // category is an enum, ensuring string key
+        categoryBreakdown[stat.category] = stat._sum.problemsSolved ?? 0;
+      }
+    }
+
+    const totals = {
+      totalProblems: aggregates._sum.problemsSolved ?? 0,
+      totalCommits: aggregates._sum.commits ?? 0,
+      totalPullRequests: aggregates._sum.pullRequests ?? 0,
+      totalTimeSpent: aggregates._sum.timeSpent ?? 0,
+      totalPoints: (aggregates._sum.points ?? 0) + (aggregates._sum.pointsEarned ?? 0),
+    };
 
     const hadActivity =
       totals.totalProblems > 0 || totals.totalCommits > 0 || totals.totalTimeSpent > 0;
@@ -1562,7 +1689,7 @@ export class TrackerService {
     if (format === "summary") {
       return entries.map((entry) => ({
         date: entry.date.toISOString().split("T")[0],
-        platform: entry.platform?.name ?? "Custom",
+        platform: (entry.platformId as { name?: string })?.name ?? "Custom",
         problemsSolved: entry.problemsSolved,
         commits: entry.commits,
         timeSpent: entry.timeSpent,

@@ -1074,15 +1074,23 @@ export async function POST(
           triggeredBy: 'manual',
         });
 
-        result = {
-          action: 'synced',
-          success: syncResult.success,
-          status: syncResult.status,
-          entriesAdded: syncResult.entriesAdded,
-          entriesUpdated: syncResult.entriesUpdated,
-          duration: syncResult.duration,
-          error: syncResult.error,
-        };
+        if ('queued' in syncResult) {
+          result = {
+            action: 'synced',
+            queued: true,
+            jobId: syncResult.jobId,
+          };
+        } else {
+          result = {
+            action: 'synced',
+            success: syncResult.success,
+            status: syncResult.status,
+            entriesAdded: syncResult.entriesAdded,
+            entriesUpdated: syncResult.entriesUpdated,
+            duration: syncResult.duration,
+            error: syncResult.error,
+          };
+        }
         break;
       }
 

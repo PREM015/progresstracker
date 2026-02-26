@@ -423,7 +423,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         {
           requestId,
-          message: syncResult?.success
+          message: syncResult && 'success' in syncResult && syncResult.success
             ? `Successfully connected ${platform.name} and fetched latest data.`
             : scraperStatus.isImplemented
               ? `Connected ${platform.name}. Initial data sync is pending.`

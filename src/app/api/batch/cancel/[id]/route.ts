@@ -6,13 +6,13 @@ import { withErrorHandling } from "@/lib/apiHandler";
 import { prisma } from "@/lib/prisma"; // Assuming prisma is used for batch cancel if it's async
 import { redis } from "@/lib/redis"; // If using redis
 
-export const POST = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const POST = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const batchId = params.id;
+    const batchId = (await params).id;
 
     // Logic depends on how batch jobs are stored.
     // The prompt mentions "Status: queued | processing" and "Redis for job state".
@@ -67,13 +67,13 @@ export const POST = withErrorHandling(async (req: Request, { params }: { params:
 });
 
 // GET: Check if batch can be cancelled (returns current status)
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const batchId = params.id;
+    const batchId = (await params).id;
     const batchKey = `batch:${batchId}`;
     const batchData = await redis.get(batchKey);
 
@@ -101,13 +101,13 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
 });
 
 // HEAD: Check if batch exists and user has access
-export const HEAD = withErrorHandling(async (req: Request, { params }: { params: { id: string } }) => {
+export const HEAD = withErrorHandling(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
         return new NextResponse(null, { status: 401 });
     }
 
-    const batchId = params.id;
+    const batchId = (await params).id;
     const batchKey = `batch:${batchId}`;
     const batchData = await redis.get(batchKey);
 

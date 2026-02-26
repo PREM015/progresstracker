@@ -17,7 +17,8 @@ export const queryKeys = {
 
   user: {
     all: ['user'] as const,
-    profile: () => [...queryKeys.user.all, 'profile'] as const,
+    profile: (userId: string, options?: { lean?: boolean }) =>
+      [...queryKeys.user.all, 'profile', userId, options] as const,
     settings: () => [...queryKeys.user.all, 'settings'] as const,
     stats: () => [...queryKeys.user.all, 'stats'] as const,
     sessions: () => [...queryKeys.user.all, 'sessions'] as const,

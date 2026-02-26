@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { Loader2 } from 'lucide-react';
 import WelcomeStep from './WelcomeStep';
 import ProfileSetupStep from './ProfileSetupStep';
 import PlatformConnectStep from './PlatformConnectStep';
@@ -164,63 +166,81 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const currentIndex = steps.findIndex((s) => s.key === currentStep);
 
   return (
-    <div className={className}>
+    <div className={cn("relative z-10", className)}>
       <OnboardingProgress
         currentStep={Math.max(currentIndex, 0)}
         totalSteps={steps.length}
         stepTitles={steps.map((s) => s.title)}
       />
 
-      {loading ? (
-        <div className="bg-white rounded-2xl p-8 text-center text-gray-500">Loading onboarding...</div>
-      ) : (
-        <>
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-              {error}
+      <div className="mt-12 scale-in">
+        {loading ? (
+          <div className="glass-card p-12 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-zinc-400 font-medium">Loading your journey...</p>
+          </div>
+        ) : (
+          <div className="relative">
+            {error && (
+              <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-xl font-medium animate-spring">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-8">
+              {currentStep === 'welcome' && (
+                <WelcomeStep onNext={() => markStepComplete('welcome')} />
+              )}
+
+              {currentStep === 'profile' && (
+                <ProfileSetupStep onNext={updateProfile} />
+              )}
+
+              {currentStep === 'platforms' && (
+                <PlatformConnectStep onNext={checkPlatforms} />
+              )}
+
+              {currentStep === 'preferences' && (
+                <PreferencesStep onNext={savePreferences} />
+              )}
+
+              {currentStep === 'goals' && (
+                <GoalSetupStep onNext={createGoalsFromTemplates} />
+              )}
+
+              {currentStep === 'complete' && (
+                <div className="space-y-8">
+                  <CompletionStep userName={stepData.profile?.name || 'there'} />
+                  <button
+                    onClick={handleComplete}
+                    disabled={saving}
+                    className="w-full h-14 text-lg font-bold rounded-2xl transition-all active:scale-[0.98] premium text-white disabled:opacity-50 shadow-2xl flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Finalizing...
+                      </>
+                    ) : (
+                      'Take me to my Dashboard'
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
-          )}
 
-          {currentStep === 'welcome' && (
-            <WelcomeStep onNext={() => markStepComplete('welcome')} />
-          )}
-
-          {currentStep === 'profile' && (
-            <ProfileSetupStep onNext={updateProfile} />
-          )}
-
-          {currentStep === 'platforms' && (
-            <PlatformConnectStep onNext={checkPlatforms} />
-          )}
-
-          {currentStep === 'preferences' && (
-            <PreferencesStep onNext={savePreferences} />
-          )}
-
-          {currentStep === 'goals' && (
-            <GoalSetupStep onNext={createGoalsFromTemplates} />
-          )}
-
-          {currentStep === 'complete' && (
-            <div className="space-y-4">
-              <CompletionStep userName={stepData.profile?.name || 'there'} />
-              <button
-                onClick={handleComplete}
-                disabled={saving}
-                className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {saving ? 'Finalizing...' : 'Finish Onboarding'}
-              </button>
-            </div>
-          )}
-
-          {saving && (
-            <div className="mt-4 text-sm text-gray-500">Saving...</div>
-          )}
-        </>
-      )}
+            {saving && currentStep !== 'complete' && (
+              <div className="mt-8 flex items-center justify-center gap-2 text-sm text-zinc-500 font-medium">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Updating your progress...
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
+
 
 export default OnboardingFlow;

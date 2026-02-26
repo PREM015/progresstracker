@@ -44,6 +44,16 @@ export interface PerformanceReport {
   }>;
   webVitals: WebVitals;
   customMetrics: PerformanceMetric[];
+  endpointStats: Array<{
+    endpoint: string;
+    count: number;
+    min: number;
+    max: number;
+    avg: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  }>;
   timestamp: string;
 }
 
@@ -57,6 +67,14 @@ class PerformanceTrackingService {
   private timers: Map<string, number> = new Map();
   private webVitals: WebVitals = {};
 
+  // Per-endpoint latency ring buffers for percentile monitoring
+  private apiLatencies: Map<string, number[]> = new Map();
+  private readonly maxLatencySamples = 200;
+
+  // Cache hit/miss counters for hit-rate monitoring
+  private cacheHits = 0;
+  private cacheMisses = 0;
+
   /**
    * Start a timer
    */
@@ -69,7 +87,7 @@ class PerformanceTrackingService {
    */
   endTimer(name: string, tags?: Record<string, string>): TimingResult | null {
     const startTime = this.timers.get(name);
-    
+
     if (startTime === undefined) {
       this.log.warn('Timer not found', { name });
       return null;
@@ -314,6 +332,7 @@ class PerformanceTrackingService {
       apiCalls: apiMetrics,
       webVitals: this.getWebVitals(),
       customMetrics: this.metrics.slice(-100),
+      endpointStats: this.getEndpointStats(),
       timestamp: new Date().toISOString(),
     };
   }
@@ -347,6 +366,78 @@ class PerformanceTrackingService {
       },
       timestamp: new Date(),
     });
+
+    // Store in per-endpoint ring buffer for percentile queries
+    const key = `${method} ${endpoint}`;
+    let buf = this.apiLatencies.get(key);
+    if (!buf) {
+      buf = [];
+      this.apiLatencies.set(key, buf);
+    }
+    buf.push(duration);
+    if (buf.length > this.maxLatencySamples) {
+      buf.shift();
+    }
+  }
+
+  /**
+   * Track a cache access (hit or miss) for hit-rate monitoring
+   */
+  trackCacheAccess(hit: boolean): void {
+    if (hit) {
+      this.cacheHits++;
+    } else {
+      this.cacheMisses++;
+    }
+  }
+
+  /**
+   * Get cache hit rate as a percentage
+   */
+  getCacheHitRate(): { hits: number; misses: number; total: number; rate: number } {
+    const total = this.cacheHits + this.cacheMisses;
+    return {
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+      total,
+      rate: total > 0 ? Math.round((this.cacheHits / total) * 10000) / 100 : 0,
+    };
+  }
+
+  /**
+   * Get per-endpoint latency stats with P50, P95, P99
+   */
+  getEndpointStats(): Array<{
+    endpoint: string;
+    count: number;
+    min: number;
+    max: number;
+    avg: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  }> {
+    const results: Array<{
+      endpoint: string; count: number; min: number; max: number;
+      avg: number; p50: number; p95: number; p99: number;
+    }> = [];
+
+    for (const [endpoint, durations] of this.apiLatencies) {
+      const sorted = [...durations].sort((a, b) => a - b);
+      const sum = sorted.reduce((a, b) => a + b, 0);
+      results.push({
+        endpoint,
+        count: sorted.length,
+        min: sorted[0],
+        max: sorted[sorted.length - 1],
+        avg: Math.round(sum / sorted.length),
+        p50: this.percentile(sorted, 50),
+        p95: this.percentile(sorted, 95),
+        p99: this.percentile(sorted, 99),
+      });
+    }
+
+    return results.sort((a, b) => b.p95 - a.p95); // slowest first
   }
 
   /**
@@ -414,7 +505,7 @@ export function trackPerformance(name: string, tags?: Record<string, string>) {
 
     descriptor.value = function (this: unknown, ...args: unknown[]) {
       const startTime = performance.now();
-      
+
       try {
         const result = originalMethod.apply(this, args);
 

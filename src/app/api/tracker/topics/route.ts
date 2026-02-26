@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // Extract and count topics
     const topicCounts: Record<string, { count: number; lastUsed: Date; categories: Set<string> }> = {};
-    
+
     entries.forEach((entry) => {
       entry.topics.forEach((topic) => {
         if (!topicCounts[topic]) {
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
       .map(([name, count]) => ({ name, count }));
 
-    return apiResponse({
+    return apiResponse.success({
       topics,
       trending,
       totalTopics: Object.keys(topicCounts).length,
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return apiResponse(updatedEntry);
+    return apiResponse.success(updatedEntry);
   } catch (error) {
     console.error("Error updating topics:", error);
     return apiError("Failed to update topics", 500);

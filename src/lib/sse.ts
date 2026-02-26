@@ -79,10 +79,10 @@ export function formatSSEMessage<T>(event: SSEEvent<T>): string {
     lines.push(`retry: ${event.retry}`);
   }
 
-  const dataString = typeof event.data === 'string' 
-    ? event.data 
+  const dataString = typeof event.data === 'string'
+    ? event.data
     : JSON.stringify(event.data);
-  
+
   const dataLines = dataString.split('\n');
   for (const line of dataLines) {
     lines.push(`data: ${line}`);
@@ -107,6 +107,7 @@ export function createSSEStream(
   options: SSEConnectionOptions = {}
 ): {
   stream: ReadableStream<Uint8Array>;
+  controller: ReadableStreamDefaultController<Uint8Array>;
   send: <T>(event: SSEEvent<T>) => boolean;
   close: () => void;
   getStats: () => { messageCount: number; bytesTransferred: number };
@@ -131,7 +132,7 @@ export function createSSEStream(
       try {
         const initialMessage = encodeSSEMessage({
           event: 'connected',
-          data: { 
+          data: {
             message: 'SSE connection established',
             timestamp: new Date().toISOString(),
           },
@@ -195,14 +196,14 @@ export function createSSEStream(
 
   const close = () => {
     if (!isOpen) return;
-    
+
     isOpen = false;
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    
+
     try {
       controllerRef?.enqueue(encodeSSEMessage({
         event: 'close',
-        data: { 
+        data: {
           message: 'Connection closed by server',
           timestamp: new Date().toISOString(),
         },
@@ -211,13 +212,12 @@ export function createSSEStream(
     } catch {
       // Ignore errors during close
     }
-    
+
     onClose?.();
   };
 
   const getStats = () => ({ messageCount, bytesTransferred });
-
-  return { stream, send, close, getStats };
+  return { stream, controller: controllerRef!, send, close, getStats };
 }
 
 // =============================================================================

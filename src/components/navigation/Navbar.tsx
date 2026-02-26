@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PUBLIC_ROUTES, DASHBOARD_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from '@/constants/routes';
 import { Magnetic } from '@/components/ui/motion/Magnetic';
+import { useNotificationBadge } from '@/hooks/useNotifications';
 
 interface NavbarProps {
   variant?: 'default' | 'dashboard';
@@ -36,6 +37,7 @@ export function Navbar({ variant = 'default', className }: NavbarProps) {
   const { data: session } = useSession();
   const { setTheme, theme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const { hasUnread, count } = useNotificationBadge();
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -145,11 +147,14 @@ export function Navbar({ variant = 'default', className }: NavbarProps) {
 
         <div className="flex items-center gap-3">
           {variant === 'dashboard' && (
-            <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-red-500 border-2 border-white dark:border-zinc-950" />
+            <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 relative group">
+              <Bell className="h-5 w-5 transition-transform group-hover:rotate-12" />
+              {hasUnread && (
+                <span className="absolute top-2 right-2.5 h-2 w-2 rounded-full bg-red-500 border-2 border-white dark:border-zinc-950 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
+              )}
             </Button>
           )}
+
 
           <Magnetic>
             <Button

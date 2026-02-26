@@ -1,6 +1,7 @@
 // src/services/cacheService.ts
 import { cache } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { performanceTracking } from '@/lib/performanceTracking';
 
 const log = logger.child({ service: 'CacheService' });
 
@@ -34,6 +35,9 @@ export class CacheService {
       const data = await cache.get(key);
       if (data) {
         log.info('User cache hit', { userId });
+        performanceTracking.trackCacheAccess(true);
+      } else {
+        performanceTracking.trackCacheAccess(false);
       }
       return data;
     } catch (error) {
@@ -64,6 +68,9 @@ export class CacheService {
       const data = await cache.get(key);
       if (data) {
         log.info('Stats cache hit', { userId });
+        performanceTracking.trackCacheAccess(true);
+      } else {
+        performanceTracking.trackCacheAccess(false);
       }
       return data;
     } catch (error) {
@@ -86,15 +93,59 @@ export class CacheService {
   }
 
   /**
-   * Invalidate stats cache
+   * Invalidate stats cache entries for a user.
+   *
+   * Supports targeted invalidation to reduce cache churn:
+   *  - 'daily'  → only today/dashboard/summary keys (tracker entry create)
+   *  - 'entry'  → daily + overview/weekly keys (bulk update/delete)
+   *  - 'goal'   → goal-specific keys only
+   *  - 'all'    → everything (default, backward compatible)
    */
-  static async invalidateStats(userId: string) {
+  static async invalidateStats(userId: string, scope: 'daily' | 'entry' | 'goal' | 'all' = 'all') {
     try {
-      const key = this.generateKey('stats', userId);
-      await cache.del(key);
-      log.info('Stats cache invalidated', { userId });
+      // Hierarchical key groups
+      const dailyKeys = [
+        `stats:summary:${userId}`,
+        `stats:dashboard:data:${userId}`,
+        this.generateKey('stats', userId),
+      ];
+
+      const entryKeys = [
+        ...dailyKeys,
+        `stats:overview:${userId}`,
+        `stats:weekly:data:${userId}`,
+        `stats:platforms:${userId}`,
+        `tracker:entries:${userId}:dashboard`,
+      ];
+
+      const goalKeys = [
+        `goals:stats:${userId}`,
+        `goals:default:${userId}`,
+      ];
+
+      const allKeys = [
+        ...entryKeys,
+        ...goalKeys,
+        `stats:overall:${userId}:7`,
+        `stats:overall:${userId}:14`,
+        `stats:overall:${userId}:30`,
+        `stats:overall:${userId}:60`,
+        `stats:overall:${userId}:90`,
+        `stats:heatmap:${userId}`,
+      ];
+
+      const keyMap = {
+        daily: dailyKeys,
+        entry: entryKeys,
+        goal: goalKeys,
+        all: allKeys,
+      };
+
+      const keysToDelete = keyMap[scope];
+      await Promise.all(keysToDelete.map(key => cache.del(key)));
+      log.info('Stats cache invalidated', { userId, scope, keysDeleted: keysToDelete.length });
     } catch (error) {
-      log.error('Error invalidating stats cache', { userId }, error);
+      log.error('Error invalidating stats cache', { userId, scope }, error);
     }
   }
 
@@ -118,6 +169,9 @@ export class CacheService {
       const data = await cache.get(key);
       if (data) {
         log.info('Cache hit', { key });
+        performanceTracking.trackCacheAccess(true);
+      } else {
+        performanceTracking.trackCacheAccess(false);
       }
       return data;
     } catch (error) {
@@ -136,6 +190,13 @@ export class CacheService {
     } catch (error) {
       log.error('Error deleting cache', { key }, error);
     }
+  }
+
+  /**
+   * Alias for delete (to match Redis API)
+   */
+  static async del(key: string) {
+    return this.delete(key);
   }
 
   /**

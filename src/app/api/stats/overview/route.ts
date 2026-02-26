@@ -1,15 +1,17 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { StatsService } from '@/services/statsService';
-import { startOfDay, subDays, endOfDay } from 'date-fns';
+import { withCache } from '@/lib/withCache';
+import { startOfDay, subDays, endOfDay, differenceInDays } from 'date-fns';
 import { logger } from '@/lib/logger';
 
 const RATE_LIMIT = 20;
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+const handler = async (request: NextRequest): Promise<NextResponse> => {
     const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
     const startTime = Date.now();
 
@@ -32,51 +34,122 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         const endDate = endOfDay(new Date());
         const startDate = startOfDay(subDays(endDate, days));
 
-        // Fetch all required data in parallel
-        const [
-            overall,
-            problemsTrend,
-            commitsTrend,
-            timeTrend,
-            pointsTrend
-        ] = await Promise.all([
-            StatsService.getOverallStats(userId, days),
-            StatsService.getTrendData(userId, startDate, endDate, 'problems'),
-            StatsService.getTrendData(userId, startDate, endDate, 'commits'),
-            StatsService.getTrendData(userId, startDate, endDate, 'time'),
-            StatsService.getTrendData(userId, startDate, endDate, 'points')
-        ]);
+        // Fetch only needed fields in one query
+        const entries = await prisma.trackerEntry.findMany({
+            where: {
+                userId,
+                date: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                date: true,
+                platformId: true,
+                problemsSolved: true,
+                commits: true,
+                timeSpent: true,
+                points: true,
+                easyProblems: true,
+                mediumProblems: true,
+                hardProblems: true,
+                platform: {
+                    select: { id: true, name: true, icon: true },
+                },
+            },
+            orderBy: { date: 'asc' },
+        });
+
+        // Initialize daily buckets
+        const dailyStats = new Map<string, { problems: number; commits: number; time: number; points: number }>();
+        // Pre-fill
+        const allDays = differenceInDays(endDate, startDate) + 1;
+        for (let i = 0; i < allDays; i++) {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + i);
+            const key = d.toISOString().split('T')[0];
+            dailyStats.set(key, { problems: 0, commits: 0, time: 0, points: 0 });
+        }
+
+        // Initialize aggregations
+        let totalProblems = 0;
+        let totalCommits = 0;
+        let totalTime = 0;
+        let totalPoints = 0;
+        let easyProblems = 0;
+        let mediumProblems = 0;
+        let hardProblems = 0;
+        const platformMap = new Map<string, { id: string; name: string; icon: string; problems: number; commits: number; time: number }>();
+
+        // Process entries
+        for (const entry of entries) {
+            const dayKey = entry.date.toISOString().split('T')[0];
+            const dayStat = dailyStats.get(dayKey);
+
+            if (dayStat) {
+                dayStat.problems += entry.problemsSolved;
+                dayStat.commits += entry.commits;
+                dayStat.time += entry.timeSpent;
+                dayStat.points += (entry.points || 0);
+            }
+
+            totalProblems += entry.problemsSolved;
+            totalCommits += entry.commits;
+            totalTime += entry.timeSpent;
+            totalPoints += (entry.points || 0);
+
+            easyProblems += entry.easyProblems || 0;
+            mediumProblems += entry.mediumProblems || 0;
+            hardProblems += entry.hardProblems || 0;
+
+            if (entry.platformId) {
+                if (!platformMap.has(entry.platformId)) {
+                    platformMap.set(entry.platformId, {
+                        id: entry.platformId,
+                        name: entry.platform?.name || 'Unknown',
+                        icon: entry.platform?.icon || '',
+                        problems: 0,
+                        commits: 0,
+                        time: 0
+                    });
+                }
+                const pStat = platformMap.get(entry.platformId)!;
+                pStat.problems += entry.problemsSolved;
+                pStat.commits += entry.commits;
+                pStat.time += entry.timeSpent;
+            }
+        }
+
+        // Aggregate trends (compute average time from totals maybe? No, return total time)
+        const dates = Array.from(dailyStats.keys()).sort();
+        const problemsTrend = dates.map(date => ({ date, count: dailyStats.get(date)!.problems }));
+        const commitsTrend = dates.map(date => ({ date, count: dailyStats.get(date)!.commits }));
+        const timeTrend = dates.map(date => ({ date, minutes: dailyStats.get(date)!.time }));
+        const pointsTrend = dates.map(date => ({ date, points: dailyStats.get(date)!.points }));
 
         const stats = {
             period: `${days} days`,
             problems: {
-                total: overall.totalProblems,
-                easy: overall.difficultyBreakdown.easy,
-                medium: overall.difficultyBreakdown.medium,
-                hard: overall.difficultyBreakdown.hard,
-                byDay: problemsTrend.map(p => ({ date: p.date, count: p.value }))
+                total: totalProblems,
+                easy: easyProblems,
+                medium: mediumProblems,
+                hard: hardProblems,
+                byDay: problemsTrend
             },
             commits: {
-                total: overall.totalCommits,
-                byDay: commitsTrend.map(p => ({ date: p.date, count: p.value }))
+                total: totalCommits,
+                byDay: commitsTrend
             },
             time: {
-                total: overall.totalTimeSpent,
-                average: overall.avgTimePerDay,
-                byDay: timeTrend.map(p => ({ date: p.date, minutes: p.value }))
+                total: totalTime,
+                average: allDays > 0 ? Math.round(totalTime / allDays) : 0,
+                byDay: timeTrend
             },
             points: {
-                total: overall.totalPoints,
-                byDay: pointsTrend.map(p => ({ date: p.date, points: p.value }))
+                total: totalPoints,
+                byDay: pointsTrend
             },
-            platforms: overall.platformStats.map(p => ({
-                id: p.platformId,
-                name: p.platformName || 'Unknown Platform',
-                icon: p.icon || '',
-                problems: p.problems,
-                commits: p.commits,
-                time: p.time
-            }))
+            platforms: Array.from(platformMap.values())
         };
 
         logger.info('GET stats overview completed', { userId, requestId, duration: Date.now() - startTime });
@@ -87,8 +160,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         logger.error('GET stats overview failed', { requestId }, error);
         return apiResponse.internalError('Operation failed', requestId);
     }
-}
+};
 
-export async function OPTIONS() {
+export const GET = withCache(handler, {
+    keyGenerator: async (req) => {
+        const session = await getServerSession(authOptions);
+        if (!session) return null;
+        const days = req.nextUrl.searchParams.get('days') || '30';
+        return `stats:overview:${session.user.id}:${days}`;
+    },
+    ttl: 300,       // 5 min fresh
+    staleTtl: 300,  // 5 min stale
+    timingLabel: 'GET /api/stats/overview',
+});
+
+export const options = async () => {
     return new NextResponse(null, { status: 204, headers: { 'Allow': 'GET, OPTIONS' } });
-}
+};

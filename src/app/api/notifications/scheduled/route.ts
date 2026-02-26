@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       notifications,
       pendingCount,
       pagination: {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return apiResponse(notification, 201);
+    return apiResponse.created(notification);
   } catch (error) {
     console.error("Error scheduling notification:", error);
     return apiError("Failed to schedule notification", 500);
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -140,7 +140,7 @@ export async function DELETE(request: NextRequest) {
       where: { id: notificationId },
     });
 
-    return apiResponse({ success: true, message: "Scheduled notification cancelled" });
+    return apiResponse.success({ success: true, message: "Scheduled notification cancelled" });
   } catch (error) {
     console.error("Error cancelling scheduled notification:", error);
     return apiError("Failed to cancel scheduled notification", 500);

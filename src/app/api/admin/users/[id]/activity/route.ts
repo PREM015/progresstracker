@@ -7,12 +7,12 @@ import auditLogService from "@/services/auditLogService";
 import { AuditAction } from "@prisma/client";
 import { getToken } from "next-auth/jwt";
 
-export const GET = async (req: NextRequest, { params }: { params: { id: string } }) => { // Updated
+export const GET = async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => { // Updated
   try {
     const authRes = await adminAuth(req);
     if (authRes) return authRes;
 
-    const { id } = params;
+    const { id } = await params;
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type") || "all";
     const limit = parseInt(searchParams.get("limit") || "50", 10);

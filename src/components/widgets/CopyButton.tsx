@@ -9,15 +9,15 @@
 
 import React, { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/context/ToastContext';
 
 export interface CopyButtonProps {
   text: string;
   label?: string;
   successMessage?: string;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+  variant?: 'default' | 'secondary' | 'outline' | 'ghost';
+  size?: 'sm' | 'default' | 'lg' | 'icon';
   showIcon?: boolean;
   showToast?: boolean;
   onCopy?: (text: string) => void;

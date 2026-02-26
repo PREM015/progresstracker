@@ -6,23 +6,23 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 import { NotificationPriority } from "@prisma/client";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     priority: string;
-  };
+  }>;
 }
 
 // GET /api/notifications/priority/[priority] - Get notifications by priority
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
 
-    const { priority } = params;
+    const { priority } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
     const isRead = searchParams.get("isRead");
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       prisma.notification.count({ where: whereClause }),
     ]);
 
-    return apiResponse({
+    return apiResponse.success({
       priority: priority.toUpperCase(),
       notifications,
       pagination: {

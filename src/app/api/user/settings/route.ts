@@ -9,6 +9,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { cache } from '@/lib/redis';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
@@ -189,10 +190,57 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const userId = session!.user.id;
 
-    logger.debug('Fetching user settings', { userId, requestId });
+    // Cache-first: try Redis before DB
+    const cacheKey = `settings:${userId}`;
+    const cached = await cache.get<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      logger.debug('Settings served from cache', { userId, requestId });
+      const response = apiResponse.success(cached, {
+        meta: { requestId, source: 'cache' },
+        headers: {
+          'X-RateLimit-Limit': String(rateLimitResult.limit),
+          'X-RateLimit-Remaining': String(rateLimitResult.remaining),
+        },
+      });
+      return addHeaders(response, requestId);
+    }
+
+    logger.debug('Fetching user settings from DB', { userId, requestId });
 
     let settings = await prisma.userSettings.findUnique({
       where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        theme: true,
+        accentColor: true,
+        compactMode: true,
+        fontSize: true,
+        reducedMotion: true,
+        highContrast: true,
+        language: true,
+        timezone: true,
+        dateFormat: true,
+        timeFormat: true,
+        weekStartsOn: true,
+        numberFormat: true,
+        autoSync: true,
+        syncFrequency: true,
+        syncOnLogin: true,
+        syncInBackground: true,
+        publicProfile: true,
+        showInLeaderboard: true,
+        allowAnalytics: true,
+        allowCookies: true,
+        dashboardLayout: true,
+        defaultDateRange: true,
+        showWelcomeBanner: true,
+        keyboardShortcuts: true,
+        soundEffects: true,
+        desktopNotifications: true,
+        dataRetentionDays: true,
+        updatedAt: true,
+      },
     });
 
     // Create default settings if not exist
@@ -202,6 +250,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         data: { userId },
       });
     }
+
+    // Cache for 10 minutes
+    await cache.set(cacheKey, settings, 600);
 
     logger.info('Settings fetched', {
       userId,
@@ -257,6 +308,9 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
 
     const settings = await UserService.updateSettings(userId, validation.data);
 
+    // Invalidate cache
+    await cache.del(`settings:${userId}`);
+
     // Audit log
     await prisma.auditLog.create({
       data: {
@@ -275,7 +329,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
       userId,
       requestId,
       duration: Date.now() - startTime,
-   fields: Object.keys(validation.data),
+      fields: Object.keys(validation.data),
 
     });
 
@@ -336,7 +390,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     const data = parsed.data; // ✅ fully typed now
 
-  
+
     const settings = await prisma.userSettings.upsert({
       where: { userId },
       create: {
@@ -346,9 +400,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         accentColor: data.accentColor,
         compactMode: data.compactMode,
         fontSize: data.fontSize,
-     dashboardLayout: (data.dashboardLayout ?? {}) as Prisma.JsonObject,
-
-        notifications: z.record(z.unknown()).optional(),
+        dashboardLayout: (data.dashboardLayout ?? {}) as Prisma.JsonObject,
         dataRetentionDays: data.dataRetentionDays,
         updatedAt: new Date(),
       },
@@ -368,6 +420,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         updatedAt: new Date(),
       },
     });
+
+    // Invalidate cache
+    await cache.del(`settings:${userId}`);
 
     logger.info('Settings patched', {
       userId,
@@ -425,6 +480,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Delete and recreate with defaults
     await prisma.userSettings.deleteMany({ where: { userId } });
+    await cache.del(`settings:${userId}`);
 
     const settings = await prisma.userSettings.create({
       data: { userId },

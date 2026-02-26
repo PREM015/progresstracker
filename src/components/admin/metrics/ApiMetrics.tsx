@@ -1,3 +1,5 @@
+'use client';
+
 import { useAdminMetrics } from '@/hooks/useAdminMetrics';
 
 export function ApiMetrics() {
@@ -38,7 +40,7 @@ export function ApiMetrics() {
                         </tr>
                     </thead>
                     <tbody>
-                        {metrics?.topEndpoints?.map((endpoint, i) => (
+                        {metrics?.topEndpoints?.map((endpoint: { path: string; count: number; avgTime: number }, i: number) => (
                             <tr key={i} className="border-b border-zinc-800">
                                 <td className="p-3 text-white font-mono text-sm">{endpoint.path}</td>
                                 <td className="p-3 text-zinc-400">{endpoint.count}</td>

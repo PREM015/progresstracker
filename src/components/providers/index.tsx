@@ -11,13 +11,16 @@ import { ThemeProvider } from './ThemeProvider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 
+import { Session } from 'next-auth';
+
 interface ProvidersProps {
   children: React.ReactNode;
+  session?: Session | null;
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, session }: ProvidersProps) {
   return (
-    <AuthProvider>
+    <AuthProvider session={session}>
       <QueryProvider>
         <ThemeProvider>
           <TooltipProvider>

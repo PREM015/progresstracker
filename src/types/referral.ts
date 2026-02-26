@@ -687,7 +687,8 @@ export function isReferralQualified(
   referral: Referral,
   qualifyingAction: QualifyingAction
 ): boolean {
-  if (referral.status === 'completed') return true;
+  const status = referral.status as string;
+  if (status === 'completed') return true;
   
   // Check based on qualifying action
   switch (qualifyingAction) {
@@ -695,11 +696,11 @@ export function isReferralQualified(
       return !!referral.registeredAt;
     case 'verify_email':
       // Would need to check user's email verification status
-      return referral.status === 'registered' || referral.status === 'completed';
+      return status === 'registered' || status === 'completed';
     case 'first_sync':
     case 'subscribe':
     case 'subscribe_paid':
-      return referral.status === 'completed';
+      return status === 'completed';
     default:
       return false;
   }
@@ -813,8 +814,9 @@ export function getReferralProgressPercentage(
   referral: Referral,
   qualifyingAction: QualifyingAction
 ): number {
-  if (referral.status === 'completed') return 100;
-  if (referral.status === 'expired' || referral.status === 'cancelled') return 0;
+  const status = referral.status as string;
+  if (status === 'completed') return 100;
+  if (status === 'expired' || status === 'cancelled') return 0;
   
   // Calculate progress based on qualifying action
   const steps = {

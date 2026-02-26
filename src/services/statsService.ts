@@ -1,6 +1,7 @@
 // src/services/statsService.ts
 
 import { prisma } from '@/lib/prisma';
+import { CacheService } from '@/services/cacheService';
 import {
   subDays,
   startOfDay,
@@ -153,69 +154,121 @@ export class StatsService {
 
   /**
    * Get comprehensive overall stats for a user
+   * Optimized: computes platform/category breakdowns inline (eliminates 2 extra DB queries)
+   * Cached with 5-minute TTL
    */
   static async getOverallStats(
     userId: string,
     days: number = 30
   ): Promise<OverallStatsResponse> {
+    // Check cache first
+    const cacheKey = `stats:overall:${userId}:${days}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) return cached as OverallStatsResponse;
+
     const startDate = startOfDay(subDays(new Date(), days));
     const endDate = endOfDay(new Date());
 
-    // Fetch entries with platform info
-    const entries = await prisma.trackerEntry.findMany({
-      where: {
-        userId,
-        date: { gte: startDate, lte: endDate },
-      },
-      include: {
-        platform: {
-          select: { id: true, name: true, slug: true },
+    // Fetch entries with platform info — single query for all breakdowns
+    const [entries, user] = await Promise.all([
+      prisma.trackerEntry.findMany({
+        where: {
+          userId,
+          date: { gte: startDate, lte: endDate },
         },
-      },
-      orderBy: { date: 'desc' },
-    });
+        select: {
+          id: true,
+          date: true,
+          platformId: true,
+          category: true,
+          problemsSolved: true,
+          commits: true,
+          pullRequests: true,
+          timeSpent: true,
+          points: true,
+          easyProblems: true,
+          mediumProblems: true,
+          hardProblems: true,
+          notes: true,
+          platform: {
+            select: { id: true, name: true, slug: true, icon: true },
+          },
+        },
+        orderBy: { date: 'desc' },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          currentStreak: true,
+          longestStreak: true,
+          lastActivityDate: true,
+          streakStartDate: true,
+        },
+      }),
+    ]);
 
-    // Get user's cached streak data for performance
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        currentStreak: true,
-        longestStreak: true,
-        lastActivityDate: true,
-        streakStartDate: true,
-      },
-    });
+    // Calculate totals in a single pass
+    let totalProblems = 0, totalCommits = 0, totalPullRequests = 0, totalTimeSpent = 0, totalPoints = 0;
+    let easyTotal = 0, mediumTotal = 0, hardTotal = 0;
+    const uniqueDaysSet = new Set<string>();
+    const platformBreakdown: Record<string, PlatformBreakdownItem> = {};
+    const categoryBreakdown: Record<string, CategoryBreakdownItem> = {};
 
-    // Calculate totals
-    const totalProblems = entries.reduce((sum, e) => sum + e.problemsSolved, 0);
-    const totalCommits = entries.reduce((sum, e) => sum + e.commits, 0);
-    const totalPullRequests = entries.reduce((sum, e) => sum + e.pullRequests, 0);
-    const totalTimeSpent = entries.reduce((sum, e) => sum + e.timeSpent, 0);
-    const totalPoints = entries.reduce((sum, e) => sum + (e.points ?? 0), 0);
+    for (const entry of entries) {
+      totalProblems += entry.problemsSolved;
+      totalCommits += entry.commits;
+      totalPullRequests += entry.pullRequests;
+      totalTimeSpent += entry.timeSpent;
+      totalPoints += entry.points ?? 0;
+      easyTotal += entry.easyProblems;
+      mediumTotal += entry.mediumProblems;
+      hardTotal += entry.hardProblems;
+      uniqueDaysSet.add(format(entry.date, 'yyyy-MM-dd'));
 
-    // Difficulty breakdown
+      // Platform breakdown (inline, no extra query)
+      if (entry.platformId) {
+        if (!platformBreakdown[entry.platformId]) {
+          platformBreakdown[entry.platformId] = {
+            platformId: entry.platformId,
+            platformName: entry.platform?.name,
+            slug: entry.platform?.slug,
+            icon: entry.platform?.icon ?? null,
+            problems: 0, commits: 0, time: 0, count: 0,
+          };
+        }
+        platformBreakdown[entry.platformId].problems += entry.problemsSolved;
+        platformBreakdown[entry.platformId].commits += entry.commits;
+        platformBreakdown[entry.platformId].time += entry.timeSpent;
+        platformBreakdown[entry.platformId].count++;
+      }
+
+      // Category breakdown (inline, no extra query)
+      if (entry.category) {
+        if (!categoryBreakdown[entry.category]) {
+          categoryBreakdown[entry.category] = {
+            category: entry.category,
+            problems: 0, commits: 0, time: 0, count: 0,
+          };
+        }
+        categoryBreakdown[entry.category].problems += entry.problemsSolved;
+        categoryBreakdown[entry.category].commits += entry.commits;
+        categoryBreakdown[entry.category].time += entry.timeSpent;
+        categoryBreakdown[entry.category].count++;
+      }
+    }
+
+    const uniqueDays = uniqueDaysSet.size;
     const difficultyBreakdown: DifficultyBreakdown = {
-      easy: entries.reduce((sum, e) => sum + e.easyProblems, 0),
-      medium: entries.reduce((sum, e) => sum + e.mediumProblems, 0),
-      hard: entries.reduce((sum, e) => sum + e.hardProblems, 0),
-      total: totalProblems,
+      easy: easyTotal, medium: mediumTotal, hard: hardTotal, total: totalProblems,
     };
-
-    // Unique active days
-    const uniqueDays = new Set(
-      entries.map((e) => format(e.date, 'yyyy-MM-dd'))
-    ).size;
 
     // Get streak (use cached or calculate)
     const streak = user?.currentStreak !== undefined && user?.longestStreak !== undefined
       ? { current: user.currentStreak, longest: user.longestStreak }
       : await this.calculateStreak(userId);
 
-    // Platform breakdown
-    const platformStats = await this.getPlatformBreakdown(userId, startDate, endDate);
-
-    // Category breakdown
-    const categoryStats = await this.getCategoryBreakdown(userId, startDate, endDate);
+    const platformStats = Object.values(platformBreakdown).sort((a, b) => b.problems - a.problems);
+    const categoryStats = Object.values(categoryBreakdown).sort((a, b) => b.problems - a.problems);
 
     // Recent activity
     const recentActivity: RecentActivityItem[] = entries.slice(0, 10).map((entry) => ({
@@ -230,7 +283,7 @@ export class StatsService {
       notes: entry.notes,
     }));
 
-    return {
+    const result: OverallStatsResponse = {
       totalProblems,
       totalCommits,
       totalPullRequests,
@@ -247,6 +300,11 @@ export class StatsService {
       difficultyBreakdown,
       recentActivity,
     };
+
+    // Cache for 5 minutes
+    await CacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   // ===========================================================================
@@ -278,6 +336,16 @@ export class StatsService {
       where: { userId },
       orderBy: { length: 'desc' },
     });
+
+    // If we have cached data in User model, return it
+    if (user && user.currentStreak !== null && user.longestStreak !== null) {
+      return {
+        current: user.currentStreak,
+        longest: user.longestStreak,
+        lastActivityDate: user.lastActivityDate,
+        streakStartDate: user.streakStartDate,
+      };
+    }
 
     if (currentStreakRecord && longestStreakRecord) {
       return {
@@ -408,7 +476,11 @@ export class StatsService {
         date: { gte: startDate, lte: endDate },
         platformId: { not: null },
       },
-      include: {
+      select: {
+        platformId: true,
+        problemsSolved: true,
+        commits: true,
+        timeSpent: true,
         platform: {
           select: { id: true, name: true, slug: true, icon: true },
         },
@@ -458,6 +530,12 @@ export class StatsService {
         date: { gte: startDate, lte: endDate },
         category: { not: null },
       },
+      select: {
+        category: true,
+        problemsSolved: true,
+        commits: true,
+        timeSpent: true,
+      },
     });
 
     const breakdown: Record<string, CategoryBreakdownItem> = {};
@@ -490,6 +568,7 @@ export class StatsService {
 
   /**
    * Get monthly breakdown of activity
+   * Optimized: uses DailyStats table
    */
   static async getMonthlyBreakdown(
     userId: string,
@@ -498,10 +577,18 @@ export class StatsService {
     const startDate = startOfDay(subDays(new Date(), months * 30));
     const endDate = endOfDay(new Date());
 
-    const entries = await prisma.trackerEntry.findMany({
+    const dailyStats = await prisma.dailyStats.findMany({
       where: {
         userId,
         date: { gte: startDate, lte: endDate },
+        // Only fetch days with activity
+        hadActivity: true,
+      },
+      select: {
+        date: true,
+        totalProblems: true,
+        totalCommits: true,
+        totalTimeSpent: true,
       },
     });
 
@@ -516,9 +603,9 @@ export class StatsService {
       }
     > = {};
 
-    entries.forEach((entry) => {
-      const key = format(entry.date, 'yyyy-MM');
-      const year = entry.date.getFullYear();
+    dailyStats.forEach((stat) => {
+      const key = format(stat.date, 'yyyy-MM');
+      const year = stat.date.getFullYear();
 
       if (!monthly[key]) {
         monthly[key] = {
@@ -529,10 +616,10 @@ export class StatsService {
           year,
         };
       }
-      monthly[key].problems += entry.problemsSolved;
-      monthly[key].commits += entry.commits;
-      monthly[key].time += entry.timeSpent;
-      monthly[key].days.add(format(entry.date, 'yyyy-MM-dd'));
+      monthly[key].problems += stat.totalProblems;
+      monthly[key].commits += stat.totalCommits;
+      monthly[key].time += stat.totalTimeSpent;
+      monthly[key].days.add(format(stat.date, 'yyyy-MM-dd'));
     });
 
     return Object.entries(monthly)
@@ -556,34 +643,49 @@ export class StatsService {
 
   /**
    * Get heatmap data for the last 365 days
+   * Optimized: uses DailyStats table
    */
-  static async getHeatmapData(userId: string): Promise<HeatmapDataPoint[]> {
+  static async getHeatmapData(userId: string, timezone: string = 'UTC'): Promise<HeatmapDataPoint[]> {
+    // Check cache first (10-minute TTL for heatmap)
+    const cacheKey = `stats:heatmap:${userId}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) return cached as HeatmapDataPoint[];
+
     const startDate = startOfDay(subDays(new Date(), 365));
     const endDate = endOfDay(new Date());
 
-    const entries = await prisma.trackerEntry.findMany({
+    // Use DailyStats for much faster query
+    const dailyStats = await prisma.dailyStats.findMany({
       where: {
         userId,
         date: { gte: startDate, lte: endDate },
+        // Only fetch days with activity to reduce payload
+        hadActivity: true,
+      },
+      select: {
+        date: true,
+        totalProblems: true,
+        totalCommits: true,
       },
     });
 
-    // Aggregate by day
-    const daily: Record<string, number> = {};
-    entries.forEach((entry) => {
-      const key = format(entry.date, 'yyyy-MM-dd');
-      daily[key] = (daily[key] || 0) + entry.problemsSolved + entry.commits;
+    // Create a map for quick lookup
+    const statsMap = new Map<string, number>();
+    let maxCount = 1;
+
+    dailyStats.forEach(stat => {
+      const dateKey = format(stat.date, 'yyyy-MM-dd');
+      const count = stat.totalProblems + stat.totalCommits;
+      statsMap.set(dateKey, count);
+      if (count > maxCount) maxCount = count;
     });
 
-    // Find max for level calculation
-    const maxCount = Math.max(...Object.values(daily), 1);
-
-    // Generate all days
+    // Generate all days to ensure complete calendar
     const allDays = eachDayOfInterval({ start: startDate, end: endDate });
 
-    return allDays.map((day) => {
+    const result = allDays.map((day) => {
       const key = format(day, 'yyyy-MM-dd');
-      const count = daily[key] || 0;
+      const count = statsMap.get(key) || 0;
 
       // Calculate level (0-4)
       let level = 0;
@@ -597,6 +699,11 @@ export class StatsService {
 
       return { date: key, count, level };
     });
+
+    // Cache for 10 minutes
+    await CacheService.set(cacheKey, result, 600);
+
+    return result;
   }
 
   // ===========================================================================
@@ -611,6 +718,11 @@ export class StatsService {
     startDate: Date,
     endDate: Date
   ): Promise<SummaryStatsResponse> {
+    // Check cache first
+    const cacheKey = `stats:summary:${userId}:${startDate.toISOString().split('T')[0]}:${endDate.toISOString().split('T')[0]}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) return cached as SummaryStatsResponse;
+
     const [
       entries,
       connectedPlatforms,
@@ -621,6 +733,14 @@ export class StatsService {
     ] = await Promise.all([
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: startDate, lte: endDate } },
+        select: {
+          date: true,
+          problemsSolved: true,
+          commits: true,
+          pullRequests: true,
+          timeSpent: true,
+          points: true,
+        },
       }),
       prisma.userPlatform.count({
         where: { userId, isActive: true },
@@ -658,7 +778,7 @@ export class StatsService {
       ? { current: user.currentStreak, longest: user.longestStreak ?? 0 }
       : await this.calculateStreak(userId);
 
-    return {
+    const result: SummaryStatsResponse = {
       totalProblems,
       totalCommits,
       totalPullRequests,
@@ -676,6 +796,11 @@ export class StatsService {
       periodStart: startDate,
       periodEnd: endDate,
     };
+
+    // Cache for 5 minutes
+    await CacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   // ===========================================================================
@@ -693,6 +818,14 @@ export class StatsService {
   ): Promise<TrendDataPoint[]> {
     const entries = await prisma.trackerEntry.findMany({
       where: { userId, date: { gte: startDate, lte: endDate } },
+      select: {
+        date: true,
+        problemsSolved: true,
+        commits: true,
+        pullRequests: true,
+        timeSpent: true,
+        points: true,
+      },
     });
 
     const daily: Record<string, number> = {};
@@ -766,16 +899,19 @@ export class StatsService {
     const lastWeekStart = startOfWeek(subDays(now, 7));
     const lastWeekEnd = endOfWeek(subDays(now, 7));
 
+    const selectFields = { problemsSolved: true, commits: true, timeSpent: true } as const;
     const [thisWeekEntries, lastWeekEntries] = await Promise.all([
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: thisWeekStart, lte: thisWeekEnd } },
+        select: selectFields,
       }),
       prisma.trackerEntry.findMany({
         where: { userId, date: { gte: lastWeekStart, lte: lastWeekEnd } },
+        select: selectFields,
       }),
     ]);
 
-    const sum = (entries: TrackerEntry[]): number => {
+    const sum = (entries: { problemsSolved: number; commits: number; timeSpent: number }[]): number => {
       return entries.reduce((s, e) => {
         switch (metric) {
           case 'problems':
@@ -827,7 +963,13 @@ export class StatsService {
         userId,
         date: { gte: startDate, lte: endDate },
       },
-      include: {
+      select: {
+        date: true,
+        problemsSolved: true,
+        commits: true,
+        pullRequests: true,
+        timeSpent: true,
+        points: true,
         platform: {
           select: { id: true, name: true },
         },
@@ -1135,6 +1277,11 @@ export class StatsService {
     leastActive: string | null;
     totalPlatforms: number;
   }> {
+    // Check cache first (5-min TTL)
+    const cacheKey = `stats:platforms:${userId}`;
+    const cached = await CacheService.get(cacheKey);
+    if (cached) return cached as Awaited<ReturnType<typeof StatsService.getPlatformStats>>;
+
     // Get user's connected platforms
     const userPlatforms = await prisma.userPlatform.findMany({
       where: { userId, isActive: true },
@@ -1152,97 +1299,128 @@ export class StatsService {
       },
     });
 
+    if (userPlatforms.length === 0) {
+      const empty = { platforms: [], mostActive: null, leastActive: null, totalPlatforms: 0 };
+      await CacheService.set(cacheKey, empty, 300);
+      return empty;
+    }
+
+    // Single query for ALL platform entries (eliminates N+1)
+    const platformIds = userPlatforms.map(up => up.platformId);
+    const allEntries = await prisma.trackerEntry.findMany({
+      where: { userId, platformId: { in: platformIds } },
+      orderBy: { date: 'desc' },
+      select: {
+        platformId: true,
+        date: true,
+        problemsSolved: true,
+        commits: true,
+        timeSpent: true,
+      },
+    });
+
+    // Group entries by platformId
+    const entriesByPlatform = new Map<string, typeof allEntries>();
+    for (const entry of allEntries) {
+      if (!entry.platformId) continue;
+      const existing = entriesByPlatform.get(entry.platformId);
+      if (existing) {
+        existing.push(entry);
+      } else {
+        entriesByPlatform.set(entry.platformId, [entry]);
+      }
+    }
+
     // Get entries for the last 30 days for trend calculation
     const thirtyDaysAgo = subDays(new Date(), 30);
     const fifteenDaysAgo = subDays(new Date(), 15);
 
-    const platformStats = await Promise.all(
-      userPlatforms.map(async (up) => {
-        // Get all entries for this platform
-        const allEntries = await prisma.trackerEntry.findMany({
-          where: { userId, platformId: up.platformId },
-          orderBy: { date: 'desc' },
-        });
+    const platformStats = userPlatforms.map((up) => {
+      const platformEntries = entriesByPlatform.get(up.platformId) || [];
 
-        // Get recent entries for trend
-        const recentEntries = allEntries.filter(
-          (e) => e.date >= thirtyDaysAgo
-        );
-        const firstHalf = recentEntries.filter(
-          (e) => e.date < fifteenDaysAgo
-        );
-        const secondHalf = recentEntries.filter(
-          (e) => e.date >= fifteenDaysAgo
-        );
+      // Get recent entries for trend
+      const recentEntries = platformEntries.filter(
+        (e) => e.date >= thirtyDaysAgo
+      );
+      const firstHalf = recentEntries.filter(
+        (e) => e.date < fifteenDaysAgo
+      );
+      const secondHalf = recentEntries.filter(
+        (e) => e.date >= fifteenDaysAgo
+      );
 
-        const firstHalfProblems = firstHalf.reduce(
-          (s, e) => s + e.problemsSolved, 0
-        );
-        const secondHalfProblems = secondHalf.reduce(
-          (s, e) => s + e.problemsSolved, 0
-        );
+      const firstHalfProblems = firstHalf.reduce(
+        (s, e) => s + e.problemsSolved, 0
+      );
+      const secondHalfProblems = secondHalf.reduce(
+        (s, e) => s + e.problemsSolved, 0
+      );
 
-        let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (secondHalfProblems > firstHalfProblems * 1.1) trend = 'up';
-        else if (secondHalfProblems < firstHalfProblems * 0.9) trend = 'down';
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (secondHalfProblems > firstHalfProblems * 1.1) trend = 'up';
+      else if (secondHalfProblems < firstHalfProblems * 0.9) trend = 'down';
 
-        // Calculate platform streak
-        const uniqueDates = [
-          ...new Set(allEntries.map((e) => format(e.date, 'yyyy-MM-dd'))),
-        ].sort((a, b) => b.localeCompare(a));
+      // Calculate platform streak
+      const uniqueDates = [
+        ...new Set(platformEntries.map((e) => format(e.date, 'yyyy-MM-dd'))),
+      ].sort((a, b) => b.localeCompare(a));
 
-        let platformStreak = 0;
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+      let platformStreak = 0;
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
-        if (uniqueDates[0] === today || uniqueDates[0] === yesterday) {
-          platformStreak = 1;
-          for (let i = 1; i < uniqueDates.length; i++) {
-            const expected = format(
-              subDays(new Date(uniqueDates[i - 1]), 1),
-              'yyyy-MM-dd'
-            );
-            if (uniqueDates[i] === expected) {
-              platformStreak++;
-            } else {
-              break;
-            }
+      if (uniqueDates[0] === today || uniqueDates[0] === yesterday) {
+        platformStreak = 1;
+        for (let i = 1; i < uniqueDates.length; i++) {
+          const expected = format(
+            subDays(new Date(uniqueDates[i - 1]), 1),
+            'yyyy-MM-dd'
+          );
+          if (uniqueDates[i] === expected) {
+            platformStreak++;
+          } else {
+            break;
           }
         }
+      }
 
-        const totalProblems = allEntries.reduce(
-          (s, e) => s + e.problemsSolved, 0
-        );
+      const totalProblems = platformEntries.reduce(
+        (s, e) => s + e.problemsSolved, 0
+      );
 
-        return {
-          platform: up.platform,
-          stats: {
-            totalProblems,
-            totalCommits: allEntries.reduce((s, e) => s + e.commits, 0),
-            totalTime: allEntries.reduce((s, e) => s + e.timeSpent, 0),
-            totalEntries: allEntries.length,
-            lastActivity: allEntries[0]?.date ?? null,
-            streak: platformStreak,
-            avgProblemsPerSession: allEntries.length > 0
-              ? Math.round(totalProblems / allEntries.length)
-              : 0,
-          },
-          trend,
-        };
-      })
-    );
+      return {
+        platform: up.platform,
+        stats: {
+          totalProblems,
+          totalCommits: platformEntries.reduce((s, e) => s + e.commits, 0),
+          totalTime: platformEntries.reduce((s, e) => s + e.timeSpent, 0),
+          totalEntries: platformEntries.length,
+          lastActivity: platformEntries[0]?.date ?? null,
+          streak: platformStreak,
+          avgProblemsPerSession: platformEntries.length > 0
+            ? Math.round(totalProblems / platformEntries.length)
+            : 0,
+        },
+        trend,
+      };
+    });
 
     // Sort by total problems to find most/least active
     const sorted = [...platformStats].sort(
       (a, b) => b.stats.totalProblems - a.stats.totalProblems
     );
 
-    return {
+    const result = {
       platforms: platformStats,
       mostActive: sorted[0]?.platform.name ?? null,
       leastActive: sorted[sorted.length - 1]?.platform.name ?? null,
       totalPlatforms: platformStats.length,
     };
+
+    // Cache for 5 minutes
+    await CacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   /**
@@ -1313,7 +1491,10 @@ export class StatsService {
         date: { gte: startDate },
         platformId: { not: null },
       },
-      include: {
+      select: {
+        date: true,
+        platformId: true,
+        problemsSolved: true,
         platform: {
           select: { id: true, name: true },
         },
@@ -1367,6 +1548,13 @@ export class StatsService {
   }> {
     const entries = await prisma.trackerEntry.findMany({
       where: { userId, date: { gte: startDate, lte: endDate } },
+      select: {
+        date: true,
+        problemsSolved: true,
+        easyProblems: true,
+        mediumProblems: true,
+        hardProblems: true,
+      },
     });
 
     const breakdown: DifficultyBreakdown = {
@@ -1593,6 +1781,11 @@ export class StatsService {
 
     const entries = await prisma.trackerEntry.findMany({
       where: { userId, date: { gte: startDate } },
+      select: {
+        date: true,
+        problemsSolved: true,
+        timeSpent: true,
+      },
     });
 
     const byDay: Record<number, { count: number; problems: number; time: number }> = {

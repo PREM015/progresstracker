@@ -4,8 +4,8 @@
  */
 
 export { ErrorBoundary } from './ErrorBoundary';
-export { ErrorPage } from './ErrorPage';
+export { default as ErrorPage } from './ErrorPage';
 export { NotFoundPage } from './NotFoundPage';
 export { ServerError } from './ServerError';
-export { MaintenancePage } from './MaintenancePage';
-export { OfflinePage } from './OfflinePage';
+export { default as MaintenancePage } from './MaintenancePage';
+export { default as OfflinePage } from './OfflinePage';

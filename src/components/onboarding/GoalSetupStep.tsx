@@ -1,6 +1,7 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
+import { Target, Check, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 interface GoalTemplate {
   id: string;
@@ -26,11 +27,11 @@ export const GoalSetupStep: React.FC<GoalSetupStepProps> = ({
   onNext,
   className = '',
 }) => {
-  const [templates, setTemplates] = useState<GoalTemplate[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = React.useState<GoalTemplate[]>([]);
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchTemplates = async () => {
       setLoading(true);
       try {
@@ -67,52 +68,89 @@ export const GoalSetupStep: React.FC<GoalSetupStepProps> = ({
   };
 
   return (
-    <div className={`bg-white rounded-2xl p-8 ${className}`}>
-      <h2 className="text-3xl font-bold mb-2">Set Your Goals</h2>
-      <p className="text-gray-600 mb-8">Choose some goals to get started</p>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className={`glass-card p-12 max-w-2xl mx-auto relative overflow-hidden ${className}`}
+    >
+      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500" />
 
-      <div className="space-y-3 mb-8">
+      <div className="text-center mb-10">
+        <h2 className="text-4xl font-black mb-3 tracking-tight text-white flex items-center justify-center gap-3">
+          Set Your Goals <Target className="h-8 w-8 text-primary" />
+        </h2>
+        <p className="text-zinc-400 font-medium text-lg">What do you want to achieve today?</p>
+      </div>
+
+      <div className="space-y-4 mb-10 relative z-10">
         {loading ? (
-          <div className="text-center text-gray-500">Loading templates...</div>
+          <div className="py-20 text-center glass rounded-2xl border-white/5">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Curating goal templates</p>
+          </div>
         ) : templates.length === 0 ? (
-          <div className="text-center text-gray-500">No goal templates available</div>
+          <div className="py-20 text-center glass rounded-2xl border-white/5">
+            <Target className="h-10 w-10 text-zinc-700 mx-auto mb-4" />
+            <p className="text-zinc-500 font-medium">No templates available. You can create custom goals later.</p>
+          </div>
         ) : (
-          templates.map((goal) => (
-            <label
-              key={goal.id}
-              className="flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors"
-            >
-              <input
-                type="checkbox"
-                className="w-6 h-6"
-                checked={selectedIds.includes(goal.id)}
-                onChange={() => toggleSelect(goal.id)}
-              />
-              <div className="flex-1">
-                <div className="font-semibold">{goal.title}</div>
-                <div className="text-sm text-gray-600">Target: {goal.target}</div>
-              </div>
-            </label>
-          ))
+          templates.map((goal, idx) => {
+            const isSelected = selectedIds.includes(goal.id);
+            return (
+              <motion.label
+                key={goal.id}
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: idx * 0.1 }}
+                onClick={() => toggleSelect(goal.id)}
+                className={`group flex items-center gap-6 p-5 glass border transition-all cursor-pointer rounded-2xl ${isSelected ? 'border-primary bg-primary/5 shadow-[0_10px_30px_rgba(99,102,241,0.1)]' : 'border-white/5 hover:border-white/10 hover:bg-white/5'
+                  }`}
+              >
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isSelected ? 'bg-primary text-white scale-110' : 'bg-zinc-900 text-zinc-600 group-hover:bg-zinc-800'
+                  }`}>
+                  {isSelected ? <Check className="h-6 w-6 stroke-[3px]" /> : <Target className="h-6 w-6" />}
+                </div>
+
+                <div className="flex-1">
+                  <div className={`font-bold text-lg transition-colors ${isSelected ? 'text-white' : 'text-zinc-400'}`}>
+                    {goal.title}
+                  </div>
+                  <div className="text-sm text-zinc-500 font-medium">Target: {goal.target} {goal.category}</div>
+                </div>
+
+                {isSelected && (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-primary">
+                    <Sparkles className="h-5 w-5 fill-current" />
+                  </motion.div>
+                )}
+              </motion.label>
+            );
+          })
         )}
       </div>
 
-      <div className="flex gap-3">
-        <button
+      <div className="flex flex-col sm:flex-row gap-4 pt-4">
+        <Button
           onClick={() => onNext([])}
-          className="flex-1 px-6 py-3 border rounded-lg hover:bg-gray-50"
+          variant="glass"
+          size="xl"
+          className="flex-1 h-16 text-lg font-bold"
         >
           Skip
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={handleContinue}
-          className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          variant="premium"
+          size="xl"
+          className="flex-1 h-16 text-lg font-black group shadow-[0_20px_40px_rgba(99,102,241,0.2)]"
         >
-          Continue
-        </button>
+          {selectedIds.length > 0 ? `Track ${selectedIds.length} Goal${selectedIds.length > 1 ? 's' : ''}` : 'Continue'}
+          <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+        </Button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
 export default GoalSetupStep;
+

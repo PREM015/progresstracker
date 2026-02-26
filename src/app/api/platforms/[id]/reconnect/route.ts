@@ -60,6 +60,8 @@ const ReconnectSchema = z.object({
   triggerSync: z.boolean().default(false),
 });
 
+type ReconnectInput = z.infer<typeof ReconnectSchema>;
+
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
@@ -136,7 +138,7 @@ export async function POST(
     }
 
     // Parse options
-    let body: z.infer<typeof ReconnectSchema> = { clearErrors: true, verify: true };
+    let body: ReconnectInput = { clearErrors: true, verify: true, triggerSync: false };
     try {
       const parsed = await request.json();
       const validation = ReconnectSchema.safeParse(parsed);

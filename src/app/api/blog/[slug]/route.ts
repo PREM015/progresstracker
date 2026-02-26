@@ -44,13 +44,13 @@ function addHeaders(response: NextResponse, requestId: string, rateLimitResult?:
     return response;
 }
 
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }): Promise<NextResponse> {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ slug: string }> }): Promise<NextResponse> {
     const requestId = generateRequestId();
     const startTime = Date.now();
 
     try {
         const post = await prisma.blogPost.findUnique({
-            where: { slug: params.slug }
+            where: { slug: (await params).slug }
         });
 
         if (!post) {
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
             logger.warn('Failed to increment view count', { postId: post.id });
         }
 
-        logger.info('GET blog post detail completed', { slug: params.slug, requestId, duration: Date.now() - startTime });
+        logger.info('GET blog post detail completed', { slug: (await params).slug, requestId, duration: Date.now() - startTime });
 
         return addHeaders(apiResponse.success(post, { meta: { requestId } }), requestId);
 
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: { slug: st
     }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { slug: string } }): Promise<NextResponse> {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ slug: string }> }): Promise<NextResponse> {
     const requestId = generateRequestId();
     const startTime = Date.now();
 
@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest, { params }: { params: { slug: st
         const { title, content, excerpt, category, tags, featuredImage, status, publishedAt } = validation.data;
 
         const post = await prisma.blogPost.update({
-            where: { slug: params.slug },
+            where: { slug: (await params).slug },
             data: {
                 title,
                 content,
@@ -128,7 +128,7 @@ export async function PUT(request: NextRequest, { params }: { params: { slug: st
             }
         });
 
-        logger.info('PUT blog post completed', { userId: session.user.id, slug: params.slug, requestId, duration: Date.now() - startTime });
+        logger.info('PUT blog post completed', { userId: session.user.id, slug: (await params).slug, requestId, duration: Date.now() - startTime });
 
         return addHeaders(apiResponse.success(post, { meta: { requestId } }), requestId, rateLimitResult);
 
@@ -138,7 +138,7 @@ export async function PUT(request: NextRequest, { params }: { params: { slug: st
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { slug: string } }): Promise<NextResponse> {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ slug: string }> }): Promise<NextResponse> {
     const requestId = generateRequestId();
     const startTime = Date.now();
 
@@ -156,10 +156,10 @@ export async function DELETE(request: NextRequest, { params }: { params: { slug:
         }
 
         await prisma.blogPost.delete({
-            where: { slug: params.slug }
+            where: { slug: (await params).slug }
         });
 
-        logger.info('DELETE blog post completed', { userId: session.user.id, slug: params.slug, requestId, duration: Date.now() - startTime });
+        logger.info('DELETE blog post completed', { userId: session.user.id, slug: (await params).slug, requestId, duration: Date.now() - startTime });
 
         return addHeaders(apiResponse.success({ success: true }, { meta: { requestId } }), requestId, rateLimitResult);
 

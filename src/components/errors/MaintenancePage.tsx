@@ -13,7 +13,7 @@ export default function MaintenancePage() {
   const checkStatus = async () => {
     try {
       setLoading(true);
-      const res = await apiClient.get('/api/system/status');
+      const res = (await apiClient.get('/api/system/status')) as { data: { maintenance: boolean; message?: string } };
       if (res.data && !res.data.maintenance) {
         // If maintenance is over, redirect to home
         window.location.href = '/';

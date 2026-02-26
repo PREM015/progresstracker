@@ -181,7 +181,6 @@ function addHeaders(
 
 function getPeriodDates(period: string): { start: Date; end: Date; days: number } {
   const end = new Date();
-  let start: Date;
   let days: number;
 
   switch (period) {
@@ -207,7 +206,7 @@ function getPeriodDates(period: string): { start: Date; end: Date; days: number 
       days = 30;
   }
 
-  const startDays = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
 
   return { start, end, days };
 }

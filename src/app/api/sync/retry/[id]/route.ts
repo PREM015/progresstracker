@@ -101,10 +101,10 @@ export async function HEAD(
   context: RouteContext
 ): Promise<NextResponse> {
   const requestId = generateRequestId();
-  
+
   try {
     const { id } = await context.params;
-    
+
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return new NextResponse(null, { status: 401 });
@@ -119,14 +119,14 @@ export async function HEAD(
       return new NextResponse(null, { status: 404 });
     }
 
-    const canRetry = syncLog.status === SyncStatus.FAILED && 
-                     syncLog.attemptNumber < syncLog.maxAttempts;
+    const canRetry = syncLog.status === SyncStatus.FAILED &&
+      syncLog.attemptNumber < syncLog.maxAttempts;
 
     const response = new NextResponse(null, { status: 200 });
     response.headers.set('X-Can-Retry', String(canRetry));
     response.headers.set('X-Attempt-Number', String(syncLog.attemptNumber));
     response.headers.set('X-Max-Attempts', String(syncLog.maxAttempts));
-    
+
     return addHeaders(response, requestId);
   } catch (error) {
     log.error('HEAD request failed', { requestId }, error);
@@ -150,7 +150,7 @@ export async function GET(
 
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 60, `sync:retry:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
@@ -181,8 +181,8 @@ export async function GET(
       );
     }
 
-    const canRetry = syncLog.status === SyncStatus.FAILED && 
-                     syncLog.attemptNumber < syncLog.maxAttempts;
+    const canRetry = syncLog.status === SyncStatus.FAILED &&
+      syncLog.attemptNumber < syncLog.maxAttempts;
 
     const duration = Date.now() - startTime;
 
@@ -239,7 +239,7 @@ export async function POST(
 
     const ip = getClientIp(request);
     const rateLimitResult = await checkLimit(apiRateLimiter, 20, `sync:retry:post:${ip}`);
-    
+
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
@@ -344,6 +344,23 @@ export async function POST(
       const result = await SyncService.syncPlatform(userId, syncLog.platformId, {
         triggeredBy: 'manual',
       });
+
+      if ('queued' in result) {
+        return addHeaders(
+          apiResponse.success(
+            {
+              retried: true,
+              queued: true,
+              newSyncLogId: null,
+              platform: { id: syncLog.platformId, name: syncLog.platform?.name },
+              message: 'Retry queued successfully'
+            },
+            { meta: { requestId, duration: Date.now() - startTime } }
+          ),
+          requestId,
+          rateLimitResult
+        );
+      }
 
       // Send SSE notification
       sseSyncService.sendSyncCompleted(userId, {

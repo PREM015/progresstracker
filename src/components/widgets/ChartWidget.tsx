@@ -9,8 +9,8 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export interface ChartDataPoint {
   label: string;
@@ -164,7 +164,7 @@ export const ChartWidget: React.FC<ChartWidgetProps> = ({
         <div className="flex items-end gap-2" style={{ height }}>
           {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="flex-1">
-              <Skeleton variant="rectangular" height={Math.random() * 80 + 20} />
+              <Skeleton className="w-full rounded" style={{ height: Math.random() * 80 + 20 }} />
             </div>
           ))}
         </div>

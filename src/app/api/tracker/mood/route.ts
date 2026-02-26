@@ -8,7 +8,7 @@ import { apiResponse, apiError } from "@/lib/apiResponse";
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return apiResponse({
+    return apiResponse.success({
       entries,
       moodStats,
       averages,
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.id) {
       return apiError("Unauthorized", 401);
     }
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return apiResponse(entry);
+    return apiResponse.success(entry);
   } catch (error) {
     console.error("Error updating mood data:", error);
     return apiError("Failed to update mood data", 500);

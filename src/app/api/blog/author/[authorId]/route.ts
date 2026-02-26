@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withErrorHandling } from "@/lib/apiHandler";
 
-export const GET = withErrorHandling(async (req: Request, { params }: { params: { authorId: string } }) => {
-    const { authorId } = params;
+export const GET = withErrorHandling(async (req: Request, { params }: { params: Promise<{ authorId: string }> }) => {
+    const { authorId } = await params;
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
