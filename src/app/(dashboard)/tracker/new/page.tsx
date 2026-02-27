@@ -3,7 +3,6 @@
 import { ProblemForm } from '@/components/tracker/ProblemForm';
 import { MetaTags } from '@/components/seo/MetaTags';
 import { Button } from '@/components/ui/button';
-import { PlatformCategory } from '@prisma/client';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -24,7 +23,7 @@ export default function NewProblemPage() {
                 timeSpent: data.timeSpent || 0,
                 notes: `[${data.title}] ${data.notes || ''}`,
                 date: new Date(),
-                category: PlatformCategory.DSA, // Corrected category
+                category: 'DSA', // Corrected category
             });
             router.push('/tracker');
         } catch (error) {
