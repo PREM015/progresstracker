@@ -1,0 +1,2909 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+enum Role {
+  user
+  admin
+}
+
+enum PlatformCategory {
+  DSA
+  JOB
+  GIT
+  LEARNING
+  HACKATHON
+  OPENSOURCE
+  COMPANY
+  DESIGN
+  DATA_SCIENCE
+  OTHER
+}
+
+enum AuthType {
+  NONE
+  OAUTH
+  API_KEY
+  SCRAPING
+  MANUAL
+  HYBRID
+}
+
+enum SyncStatus {
+  IDLE
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  PARTIAL
+  FAILED
+  CANCELLED
+  RATE_LIMITED
+}
+
+enum NotificationType {
+  SYSTEM
+  ACHIEVEMENT_UNLOCKED
+  GOAL_REMINDER
+  GOAL_COMPLETED
+  GOAL_FAILED
+  STREAK_AT_RISK
+  STREAK_BROKEN
+  STREAK_MILESTONE
+  SYNC_COMPLETE
+  SYNC_FAILED
+  WEEKLY_REPORT
+  MONTHLY_REPORT
+  NEW_FEATURE
+  SECURITY_ALERT
+  BILLING_ALERT
+  WELCOME
+  REFERRAL
+  CUSTOM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum GoalStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  FAILED
+  ARCHIVED
+  CANCELLED
+}
+
+enum GoalType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+  STREAK
+  MILESTONE
+}
+
+enum GoalMetric {
+  PROBLEMS_SOLVED
+  COMMITS
+  PULL_REQUESTS
+  PROJECTS_COMPLETED
+  COURSES_COMPLETED
+  CERTIFICATIONS
+  APPLICATIONS_SUBMITTED
+  CONTESTS_PARTICIPATED
+  TIME_SPENT
+  STREAK_DAYS
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELLED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+  UNPAID
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+  DISPUTED
+}
+
+enum ExportFormat {
+  CSV
+  JSON
+  PDF
+  EXCEL
+  XML
+}
+
+enum ExportStatus {
+  QUEUED
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  EMAIL_CHANGE
+  SETTINGS_CHANGE
+  EXPORT_DATA
+  IMPORT_DATA
+  SYNC_TRIGGER
+  SUBSCRIPTION_CHANGE
+  API_KEY_CREATE
+  API_KEY_DELETE
+  TWO_FACTOR_ENABLE
+  TWO_FACTOR_DISABLE
+  ACCOUNT_DELETE
+  ADMIN_ACTION
+  WEBHOOK_TRIGGER
+  SHARE_CREATE
+  SHARE_ACCESS
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ShareEntityType {
+  PROFILE
+  ACHIEVEMENT
+  GOAL
+  REPORT
+  STATS
+  STREAK
+  ACTIVITY
+}
+
+enum WebhookEventType {
+  ENTRY_CREATED
+  ENTRY_UPDATED
+  ENTRY_DELETED
+  GOAL_CREATED
+  GOAL_COMPLETED
+  GOAL_FAILED
+  ACHIEVEMENT_UNLOCKED
+  STREAK_MILESTONE
+  STREAK_BROKEN
+  SYNC_COMPLETED
+  SYNC_FAILED
+  SUBSCRIPTION_CHANGED
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  RETRYING
+}
+
+enum ReferralRewardType {
+  CREDITS
+  SUBSCRIPTION_DAYS
+  DISCOUNT_PERCENTAGE
+  DISCOUNT_FIXED
+  CASH
+}
+
+enum ReferralRewardStatus {
+  PENDING
+  EARNED
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum CouponDuration {
+  ONCE
+  REPEATING
+  FOREVER
+}
+
+enum CouponDiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum EmailLogStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+  COMPLAINED
+}
+
+// ============================================================================
+// USER & AUTHENTICATION MODELS
+// ============================================================================
+
+model User {
+  id String @id @default(cuid())
+
+  // Basic Info
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  username      String?   @unique
+  image         String?
+  password      String?
+
+  // Profile
+  bio      String? @db.Text
+  location String?
+  website  String?
+  company  String?
+  jobTitle String?
+
+  // Social Links
+  githubUsername  String?
+  linkedinUrl     String?
+  twitterHandle   String?
+  discordUsername String?
+
+  // Profile Visibility
+  isPublic         Boolean @default(false)
+  showEmail        Boolean @default(false)
+  showLocation     Boolean @default(true)
+  showActivity     Boolean @default(true)
+  showAchievements Boolean @default(true)
+  showGoals        Boolean @default(false)
+  showPlatforms    Boolean @default(true)
+  showStreak       Boolean @default(true)
+
+  // Account Status
+  isActive   Boolean   @default(true)
+  isVerified Boolean   @default(false)
+  isBanned   Boolean   @default(false)
+  banReason  String?
+  bannedAt   DateTime?
+  bannedBy   String?
+
+  // Admin & Roles
+  isAdmin     Boolean  @default(false)
+  role        Role     @default(user)
+  permissions String[] @default([])
+
+  // Streak Data (denormalized for performance)
+  currentStreak      Int       @default(0)
+  longestStreak      Int       @default(0)
+  lastActivityDate   DateTime?
+  streakStartDate    DateTime?
+  streakFreezeCount  Int       @default(0)
+  streakFreezeUsedAt DateTime?
+
+  // Stats (denormalized for performance)
+  totalProblems       Int  @default(0)
+  totalCommits        Int  @default(0)
+  totalProjects       Int  @default(0)
+  totalCertifications Int  @default(0)
+  totalAchievements   Int  @default(0)
+  totalPoints         Int  @default(0)
+  rank                Int?
+
+  // Preferences
+  preferredLanguage String @default("en")
+  timezone          String @default("UTC")
+
+  // Metadata
+  signupSource String?
+  referralCode String? @unique
+  referredBy   String?
+
+  // Onboarding
+  onboardingCompleted   Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  onboardingStep        Int       @default(0)
+
+  // Timestamps
+  lastLoginAt       DateTime?
+  lastActiveAt      DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@index([email, isActive], map: "idx_user_email_active_v1")
+  @@index([username, isActive], map: "idx_user_username_active_v1")
+  @@index([totalPoints(sort: Desc)], map: "idx_user_points_desc_v1")
+
+  // ===== RELATIONS =====
+
+  // Auth Relations
+  accounts            Account[]
+  sessions            Session[]
+  activeSessions      ActiveSession[]
+  refreshTokens       RefreshToken[]
+  passwordResets      PasswordReset[]
+  emailVerifications  EmailVerification[]
+  emailChangeRequests EmailChangeRequest[]
+  twoFactorAuth       TwoFactorAuth?
+  backupCodes         BackupCode[]
+  loginAttempts       LoginAttempt[]
+
+  // Platform Relations
+  platforms       UserPlatform[]
+  customPlatforms CustomPlatform[]
+
+  // Tracking Relations
+  trackerEntries TrackerEntry[]
+  dailyStats     DailyStats[]
+  streakHistory  StreakHistory[]
+
+  // Goals & Achievements
+  goals           Goal[]
+  goalReminders   GoalReminder[]
+  goalHistories   GoalHistory[]
+  achievements    UserAchievement[]
+
+  // Notifications
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+
+  // Billing
+  subscription       Subscription?
+  invoices           Invoice[]
+  paymentMethods     PaymentMethod[]
+  paymentEvents      PaymentEvent[]
+  couponRedemptions  CouponRedemption[]
+
+  // Export
+  exportJobs       ExportJob[]
+  scheduledExports ScheduledExport[]
+
+  // Sync
+  syncLogs SyncLog[]
+
+  // Settings
+  settings          UserSettings?
+  notificationPrefs NotificationPreferences?
+
+  // API & Security
+  apiKeys   ApiKey[]
+  auditLogs AuditLog[]
+  webhooks  Webhook[]
+
+  // Support
+  supportTickets SupportTicket[]
+  ticketReplies  TicketReply[]
+
+  // Reports
+  reports Report[]
+
+  // Referrals
+  referrals        User[]           @relation("Referrals")
+  referrer         User?            @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
+  referrerRewards  ReferralReward[] @relation("ReferrerRewards")
+  referredRewards  ReferralReward[] @relation("ReferredRewards")
+
+  // Feedback
+  feedback Feedback[]
+
+  // Blog & Bookmarks
+  bookmarks    Bookmark[]
+  blogComments BlogComment[]
+  blogLikes    BlogPostLike[]
+
+  // Share Links
+  shareLinks   ShareLink[]
+  shareViews   ShareViewLog[]
+  recentSearches RecentSearch[]
+
+  @@index([email])
+  @@index([username])
+  @@index([isPublic])
+  @@index([isActive])
+  @@index([currentStreak], map: "idx_user_current_streak_v1")
+  @@index([totalPoints], map: "idx_user_points_plain_v1")
+  @@index([rank])
+  @@index([createdAt])
+  @@index([lastActiveAt])
+  @@index([referralCode])
+  @@index([referredBy])
+  @@index([deletedAt], map: "idx_user_deleted_at_v1")
+  @@index([email, isActive], map: "idx_user_email_active_v2")
+}
+
+model Account {
+  id                String @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+
+  refresh_token String? @db.Text
+  access_token  String? @db.Text
+  expires_at    Int?
+  token_type    String?
+  scope         String?
+  id_token      String? @db.Text
+  session_state String?
+
+  // Additional OAuth data
+  providerProfileUrl String?
+  providerUsername   String?
+  providerEmail      String?
+  providerAvatar     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+model ActiveSession {
+  id     String @id @default(cuid())
+  userId String
+
+  token String @unique
+
+  // Device Information
+  userAgent      String? @db.Text
+  ipAddress      String?
+  device         String?
+  deviceModel    String?
+  browser        String?
+  browserVersion String?
+  os             String?
+  osVersion      String?
+
+  // Location (from IP)
+  country     String?
+  countryCode String?
+  city        String?
+  region      String?
+  latitude    Float?
+  longitude   Float?
+
+  // Status
+  isValid   Boolean @default(true)
+  isCurrent Boolean @default(false)
+
+  // Activity
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+
+  // Security
+  revokedAt     DateTime?
+  revokedReason String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([isValid])
+  @@index([expiresAt])
+  @@index([lastActiveAt])
+  @@index([userId, isValid, expiresAt], name: "active_sessions_count_idx")
+  @@index([lastActiveAt, isValid])
+  @@index([userId, lastActiveAt])
+}
+
+model RefreshToken {
+  id     String @id @default(cuid())
+  userId String
+
+  token  String @unique
+  family String
+
+  deviceId String?
+
+  isValid Boolean @default(true)
+
+  expiresAt DateTime
+
+  revokedAt       DateTime?
+  revokedReason   String?
+  replacedByToken String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([family])
+  @@index([isValid])
+  @@index([expiresAt])
+}
+
+model PasswordReset {
+  id     String @id @default(cuid())
+  userId String
+
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  ipAddress String?
+  userAgent String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model EmailVerification {
+  id     String @id @default(cuid())
+  userId String
+
+  email      String
+  token      String    @unique
+  expiresAt  DateTime
+  verifiedAt DateTime?
+
+  type String @default("verification")
+
+  verifiedIp String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model EmailChangeRequest {
+  id     String @id @default(cuid())
+  userId String
+
+  oldEmail String
+  newEmail String
+
+  oldEmailToken String @unique
+  newEmailToken String @unique
+
+  oldEmailVerified Boolean @default(false)
+  newEmailVerified Boolean @default(false)
+
+  expiresAt   DateTime
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([oldEmailToken])
+  @@index([newEmailToken])
+  @@index([expiresAt])
+}
+
+model TwoFactorAuth {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  secret String
+
+  isEnabled Boolean @default(false)
+  isPending Boolean @default(true)
+
+  verifiedAt DateTime?
+  lastUsedAt DateTime?
+
+  recoveryEmail String?
+  recoveryPhone String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BackupCode {
+  id     String @id @default(cuid())
+  userId String
+
+  code String
+
+  usedAt        DateTime?
+  usedIpAddress String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([code])
+}
+
+model LoginAttempt {
+  id     String  @id @default(cuid())
+  userId String?
+
+  email String
+
+  success       Boolean
+  failureReason String?
+
+  ipAddress String?
+  userAgent String? @db.Text
+  country   String?
+
+  twoFactorRequired Boolean @default(false)
+  twoFactorPassed   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@index([success])
+}
+
+// ============================================================================
+// PLATFORM MODELS
+// ============================================================================
+
+model Platform {
+  id String @id @default(cuid())
+
+  slug        String  @unique
+  name        String
+  displayName String?
+  description String? @db.Text
+
+  category    PlatformCategory
+  subcategory String?
+  tags        String[]         @default([])
+
+  authType     AuthType @default(NONE)
+  oauthConfig  Json?
+  apiKeyConfig Json?
+
+  icon            String?
+  logo            String?
+  color           String?
+  backgroundColor String?
+
+  website           String?
+  apiEndpoint       String?
+  profileUrlPattern String?
+
+  supportsAutoSync    Boolean @default(false)
+  supportsWebhook     Boolean @default(false)
+  supportsOAuth       Boolean @default(false)
+  supportsApiKey      Boolean @default(false)
+  requiresCredentials Boolean @default(false)
+
+  syncPriority Int @default(0)
+  syncInterval Int @default(1440)
+
+  rateLimit       Int?
+  rateLimitWindow Int?
+
+  dataPoints    Json?
+  scraperConfig Json?
+
+  isActive           Boolean @default(true)
+  isVerified         Boolean @default(true)
+  isBeta             Boolean @default(false)
+  maintenanceMode    Boolean @default(false)
+  maintenanceMessage String?
+
+  lastHealthCheck DateTime?
+  healthStatus    String?
+  healthMessage   String?
+
+  totalUsers      Int   @default(0)
+  successRate     Float @default(100)
+  avgSyncDuration Int?
+
+  setupGuideUrl  String?
+  helpArticleUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          UserPlatform[]
+  trackerEntries TrackerEntry[]
+  syncLogs       SyncLog[]
+  platformStats  PlatformDailyStats[]
+  goals          Goal[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([slug])
+  @@index([supportsAutoSync])
+}
+
+model CustomPlatform {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String
+  displayName String?
+  description String? @db.Text
+
+  category PlatformCategory
+
+  icon    String?
+  color   String?
+  website String?
+
+  trackingFields Json?
+
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackerEntries TrackerEntry[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([category])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model UserPlatform {
+  id         String @id @default(cuid())
+  userId     String
+  platformId String
+
+  username       String?
+  profileUrl     String?
+  externalUserId String?
+
+  credentials    Json?
+  accessToken    String?   @db.Text
+  refreshToken   String?   @db.Text
+  tokenExpiresAt DateTime?
+
+  apiKey String? @db.Text
+
+  isActive   Boolean   @default(true)
+  isVerified Boolean   @default(false)
+  verifiedAt DateTime?
+
+  connectionStatus String  @default("pending")
+  connectionError  String?
+
+  syncStatus          SyncStatus @default(IDLE)
+  lastSyncedAt        DateTime?
+  lastSyncError       String?
+  lastSyncDuration    Int?
+  syncAttempts        Int        @default(0)
+  consecutiveFailures Int        @default(0)
+  nextSyncAt          DateTime?
+
+  cachedStats    Json?
+  statsUpdatedAt DateTime?
+
+  platformData Json?
+
+  autoSync     Boolean @default(true)
+  syncPriority Int     @default(0)
+
+  notifyOnSync  Boolean @default(false)
+  notifyOnError Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform Platform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  syncLogs SyncLog[]
+
+  @@unique([userId, platformId])
+  @@index([userId])
+  @@index([platformId])
+  @@index([syncStatus])
+  @@index([nextSyncAt])
+  @@index([isActive])
+  @@index([lastSyncedAt])
+  @@index([userId, platformId, isActive])
+  @@index([userId, syncStatus])
+  @@index([userId, isActive])
+  @@index([userId, updatedAt])
+}
+
+// ============================================================================
+// TRACKING MODELS
+// ============================================================================
+
+model TrackerEntry {
+  id               String  @id @default(cuid())
+  userId           String
+  platformId       String?
+  customPlatformId String?
+
+  date DateTime @db.Date
+
+  category    PlatformCategory?
+  subcategory String?
+
+  problemsSolved    Int @default(0)
+  problemsAttempted Int @default(0)
+
+  easyProblems   Int @default(0)
+  mediumProblems Int @default(0)
+  hardProblems   Int @default(0)
+
+  commits            Int @default(0)
+  pullRequests       Int @default(0)
+  pullRequestsMerged Int @default(0)
+  issuesOpened       Int @default(0)
+  issuesClosed       Int @default(0)
+  codeReviews        Int @default(0)
+  linesOfCode        Int @default(0)
+
+  projectsStarted   Int @default(0)
+  projectsCompleted Int @default(0)
+
+  coursesStarted       Int @default(0)
+  coursesCompleted     Int @default(0)
+  lessonsCompleted     Int @default(0)
+  modulesCompleted     Int @default(0)
+  certificationsEarned Int @default(0)
+  quizzesTaken         Int @default(0)
+  quizzesPassed        Int @default(0)
+
+  articlesRead       Int @default(0)
+  tutorialsCompleted Int @default(0)
+  documentationPages Int @default(0)
+
+  applicationsSubmitted Int @default(0)
+  applicationsViewed    Int @default(0)
+  interviewsScheduled   Int @default(0)
+  interviewsCompleted   Int @default(0)
+  offersReceived        Int @default(0)
+
+  contestsParticipated Int @default(0)
+  contestsCompleted    Int @default(0)
+  hackathonsJoined     Int @default(0)
+  hackathonsCompleted  Int @default(0)
+
+  mentoringSessions Int @default(0)
+  helpGiven         Int @default(0)
+  helpReceived      Int @default(0)
+  postsWritten      Int @default(0)
+  commentsWritten   Int @default(0)
+
+  timeSpent Int @default(0)
+  focusTime Int @default(0)
+
+  averageDifficulty Float?
+  accuracyRate      Float?
+  completionRate    Float?
+
+  rating       Int?
+  ratingChange Int?
+  rank         Int?
+  rankChange   Int?
+  points       Int?
+  pointsEarned Int?
+  streak       Int?
+  xpEarned     Int?
+
+  mood               String?
+  energyLevel        Int?
+  productivityRating Int?
+  notes              String? @db.Text
+
+  tags      String[] @default([])
+  topics    String[] @default([])
+  languages String[] @default([])
+
+  source          String  @default("manual")
+  syncLogId       String?
+  isAutoGenerated Boolean @default(false)
+
+  isVerified Boolean   @default(false)
+  verifiedAt DateTime?
+
+  customFields Json?
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform       Platform?       @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  customPlatform CustomPlatform? @relation(fields: [customPlatformId], references: [id], onDelete: SetNull)
+  syncLog        SyncLog?        @relation(fields: [syncLogId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, platformId, date])
+  @@index([userId])
+  @@index([platformId])
+  @@index([userId, createdAt], map: "tracker_user_created_idx")
+  @@index([userId, date(sort: Desc)], map: "tracker_user_date_desc_idx") // Optimized for recent entries
+  @@index([platformId, date])
+  @@index([userId, category])
+  @@index([userId, category, date])
+  @@index([userId, platformId, date])
+  @@index([source])
+  @@index([date])
+  @@index([customPlatformId])
+  @@index([syncLogId])
+  @@index([deletedAt])
+  @@index([userId, date, problemsSolved], map: "tracker_user_date_problems_idx")
+  @@index([userId, date], map: "tracker_user_date_idx_v2")
+  @@index([userId, date, platformId])
+}
+
+model DailyStats {
+  id     String   @id @default(cuid())
+  userId String
+  date   DateTime @db.Date
+
+  totalProblems     Int @default(0)
+  totalCommits      Int @default(0)
+  totalPullRequests Int @default(0)
+  totalTimeSpent    Int @default(0)
+  totalPoints       Int @default(0)
+
+  platformBreakdown Json?
+  categoryBreakdown Json?
+
+  hadActivity Boolean @default(false)
+  streakDay   Int?
+
+  isComplete Boolean   @default(false)
+  computedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@index([hadActivity])
+  @@index([userId, hadActivity, date])
+}
+
+model StreakHistory {
+  id     String @id @default(cuid())
+  userId String
+
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  length Int
+
+  isActive  Boolean @default(false)
+  isCurrent Boolean @default(false)
+
+  endReason String?
+
+  totalProblems Int @default(0)
+  totalCommits  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isCurrent])
+  @@index([length])
+  @@index([startDate])
+  @@index([userId, length(sort: Desc)]) // Optimized for finding longest streaks
+}
+
+model PlatformDailyStats {
+  id         String   @id @default(cuid())
+  platformId String
+  date       DateTime @db.Date
+
+  totalSyncs      Int @default(0)
+  successfulSyncs Int @default(0)
+  failedSyncs     Int @default(0)
+
+  avgSyncDuration Int?
+
+  activeUsers    Int @default(0)
+  newConnections Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@unique([platformId, date])
+  @@index([platformId])
+  @@index([date])
+}
+
+// ============================================================================
+// GOALS & ACHIEVEMENTS
+// ============================================================================
+
+model Goal {
+  id         String  @id @default(cuid())
+  userId     String
+  platformId String?
+
+  title       String
+  description String? @db.Text
+
+  category     PlatformCategory
+  goalType     GoalType         @default(CUSTOM)
+  metric       GoalMetric       @default(PROBLEMS_SOLVED)
+  customMetric String?
+
+  target             Int
+  progress           Int     @default(0)
+  progressPercentage Float   @default(0)
+  unit               String?
+
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+  deadline  DateTime?
+
+  status      GoalStatus @default(ACTIVE)
+  completedAt DateTime?
+  failedAt    DateTime?
+
+  milestones Json?
+
+  currentStreakDays  Int  @default(0)
+  requiredStreakDays Int?
+
+  isPublic  Boolean @default(false)
+  shareCode String? @unique
+
+  reminderEnabled Boolean @default(false)
+
+  daysActive       Int   @default(0)
+  avgDailyProgress Float @default(0)
+  bestDay          Json?
+
+  color String?
+  icon  String?
+
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform  Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  reminders GoalReminder[]
+  history   GoalHistory[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([category])
+  @@index([deadline])
+  @@index([shareCode])
+  @@index([status])
+  @@index([platformId])
+  @@index([isPublic, status])
+  @@index([deletedAt])
+  // Performance indexes for sorting/filtering
+  @@index([userId, createdAt])
+  @@index([userId, status, createdAt])
+  @@index([userId, status, deadline])
+  @@index([userId, deadline])
+}
+
+model GoalReminder {
+  id     String @id @default(cuid())
+  goalId String
+  userId String
+
+  frequency String
+  time      String
+  timezone  String @default("UTC")
+
+  days Int[] @default([])
+
+  channel NotificationChannel @default(IN_APP)
+
+  isActive Boolean @default(true)
+
+  lastSentAt DateTime?
+  nextSendAt DateTime?
+  sendCount  Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([userId])
+  @@index([nextSendAt])
+  @@index([isActive])
+}
+
+model GoalTemplate {
+  id String @id @default(cuid())
+
+  title       String
+  description String? @db.Text
+
+  category PlatformCategory
+  goalType GoalType
+  metric   GoalMetric
+
+  target   Int
+  duration Int
+
+  icon  String?
+  color String?
+
+  difficulty    String   @default("medium")
+  estimatedTime String?
+  tips          String[] @default([])
+
+  timesUsed         Int    @default(0)
+  successRate       Float  @default(0)
+  avgCompletionTime Float?
+
+  isActive   Boolean @default(true)
+  isFeatured Boolean @default(false)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([difficulty])
+}
+
+model GoalHistory {
+  id     String @id @default(cuid())
+  goalId String
+  userId String
+
+  // Snapshot of goal at change time
+  data       Json
+  changeType String // 'created', 'updated', 'status_changed', 'progress_updated', 'completed', 'failed'
+  changedBy  String?
+
+  // Previous values for specific field changes
+  previousStatus   String?
+  previousProgress Int?
+
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@index([userId])
+  @@index([changeType])
+  @@index([createdAt])
+}
+
+model Achievement {
+  id String @id @default(cuid())
+
+  slug        String @unique
+  title       String @unique
+  description String @db.Text
+
+  category PlatformCategory
+  tier     String           @default("bronze")
+
+  icon       String?
+  color      String?
+  badgeImage String?
+
+  points   Int    @default(0)
+  xpReward Int    @default(0)
+  rarity   String @default("common")
+
+  requirement     Json?
+  requirementText String?
+
+  thresholds Json?
+
+  isHidden Boolean @default(false)
+  isSecret Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  totalUnlocked    Int   @default(0)
+  unlockPercentage Float @default(0)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users UserAchievement[]
+
+  @@index([category])
+  @@index([tier])
+  @@index([isActive])
+  @@index([isHidden])
+  @@index([rarity])
+}
+
+model UserAchievement {
+  id            String @id @default(cuid())
+  userId        String
+  achievementId String
+
+  progress           Int   @default(0)
+  progressPercentage Float @default(0)
+  currentThreshold   Int   @default(0)
+
+  unlockedAt DateTime @default(now())
+
+  notified   Boolean   @default(false)
+  notifiedAt DateTime?
+
+  isPinned Boolean @default(false)
+  isHidden Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@index([achievementId])
+  @@index([unlockedAt])
+  @@index([isPinned])
+  @@index([notified])
+}
+
+// ============================================================================
+// NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  id     String @id @default(cuid())
+  userId String
+
+  type     NotificationType
+  channel  NotificationChannel  @default(IN_APP)
+  priority NotificationPriority @default(NORMAL)
+
+  title        String
+  message      String  @db.Text
+  shortMessage String?
+
+  actionUrl   String?
+  actionLabel String?
+
+  entityType String?
+  entityId   String?
+
+  imageUrl String?
+  metadata Json?
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  isArchived Boolean   @default(false)
+  archivedAt DateTime?
+
+  isDismissed Boolean   @default(false)
+  dismissedAt DateTime?
+
+  isDelivered   Boolean   @default(false)
+  deliveredAt   DateTime?
+  deliveryError String?
+
+  scheduledFor DateTime?
+  sentAt       DateTime?
+
+  expiresAt DateTime?
+
+  updatedAt DateTime @updatedAt @default(now())
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([userId, type])
+  @@index([userId, createdAt])
+  @@index([userId, isRead, createdAt])
+  @@index([isRead])
+  @@index([scheduledFor])
+  @@index([expiresAt])
+}
+
+model PushSubscription {
+  id     String @id @default(cuid())
+  userId String
+
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  deviceId   String?
+  deviceName String?
+  userAgent  String? @db.Text
+  browser    String?
+  os         String?
+
+  isActive Boolean @default(true)
+
+  lastUsedAt   DateTime?
+  successCount Int       @default(0)
+  failureCount Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([endpoint])
+}
+
+// ============================================================================
+// SYNC & LOGS
+// ============================================================================
+
+model SyncLog {
+  id             String  @id @default(cuid())
+  userId         String
+  platformId     String?
+  userPlatformId String?
+
+  status SyncStatus
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  duration    Int?
+
+  itemsFound   Int @default(0)
+  itemsCreated Int @default(0)
+  itemsUpdated Int @default(0)
+  itemsSkipped Int @default(0)
+  itemsFailed  Int @default(0)
+
+  dataFromDate DateTime?
+  dataToDate   DateTime?
+
+  hasError     Boolean @default(false)
+  errorCode    String?
+  errorMessage String? @db.Text
+  errorStack   String? @db.Text
+
+  attemptNumber Int       @default(1)
+  maxAttempts   Int       @default(3)
+  nextRetryAt   DateTime?
+
+  triggeredBy   String  @default("manual")
+  triggerSource String?
+
+  requestId String?
+
+  logEntries Json?
+
+  createdAt DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform       Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  userPlatform   UserPlatform?  @relation(fields: [userPlatformId], references: [id], onDelete: SetNull)
+  trackerEntries TrackerEntry[]
+
+  @@index([userId])
+  @@index([platformId])
+  @@index([userPlatformId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([triggeredBy])
+  @@index([hasError])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([userPlatformId, status])
+  @@index([userId, status])
+}
+
+// ============================================================================
+// BILLING & SUBSCRIPTION
+// ============================================================================
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId        String?
+  stripeProductId      String?
+
+  tier            SubscriptionTier   @default(FREE)
+  status          SubscriptionStatus @default(ACTIVE)
+  billingInterval BillingInterval    @default(MONTHLY)
+
+  priceAmount Int?
+  currency    String @default("usd")
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  trialStart DateTime?
+  trialEnd   DateTime?
+  trialDays  Int?
+
+  cancelAtPeriodEnd Boolean   @default(false)
+  cancelAt          DateTime?
+  canceledAt        DateTime?
+  cancelReason      String?
+  cancelFeedback    String?   @db.Text
+
+  pausedAt  DateTime?
+  resumesAt DateTime?
+
+  platformLimit        Int @default(5)
+  syncFrequencyMinutes Int @default(1440)
+  exportLimitMonthly   Int @default(3)
+  apiRequestsDaily     Int @default(100)
+
+  currentPlatformCount Int       @default(0)
+  currentExportCount   Int       @default(0)
+  usageResetAt         DateTime?
+
+  features String[] @default([])
+
+  lastPaymentAt     DateTime?
+  lastPaymentAmount Int?
+  nextPaymentAt     DateTime?
+
+  // Applied coupon
+  appliedCouponId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices      Invoice[]
+  paymentEvents PaymentEvent[]
+  appliedCoupon Coupon?        @relation(fields: [appliedCouponId], references: [id], onDelete: SetNull)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+  @@index([tier])
+  @@index([appliedCouponId])
+}
+
+model PaymentMethod {
+  id     String @id @default(cuid())
+  userId String
+
+  stripePaymentMethodId String @unique
+
+  type     String
+  brand    String?
+  last4    String?
+  expMonth Int?
+  expYear  Int?
+
+  isDefault Boolean @default(false)
+  isValid   Boolean @default(true)
+
+  billingName    String?
+  billingEmail   String?
+  billingPhone   String?
+  billingAddress Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isDefault])
+}
+
+model Invoice {
+  id             String  @id @default(cuid())
+  userId         String
+  subscriptionId String?
+
+  stripeInvoiceId       String? @unique
+  stripePaymentIntentId String?
+
+  invoiceNumber String?
+
+  subtotal   Int
+  tax        Int    @default(0)
+  total      Int
+  amountPaid Int    @default(0)
+  amountDue  Int
+  currency   String @default("usd")
+
+  status String
+
+  invoiceDate DateTime
+  dueDate     DateTime?
+  paidAt      DateTime?
+  voidedAt    DateTime?
+
+  lineItems Json?
+
+  invoicePdfUrl    String?
+  hostedInvoiceUrl String?
+
+  billingReason String?
+
+  // Discount applied
+  discountAmount Int?
+  couponId       String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([stripeInvoiceId])
+  @@index([stripePaymentIntentId])
+  @@index([invoiceDate])
+}
+
+model PaymentEvent {
+  id             String  @id @default(cuid())
+  userId         String?
+  subscriptionId String?
+
+  stripeEventId   String @unique
+  stripeEventType String
+
+  eventType String
+  status    PaymentStatus
+
+  amount   Int?
+  currency String?
+
+  failureCode    String?
+  failureMessage String?
+
+  stripePaymentIntentId String?
+  stripeInvoiceId       String?
+  stripeChargeId        String?
+
+  rawData Json?
+
+  processedAt     DateTime?
+  processingError String?
+
+  createdAt DateTime @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([stripeEventId])
+  @@index([stripePaymentIntentId])
+  @@index([stripeInvoiceId])
+  @@index([stripeChargeId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Coupon {
+  id String @id @default(cuid())
+
+  code        String @unique
+  name        String
+  description String?
+
+  // Discount configuration
+  discountType  CouponDiscountType
+  discountValue Int // Percentage (0-100) or amount in cents
+  currency      String             @default("usd")
+
+  // Applicability
+  applicableTiers SubscriptionTier[] @default([])
+  applicablePlans String[]           @default([]) // Stripe price IDs
+
+  // Duration
+  duration       CouponDuration @default(ONCE)
+  durationMonths Int?
+
+  // Limits
+  maxRedemptions        Int? // Total max redemptions
+  maxRedemptionsPerUser Int  @default(1)
+  currentRedemptions    Int  @default(0)
+
+  // Validity period
+  validFrom  DateTime @default(now())
+  validUntil DateTime?
+
+  // Minimum requirements
+  minimumAmount Int? // Minimum order amount in cents
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Stripe integration
+  stripeCouponId String? @unique
+
+  // Tracking
+  createdBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  redemptions   CouponRedemption[]
+  subscriptions Subscription[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([validFrom, validUntil])
+  @@index([stripeCouponId])
+}
+
+model CouponRedemption {
+  id       String @id @default(cuid())
+  couponId String
+  userId   String
+
+  // Order/subscription info
+  subscriptionId String?
+  invoiceId      String?
+
+  // Discount applied
+  discountAmount Int
+  currency       String
+
+  redeemedAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId, subscriptionId])
+  @@index([couponId])
+  @@index([userId])
+  @@index([redeemedAt])
+}
+
+// ============================================================================
+// REFERRAL SYSTEM
+// ============================================================================
+
+model ReferralReward {
+  id String @id @default(cuid())
+
+  // Referrer (who shared the code)
+  referrerId String
+
+  // Referred user
+  referredId String
+
+  // Reward details
+  type   String               @default("signup") // 'signup', 'subscription', 'milestone'
+  status ReferralRewardStatus @default(PENDING)
+
+  // Reward value
+  rewardType     ReferralRewardType
+  rewardValue    Int // Amount of credits, days, percentage, or cents
+  rewardCurrency String?
+
+  // Conditions
+  qualifyingAction String? // What action triggered the reward
+  qualifiedAt      DateTime?
+
+  // Payout (for cash rewards)
+  paidAt        DateTime?
+  paymentMethod String?
+  paymentRef    String?
+
+  // Expiry
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  referrer User @relation("ReferrerRewards", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("ReferredRewards", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@unique([referrerId, referredId, type])
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// EXPORT
+// ============================================================================
+
+model ExportJob {
+  id     String @id @default(cuid())
+  userId String
+
+  name String?
+
+  format       ExportFormat
+  dateFrom     DateTime?
+  dateTo       DateTime?
+  platforms    String[]           @default([])
+  categories   PlatformCategory[] @default([])
+  includeNotes Boolean            @default(true)
+  includeStats Boolean            @default(true)
+
+  status   ExportStatus @default(QUEUED)
+  progress Int          @default(0)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  fileUrl      String?
+  fileName     String?
+  fileSize     Int?
+  fileMimeType String?
+
+  hasError     Boolean @default(false)
+  errorMessage String?
+
+  expiresAt DateTime?
+
+  totalRecords    Int @default(0)
+  exportedRecords Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model ScheduledExport {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String
+  description String?
+
+  frequency  String
+  dayOfWeek  Int?
+  dayOfMonth Int?
+  time       String
+  timezone   String @default("UTC")
+
+  format            ExportFormat
+  platforms         String[]           @default([])
+  categories        PlatformCategory[] @default([])
+  relativeDateRange String             @default("last_7_days")
+
+  deliveryMethod String  @default("email")
+  emailTo        String?
+  emailSubject   String?
+
+  isActive Boolean @default(true)
+
+  lastRunAt     DateTime?
+  lastRunStatus String?
+  lastRunJobId  String?
+  nextRunAt     DateTime?
+  runCount      Int       @default(0)
+  failureCount  Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@index([nextRunAt])
+}
+
+// ============================================================================
+// SETTINGS & PREFERENCES
+// ============================================================================
+
+model UserSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  theme         String  @default("system")
+  accentColor   String  @default("blue")
+  compactMode   Boolean @default(false)
+  fontSize      String  @default("medium")
+  reducedMotion Boolean @default(false)
+  highContrast  Boolean @default(false)
+
+  language     String @default("en")
+  timezone     String @default("UTC")
+  dateFormat   String @default("MM/DD/YYYY")
+  timeFormat   String @default("12h")
+  weekStartsOn Int    @default(0)
+  numberFormat String @default("en-US")
+
+  autoSync         Boolean @default(true)
+  syncFrequency    String  @default("daily")
+  syncOnLogin      Boolean @default(true)
+  syncInBackground Boolean @default(true)
+
+  publicProfile     Boolean @default(false)
+  showInLeaderboard Boolean @default(true)
+  allowAnalytics    Boolean @default(true)
+  allowCookies      Boolean @default(true)
+
+  dashboardLayout   Json?
+  defaultDateRange  String  @default("7d")
+  showWelcomeBanner Boolean @default(true)
+
+  keyboardShortcuts    Boolean @default(true)
+  soundEffects         Boolean @default(false)
+  desktopNotifications Boolean @default(true)
+
+  dataRetentionDays Int @default(365)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NotificationPreferences {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  enabled Boolean @default(true)
+
+  emailEnabled Boolean @default(true)
+  pushEnabled  Boolean @default(false)
+  inAppEnabled Boolean @default(true)
+  smsEnabled   Boolean @default(false)
+
+  emailAddress  String?
+  emailVerified Boolean @default(false)
+
+  achievementAlerts Boolean @default(true)
+  goalReminders     Boolean @default(true)
+  goalCompleted     Boolean @default(true)
+  streakAlerts      Boolean @default(true)
+  syncComplete      Boolean @default(false)
+  syncFailed        Boolean @default(true)
+  weeklyReport      Boolean @default(true)
+  monthlyReport     Boolean @default(true)
+  securityAlerts    Boolean @default(true)
+  billingAlerts     Boolean @default(true)
+  newFeatures       Boolean @default(true)
+  tips              Boolean @default(true)
+  communityUpdates  Boolean @default(false)
+  marketingEmails   Boolean @default(false)
+
+  quietHoursEnabled  Boolean @default(false)
+  quietHoursStart    String  @default("22:00")
+  quietHoursEnd      String  @default("08:00")
+  quietHoursTimezone String  @default("UTC")
+
+  digestEnabled   Boolean @default(false)
+  digestFrequency String  @default("daily")
+  digestTime      String  @default("09:00")
+  digestDay       Int     @default(1)
+
+  dndEnabled Boolean   @default(false)
+  dndUntil   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// API & SECURITY
+// ============================================================================
+
+model ApiKey {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String
+  description String?
+
+  keyHash   String @unique
+  keyPrefix String
+
+  scopes String[] @default(["read"])
+
+  rateLimit       Int @default(100)
+  rateLimitWindow Int @default(60)
+
+  allowedIps     String[] @default([])
+  allowedOrigins String[] @default([])
+
+  isActive Boolean @default(true)
+
+  expiresAt DateTime?
+
+  lastUsedAt      DateTime?
+  lastUsedIp      String?
+  usageCount      Int       @default(0)
+  usageCountDaily Int       @default(0)
+  usageResetAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id     String  @id @default(cuid())
+  userId String?
+
+  action   AuditAction
+  category String?
+
+  entityType String?
+  entityId   String?
+
+  description String?
+  oldValue    Json?
+  newValue    Json?
+  changes     Json?
+  metadata    Json?
+
+  ipAddress String?
+  userAgent String? @db.Text
+
+  country String?
+  city    String?
+
+  requestId     String?
+  requestPath   String?
+  requestMethod String?
+
+  status       String  @default("success")
+  errorMessage String?
+
+  performedBy String?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
+  @@index([category])
+  @@index([userId, action, createdAt])
+}
+
+// ============================================================================
+// WEBHOOKS
+// ============================================================================
+
+model Webhook {
+  id     String @id @default(cuid())
+  userId String
+
+  name        String
+  description String?
+
+  // Webhook configuration
+  url        String
+  secret     String
+  httpMethod String @default("POST")
+  headers    Json?
+
+  // Events to trigger
+  events WebhookEventType[] @default([])
+
+  // Filtering
+  filters Json? // e.g., { platformId: 'xxx', category: 'DSA' }
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Retry configuration
+  maxRetries   Int @default(3)
+  retryDelayMs Int @default(1000)
+  timeoutMs    Int @default(30000)
+
+  // Stats
+  successCount    Int       @default(0)
+  failureCount    Int       @default(0)
+  lastTriggeredAt DateTime?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+
+  // Error tracking
+  consecutiveFailures Int       @default(0)
+  lastError           String?
+  disabledAt          DateTime?
+  disabledReason      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id        String @id @default(cuid())
+  webhookId String
+
+  // Event info
+  event   WebhookEventType
+  payload Json
+
+  // Request details
+  requestUrl     String
+  requestHeaders Json?
+  requestBody    String? @db.Text
+
+  // Response
+  status         WebhookDeliveryStatus @default(PENDING)
+  responseCode   Int?
+  responseBody   String?               @db.Text
+  responseTimeMs Int?
+
+  // Error handling
+  errorMessage  String?
+  attemptNumber Int       @default(1)
+  nextRetryAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([nextRetryAt])
+}
+
+// ============================================================================
+// SHARE & EMBED
+// ============================================================================
+
+model ShareLink {
+  id     String @id @default(cuid())
+  userId String
+
+  code String @unique
+
+  // What's being shared
+  entityType ShareEntityType
+  entityId   String?
+
+  // Share configuration
+  title       String?
+  description String?
+
+  // Visibility settings
+  isPublic      Boolean  @default(true)
+  requiresAuth  Boolean  @default(false)
+  allowedEmails String[] @default([])
+
+  // Access control
+  password  String?
+  expiresAt DateTime?
+  maxViews  Int?
+
+  // Analytics
+  viewCount       Int       @default(0)
+  uniqueViewCount Int       @default(0)
+  lastViewedAt    DateTime?
+
+  // Embed settings
+  allowEmbed   Boolean @default(true)
+  embedTheme   String  @default("auto") // 'light', 'dark', 'auto'
+  embedSize    String  @default("medium") // 'small', 'medium', 'large'
+  showBranding Boolean @default(true)
+  customStyles Json?
+
+  // Status
+  isActive     Boolean   @default(true)
+  revokedAt    DateTime?
+  revokeReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  viewLogs ShareViewLog[]
+
+  @@index([userId])
+  @@index([code])
+  @@index([entityType, entityId])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model ShareViewLog {
+  id          String @id @default(cuid())
+  shareLinkId String
+
+  // Viewer info
+  viewerUserId String?
+  ipHash       String?
+  userAgent    String? @db.Text
+
+  // Location
+  country String?
+  city    String?
+
+  // Referrer
+  referrer String?
+
+  // Embed info
+  isEmbed   Boolean @default(false)
+  embedHost String?
+
+  createdAt DateTime @default(now())
+
+  shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  viewer    User?     @relation(fields: [viewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([shareLinkId])
+  @@index([viewerUserId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// EMAIL TEMPLATES & LOGS
+// ============================================================================
+
+model EmailTemplate {
+  id String @id @default(cuid())
+
+  slug        String @unique
+  name        String
+  description String?
+
+  // Template content
+  subject     String
+  htmlContent String @db.Text
+  textContent String? @db.Text
+
+  // Template variables
+  variables   String[] @default([]) // e.g., ['userName', 'resetLink']
+  defaultData Json?
+
+  // Categorization
+  category String // 'auth', 'notification', 'marketing', 'transactional', 'report'
+
+  // Status
+  isActive Boolean @default(true)
+  isSystem Boolean @default(false) // System templates can't be deleted
+
+  // Version control
+  version         Int    @default(1)
+  previousVersion String?
+
+  // Usage stats
+  sentCount  Int       @default(0)
+  lastSentAt DateTime?
+
+  // Preview
+  previewData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  emailLogs EmailLog[]
+
+  @@index([slug])
+  @@index([category])
+  @@index([isActive])
+}
+
+model EmailLog {
+  id String @id @default(cuid())
+
+  templateId String?
+  userId     String?
+
+  // Email details
+  to           String
+  cc           String[] @default([])
+  bcc          String[] @default([])
+  subject      String
+  templateSlug String?
+
+  // Status
+  status EmailLogStatus @default(QUEUED)
+
+  // Provider info
+  provider   String? // 'resend', 'sendgrid', etc.
+  providerId String? // External message ID
+
+  // Tracking
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  bouncedAt   DateTime?
+  failedAt    DateTime?
+
+  // Engagement
+  openCount  Int @default(0)
+  clickCount Int @default(0)
+
+  // Error handling
+  errorCode    String?
+  errorMessage String?
+  retryCount   Int       @default(0)
+  nextRetryAt  DateTime?
+
+  // Metadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([templateId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([to])
+  @@index([providerId])
+}
+
+// ============================================================================
+// REPORTS
+// ============================================================================
+
+model Report {
+  id     String @id @default(cuid())
+  userId String
+
+  type String
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  title   String
+  summary String? @db.Text
+  data    Json
+
+  highlights      Json?
+  insights        Json?
+  recommendations Json?
+
+  status String @default("generated")
+
+  sentAt DateTime?
+  sentTo String?
+
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([periodStart])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SUPPORT & FEEDBACK
+// ============================================================================
+
+model SupportTicket {
+  id     String @id @default(cuid())
+  userId String
+
+  ticketNumber String @unique
+  subject      String
+  description  String @db.Text
+
+  category String
+  priority TicketPriority @default(MEDIUM)
+
+  status TicketStatus @default(OPEN)
+
+  assignedTo String?
+
+  resolution String?   @db.Text
+  resolvedAt DateTime?
+
+  metadata    Json?
+  attachments String[] @default([])
+
+  satisfactionRating Int?
+  feedbackComment    String?
+
+  // SLA tracking
+  firstResponseAt  DateTime?
+  firstResponseSla Int? // minutes
+  resolutionSla    Int? // minutes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies TicketReply[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([ticketNumber])
+  @@index([createdAt])
+  @@index([assignedTo])
+}
+
+model TicketReply {
+  id       String  @id @default(cuid())
+  ticketId String
+  userId   String?
+
+  message String @db.Text
+
+  isStaffReply Boolean @default(false)
+  isAutoReply  Boolean @default(false)
+
+  attachments String[] @default([])
+
+  isInternal Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Feedback {
+  id     String  @id @default(cuid())
+  userId String?
+
+  type String
+
+  title   String?
+  message String  @db.Text
+
+  rating Int?
+
+  page       String?
+  userAgent  String?
+  screenshot String? // URL to screenshot
+
+  status String @default("new")
+
+  response    String?   @db.Text
+  respondedAt DateTime?
+  respondedBy String?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// KNOWLEDGE BASE
+// ============================================================================
+
+model KnowledgeBaseCategory {
+  id String @id @default(cuid())
+
+  slug        String  @unique
+  name        String
+  description String?
+  icon        String?
+
+  parentId String?
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   KnowledgeBaseCategory?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
+  children KnowledgeBaseCategory[] @relation("SubCategories")
+  articles KnowledgeBaseArticle[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([slug])
+}
+
+model KnowledgeBaseArticle {
+  id String @id @default(cuid())
+
+  slug    String @unique
+  title   String
+  excerpt String? @db.Text
+  content String  @db.Text
+
+  categoryId String
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+
+  // Status
+  status      String    @default("draft") // 'draft', 'published', 'archived'
+  publishedAt DateTime?
+
+  // Engagement
+  viewCount  Int @default(0)
+  helpfulYes Int @default(0)
+  helpfulNo  Int @default(0)
+
+  // Related
+  relatedArticleIds String[] @default([])
+  tags              String[] @default([])
+
+  // Featured
+  isFeatured Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  // Author
+  authorId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category KnowledgeBaseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([slug])
+  @@index([isFeatured])
+  @@index([publishedAt])
+}
+
+// ============================================================================
+// WAITLIST & NEWSLETTER
+// ============================================================================
+
+model Waitlist {
+  id String @id @default(cuid())
+
+  email String  @unique
+  name  String?
+
+  source       String?
+  referralCode String?
+  referredById String?
+
+  status String @default("waiting")
+
+  invitedAt  DateTime?
+  inviteCode String?   @unique
+  joinedAt   DateTime?
+
+  position Int?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@index([inviteCode])
+  @@index([position])
+}
+
+model NewsletterSubscriber {
+  id String @id @default(cuid())
+
+  email String  @unique
+  name  String?
+
+  topics    String[] @default([])
+  frequency String   @default("weekly")
+
+  isActive          Boolean   @default(true)
+  confirmedAt       DateTime?
+  unsubscribedAt    DateTime?
+  unsubscribeReason String?
+
+  unsubscribeToken String @unique @default(cuid())
+  confirmToken     String? @unique
+
+  emailsSent    Int @default(0)
+  emailsOpened  Int @default(0)
+  emailsClicked Int @default(0)
+
+  source   String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([isActive])
+  @@index([unsubscribeToken])
+  @@index([confirmToken])
+}
+
+// ============================================================================
+// SYSTEM CONFIGURATION
+// ============================================================================
+
+model FeatureFlag {
+  id String @id @default(cuid())
+
+  key         String  @unique
+  name        String
+  description String?
+
+  isEnabled Boolean @default(false)
+
+  enabledForAll     Boolean            @default(false)
+  enabledUserIds    String[]           @default([])
+  enabledTiers      SubscriptionTier[] @default([])
+  enabledPercentage Int                @default(0)
+
+  // Targeting rules
+  rules Json?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([isEnabled])
+}
+
+model SystemSettings {
+  id String @id @default(cuid())
+
+  key   String @unique
+  value Json
+
+  description String?
+  category    String?
+
+  isPublic  Boolean @default(false)
+  isSecret  Boolean @default(false)
+  encrypted Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([key])
+  @@index([category])
+  @@index([isPublic])
+}
+
+model MaintenanceWindow {
+  id String @id @default(cuid())
+
+  title   String
+  message String @db.Text
+
+  startTime DateTime
+  endTime   DateTime
+
+  isActive         Boolean  @default(false)
+  affectedServices String[] @default([])
+  severity         String   @default("partial") // 'full', 'partial', 'degraded'
+
+  allowedIps    String[] @default([])
+  bypassSecrets String[] @default([])
+
+  createdBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([startTime])
+  @@index([endTime])
+}
+
+// ============================================================================
+// BLOG
+// ============================================================================
+
+model BlogPost {
+  id String @id @default(cuid())
+
+  slug    String  @unique
+  title   String
+  excerpt String? @db.Text
+  content String  @db.Text
+
+  authorId   String?
+  authorName String?
+
+  category String?
+  tags     String[] @default([])
+
+  featuredImage   String?
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String[] @default([])
+
+  viewCount    Int @default(0)
+  likeCount    Int @default(0)
+  commentCount Int @default(0)
+  shareCount   Int @default(0)
+
+  status      String    @default("draft")
+  publishedAt DateTime?
+
+  isFeatured       Boolean @default(false)
+  allowComments    Boolean @default(true)
+  showTableOfContents Boolean @default(true)
+
+  // Reading time
+  readingTimeMinutes Int?
+  wordCount          Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments BlogComment[]
+  likes    BlogPostLike[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([publishedAt])
+  @@index([category])
+  @@index([isFeatured])
+}
+
+model BlogComment {
+  id String @id @default(cuid())
+
+  postId   String
+  authorId String
+  parentId String?
+
+  content String @db.Text
+
+  likes Int @default(0)
+
+  isApproved Boolean @default(true)
+  isDeleted  Boolean @default(false)
+  isPinned   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post    BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  BlogComment?  @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies BlogComment[] @relation("Replies")
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([isApproved])
+}
+
+model BlogPostLike {
+  id String @id @default(cuid())
+
+  postId String
+  userId String?
+  ipHash String?
+
+  createdAt DateTime @default(now())
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([postId, userId])
+  @@unique([postId, ipHash])
+  @@index([postId])
+}
+
+// ============================================================================
+// CHANGELOG
+// ============================================================================
+
+model ChangelogEntry {
+  id String @id @default(cuid())
+
+  version     String
+  title       String
+  description String @db.Text
+
+  type String // 'feature', 'improvement', 'bugfix', 'security', 'deprecation'
+
+  changes Json
+
+  // Links
+  pullRequestUrl String?
+  issueUrl       String?
+  docsUrl        String?
+
+  // Media
+  imageUrl String?
+  videoUrl String?
+
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  isBreaking  Boolean   @default(false)
+  isFeatured  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([version])
+  @@index([isPublished])
+  @@index([publishedAt])
+  @@index([type])
+}
+
+// ============================================================================
+// BOOKMARK
+// ============================================================================
+
+model Bookmark {
+  id String @id @default(cuid())
+
+  userId     String
+  entityType String
+  entityId   String
+
+  title String?
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId])
+  @@index([entityType])
+}
+
+model RecentSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  query     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
