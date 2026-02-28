@@ -10,14 +10,13 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
-    // 1. Get author info
     const author = await prisma.user.findUnique({
         where: { id: authorId },
         select: {
             id: true,
             name: true,
             image: true,
-            bio: true // Assuming bio exists on User
+            bio: true
         }
     });
 
@@ -25,7 +24,6 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
         return NextResponse.json({ error: "Author not found" }, { status: 404 });
     }
 
-    // 2. Get posts
     const [posts, total] = await Promise.all([
         prisma.blogPost.findMany({
             where: {
@@ -46,7 +44,8 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
                 tags: true,
                 publishedAt: true,
                 viewCount: true,
-                content: true // needed for reading time
+                readingTimeMinutes: true,
+                wordCount: true
             }
         }),
         prisma.blogPost.count({
@@ -62,13 +61,9 @@ export const GET = withErrorHandling(async (req: Request, { params }: { params: 
         return NextResponse.json({ error: "Author has no published posts" }, { status: 404 });
     }
 
-    // 3. Process posts (reading time)
     const processedPosts = posts.map(post => {
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post; // Exclude content from list response
-        return { ...rest, readingTime };
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
+        return { ...post, readingTime };
     });
 
     return NextResponse.json({

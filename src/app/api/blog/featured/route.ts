@@ -21,7 +21,21 @@ export const GET = withErrorHandling(async (req: Request) => {
             tags: { has: 'featured' }
         },
         take: limit,
-        orderBy: { publishedAt: 'desc' }
+        orderBy: { publishedAt: 'desc' },
+        select: {
+            id: true,
+            slug: true,
+            title: true,
+            excerpt: true,
+            featuredImage: true,
+            category: true,
+            tags: true,
+            authorName: true,
+            publishedAt: true,
+            viewCount: true,
+            readingTimeMinutes: true,
+            wordCount: true
+        }
     });
 
     // 2. Fallback to popular if not enough
@@ -34,19 +48,32 @@ export const GET = withErrorHandling(async (req: Request) => {
                 id: { notIn: featuredIds }
             },
             take: limit - featured.length,
-            orderBy: { viewCount: 'desc' }
+            orderBy: { viewCount: 'desc' },
+            select: {
+                id: true,
+                slug: true,
+                title: true,
+                excerpt: true,
+                featuredImage: true,
+                category: true,
+                tags: true,
+                authorName: true,
+                publishedAt: true,
+                viewCount: true,
+                readingTimeMinutes: true,
+                wordCount: true
+            }
         });
 
         featured.push(...popular);
     }
 
     const processedPosts = featured.map(post => {
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post;
+        // Use readingTimeMinutes if available, fallback to wordCount calculation if not
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
+
         return {
-            ...rest,
+            ...post,
             authorName: post.authorName,
             readingTime,
             isFeatured: post.tags.includes('featured')

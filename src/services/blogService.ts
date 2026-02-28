@@ -116,6 +116,24 @@ class BlogService {
           orderBy: { publishedAt: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            excerpt: true,
+            featuredImage: true,
+            category: true,
+            tags: true,
+            authorName: true,
+            publishedAt: true,
+            viewCount: true,
+            readingTimeMinutes: true,
+            wordCount: true,
+            status: true,
+            authorId: true,
+            createdAt: true,
+            updatedAt: true
+          }
         }),
         prisma.blogPost.count({ where }),
       ]);
@@ -224,14 +242,13 @@ class BlogService {
    */
   async getCategories() {
     try {
-      const posts = await prisma.blogPost.findMany({
+      const groups = await prisma.blogPost.groupBy({
+        by: ['category'],
         where: { status: 'published', category: { not: null } },
-        select: { category: true },
-        distinct: ['category'],
       });
 
-      const categories = posts
-        .map((p) => p.category)
+      const categories = groups
+        .map((g) => g.category)
         .filter((c): c is string => !!c);
 
       log.info('Blog categories fetched', { count: categories.length });
@@ -248,13 +265,14 @@ class BlogService {
    */
   async getTags() {
     try {
-      const posts = await prisma.blogPost.findMany({
-        where: { status: 'published' },
-        select: { tags: true },
-      });
+      // Use raw query to efficiently get unique tags from the array column at the database level
+      const result = await prisma.$queryRaw<{ tag: string }[]>`
+        SELECT DISTINCT unnest(tags) as tag 
+        FROM "BlogPost" 
+        WHERE status = 'published'
+      `;
 
-      const allTags = posts.flatMap((p) => p.tags);
-      const uniqueTags = [...new Set(allTags)];
+      const uniqueTags = result.map(r => r.tag).filter(Boolean);
 
       log.info('Blog tags fetched', { count: uniqueTags.length });
 

@@ -15,7 +15,22 @@ export const GET = withErrorHandling(async (req: Request) => {
             id: excludeIds.length ? { notIn: excludeIds } : undefined
         },
         orderBy: { publishedAt: 'desc' },
-        take: limit + 1 // Get one more to check hasMore
+        take: limit + 1, // Get one more to check hasMore
+        select: {
+            id: true,
+            slug: true,
+            title: true,
+            excerpt: true,
+            featuredImage: true,
+            category: true,
+            tags: true,
+            authorName: true,
+            publishedAt: true,
+            viewCount: true,
+            likeCount: true,
+            readingTimeMinutes: true,
+            wordCount: true
+        }
     });
 
     const hasMore = posts.length > limit;
@@ -23,10 +38,7 @@ export const GET = withErrorHandling(async (req: Request) => {
 
     const now = new Date();
     const processedPosts = resultPosts.map(post => {
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post;
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
 
         // Check if new (within 7 days)
         const published = post.publishedAt ? new Date(post.publishedAt) : new Date();
@@ -35,7 +47,7 @@ export const GET = withErrorHandling(async (req: Request) => {
         const isNew = diffDays <= 7;
 
         return {
-            ...rest,
+            ...post,
             authorName: post.authorName,
             authorAvatar: null, // BlogPost doesn't have authorAvatar field
             readingTime,

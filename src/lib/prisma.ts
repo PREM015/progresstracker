@@ -18,7 +18,9 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   // Connection pool configuration
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DATABASE_URL?.includes('sslmode=require')
+      ? process.env.DATABASE_URL.replace('sslmode=require', 'sslmode=verify-full')
+      : process.env.DATABASE_URL,
     max: 20, // Maximum number of connections
     idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
     connectionTimeoutMillis: 10000, // Fail after 10 seconds if can't connect

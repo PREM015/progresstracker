@@ -13,7 +13,8 @@ export async function GET() {
             publishedAt: true,
             updatedAt: true
         },
-        orderBy: { publishedAt: 'desc' }
+        orderBy: { publishedAt: 'desc' },
+        take: 1000
     });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';

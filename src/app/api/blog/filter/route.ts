@@ -47,7 +47,6 @@ export const GET = withErrorHandling(async (req: Request) => {
     if (search) {
         where.OR = [
             { title: { contains: search, mode: 'insensitive' } },
-            { content: { contains: search, mode: 'insensitive' } },
             { excerpt: { contains: search, mode: 'insensitive' } }
         ];
     }
@@ -58,19 +57,28 @@ export const GET = withErrorHandling(async (req: Request) => {
             orderBy: { [sortBy]: order as 'asc' | 'desc' },
             skip,
             take: limit,
-
+            select: {
+                id: true,
+                slug: true,
+                title: true,
+                excerpt: true,
+                featuredImage: true,
+                category: true,
+                tags: true,
+                authorName: true,
+                publishedAt: true,
+                viewCount: true,
+                readingTimeMinutes: true,
+                wordCount: true
+            }
         }),
         prisma.blogPost.count({ where })
     ]);
 
     const processedPosts = posts.map(post => {
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post;
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
         return {
-            ...rest,
-
+            ...post,
             readingTime
         };
     });

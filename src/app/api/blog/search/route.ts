@@ -48,7 +48,21 @@ export const GET = withErrorHandling(async (req: Request) => {
             where,
             skip,
             take: limit,
-            orderBy: { publishedAt: 'desc' } // or sort by relevance if possible (hard with simple Prisma query)
+            orderBy: { publishedAt: 'desc' },
+            select: {
+                id: true,
+                slug: true,
+                title: true,
+                excerpt: true,
+                featuredImage: true,
+                category: true,
+                tags: true,
+                authorName: true,
+                publishedAt: true,
+                viewCount: true,
+                readingTimeMinutes: true,
+                wordCount: true
+            }
         }),
         prisma.blogPost.count({ where })
     ]);
@@ -70,14 +84,10 @@ export const GET = withErrorHandling(async (req: Request) => {
             highlightedTitle = post.title.replace(regex, '<mark>$1</mark>');
         }
 
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post;
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
 
         return {
-            ...rest,
+            ...post,
             highlightedExcerpt,
             highlightedTitle,
             readingTime,

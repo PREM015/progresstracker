@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Helper to escape XML special chars
 function escapeXml(unsafe: string): string {
     return unsafe.replace(/[<>&'"]/g, (c) => {
         switch (c) {
@@ -20,7 +19,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "20");
     const category = searchParams.get("category");
-    // format param ignored, defaulting to RSS for now as per simple impl
 
     const posts = await prisma.blogPost.findMany({
         where: {
@@ -29,7 +27,15 @@ export async function GET(req: Request) {
             category: category || undefined
         },
         orderBy: { publishedAt: 'desc' },
-        take: limit
+        take: limit,
+        select: {
+            id: true,
+            slug: true,
+            title: true,
+            excerpt: true,
+            category: true,
+            publishedAt: true
+        }
     });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
@@ -72,7 +78,6 @@ export async function GET(req: Request) {
     });
 }
 
-// HEAD: Quick feed availability check
 export async function HEAD(req: Request) {
     const postCount = await prisma.blogPost.count({
         where: {
@@ -100,7 +105,6 @@ export async function HEAD(req: Request) {
     });
 }
 
-// OPTIONS: CORS preflight
 export async function OPTIONS(req: Request) {
     return new NextResponse(null, {
         status: 200,
@@ -112,4 +116,3 @@ export async function OPTIONS(req: Request) {
         },
     });
 }
-

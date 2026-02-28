@@ -43,16 +43,28 @@ export const GET = withErrorHandling(async (req: Request) => {
             }
         },
         orderBy: { viewCount: 'desc' },
-        take: limit
+        take: limit,
+        select: {
+            id: true,
+            slug: true,
+            title: true,
+            excerpt: true,
+            featuredImage: true,
+            category: true,
+            tags: true,
+            authorName: true,
+            publishedAt: true,
+            viewCount: true,
+            readingTimeMinutes: true,
+            wordCount: true
+        }
     });
 
     const processedPosts = posts.map((post, index) => {
-        const wordCount = post.content ? post.content.split(/\s+/).length : 0;
-        const readingTime = Math.ceil(wordCount / 200);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { content, ...rest } = post;
+        const readingTime = post.readingTimeMinutes || (post.wordCount ? Math.ceil(post.wordCount / 200) : 1);
+
         return {
-            ...rest,
+            ...post,
             authorName: post.authorName,
             readingTime,
             rank: index + 1
