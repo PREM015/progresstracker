@@ -58,3 +58,6 @@ phase.md
 src/full.txt
 future.md
 review.md
+
+.vercel
+.env*.local
