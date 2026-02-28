@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:test": "dotenv -e .env.local -- tsx src/scripts/seed-test-data.ts",
-    "prepare": "husky",
+ "prepare": "husky || true",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci",
