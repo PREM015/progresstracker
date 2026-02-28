@@ -13,8 +13,10 @@ import { format } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ActivityService } from '@/services/api/activity.service';
-import { PlatformCategory } from '@prisma/client';
 import { platforms } from '@/config/platforms';
+
+type PlatformCategory = 'LEARNING' | 'DSA' | 'GIT' | 'OPENSOURCE' | 'OTHER';
+const PlatformCategories: PlatformCategory[] = ['LEARNING', 'DSA', 'GIT', 'OPENSOURCE', 'OTHER'];
 
 interface ActivityFormData {
     date: Date;
@@ -43,7 +45,7 @@ export const ActivityLogForm: React.FC<ActivityLogFormProps> = ({
 }) => {
     const [formData, setFormData] = useState<ActivityFormData>({
         date: initialData?.date ? new Date(initialData.date) : new Date(),
-        category: initialData?.category || PlatformCategory.LEARNING,
+        category: initialData?.category || 'LEARNING',
         platformId: initialData?.platform?.id || 'other',
         description: initialData?.notes || '',
         timeSpent: initialData?.timeSpent || 30,
@@ -90,7 +92,7 @@ export const ActivityLogForm: React.FC<ActivityLogFormProps> = ({
             if (!initialData) {
                 setFormData({
                     date: new Date(),
-                    category: PlatformCategory.LEARNING,
+                    category: 'LEARNING',
                     platformId: 'other',
                     description: '',
                     timeSpent: 30,
@@ -181,7 +183,7 @@ export const ActivityLogForm: React.FC<ActivityLogFormProps> = ({
                                 <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
-                                {Object.values(PlatformCategory).map((cat) => (
+                                {PlatformCategories.map((cat) => (
                                     <SelectItem key={cat} value={cat} className="capitalize">
                                         {cat.toLowerCase().replace('_', ' ')}
                                     </SelectItem>

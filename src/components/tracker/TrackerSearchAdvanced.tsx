@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { PlatformCategory } from '@prisma/client';
 import { TrackerFilter, EntrySource } from '@/types/tracker';
 
 interface TrackerSearchAdvancedProps {
