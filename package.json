@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed:test": "dotenv -e .env.local -- tsx src/scripts/seed-test-data.ts",
-"prepare": "if [ -z \"$CI\" ]; then husky install; fi",
+"prepare": "husky install || exit 0",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci",
