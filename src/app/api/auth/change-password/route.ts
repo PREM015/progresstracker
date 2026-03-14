@@ -11,7 +11,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -332,21 +332,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Send notification email
     if (user.email) {
-      sendEmail({
-        to: user.email,
-        subject: 'Your Password Has Been Changed',
-        html: `
-          <h1>Password Changed</h1>
-          <p>Hi ${user.name || 'there'},</p>
-          <p>Your password has been successfully changed.</p>
-          ${logoutOtherSessions ? '<p>All other sessions have been logged out for security.</p>' : ''}
-          <p>If you did not make this change, please reset your password immediately.</p>
-          <p>IP Address: ${clientIP}</p>
-          <p>Time: ${new Date().toISOString()}</p>
-        `,
-      }).catch((err) => {
-        logger.error('Failed to send password change notification', { userId, requestId }, err);
+      const emailResult = await emailService.sendPasswordChangedEmail(user.email, {
+        userName: user.name || 'there',
+        changedAt: new Date().toISOString(),
+        ipAddress: clientIP,
+        device: userAgent || 'Unknown',
       });
+      if (!emailResult.success) {
+        console.error(`[CHANGE-PASSWORD] ❌ Failed to send notification to ${user.email}:`, emailResult.error);
+        logger.error('Failed to send password change notification', { userId, requestId, error: emailResult.error });
+      } else {
+        console.log(`[CHANGE-PASSWORD] ✅ Password changed notification sent to ${user.email}`);
+      }
     }
 
     logger.info('Password changed', { userId, logoutOtherSessions, ip: clientIP, requestId });

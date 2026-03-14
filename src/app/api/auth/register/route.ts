@@ -10,7 +10,7 @@ import { nanoid } from 'nanoid';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -420,22 +420,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return newUser;
     });
 
-    // Send verification email (non-blocking)
+    // Send verification email — awaited so errors are caught and logged
     const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${verificationToken}`;
-    sendEmail({
-      to: email,
-      subject: 'Verify your email address',
-      html: `
-        <h1>Welcome to CodeSync!</h1>
-        <p>Hi ${user.name},</p>
-        <p>Please verify your email address by clicking the link below:</p>
-        <p><a href="${verificationUrl}">Verify Email</a></p>
-        <p>This link will expire in ${VERIFICATION_TOKEN_EXPIRY_HOURS} hours.</p>
-        <p>If you didn't create this account, you can safely ignore this email.</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send verification email', { userId: user.id, requestId }, err);
+    const emailResult = await emailService.sendVerificationEmail(email, {
+      userName: user.name || email.split('@')[0],
+      verificationUrl,
+      verificationCode: undefined, // token-based flow, no code needed
+      expiresIn: `${VERIFICATION_TOKEN_EXPIRY_HOURS} hours`,
     });
+
+    if (!emailResult.success) {
+      // Log error clearly — email failure should not block registration, but must be visible
+      console.error(
+        `[REGISTER] ❌ Failed to send verification email to ${email}:`,
+        emailResult.error
+      );
+      logger.error('Failed to send verification email after registration', {
+        userId: user.id,
+        requestId,
+        error: emailResult.error,
+      });
+    } else {
+      console.log(`[REGISTER] ✅ Verification email sent to ${email} (messageId: ${emailResult.messageId})`);
+    }
 
     logger.info('User registered successfully', {
       userId: user.id,

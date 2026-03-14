@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { ApiKeyForm, ApiKeyList } from "@/components/api-keys";
+import { GlassCard } from "@/components/ui/GlassCard";
+import { Key, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 export default function ApiKeysPage() {
   const [apiKeys, setApiKeys] = useState<any[]>([]);
@@ -9,57 +12,66 @@ export default function ApiKeysPage() {
   const [showNewKey, setShowNewKey] = useState(false);
 
   useEffect(() => {
-    fetch('/api/user/api-keys')
-      .then(r => r.json())
-      .then(data => setApiKeys(data.keys || []))
-      .catch(err => console.error(err))
+    fetch("/api/user/api-keys")
+      .then((r) => r.json())
+      .then((data) => setApiKeys(data.data?.keys || data.keys || []))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, []);
 
   const createApiKey = async (name: string) => {
-    const res = await fetch('/api/user/api-keys', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
-    });
-    const data = await res.json();
-    setApiKeys([...apiKeys, data.key]);
-    setShowNewKey(false);
+    try {
+      const res = await fetch("/api/user/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Failed to create key");
+      setApiKeys((prev) => [...prev, data.data?.key || data.key]);
+      setShowNewKey(false);
+      toast.success("API key created");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to create API key");
+    }
   };
 
   const deleteApiKey = async (id: string) => {
-    await fetch(`/api/user/api-keys/${id}`, { method: 'DELETE' });
-    setApiKeys(apiKeys.filter(k => k.id !== id));
+    try {
+      const res = await fetch(`/api/user/api-keys/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete key");
+      setApiKeys((prev) => prev.filter((k) => k.id !== id));
+      toast.success("API key deleted");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete API key");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold">API Keys</h1>
-          {!showNewKey && (
-            <button
-              onClick={() => setShowNewKey(true)}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Create New Key
-            </button>
-          )}
+    <GlassCard className="p-8 flex flex-col gap-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Key className="w-5 h-5 text-indigo-500" />
+          <h3 className="text-2xl font-black text-zinc-900 dark:text-zinc-50 tracking-tighter">
+            API Keys
+          </h3>
         </div>
-
-        {showNewKey && (
-          <ApiKeyForm
-            onCreate={createApiKey}
-            onCancel={() => setShowNewKey(false)}
-          />
+        {!showNewKey && (
+          <button
+            onClick={() => setShowNewKey(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Key
+          </button>
         )}
-
-        <ApiKeyList
-          keys={apiKeys}
-          onDelete={deleteApiKey}
-          isLoading={loading}
-        />
       </div>
-    </div>
+
+      {showNewKey && (
+        <ApiKeyForm onCreate={createApiKey} onCancel={() => setShowNewKey(false)} />
+      )}
+
+      <ApiKeyList keys={apiKeys} onDelete={deleteApiKey} isLoading={loading} />
+    </GlassCard>
   );
 }

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
 import { decrypt } from '@/lib/crypto';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       select: {
         id: true,
         email: true,
+        name: true,
         password: true,
         twoFactorAuth: {
           select: {
@@ -268,23 +270,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Send notification email
     if (user.email) {
-      const { sendEmail } = await import('@/lib/email');
-      sendEmail({
-        to: user.email,
-        subject: 'Two-Factor Authentication Disabled',
-        html: `
-          <h1>2FA Disabled</h1>
-          <p>Two-factor authentication has been disabled on your account.</p>
-          <p>If you did not make this change, please secure your account immediately.</p>
-          <p>Details:</p>
-          <ul>
-            <li>IP Address: ${clientIP}</li>
-            <li>Time: ${new Date().toISOString()}</li>
-          </ul>
-        `,
-      }).catch((err) => {
-        logger.error('Failed to send 2FA disabled notification', { userId, requestId }, err);
+      const emailResult = await emailService.sendTwoFactorDisabled(user.email, {
+        userName: user.name || 'there',
+        ipAddress: clientIP,
+        disabledAt: new Date().toISOString(),
       });
+      if (!emailResult.success) {
+        console.error(`[2FA-DISABLE] ❌ Failed to send 2FA disabled email:`, emailResult.error);
+        logger.error('Failed to send 2FA disabled notification', { userId, requestId, error: emailResult.error });
+      } else {
+        console.log(`[2FA-DISABLE] ✅ 2FA disabled notification sent to ${user.email}`);
+      }
     }
 
     logger.info('2FA disabled', { userId, ip: clientIP, requestId });

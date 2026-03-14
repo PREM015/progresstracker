@@ -2,7 +2,7 @@
 import { render } from '@react-email/render';
 import * as React from 'react';
 import nodemailer from 'nodemailer';
-import { brevoConfig, emailConfig } from './email-config';
+import { brevoConfig, emailConfig, validateEmailEnv } from './email-config';
 import { logger } from '@/lib/logger';
 
 // Import all email templates
@@ -72,16 +72,49 @@ export class EmailService {
     this.defaultFrom = emailConfig.from.default;
     this.replyTo = emailConfig.replyTo;
 
-    // Initialize nodemailer transporter for Brevo
+    // Validate env vars at startup — logs clear errors instead of silent failures
+    const envCheck = validateEmailEnv();
+    if (!envCheck.valid) {
+      console.error(
+        '[EMAIL SERVICE] ❌ Missing required email environment variables:',
+        envCheck.missing.join(', '),
+        '\nEmails WILL NOT be sent until these are set.'
+      );
+    }
+    if (envCheck.warnings.length > 0) {
+      console.warn(
+        '[EMAIL SERVICE] ⚠️  Email config warnings:\n  -',
+        envCheck.warnings.join('\n  - ')
+      );
+    }
+
+    // Initialize nodemailer transporter for Brevo SMTP
     this.transporter = nodemailer.createTransport({
       host: brevoConfig.smtp.host,
       port: brevoConfig.smtp.port,
-      secure: brevoConfig.smtp.secure,
+      secure: brevoConfig.smtp.secure, // false = STARTTLS on port 587
       auth: {
         user: brevoConfig.smtp.auth.user,
         pass: brevoConfig.smtp.auth.pass,
       },
+      // Enforce TLS upgrade on port 587
+      requireTLS: true,
     });
+
+    // Verify SMTP connection on startup (async — does not block constructor)
+    if (envCheck.valid) {
+      this.transporter.verify().then(() => {
+        console.log('[EMAIL SERVICE] ✅ Brevo SMTP connection verified — ready to send emails.');
+      }).catch((err: Error) => {
+        console.error(
+          '[EMAIL SERVICE] ❌ Brevo SMTP connection FAILED:',
+          err.message,
+          '\nCheck BREVO_EMAIL and BREVO_API_KEY in your .env file.',
+          '\nMake sure BREVO_API_KEY is the SMTP password from Brevo Dashboard → SMTP & API → SMTP tab.'
+        );
+        logger.error('[EmailService] SMTP verification failed', { error: err.message });
+      });
+    }
   }
 
   // ===========================================================================
@@ -117,6 +150,11 @@ export class EmailService {
       return { success: true, messageId: info.messageId, provider: 'brevo' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      // Log with both console.error (always visible) and logger (structured)
+      console.error(
+        `[EMAIL SERVICE] ❌ Failed to send email to ${JSON.stringify(options.to)} | Subject: "${options.subject}"`,
+        '\nError:', message
+      );
       logger.error('Email service error', { error: message, to: options.to, subject: options.subject });
       return { success: false, error: message, provider: 'brevo' };
     }

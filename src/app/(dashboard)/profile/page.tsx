@@ -1,20 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ShieldCheck, ShieldAlert, Award, Target, ExternalLink } from "lucide-react";
 import type { UserProfileResponse } from "@/services/userService";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Controlled form state
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
 
   useEffect(() => {
     async function fetchProfile() {
@@ -22,7 +30,12 @@ export default function ProfilePage() {
         const response = await fetch("/api/user/profile");
         if (response.ok) {
           const data = await response.json();
-          setProfile(data.data);
+          const p = data.data;
+          setProfile(p);
+          setName(p?.name || session?.user?.name || "");
+          setUsername(p?.username || "");
+          setBio(p?.bio || "");
+          setLocation(p?.location || "");
         }
       } catch (error) {
         console.error("Failed to fetch profile:", error);
@@ -34,7 +47,34 @@ export default function ProfilePage() {
     if (status === "authenticated") {
       fetchProfile();
     }
-  }, [status]);
+  }, [status, session]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, username, bio }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const errorMsg = data?.error || data?.message || "Failed to update profile";
+        throw new Error(errorMsg);
+      }
+
+      // Update local profile state to reflect saved values
+      setProfile((prev) => prev ? { ...prev, name, username, bio, location } : prev);
+      toast.success("Profile updated successfully");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update profile");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (status === "loading" || loading) {
     return (
@@ -44,7 +84,7 @@ export default function ProfilePage() {
     );
   }
 
-  const displayName = profile?.name || session?.user?.name || "User";
+  const displayName = name || profile?.name || session?.user?.name || "User";
   const email = profile?.email || session?.user?.email;
 
   return (
@@ -57,16 +97,22 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left: Avatar Card */}
         <div className="lg:col-span-1">
           <div className="glass-card p-8 flex flex-col items-center text-center space-y-6">
             <div className="relative group p-1 rounded-full border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-indigo-500 transition-colors duration-500">
               <Avatar className="h-32 w-32 border-4 border-white dark:border-zinc-900 shadow-2xl">
                 <AvatarImage src={profile?.image || session?.user?.image || ""} />
-                <AvatarFallback className="text-3xl font-bold bg-zinc-100 dark:bg-zinc-800">{displayName[0]}</AvatarFallback>
+                <AvatarFallback className="text-3xl font-bold bg-zinc-100 dark:bg-zinc-800">
+                  {displayName[0]}
+                </AvatarFallback>
               </Avatar>
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-full flex items-center justify-center transition-opacity cursor-pointer">
+              <button
+                onClick={() => router.push("/settings")}
+                className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-full flex items-center justify-center transition-opacity cursor-pointer"
+              >
                 <span className="text-white text-xs font-bold uppercase tracking-widest">Change</span>
-              </div>
+              </button>
             </div>
             <div>
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{displayName}</h2>
@@ -92,7 +138,9 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Right: Form Cards */}
         <div className="lg:col-span-2 space-y-8">
+          {/* Personal Details */}
           <div className="glass-card overflow-hidden">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
               <h3 className="font-bold text-lg tracking-tight">Personal Details</h3>
@@ -102,27 +150,61 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-xs font-black uppercase tracking-widest text-zinc-400">Display Name</Label>
-                  <Input id="name" defaultValue={displayName} className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium" />
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-zinc-400">Email Address</Label>
-                  <Input id="email" type="email" defaultValue={email || ""} disabled className="bg-zinc-50 dark:bg-zinc-950/50 border-zinc-100 dark:border-zinc-800/50 rounded-xl font-medium cursor-not-allowed opacity-70" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email || ""}
+                    disabled
+                    className="bg-zinc-50 dark:bg-zinc-950/50 border-zinc-100 dark:border-zinc-800/50 rounded-xl font-medium cursor-not-allowed opacity-70"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="username" className="text-xs font-black uppercase tracking-widest text-zinc-400">Username</Label>
-                  <Input id="username" defaultValue={profile?.username || ""} className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium" />
+                  <Input
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="your_username"
+                    className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="text-xs font-black uppercase tracking-widest text-zinc-400">Location</Label>
-                  <Input id="location" defaultValue={profile?.location || ""} placeholder="City, Country" className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium" />
+                  <Label htmlFor="bio" className="text-xs font-black uppercase tracking-widest text-zinc-400">Bio</Label>
+                  <Input
+                    id="bio"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Short bio about yourself"
+                    className="bg-transparent border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-indigo-500/20 rounded-xl font-medium"
+                  />
                 </div>
               </div>
               <div className="pt-4 flex justify-end">
-                <Button className="bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl px-8 hover:scale-[1.02] transition-transform font-bold">Save Changes</Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="bg-zinc-900 dark:bg-zinc-50 text-white dark:text-zinc-900 rounded-xl px-8 hover:scale-[1.02] transition-transform font-bold disabled:opacity-60"
+                >
+                  {isSaving ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
               </div>
             </div>
           </div>
 
+          {/* Quick Security */}
           <div className="glass-card overflow-hidden">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
               <div>
@@ -153,10 +235,13 @@ export default function ProfilePage() {
                 </div>
               </div>
               <Button
+                asChild
                 variant={profile?.twoFactorEnabled ? "outline" : "default"}
                 className={`rounded-xl font-bold text-xs h-9 px-4 ${!profile?.twoFactorEnabled && 'bg-rose-500 hover:bg-rose-600 text-white border-none'}`}
               >
-                {profile?.twoFactorEnabled ? 'Disable' : 'Enable Now'}
+                <a href="/settings/security">
+                  {profile?.twoFactorEnabled ? 'Manage 2FA' : 'Enable Now'}
+                </a>
               </Button>
             </div>
           </div>

@@ -8,7 +8,8 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { sendEmail as _unused } from '@/lib/email'; // legacy
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -203,21 +204,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Send reset email
     const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${rawToken}`;
 
-    sendEmail({
-      to: email,
-      subject: 'Reset Your Password',
-      html: `
-        <h1>Reset Your Password</h1>
-        <p>Hi ${user.name || 'there'},</p>
-        <p>We received a request to reset your password. Click the link below to create a new password:</p>
-        <p><a href="${resetUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Reset Password</a></p>
-        <p>This link will expire in ${RESET_TOKEN_EXPIRY_MINUTES} minutes.</p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-        <p>For security, this request was received from IP: ${clientIP}</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send reset email', { userId: user.id, requestId }, err);
+    const emailResult = await emailService.sendPasswordResetEmail(email, {
+      userName: user.name || 'there',
+      resetUrl,
+      expiresIn: `${RESET_TOKEN_EXPIRY_MINUTES} minutes`,
+      ipAddress: clientIP,
+      device: userAgent || 'Unknown',
     });
+    if (!emailResult.success) {
+      console.error(`[FORGOT-PASSWORD] ❌ Failed to send reset email to ${email}:`, emailResult.error);
+      logger.error('Failed to send reset email', { userId: user.id, requestId, error: emailResult.error });
+    } else {
+      console.log(`[FORGOT-PASSWORD] ✅ Password reset email sent to ${email}`);
+    }
 
     // Create audit log
     await prisma.auditLog.create({

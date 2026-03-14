@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -164,19 +164,21 @@ async function verifyEmailToken(token: string, clientIP: string, userAgent: stri
     }),
   ]);
 
-  // Send welcome email
-  sendEmail({
-    to: verification.user.email!,
-    subject: 'Welcome to CodeSync!',
-    html: `
-      <h1>Email Verified!</h1>
-      <p>Hi ${verification.user.name || 'there'},</p>
-      <p>Your email has been verified successfully. You now have full access to your account.</p>
-      <p><a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard">Go to Dashboard</a></p>
-    `,
-  }).catch((err) => {
-    logger.error('Failed to send welcome email', { userId: verification.userId }, err);
+  // Send welcome email (awaited, errors logged but don't block the success response)
+  const welcomeResult = await emailService.sendWelcome(verification.user.email!, {
+    userName: verification.user.name || 'there',
+    email: verification.user.email!,
+    onboardingUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard`,
   });
+  if (!welcomeResult.success) {
+    console.error(
+      `[VERIFY-EMAIL] ❌ Failed to send welcome email to ${verification.user.email}:`,
+      welcomeResult.error
+    );
+    logger.error('Failed to send welcome email', { userId: verification.userId, error: welcomeResult.error });
+  } else {
+    console.log(`[VERIFY-EMAIL] ✅ Welcome email sent to ${verification.user.email}`);
+  }
 
   return {
     success: true,

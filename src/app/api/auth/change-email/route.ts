@@ -10,7 +10,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -283,44 +283,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Send confirmation emails
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-    // Email to old address
-    sendEmail({
-      to: user.email!,
-      subject: 'Confirm Email Change Request',
-      html: `
-        <h1>Email Change Request</h1>
-        <p>Hi ${user.name || 'there'},</p>
-        <p>We received a request to change your email address to <strong>${newEmail}</strong>.</p>
-        <p>If you made this request, please confirm by clicking the link below:</p>
-        <p><a href="${baseUrl}/auth/confirm-email-change?token=${oldEmailToken}&type=old" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Confirm from Old Email</a></p>
-        <p>This link will expire in ${TOKEN_EXPIRY_HOURS} hour(s).</p>
-        <p>If you did not request this change, please ignore this email and consider changing your password.</p>
-        <p>Request details:</p>
-        <ul>
-          <li>IP Address: ${clientIP}</li>
-          <li>Time: ${new Date().toISOString()}</li>
-        </ul>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send old email confirmation', { userId, requestId }, err);
+    // Email to old address — confirm intent
+    const oldEmailResult = await emailService.sendEmailChangeRequest(user.email!, {
+      userName: user.name || 'there',
+      currentEmail: user.email!,
+      newEmail,
+      verificationUrl: `${baseUrl}/auth/confirm-email-change?token=${oldEmailToken}&type=old`,
+      expiresIn: `${TOKEN_EXPIRY_HOURS} hour(s)`,
+      requestedAt: new Date().toISOString(),
+      ipAddress: clientIP,
     });
+    if (!oldEmailResult.success) {
+      console.error(`[CHANGE-EMAIL] ❌ Failed to send old-email confirmation to ${user.email}:`, oldEmailResult.error);
+      logger.error('Failed to send old email confirmation', { userId, requestId, error: oldEmailResult.error });
+    }
 
-    // Email to new address
-    sendEmail({
+    // Email to new address — confirm ownership
+    const newEmailResult = await emailService.send({
       to: newEmail,
       subject: 'Confirm Your New Email Address',
-      html: `
-        <h1>Confirm Your Email</h1>
-        <p>Hi ${user.name || 'there'},</p>
-        <p>Someone is trying to change their account email to this address.</p>
-        <p>If this was you, please confirm by clicking the link below:</p>
-        <p><a href="${baseUrl}/auth/confirm-email-change?token=${newEmailToken}&type=new" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Confirm New Email</a></p>
-        <p>This link will expire in ${TOKEN_EXPIRY_HOURS} hour(s).</p>
-        <p>If you did not request this, please ignore this email.</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send new email confirmation', { userId, newEmail, requestId }, err);
+      html: `<h2>Confirm Your New Email</h2><p>Hi ${user.name || 'there'},</p><p>Click to confirm: <a href="${baseUrl}/auth/confirm-email-change?token=${newEmailToken}&type=new">Confirm New Email</a></p><p>Expires in ${TOKEN_EXPIRY_HOURS} hour(s). If you did not request this, ignore this email.</p>`,
     });
+    if (!newEmailResult.success) {
+      console.error(`[CHANGE-EMAIL] ❌ Failed to send new-email confirmation to ${newEmail}:`, newEmailResult.error);
+      logger.error('Failed to send new email confirmation', { userId, newEmail, requestId, error: newEmailResult.error });
+    }
 
     // Create audit log
     await prisma.auditLog.create({

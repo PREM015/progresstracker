@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -290,20 +290,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }),
     ]);
 
-    // Send confirmation email
-    sendEmail({
-      to: resetRecord.user.email!,
-      subject: 'Your Password Has Been Reset',
-      html: `
-        <h1>Password Reset Successful</h1>
-        <p>Hi ${resetRecord.user.name || 'there'},</p>
-        <p>Your password has been successfully reset.</p>
-        <p>If you did not make this change, please contact support immediately.</p>
-        <p>For security, this action was performed from IP: ${clientIP}</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send password reset confirmation', { userId: resetRecord.userId, requestId }, err);
+    // Send confirmation email using proper React template
+    const emailResult = await emailService.sendPasswordChangedEmail(resetRecord.user.email!, {
+      userName: resetRecord.user.name || 'there',
+      changedAt: new Date().toISOString(),
+      ipAddress: clientIP,
+      device: userAgent || 'Unknown',
     });
+    if (!emailResult.success) {
+      console.error(`[RESET-PASSWORD] ❌ Failed to send password changed email:`, emailResult.error);
+      logger.error('Failed to send password reset confirmation', { userId: resetRecord.userId, requestId, error: emailResult.error });
+    } else {
+      console.log(`[RESET-PASSWORD] ✅ Password changed email sent to ${resetRecord.user.email}`);
+    }
 
     logger.info('Password reset completed', {
       userId: resetRecord.userId,

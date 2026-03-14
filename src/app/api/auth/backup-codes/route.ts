@@ -11,6 +11,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -322,23 +323,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Send notification email
     if (user.email) {
-      const { sendEmail } = await import('@/lib/email');
-      sendEmail({
-        to: user.email,
-        subject: 'Backup Codes Regenerated',
-        html: `
-          <h1>Backup Codes Regenerated</h1>
-          <p>Your backup codes have been regenerated. All previous codes are now invalid.</p>
-          <p>If you did not make this change, please secure your account immediately.</p>
-          <p>Details:</p>
-          <ul>
-            <li>IP Address: ${clientIP}</li>
-            <li>Time: ${new Date().toISOString()}</li>
-          </ul>
-        `,
-      }).catch((err) => {
-        logger.error('Failed to send backup codes notification', { userId, requestId }, err);
+      const emailResult = await emailService.sendBackupCodesGenerated(user.email, {
+        ipAddress: clientIP,
+        generatedAt: new Date().toISOString(),
+        codesCount: BACKUP_CODES_COUNT,
       });
+      if (!emailResult.success) {
+        console.error(`[BACKUP-CODES] ❌ Failed to send backup codes notification:`, emailResult.error);
+        logger.error('Failed to send backup codes notification', { userId, requestId, error: emailResult.error });
+      } else {
+        console.log(`[BACKUP-CODES] ✅ Backup codes notification sent to ${user.email}`);
+      }
     }
 
     logger.info('Backup codes regenerated', { userId, ip: clientIP, requestId });

@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 import { signJwt } from '@/lib/jwt';
 
 // =============================================================================
@@ -242,22 +242,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Send magic link email
     const magicLinkUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/magic-link?token=${rawToken}`;
 
-    sendEmail({
+    const magicEmailResult = await emailService.send({
       to: email,
       subject: 'Your Magic Link to Sign In',
-      html: `
-        <h1>Sign In to CodeSync</h1>
-        <p>Hi ${user.name || 'there'},</p>
-        <p>Click the button below to sign in to your account. No password needed!</p>
-        <p><a href="${magicLinkUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Sign In</a></p>
-        <p>Or copy and paste this link: ${magicLinkUrl}</p>
-        <p>This link will expire in ${MAGIC_LINK_EXPIRY_MINUTES} minutes.</p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-        <p>IP Address: ${clientIP}</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send magic link email', { userId: user.id, requestId }, err);
+      html: `<h2>Sign In to ProgressTracker</h2><p>Hi ${user.name || 'there'},</p><p>Click to sign in (no password needed!): <a href="${magicLinkUrl}" style="display:inline-block;background:#3b82f6;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">Sign In</a></p><p>Or copy: ${magicLinkUrl}</p><p>Expires in ${MAGIC_LINK_EXPIRY_MINUTES} minutes. IP: ${clientIP}</p>`,
     });
+    if (!magicEmailResult.success) {
+      console.error(`[MAGIC-LINK] ❌ Failed to send magic link to ${email}:`, magicEmailResult.error);
+      logger.error('Failed to send magic link email', { userId: user.id, requestId, error: magicEmailResult.error });
+    } else {
+      console.log(`[MAGIC-LINK] ✅ Magic link sent to ${email}`);
+    }
 
     logger.info('Magic link sent', { userId: user.id, email, ip: clientIP, requestId });
 

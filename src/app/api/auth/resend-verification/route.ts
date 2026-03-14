@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail } from '@/lib/email';
+import { emailService } from '@/lib/email';
 
 // =============================================================================
 // CONFIGURATION
@@ -204,23 +204,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }),
     ]);
 
-    // Send verification email
+    // Send verification email — awaited so errors are caught and logged
     const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/verify-email?token=${rawToken}`;
 
-    sendEmail({
-      to: email,
-      subject: 'Verify Your Email Address',
-      html: `
-        <h1>Verify Your Email</h1>
-        <p>Hi ${user.name || 'there'},</p>
-        <p>Please verify your email address by clicking the link below:</p>
-        <p><a href="${verificationUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Verify Email</a></p>
-        <p>This link will expire in ${TOKEN_EXPIRY_HOURS} hours.</p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-      `,
-    }).catch((err) => {
-      logger.error('Failed to send verification email', { userId: user.id, requestId }, err);
+    const emailResult = await emailService.sendVerificationEmail(email, {
+      userName: user.name || email.split('@')[0],
+      verificationUrl,
+      verificationCode: undefined,
+      expiresIn: `${TOKEN_EXPIRY_HOURS} hours`,
     });
+
+    if (!emailResult.success) {
+      console.error(
+        `[RESEND-VERIFICATION] ❌ Failed to send verification email to ${email}:`,
+        emailResult.error
+      );
+      logger.error('Failed to send verification email', {
+        userId: user.id,
+        requestId,
+        error: emailResult.error,
+      });
+    } else {
+      console.log(`[RESEND-VERIFICATION] ✅ Verification email sent to ${email} (messageId: ${emailResult.messageId})`);
+    }
 
     logger.info('Verification email resent', { userId: user.id, email, ip: clientIP, requestId });
 
