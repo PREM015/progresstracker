@@ -35,7 +35,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.get('https://progresstracker.vercel.app/api/health');
+  const res = http.get('https://vriddhi-app.vercel.app/api/health');
   check(res, { 'status is 200': (r) => r.status === 200 });
   sleep(1);
 }

@@ -5,7 +5,7 @@
   <p>Monitor activity across 50+ coding platforms, set goals, build streaks, and share your journey.</p>
 
   <p>
-    <a href="https://progresstracker.app"><img src="https://img.shields.io/badge/Status-Live-success.svg" alt="Status"></a>
+    <a href="https://vriddhi-app.vercel.app"><img src="https://img.shields.io/badge/Status-Live-success.svg" alt="Status"></a>
     <a href="https://github.com/PREM015/progresstracker/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black.svg?logo=next.js" alt="Next.js"></a>
     <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0-blue.svg?logo=typescript" alt="TypeScript"></a>

@@ -41,7 +41,7 @@ const platforms = [
 // Test user created by seed
 const testUser = await prisma.user.create({
   data: {
-    email: 'test@progresstracker.app',
+    email: 'test@vriddhi-app.vercel.app',
     name: 'Test User',
     password: await bcrypt.hash('TestPass123!', 12),
     isVerified: true,

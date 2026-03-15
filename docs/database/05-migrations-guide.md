@@ -99,7 +99,7 @@ npx prisma migrate status
 npx prisma migrate deploy
 
 # 4. Verify application working
-curl https://yourapp.com/api/health
+curl https://vriddhi-app.vercel.app/api/health
 ```
 
 ---

@@ -16,7 +16,7 @@
 
 | Environment | URL |
 |-------------|-----|
-| **Production** | `https://progresstracker.vercel.app/api` |
+| **Production** | `https://vriddhi-app.vercel.app/api` |
 | **Development** | `http://localhost:3000/api` |
 
 ---

@@ -61,9 +61,9 @@ Or use `vercel.json` (already configured in project):
 ### Step 5: Set Up Stripe Webhooks
 
 After deploying:
-1. Get your Vercel URL (e.g., `https://progresstracker.vercel.app`)
+1. Get your Vercel URL (e.g., `https://vriddhi-app.vercel.app`)
 2. Go to Stripe Dashboard → Webhooks → Add endpoint
-3. URL: `https://progresstracker.vercel.app/api/billing/webhook`
+3. URL: `https://vriddhi-app.vercel.app/api/billing/webhook`
 4. Events: `checkout.session.completed`, `invoice.payment_succeeded`, `customer.subscription.*`
 5. Copy webhook signing secret → Set as `STRIPE_WEBHOOK_SECRET`
 
@@ -71,7 +71,7 @@ After deploying:
 
 For real-time GitHub sync:
 1. GitHub repository → Settings → Webhooks → Add webhook
-2. Payload URL: `https://yourapp.vercel.app/api/webhooks/github`
+2. Payload URL: `https://vriddhi-app.vercel.app/api/webhooks/github`
 3. Content type: `application/json`
 4. Secret: Set `GITHUB_WEBHOOK_SECRET` env var
 5. Events: Push, Pull request

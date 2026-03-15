@@ -12,7 +12,7 @@ All environment variables for ProgressTracker, explained.
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
 | `NEXTAUTH_SECRET` | JWT signing secret (min 32 chars) | Output of `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | App public URL | `https://progresstracker.vercel.app` |
+| `NEXTAUTH_URL` | App public URL | `https://vriddhi-app.vercel.app` |
 | `ENCRYPTION_KEY` | AES encryption key (min 32 chars) | Output of `openssl rand -base64 32` |
 
 ---
@@ -50,8 +50,8 @@ All environment variables for ProgressTracker, explained.
 
 **Set up GitHub OAuth:**
 1. GitHub → Settings → Developer settings → OAuth Apps → New
-2. Homepage URL: `https://yourapp.vercel.app`
-3. Callback URL: `https://yourapp.vercel.app/api/auth/callback/github`
+2. Homepage URL: `https://vriddhi-app.vercel.app`
+3. Callback URL: `https://vriddhi-app.vercel.app/api/auth/callback/github`
 
 ---
 

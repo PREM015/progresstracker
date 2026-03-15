@@ -41,7 +41,7 @@ Use ProgressTracker as a data source in your own applications:
 ```bash
 # Get your API key: Settings → API Keys → Generate
 
-curl https://progresstracker.vercel.app/api/stats \
+curl https://vriddhi-app.vercel.app/api/stats \
   -H "Authorization: Bearer pt_live_your_key_here"
 ```
 

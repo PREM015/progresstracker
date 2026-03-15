@@ -39,7 +39,7 @@ echo ${#NEXTAUTH_SECRET}  # Should be 32+
 **Problem**: OAuth login fails (GitHub/Google)
 
 1. Check callback URL in GitHub/Google OAuth settings
-2. URL format: `https://yourapp.com/api/auth/callback/github`
+2. URL format: `https://vriddhi-app.vercel.app/api/auth/callback/github`
 3. Ensure `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are correct
 
 ---
@@ -66,7 +66,7 @@ echo ${#NEXTAUTH_SECRET}  # Should be 32+
 **Problem**: Webhook events not received
 
 1. Check `STRIPE_WEBHOOK_SECRET` matches the webhook signing secret in Stripe dashboard
-2. Verify webhook URL: `https://yourapp.com/api/billing/webhook`
+2. Verify webhook URL: `https://vriddhi-app.vercel.app/api/billing/webhook`
 3. Check Stripe webhook logs for delivery failures
 
 **Problem**: Subscription not activating after payment
@@ -123,7 +123,7 @@ npm run type-check
 1. Check this guide first
 2. Search [GitHub Issues](https://github.com/PREM015/progresstracker/issues)
 3. Open a new issue with error logs
-4. Email: support@progresstracker.app
+4. Email: support@vriddhi-app.vercel.app
 
 ---
 

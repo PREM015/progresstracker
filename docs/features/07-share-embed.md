@@ -10,7 +10,7 @@ Users can create public profile links to share their progress with employers, te
 
 ## 🌐 Share Link Features
 
-- **Custom slug**: e.g., `progresstracker.app/share/prem015`
+- **Custom slug**: e.g., `vriddhi-app.vercel.app/share/prem015`
 - **Configurable visibility**: Choose what to show/hide
 - **View analytics**: See how many times your profile was viewed
 - **Expiry**: Optional expiry date for temporary sharing

@@ -12,7 +12,7 @@ ProgressTracker has a referral program that rewards users for inviting new membe
 
 ```
 1. User gets unique referral code (stored on User.referralCode)
-2. User shares referral link: progresstracker.app/register?ref=PREM015
+2. User shares referral link: vriddhi-app.vercel.app/register?ref=PREM015
 3. New user registers with referral code
 4. User.referredBy = referrer's userId
 5. When referred user completes onboarding:
