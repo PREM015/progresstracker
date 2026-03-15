@@ -1,0 +1,120 @@
+# Dependabot Configuration for ProgressTracker
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+
+updates:
+  # ────────────────────────────────────────────
+  # NPM Dependencies (package.json)
+  # ────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "PREM015"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      # React & Next.js related packages
+      next-ecosystem:
+        patterns:
+          - "next"
+          - "next-*"
+          - "react"
+          - "react-dom"
+          - "@next/*"
+      # Prisma packages
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/*"
+      # Auth packages
+      auth:
+        patterns:
+          - "next-auth"
+          - "@next-auth/*"
+          - "@auth/*"
+      # UI & Styling
+      ui:
+        patterns:
+          - "@radix-ui/*"
+          - "radix-ui"
+          - "tailwind*"
+          - "@tailwindcss/*"
+          - "lucide-react"
+          - "framer-motion"
+          - "class-variance-authority"
+          - "clsx"
+          - "tailwind-merge"
+      # Stripe & Billing
+      billing:
+        patterns:
+          - "stripe"
+      # Sentry & Monitoring
+      monitoring:
+        patterns:
+          - "@sentry/*"
+          - "@vercel/*"
+      # Testing
+      testing:
+        patterns:
+          - "jest"
+          - "jest-*"
+          - "@jest/*"
+          - "@testing-library/*"
+          - "@playwright/*"
+          - "playwright"
+          - "ts-jest"
+      # TypeScript & Linting
+      tooling:
+        patterns:
+          - "typescript"
+          - "eslint"
+          - "eslint-*"
+          - "@typescript-eslint/*"
+          - "prettier"
+      # Type definitions
+      types:
+        patterns:
+          - "@types/*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Trigger.dev
+      trigger:
+        patterns:
+          - "@trigger.dev/*"
+    ignore:
+      # Major version bumps - manually review
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # ────────────────────────────────────────────
+  # GitHub Actions
+  # ────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Asia/Kolkata"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"
