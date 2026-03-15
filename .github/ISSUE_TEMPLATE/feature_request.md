@@ -1,9 +1,10 @@
 ---
-name: 🚀 Feature Request
+name: "\U0001F680 Feature Request"
 about: Suggest a new feature or improvement for ProgressTracker
-title: '[FEATURE] '
-labels: 'enhancement, needs-discussion'
+title: "[FEATURE] "
+labels: enhancement
 assignees: ''
+
 ---
 
 ## 🚀 Feature Description

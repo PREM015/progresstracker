@@ -1,9 +1,10 @@
 ---
-name: ❓ Question
+name: "❓ Question"
 about: Ask a question about ProgressTracker
-title: '[QUESTION] '
-labels: 'question'
+title: "[QUESTION] "
+labels: question
 assignees: ''
+
 ---
 
 ## ❓ Question
@@ -21,4 +22,4 @@ assignees: ''
 **Environment:**
 - OS: 
 - Node.js version: 
-- App version: 
+- App version:

@@ -1,9 +1,10 @@
 ---
-name: 🐛 Bug Report
+name: "\U0001F41B Bug Report"
 about: Report a bug to help us improve ProgressTracker
-title: '[BUG] '
-labels: 'bug, needs-triage'
-assignees: 'PREM015'
+title: "[BUG] "
+labels: bug
+assignees: PREM015
+
 ---
 
 ## 🐛 Bug Description
