@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
+import { authenticator } from '@/lib/totp';
 
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';

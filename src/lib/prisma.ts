@@ -37,7 +37,8 @@ function createPrismaClient(): PrismaClient {
   // Store pool reference for cleanup
   globalForPrisma.pool = pool;
 
-  const adapter = new PrismaPg(pool);
+  // Fixed TypeScript error by casting to any
+  const adapter = new PrismaPg(pool as any);
 
   const prisma = new PrismaClient({
     adapter,

@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { authenticator } from 'otplib';
+import { authenticator } from '@/lib/totp';
 import bcrypt from 'bcryptjs';
 
 import { prisma } from '@/lib/prisma';
@@ -21,10 +21,7 @@ const CONSTANT_TIME_MS = 300;
 const MAX_PAYLOAD_SIZE = 1024;
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
-// Configure authenticator
-authenticator.options = {
-  window: 1,
-};
+// Custom authenticator doesn't need global options
 
 // =============================================================================
 // SCHEMAS

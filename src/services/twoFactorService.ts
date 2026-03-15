@@ -2,7 +2,7 @@
 
 
 import { prisma } from '@/lib/prisma';
-import { authenticator } from 'otplib';
+import { authenticator } from '@/lib/totp';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';

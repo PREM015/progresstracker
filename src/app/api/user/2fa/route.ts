@@ -8,7 +8,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { authenticator } from 'otplib';
+import { authenticator } from '@/lib/totp';
 import { encrypt, decrypt } from '@/lib/encryption';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { authenticator } from 'otplib';
+import { authenticator } from '@/lib/totp';
 import QRCode from 'qrcode';
 
 import { authOptions } from '@/lib/auth';
@@ -22,10 +22,7 @@ const CONSTANT_TIME_MS = 200;
 const MAX_PAYLOAD_SIZE = 1024;
 const APP_NAME = process.env.APP_NAME || 'CodeSync';
 
-// Configure authenticator
-authenticator.options = {
-  window: 1, // Allow 1 step before/after for clock skew
-};
+// Custom authenticator doesn't need global options
 
 // =============================================================================
 // SCHEMAS
