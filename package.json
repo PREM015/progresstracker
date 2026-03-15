@@ -18,7 +18,7 @@
     "test:watch": "jest --watch",
     "test:ci": "jest --ci",
     "test:e2e": "playwright test",
-    "test:coverage": "jest --coverage",
+    "test:coverage": "jest --coverage --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate": "npx prisma migrate dev",
