@@ -100,12 +100,16 @@ export function validateEmailEnv(): { valid: boolean; missing: string[]; warning
   if (!process.env.EMAIL_FROM_NAME) warnings.push('EMAIL_FROM_NAME (using default: ProgressTracker)');
   if (!process.env.NEXT_PUBLIC_APP_URL) warnings.push('NEXT_PUBLIC_APP_URL (verification links will use localhost)');
 
-  // Warn if the key doesn't look like a Brevo SMTP key
+  // Warn if the key doesn't look like a valid Brevo key
+  // Brevo uses two key formats:
+  //   xsmtpsib-  → SMTP password (from SMTP tab) — used here for nodemailer
+  //   xkeysib-   → REST API key (from API tab)
   const apiKey = process.env.BREVO_API_KEY || '';
-  if (apiKey && !apiKey.startsWith('xkeysib-')) {
+  if (apiKey && !apiKey.startsWith('xsmtpsib-') && !apiKey.startsWith('xkeysib-')) {
     warnings.push(
-      'BREVO_API_KEY does not look like a Brevo SMTP key (expected prefix: xkeysib-). ' +
-      'Go to Brevo Dashboard → SMTP & API → SMTP tab to get your SMTP password.'
+      'BREVO_API_KEY does not look like a valid Brevo key. ' +
+      'For SMTP (recommended): Go to Brevo Dashboard → SMTP & API → SMTP tab → Generate SMTP key (starts with xsmtpsib-). ' +
+      'For API: Go to SMTP & API → API Keys tab (starts with xkeysib-).'
     );
   }
 
