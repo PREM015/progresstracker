@@ -114,7 +114,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/connect": "^3.4.38",
     "@types/crypto-js": "^4.2.2",
-    "@types/dompurify": "^3.0.5",
+    "@types/dompurify": "^3.2.0",
     "@types/estree": "^1.0.8",
     "@types/istanbul-lib-coverage": "^2.0.6",
     "@types/istanbul-lib-report": "^3.0.3",
