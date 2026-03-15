@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant U as User
+    participant App as Next.js
+    participant Stripe as Stripe
+    participant DB as PostgreSQL
+    participant Email as Brevo
+
+    Note over U,Email: New Subscription
+    U->>App: POST /api/billing/checkout (priceId)
+    App->>Stripe: Create Checkout Session
+    Stripe-->>App: Session URL
+    App-->>U: Redirect to Stripe Checkout
+    U->>Stripe: Enter payment + submit
+    Stripe->>App: Webhook: checkout.session.completed
+    App->>DB: Create/Update Subscription (ACTIVE)
+    App->>Email: Send welcome email
+    Stripe-->>U: Redirect to /billing?success=true
+
+    Note over U,Email: Payment Failure
+    Stripe->>Stripe: Retry payment (day 3, 7, 14)
+    Stripe->>App: Webhook: invoice.payment_failed
+    App->>DB: Update subscription (PAST_DUE)
+    App->>Email: Send payment failed email
+    
+    Note over U,Email: Cancellation
+    U->>App: POST /api/billing/cancel
+    App->>Stripe: Cancel at period end
+    Stripe->>App: Webhook: customer.subscription.deleted
+    App->>DB: Downgrade to FREE tier
+    App->>Email: Send cancellation confirmation

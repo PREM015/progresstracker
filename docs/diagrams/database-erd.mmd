@@ -1,0 +1,102 @@
+erDiagram
+    User {
+        string id PK
+        string email UK
+        string username UK
+        string password
+        int currentStreak
+        int totalPoints
+        string role
+        datetime createdAt
+    }
+
+    Account {
+        string id PK
+        string userId FK
+        string provider
+        string providerAccountId
+        string access_token
+    }
+
+    Platform {
+        string id PK
+        string name
+        string slug UK
+        string category
+        string authType
+    }
+
+    UserPlatform {
+        string id PK
+        string userId FK
+        string platformId FK
+        string username
+        boolean isConnected
+        datetime lastSyncAt
+    }
+
+    TrackerEntry {
+        string id PK
+        string userId FK
+        string platformId FK
+        string category
+        int problemsSolved
+        int commits
+        int timeSpentMinutes
+        datetime date
+    }
+
+    Goal {
+        string id PK
+        string userId FK
+        string title
+        string type
+        string metric
+        float targetValue
+        float currentValue
+        string status
+        datetime dueDate
+    }
+
+    Achievement {
+        string id PK
+        string slug UK
+        string name
+        string description
+        int points
+    }
+
+    UserAchievement {
+        string id PK
+        string userId FK
+        string achievementId FK
+        datetime earnedAt
+    }
+
+    Subscription {
+        string id PK
+        string userId FK UK
+        string stripeSubscriptionId
+        string status
+        string tier
+        datetime currentPeriodEnd
+    }
+
+    AuditLog {
+        string id PK
+        string userId FK
+        string action
+        string ipAddress
+        datetime createdAt
+    }
+
+    User ||--o{ Account : "has"
+    User ||--o{ UserPlatform : "connects"
+    User ||--o{ TrackerEntry : "logs"
+    User ||--o{ Goal : "creates"
+    User ||--o{ UserAchievement : "earns"
+    User ||--|| Subscription : "has"
+    User ||--o{ AuditLog : "generates"
+    UserPlatform }o--|| Platform : "references"
+    TrackerEntry }o--o| Platform : "from"
+    UserAchievement }o--|| Achievement : "unlocks"

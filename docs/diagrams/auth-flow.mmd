@@ -1,0 +1,31 @@
+sequenceDiagram
+    participant U as User
+    participant App as Next.js App
+    participant NA as NextAuth
+    participant DB as PostgreSQL
+    participant Email as Brevo Email
+
+    Note over U,Email: Email + Password Registration
+    U->>App: POST /api/auth/register
+    App->>App: Validate input (Zod)
+    App->>DB: Check email exists
+    DB-->>App: Not found
+    App->>App: Hash password (bcrypt)
+    App->>DB: Create User + EmailVerification token
+    App->>Email: Send verification email
+    App-->>U: 201 Created
+
+    Note over U,Email: Email Verification
+    U->>App: GET /verify-email?token=xyz
+    App->>DB: Validate token (not expired)
+    App->>DB: Mark email verified
+    App-->>U: Redirect to /dashboard
+
+    Note over U,Email: OAuth Login (GitHub)
+    U->>App: Click "Login with GitHub"
+    App->>NA: Initiate OAuth flow
+    NA->>U: Redirect to GitHub
+    U->>NA: Authorize app
+    NA->>DB: Find or create User + Account
+    NA->>DB: Create Session
+    NA-->>U: Set cookie + redirect /dashboard

@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant TD as Trigger.dev
+    participant SS as SyncService
+    participant DB as PostgreSQL
+    participant GitHub as GitHub API
+    participant LC as LeetCode API
+    participant Email as Brevo
+
+    TD->>SS: Fire sync job (every 6h)
+    SS->>DB: Get all users with connected platforms
+    DB-->>SS: Users list
+
+    loop For each user
+        SS->>DB: Get user's connected platforms
+        DB-->>SS: UserPlatform records
+
+        par Parallel platform sync
+            SS->>GitHub: GET /user/commits (OAuth token)
+            GitHub-->>SS: Commits data
+        and
+            SS->>LC: GraphQL query (username)
+            LC-->>SS: Problems solved
+        end
+
+        SS->>SS: Normalize data to TrackerEntry format
+        SS->>DB: Upsert TrackerEntries (batch)
+        SS->>DB: Update User stats (streak, totals)
+        SS->>DB: Create SyncLog record
+        SS->>Email: Send sync summary (if enabled)
+    end

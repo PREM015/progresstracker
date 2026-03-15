@@ -1,0 +1,26 @@
+stateDiagram-v2
+    [*] --> DRAFT : User creates goal
+    DRAFT --> ACTIVE : User activates
+    ACTIVE --> PAUSED : User pauses
+    PAUSED --> ACTIVE : User resumes
+    ACTIVE --> COMPLETED : Target value reached
+    ACTIVE --> FAILED : Deadline passed
+    COMPLETED --> ARCHIVED : After 30 days auto-archive
+    FAILED --> ARCHIVED : After 30 days auto-archive
+    ACTIVE --> CANCELLED : User cancels
+    CANCELLED --> [*]
+    ARCHIVED --> [*]
+
+    note right of ACTIVE
+        Progress updated on:
+        - New tracker entry
+        - Platform sync
+        - Manual update
+    end note
+
+    note right of COMPLETED
+        Triggers:
+        - Achievement check
+        - +100 points reward
+        - Completion notification
+    end note

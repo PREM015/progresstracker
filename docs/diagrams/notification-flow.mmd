@@ -1,0 +1,27 @@
+flowchart TD
+    Event([Trigger Event]) --> NS[NotificationService]
+    NS --> Pref{Check User\nPreferences}
+    Pref -->|InApp enabled| InApp[Create Notification\nin DB]
+    Pref -->|Email enabled| Email[Send via Brevo]
+    Pref -->|Push enabled| Push{User has\npush subscription?}
+    
+    Push -->|Yes| SendPush[Send Web Push]
+    Push -->|No| Skip[Skip push]
+    
+    InApp --> Display[Display in\nNavbar Bell]
+    Email --> Inbox[User's Email]
+    SendPush --> Browser[Browser\nNotification]
+
+    subgraph Triggers["Notification Triggers"]
+        StreakRisk["Streak at Risk\n(Daily 8PM)"]
+        AchievUnlock["Achievement\nUnlocked"]
+        GoalDue["Goal Due\nReminder"]
+        SyncDone["Sync\nCompleted"]
+        WeeklyReport["Weekly\nReport"]
+    end
+
+    StreakRisk --> Event
+    AchievUnlock --> Event
+    GoalDue --> Event
+    SyncDone --> Event
+    WeeklyReport --> Event

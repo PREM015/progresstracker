@@ -1,0 +1,36 @@
+graph TB
+    subgraph Dev["💻 Development"]
+        LocalDev["Local Machine\n(npm run dev)"]
+        GitHub["GitHub\nRepository"]
+    end
+
+    subgraph CI["🔄 CI/CD (GitHub Actions)"]
+        Lint["Lint +\nType Check"]
+        Tests["Run Tests"]
+        Build["Build Check"]
+    end
+
+    subgraph Vercel["☁️ Vercel"]
+        Preview["Preview\nDeployment\n(PRs)"]
+        Prod["Production\nDeployment\n(main branch)"]
+        Edge["Edge\nNetwork\n(Global CDN)"]
+    end
+
+    subgraph Services["🔌 Production Services"]
+        Neon["Neon\nPostgreSQL"]
+        Upstash["Upstash\nRedis"]
+        TriggerDev["Trigger.dev\nBackground Jobs"]
+    end
+
+    LocalDev -->|git push| GitHub
+    GitHub -->|PR| CI
+    CI --> Lint
+    CI --> Tests
+    CI --> Build
+    CI -->|Merged to main| Vercel
+    GitHub -->|PR| Preview
+    Vercel --> Prod
+    Prod --> Edge
+    Prod --> Neon
+    Prod --> Upstash
+    Prod --> TriggerDev

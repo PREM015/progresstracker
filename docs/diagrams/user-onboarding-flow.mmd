@@ -1,0 +1,17 @@
+flowchart TD
+    A([User Registers]) --> B[Email Verification Sent]
+    B --> C{Email Verified?}
+    C -->|No - Resend| B
+    C -->|Yes| D[Account Active]
+    D --> E[Welcome Email Sent]
+    E --> F[Onboarding Step 1:\nSet Profile]
+    F --> G[Onboarding Step 2:\nConnect First Platform]
+    G --> H{Platform Connected?}
+    H -->|Skip| I[Onboarding Step 3:\nCreate First Goal]
+    H -->|Yes| J[First Sync Triggered]
+    J --> I
+    I --> K{Goal Created?}
+    K -->|Skip| L[Onboarding Complete!]
+    K -->|Yes| L
+    L --> M[Dashboard]
+    M --> N([User Active])

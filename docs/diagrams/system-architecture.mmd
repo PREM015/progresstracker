@@ -1,0 +1,52 @@
+graph TB
+    subgraph Client["🌐 Client Browser"]
+        Browser["Next.js App\n(SSR + CSR)"]
+    end
+
+    subgraph Vercel["☁️ Vercel (Edge Network)"]
+        NextApp["Next.js 14\nApp Router"]
+        API["API Routes\n/api/*"]
+        Auth["NextAuth.js"]
+        Edge["Edge Functions"]
+    end
+
+    subgraph Background["⏰ Background Jobs"]
+        Trigger["Trigger.dev"]
+        SyncJob["Sync Job\n(Every 6h)"]
+        EmailJob["Email Job\n(Reports)"]
+        CleanupJob["Cleanup Job\n(Weekly)"]
+    end
+
+    subgraph DataLayer["🗄️ Data Layer"]
+        Postgres[("PostgreSQL\n(Neon)")]
+        Redis[("Redis\n(Upstash)")]
+        Storage["Supabase\nStorage"]
+    end
+
+    subgraph External["🔌 External Services"]
+        GitHub["GitHub API"]
+        LeetCode["LeetCode\nGraphQL"]
+        Stripe["Stripe\nPayments"]
+        Brevo["Brevo\nEmail"]
+        Sentry["Sentry\nMonitoring"]
+    end
+
+    Browser --> NextApp
+    NextApp --> API
+    NextApp --> Auth
+    API --> Postgres
+    API --> Redis
+    Auth --> Postgres
+    Auth --> Redis
+    Trigger --> SyncJob
+    Trigger --> EmailJob
+    Trigger --> CleanupJob
+    SyncJob --> GitHub
+    SyncJob --> LeetCode
+    SyncJob --> Postgres
+    EmailJob --> Brevo
+    API --> Stripe
+    API --> Brevo
+    API --> Storage
+    NextApp --> Sentry
+    API --> Sentry
