@@ -9,6 +9,7 @@ interface Report {
   id: string;
   title: string;
   type: string;
+  pdfUrl?: string;
   createdAt: string;
 }
 
@@ -106,10 +107,17 @@ export const ReportsList: React.FC<ReportsListProps> = ({
                   </div>
                 </div>
 
-                <Button variant="ghost" size="sm" className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
-                  <Download className="w-4 h-4" />
-                  <span className="sr-only">Download</span>
-                </Button>
+                {report.pdfUrl ? (
+                  <a href={report.pdfUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+                    <Download className="w-4 h-4" />
+                    <span className="sr-only">Download</span>
+                  </a>
+                ) : (
+                  <a href={`/api/reports/download/${report.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+                    <Download className="w-4 h-4" />
+                    <span className="sr-only">Download</span>
+                  </a>
+                )}
               </motion.div>
             ))}
           </div>

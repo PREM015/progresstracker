@@ -284,8 +284,9 @@ export function ConnectedPlatformsStats({ className }: ConnectedPlatformsStatsPr
                                         </div>
                                     </div>
                                     <Link
-                                        href={`/platforms/${p.slug}`}
+                                        href="/connected-platforms"
                                         className="p-2 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                                        title={`Manage ${p.name}`}
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" />
                                     </Link>

@@ -38,18 +38,38 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
       limit: limit.toString(),
     });
 
+    setLoading(true);
     fetch(`/api/leaderboard?${params}`)
       .then(r => r.json())
       .then(data => {
+        // Normalize all API response shapes into a flat array of entries
+        let rawEntries: any[] = [];
+
         if (Array.isArray(data)) {
-          setEntries(data);
+          rawEntries = data;
         } else if (data.success && Array.isArray(data.data)) {
-          setEntries(data.data);
+          rawEntries = data.data;
         } else if (data.success && Array.isArray(data.data?.entries)) {
-          setEntries(data.data.entries);
-        } else {
-          setEntries([]);
+          rawEntries = data.data.entries;
+        } else if (data.success && Array.isArray(data.data?.items)) {
+          // paginated response: { success, data: { items, pagination } }
+          rawEntries = data.data.items;
+        } else if (Array.isArray(data.items)) {
+          // httpClient-unwrapped paginated: { items, pagination }
+          rawEntries = data.items;
         }
+
+        // Map API fields to LeaderboardEntry shape
+        const mapped: LeaderboardEntry[] = rawEntries.map((u: any, idx: number) => ({
+          rank: u.rank ?? u.displayRank ?? (idx + 1),
+          userId: u.userId ?? u.id ?? String(idx),
+          username: u.username ?? u.name ?? 'Anonymous',
+          avatar: u.avatar ?? u.image ?? undefined,
+          score: u.score ?? u.totalPoints ?? 0,
+          change: u.change ?? undefined,
+        }));
+
+        setEntries(mapped);
       })
       .catch(err => {
         console.error('Failed to fetch leaderboard:', err);
@@ -81,6 +101,17 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+            {entries.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="text-4xl">🏆</span>
+                    <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">No users on the leaderboard yet.</p>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">Be the first — connect a platform and start tracking!</p>
+                  </div>
+                </td>
+              </tr>
+            )}
             {entries.map((entry, index) => {
               const isTop3 = entry.rank <= 3;
               return (

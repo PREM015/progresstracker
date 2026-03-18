@@ -107,9 +107,11 @@ export class SyncService {
     const startTime = Date.now();
     const {
       platformIds,
-      force = false,
+      force: forceOption = false,
       triggeredBy = 'manual'
     } = options;
+    // Manual syncs always bypass the cooldown to ensure fresh data
+    const force = forceOption || triggeredBy === 'manual';
 
     logger.info(`Starting sync job ${jobId} for user ${userId}`, {
       userId,
@@ -284,6 +286,8 @@ export class SyncService {
 
     // Final recalculation of all stats after the entire job is done
     await StatsService.recalculateUserStats(userId).catch(() => { });
+
+    const duration = Date.now() - startTime;
 
     return {
       jobId,

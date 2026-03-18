@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import LeaderboardTable from "@/components/leaderboard/LeaderboardTable";
 import LeaderboardFilters from "@/components/leaderboard/LeaderboardFilters";
-import TopPerformers from "@/components/leaderboard/LeaderboardCard";
 import UserRankBadge from "@/components/leaderboard/UserRankBadge";
 
 export default function LeaderboardPage() {
@@ -25,11 +24,11 @@ export default function LeaderboardPage() {
   }, [filters]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-transparent p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold">Leaderboard</h1>
+            <h1 className="text-4xl font-bold text-zinc-900 dark:text-white">Leaderboard</h1>
             {!loading && userRank && (
               <div className="mt-2">
                 <UserRankBadge rank={userRank.rank} showChange change={userRank.change} />
@@ -44,7 +43,10 @@ export default function LeaderboardPage() {
         </div>
 
         <div className="space-y-6">
-          <LeaderboardTable />
+          <LeaderboardTable
+            category={filters.category !== "overall" ? filters.category : undefined}
+            timeRange={filters.timeframe as any}
+          />
         </div>
       </div>
     </div>

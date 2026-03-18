@@ -54,11 +54,29 @@ async function rateLimit(request: NextRequest) {
   }
 }
 
+// ✅ Helper function - Static files ko check karo
+function isStaticFile(pathname: string): boolean {
+  const staticExtensions = [
+    '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.webmanifest',
+    '.woff', '.woff2', '.ttf', '.eot', '.otf',
+    '.mp4', '.webm', '.mp3', '.wav',
+  ];
+
+  return staticExtensions.some(ext => pathname.endsWith(ext));
+}
+
 // -------------------
 // Merged Proxy Middleware
 // -------------------
 export default withAuth(
   async function middleware(req: NextRequest) {
+    const { pathname } = req.nextUrl;
+
+    // ✅ Static files ko directly pass karo (middleware execute na ho)
+    if (isStaticFile(pathname)) {
+      return NextResponse.next();
+    }
+
     const response = NextResponse.next();
 
     // Add security headers
@@ -67,7 +85,7 @@ export default withAuth(
     });
 
     // Rate limiting only for API
-    if (req.nextUrl.pathname.startsWith("/api")) {
+    if (pathname.startsWith("/api")) {
       const { success, limit, remaining, reset } = await rateLimit(req);
       response.headers.set("X-RateLimit-Limit", limit.toString());
       response.headers.set("X-RateLimit-Remaining", remaining.toString());
@@ -86,23 +104,28 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        const path = req.nextUrl.pathname;
+        const pathname = req.nextUrl.pathname;
+
+        // ✅ Static files ko skip karo (ye authorized callback mein aana hi nahi chahiye)
+        if (isStaticFile(pathname)) {
+          return true;
+        }
 
         // Public paths
         if (
-          path.startsWith("/login") ||
-          path.startsWith("/register") ||
-          path.startsWith("/api/auth") ||
-          path.startsWith("/api/platforms") ||
-          path.startsWith("/api/leaderboard") ||
-          path.startsWith("/api/achievements") ||
-          path.startsWith("/verify-email") ||
-          path.startsWith("/reset-password") ||
-          path === "/"
+          pathname.startsWith("/login") ||
+          pathname.startsWith("/register") ||
+          pathname.startsWith("/api/auth") ||
+          pathname.startsWith("/api/platforms") ||
+          pathname.startsWith("/api/leaderboard") ||
+          pathname.startsWith("/api/achievements") ||
+          pathname.startsWith("/verify-email") ||
+          pathname.startsWith("/reset-password") ||
+          pathname === "/"
         ) return true;
 
         // Admin routes
-        if (path.startsWith("/admin")) return token?.role === "admin" || token?.isAdmin === true;
+        if (pathname.startsWith("/admin")) return token?.role === "admin" || token?.isAdmin === true;
 
         // All other routes require login
         return !!token;
@@ -112,10 +135,11 @@ export default withAuth(
 );
 
 // -------------------
-// Matcher
+// Matcher - More Specific
 // -------------------
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|public|images|icons).*)",
+    // ✅ Match everything except static files, Next.js internals
+    "/((?!_next/static|_next/image|favicon.ico|public|images|icons|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webmanifest|woff|woff2|ttf|eot)$).*)",
   ],
 };

@@ -73,15 +73,20 @@ export const NotificationList: React.FC<NotificationListProps> = ({
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const fetchNotifications = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await NotificationService.getList({ isRead: filter === 'unread' ? false : undefined }, 1, limit);
-      setNotifications(data.items);
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      // Guard against unexpected API shapes
+      setNotifications(data?.items ?? []);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+      setError('Failed to load notifications. Please try again.');
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -142,6 +147,24 @@ export const NotificationList: React.FC<NotificationListProps> = ({
           <div key={i} className="h-24 bg-white/50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 animate-pulse" />
         ))}
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <GlassCard className="py-20 flex flex-col items-center justify-center text-center">
+        <div className="p-4 bg-rose-100 dark:bg-rose-500/10 rounded-full mb-4">
+          <AlertCircle className="w-8 h-8 text-rose-500" />
+        </div>
+        <h3 className="font-bold text-zinc-900 dark:text-zinc-50">Something went wrong</h3>
+        <p className="text-sm text-zinc-500 max-w-xs mt-1">{error}</p>
+        <button
+          onClick={fetchNotifications}
+          className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          Try Again
+        </button>
+      </GlassCard>
     );
   }
 
