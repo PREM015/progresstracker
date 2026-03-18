@@ -1,16 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
+import { subDays } from "date-fns";
 
-// TODO: Implement this route
+export const POST = async (req: Request) => {
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    const startTime = Date.now();
+    try {
+        const sessionCutoff = subDays(new Date(), 30);
+        const result = await prisma.activeSession.deleteMany({
+            where: {
+                OR: [
+                    { lastActiveAt: { lt: sessionCutoff } },
+                    { expiresAt: { lt: new Date() } }
+                ]
+            }
+        });
 
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
-}
+        return NextResponse.json({
+            success: true,
+            data: {
+                deletedSessions: result.count,
+                duration: Date.now() - startTime
+            }
+        });
+    } catch (e: any) {
+        return NextResponse.json({ error: "Session cleanup failed", details: e.message }, { status: 500 });
+    }
+};
 
-export async function OPTIONS() {
-  return new Response(null, { status: 204 });
-}
+export const GET = POST;

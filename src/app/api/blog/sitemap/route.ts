@@ -1,43 +1,36 @@
+import { NextRequest, NextResponse } from "next/server";
+import blogService from "@/services/blogService";
 
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const { posts } = await blogService.getPublished(1, 1000);
+    
+    // Simple sitemap generation
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${process.env.NEXT_PUBLIC_APP_URL}/blog</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  ${posts.map(post => `
+  <url>
+    <loc>${process.env.NEXT_PUBLIC_APP_URL}/blog/${post.slug}</loc>
+    <lastmod>${(post.updatedAt || post.createdAt).toISOString().split('T')[0]}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`).join('')}
+</urlset>`;
 
-export async function GET() {
-    const posts = await prisma.blogPost.findMany({
-        where: {
-            status: 'published',
-            publishedAt: { lte: new Date() }
-        },
-        select: {
-            slug: true,
-            publishedAt: true,
-            updatedAt: true
-        },
-        orderBy: { publishedAt: 'desc' },
-        take: 1000
+    return new NextResponse(sitemap, {
+      headers: {
+        'Content-Type': 'application/xml',
+        'Cache-Control': 's-maxage=86400, stale-while-revalidate'
+      }
     });
-
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>';
-    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-
-    for (const post of posts) {
-        const lastmod = (post.updatedAt || post.publishedAt).toISOString();
-        xml += `
-      <url>
-        <loc>${siteUrl}/blog/${post.slug}</loc>
-        <lastmod>${lastmod}</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.7</priority>
-      </url>
-    `;
-    }
-    xml += '</urlset>';
-
-    return new NextResponse(xml, {
-        headers: {
-            'Content-Type': 'application/xml',
-            'Cache-Control': 'public, max-age=3600'
-        }
-    });
+  } catch (error) {
+    return new NextResponse('Error generating sitemap', { status: 500 });
+  }
 }
+
+export const dynamic = 'force-dynamic';

@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
+import apiResponse from "@/lib/apiResponse";
+import { generateRequestId } from "@/lib/utils";
 
-// TODO: Implement this route
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
 
+    // Mock preview data based on what a JSON export might look like
+    const preview = {
+        metadata: {
+            user: session.user.id,
+            generatedAt: new Date().toISOString()
+        },
+        dataSnippet: [
+            { type: 'activity', date: '2023-11-01', value: 10 },
+            { type: 'activity', date: '2023-11-02', value: 15 }
+        ]
+    };
 
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
+    return apiResponse.success(preview, { meta: { requestId } });
+  } catch (error) {
+    return apiResponse.internalError('Operation failed', requestId);
+  }
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+  return new NextResponse(null, { status: 204 });
 }

@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
+import apiResponse from "@/lib/apiResponse";
+import { generateRequestId } from "@/lib/utils";
 
-// TODO: Implement this route
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  try {
+    const formats = [
+      { id: 'json', name: 'JSON Data', extension: '.json' },
+      { id: 'csv', name: 'CSV Spreadhseet', extension: '.csv' },
+      { id: 'pdf', name: 'Standard PDF Report', extension: '.pdf' },
+      { id: 'excel', name: 'Excel Spreadhseet', extension: '.xlsx' }
+    ];
 
-
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
+    return apiResponse.success(formats, { meta: { requestId } });
+  } catch (error) {
+    return apiResponse.internalError('Operation failed', requestId);
+  }
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+  return new NextResponse(null, { status: 204 });
 }

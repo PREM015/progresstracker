@@ -1,16 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
+import apiResponse from "@/lib/apiResponse";
+import { generateRequestId } from "@/lib/utils";
 
 // TODO: Implement this route
 
 
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  try {
+    const { searchParams } = request.nextUrl;
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const page = parseInt(searchParams.get('page') || '1', 10);
+
+    const users = await prisma.user.findMany({
+      where: { isPublic: true, isActive: true },
+      orderBy: { totalPoints: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit,
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        image: true,
+        totalPoints: true,
+        rank: true,
+        currentStreak: true
+      }
+    });
+
+    const total = await prisma.user.count({ where: { isPublic: true, isActive: true } });
+
+    return apiResponse.paginated(
+      users,
+      { page, limit, total, totalPages: Math.ceil(total / limit), hasNextPage: page * limit < total, hasPreviousPage: page > 1 },
+      { meta: { requestId } }
+    );
+  } catch (error) {
+    return apiResponse.internalError('Operation failed', requestId);
+  }
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+  return new NextResponse(null, { status: 204 });
 }

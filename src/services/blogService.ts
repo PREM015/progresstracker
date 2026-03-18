@@ -282,6 +282,109 @@ class BlogService {
       throw error;
     }
   }
+
+  /**
+   * Get comments for a post
+   */
+  async getComments(postId: string) {
+    try {
+      const comments = await prisma.blogComment.findMany({
+        where: { postId, isApproved: true, isDeleted: false },
+        include: {
+          author: {
+            select: { id: true, name: true, image: true }
+          },
+          replies: {
+            where: { isApproved: true, isDeleted: false },
+            include: {
+              author: {
+                select: { id: true, name: true, image: true }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return comments;
+    } catch (error) {
+      log.error('Error fetching blog comments', { postId }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a comment
+   */
+  async createComment(postId: string, userId: string, content: string) {
+    try {
+      const comment = await prisma.blogComment.create({
+        data: {
+          postId,
+          authorId: userId,
+          content,
+          isApproved: true // Auto-approve for now
+        },
+        include: {
+          author: {
+            select: { id: true, name: true, image: true }
+          }
+        }
+      });
+
+      // Update comment count on post
+      await prisma.blogPost.update({
+        where: { id: postId },
+        data: { commentCount: { increment: 1 } }
+      });
+
+      log.info('Blog comment created', { postId, userId, commentId: comment.id });
+
+      return comment;
+    } catch (error) {
+      log.error('Error creating blog comment', { postId, userId }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get related posts
+   */
+  async getRelatedPosts(postId: string, limit: number = 3) {
+    try {
+      const post = await prisma.blogPost.findUnique({
+        where: { id: postId },
+        select: { category: true, tags: true }
+      });
+
+      if (!post) return [];
+
+      const related = await prisma.blogPost.findMany({
+        where: {
+          id: { not: postId },
+          status: 'published',
+          OR: [
+            { category: post.category },
+            { tags: { hasSome: post.tags } }
+          ]
+        },
+        orderBy: { publishedAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          featuredImage: true,
+          publishedAt: true
+        }
+      });
+
+      return related;
+    } catch (error) {
+      log.error('Error fetching related posts', { postId }, error);
+      throw error;
+    }
+  }
 }
 
 export const blogService = new BlogService();

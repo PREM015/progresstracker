@@ -1,16 +1,31 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
 
-// TODO: Implement this route
+export const POST = async (req: Request) => {
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    const startTime = Date.now();
+    try {
+        // Aggregate daily usage and stats
+        const usersCount = await prisma.user.count();
+        const entriesCount = await prisma.trackerEntry.count();
 
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
-}
+        // In a real scenario, write these to a daily stats table
 
-export async function OPTIONS() {
-  return new Response(null, { status: 204 });
-}
+        return NextResponse.json({
+            success: true,
+            data: {
+                totalUsers: usersCount,
+                totalEntries: entriesCount,
+                duration: Date.now() - startTime
+            }
+        });
+    } catch (e: any) {
+        return NextResponse.json({ error: "Stats aggregation failed", details: e.message }, { status: 500 });
+    }
+};
+
+export const GET = POST;

@@ -137,9 +137,7 @@ export function noContent(): NextResponse {
  * Create error response
  */
 export function error(
-  err: ApiError | Error | unknown,
-  requestId?: string
-): NextResponse<ApiErrorResponse> {
+err: ApiError | Error | unknown, p0: number, p1: { meta: { requestId: string; }; }, requestId?: string): NextResponse<ApiErrorResponse> {
   const apiError = isApiError(err) ? err : toApiError(err, requestId);
 
   // Log the error

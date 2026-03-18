@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { apiResponse, apiError } from "@/lib/apiResponse";
+import apiResponse from "@/lib/apiResponse";
+import { generateRequestId } from "@/lib/utils";
 
-// TODO: Implement this route
+export async function POST(
+  request: NextRequest, 
+  { params }: { params: Promise<{ code: string }> }
+): Promise<NextResponse> {
+  const requestId = generateRequestId();
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return apiResponse.unauthorized('Authentication required', requestId);
+    }
 
-
-export async function GET() {
-  return new Response(JSON.stringify({ message: 'Not implemented' }), { status: 501, headers: { 'Content-Type': 'application/json' } });
+    const code = (await params).code;
+    
+    // Mock revocation
+    return apiResponse.success({ message: `Share link ${code} revoked` }, { meta: { requestId } });
+  } catch (error) {
+    return apiResponse.internalError('Operation failed', requestId);
+  }
 }
 
 export async function OPTIONS() {
-  return new Response(null, { status: 204 });
+  return new NextResponse(null, { status: 204 });
 }

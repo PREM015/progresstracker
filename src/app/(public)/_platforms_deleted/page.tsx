@@ -3,6 +3,7 @@
 import React from "react";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function DeletedPlatformsPage() {
     return (
@@ -13,9 +14,9 @@ export default function DeletedPlatformsPage() {
                 The platforms you are looking for have been removed or are no longer supported.
             </p>
             <Button variant="outline" className="bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800" asChild>
-                <a href="/">
+                <Link href="/">
                     <ArrowLeft className="w-4 h-4 mr-2" /> Return Home
-                </a>
+                </Link>
             </Button>
         </div>
     );

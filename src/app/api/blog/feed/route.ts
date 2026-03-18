@@ -3,45 +3,45 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 function escapeXml(unsafe: string): string {
-    return unsafe.replace(/[<>&'"]/g, (c) => {
-        switch (c) {
-            case '<': return '&lt;';
-            case '>': return '&gt;';
-            case '&': return '&amp;';
-            case '\'': return '&apos;';
-            case '"': return '&quot;';
-            default: return c;
-        }
-    });
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
 }
 
 export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const category = searchParams.get("category");
+  const { searchParams } = new URL(req.url);
+  const limit = parseInt(searchParams.get("limit") || "20");
+  const category = searchParams.get("category");
 
-    const posts = await prisma.blogPost.findMany({
-        where: {
-            status: 'published',
-            publishedAt: { lte: new Date() },
-            category: category || undefined
-        },
-        orderBy: { publishedAt: 'desc' },
-        take: limit,
-        select: {
-            id: true,
-            slug: true,
-            title: true,
-            excerpt: true,
-            category: true,
-            publishedAt: true
-        }
-    });
+  const posts = await prisma.blogPost.findMany({
+    where: {
+      status: 'published',
+      publishedAt: { lte: new Date() },
+      category: category || undefined
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      excerpt: true,
+      category: true,
+      publishedAt: true
+    }
+  });
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
-    const lastBuildDate = new Date().toUTCString();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com';
+  const lastBuildDate = new Date().toUTCString();
 
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Progress Tracker Blog</title>
@@ -51,11 +51,11 @@ export async function GET(req: Request) {
     <lastBuildDate>${lastBuildDate}</lastBuildDate>
     <atom:link href="${siteUrl}/api/blog/feed" rel="self" type="application/rss+xml"/>`;
 
-    for (const post of posts) {
-        const postUrl = `${siteUrl}/blog/${post.slug}`;
-        const pubDate = post.publishedAt ? new Date(post.publishedAt).toUTCString() : new Date().toUTCString();
+  for (const post of posts) {
+    const postUrl = `${siteUrl}/blog/${post.slug}`;
+    const pubDate = post.publishedAt ? new Date(post.publishedAt).toUTCString() : new Date().toUTCString();
 
-        xml += `
+    xml += `
     <item>
       <title>${escapeXml(post.title)}</title>
       <link>${postUrl}</link>
@@ -64,55 +64,55 @@ export async function GET(req: Request) {
       <guid isPermaLink="true">${postUrl}</guid>
       ${post.category ? `<category>${escapeXml(post.category)}</category>` : ''}
     </item>`;
-    }
+  }
 
-    xml += `
+  xml += `
   </channel>
 </rss>`;
 
-    return new NextResponse(xml, {
-        headers: {
-            'Content-Type': 'application/rss+xml; charset=utf-8',
-            'Cache-Control': 'public, max-age=3600'
-        }
-    });
+  return new NextResponse(xml, {
+    headers: {
+      'Content-Type': 'application/rss+xml; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600'
+    }
+  });
 }
 
 export async function HEAD(req: Request) {
-    const postCount = await prisma.blogPost.count({
-        where: {
-            status: 'published',
-            publishedAt: { lte: new Date() }
-        }
-    });
+  const postCount = await prisma.blogPost.count({
+    where: {
+      status: 'published',
+      publishedAt: { lte: new Date() }
+    }
+  });
 
-    const latestPost = await prisma.blogPost.findFirst({
-        where: {
-            status: 'published',
-            publishedAt: { lte: new Date() }
-        },
-        orderBy: { publishedAt: 'desc' },
-        select: { publishedAt: true }
-    });
+  const latestPost = await prisma.blogPost.findFirst({
+    where: {
+      status: 'published',
+      publishedAt: { lte: new Date() }
+    },
+    orderBy: { publishedAt: 'desc' },
+    select: { publishedAt: true }
+  });
 
-    return new NextResponse(null, {
-        status: 200,
-        headers: {
-            'X-Post-Count': postCount.toString(),
-            'X-Latest-Post-Date': latestPost?.publishedAt?.toISOString() || '',
-            'Content-Type': 'application/rss+xml; charset=utf-8',
-        },
-    });
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'X-Post-Count': postCount.toString(),
+      'X-Latest-Post-Date': latestPost?.publishedAt?.toISOString() || '',
+      'Content-Type': 'application/rss+xml; charset=utf-8',
+    },
+  });
 }
 
 export async function OPTIONS(req: Request) {
-    return new NextResponse(null, {
-        status: 200,
-        headers: {
-            'Allow': 'GET, HEAD, OPTIONS',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Cache-Control': 'public, max-age=3600',
-        },
-    });
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Allow': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
 }
