@@ -5,9 +5,9 @@
 // =============================================================================
 
 // Build a proper "Name <email>" from address from env vars
-const fromEmail = process.env.BREVO_EMAIL || process.env.EMAIL_FROM || 'noreply@progresstracker.app';
+const fromEmail = process.env.EMAIL_FROM || process.env.BREVO_EMAIL || 'noreply@progresstracker.app';
 const fromName = process.env.EMAIL_FROM_NAME || 'ProgressTracker';
-const formattedFrom = `${fromName} <${fromEmail}>`;
+const formattedFrom = `"${fromName}" <${fromEmail}>`;
 
 export const emailConfig = {
   // From addresses

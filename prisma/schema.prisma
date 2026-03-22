@@ -374,8 +374,6 @@ model User {
   deletedAt         DateTime?
 
   // ===== RELATIONS =====
-
-  // Auth Relations
   accounts            Account[]
   sessions            Session[]
   activeSessions      ActiveSession[]
@@ -386,112 +384,70 @@ model User {
   twoFactorAuth       TwoFactorAuth?
   backupCodes         BackupCode[]
   loginAttempts       LoginAttempt[]
+  platforms           UserPlatform[]
+  customPlatforms     CustomPlatform[]
+  trackerEntries      TrackerEntry[]
+  dailyStats          DailyStats[]
+  streakHistory       StreakHistory[]
+  goals               Goal[]
+  goalReminders       GoalReminder[]
+  goalHistories       GoalHistory[]
+  achievements        UserAchievement[]
+  notifications       Notification[]
+  pushSubscriptions   PushSubscription[]
+  subscription        Subscription?
+  invoices            Invoice[]
+  paymentMethods      PaymentMethod[]
+  paymentEvents       PaymentEvent[]
+  couponRedemptions   CouponRedemption[]
+  exportJobs          ExportJob[]
+  scheduledExports    ScheduledExport[]
+  syncLogs            SyncLog[]
+  settings            UserSettings?
+  notificationPrefs   NotificationPreferences?
+  apiKeys             ApiKey[]
+  auditLogs           AuditLog[]
+  webhooks            Webhook[]
+  supportTickets      SupportTicket[]
+  ticketReplies       TicketReply[]
+  reports             Report[]
+  referrals           User[]           @relation("Referrals")
+  referrer            User?            @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
+  referrerRewards     ReferralReward[] @relation("ReferrerRewards")
+  referredRewards     ReferralReward[] @relation("ReferredRewards")
+  feedback            Feedback[]
+  bookmarks           Bookmark[]
+  blogComments        BlogComment[]
+  blogLikes           BlogPostLike[]
+  shareLinks          ShareLink[]
+  shareViews          ShareViewLog[]
+  recentSearches      RecentSearch[]
 
-  // Platform Relations
-  platforms       UserPlatform[]
-  customPlatforms CustomPlatform[]
-
-  // Tracking Relations
-  trackerEntries TrackerEntry[]
-  dailyStats     DailyStats[]
-  streakHistory  StreakHistory[]
-
-  // Goals & Achievements
-  goals         Goal[]
-  goalReminders GoalReminder[]
-  goalHistories GoalHistory[]
-  achievements  UserAchievement[]
-
-  // Notifications
-  notifications     Notification[]
-  pushSubscriptions PushSubscription[]
-
-  // Billing
-  subscription      Subscription?
-  invoices          Invoice[]
-  paymentMethods    PaymentMethod[]
-  paymentEvents     PaymentEvent[]
-  couponRedemptions CouponRedemption[]
-
-  // Export
-  exportJobs       ExportJob[]
-  scheduledExports ScheduledExport[]
-
-  // Sync
-  syncLogs SyncLog[]
-
-  // Settings
-  settings          UserSettings?
-  notificationPrefs NotificationPreferences?
-
-  // API & Security
-  apiKeys   ApiKey[]
-  auditLogs AuditLog[]
-  webhooks  Webhook[]
-
-  // Support
-  supportTickets SupportTicket[]
-  ticketReplies  TicketReply[]
-
-  // Reports
-  reports Report[]
-
-  // Referrals
-  referrals       User[]           @relation("Referrals")
-  referrer        User?            @relation("Referrals", fields: [referredBy], references: [id], onDelete: SetNull)
-  referrerRewards ReferralReward[] @relation("ReferrerRewards")
-  referredRewards ReferralReward[] @relation("ReferredRewards")
-
-  // Feedback
-  feedback Feedback[]
-
-  // Blog & Bookmarks
-  bookmarks    Bookmark[]
-  blogComments BlogComment[]
-  blogLikes    BlogPostLike[]
-
-  // Share Links
-  shareLinks     ShareLink[]
-  shareViews     ShareViewLog[]
-  recentSearches RecentSearch[]
-
-  // ===== EXISTING INDEXES =====
-  @@index([email, isActive], map: "idx_user_email_active_v1")
-  @@index([username, isActive], map: "idx_user_username_active_v1")
-  @@index([totalPoints(sort: Desc)], map: "idx_user_points_desc_v1")
-  // ===== EXISTING INDEXES =====
+  // ===== INDEXES =====
   @@index([email])
   @@index([username])
   @@index([isPublic])
   @@index([isActive])
-  @@index([currentStreak], map: "idx_user_current_streak_v1")
-  @@index([totalPoints], map: "idx_user_points_plain_v1")
   @@index([rank])
   @@index([createdAt])
   @@index([lastActiveAt])
   @@index([referralCode])
   @@index([referredBy])
-  @@index([deletedAt], map: "idx_user_deleted_at_v1")
-  @@index([email, isActive], map: "idx_user_email_active_v2")
-  // ===== NEW INDEXES =====
-  // Admin panel mein banned users filter karne ke liye
-  @@index([isBanned], map: "idx_user_is_banned")
-  // Role-based access queries ke liye (admin list, etc.)
-  @@index([role], map: "idx_user_role")
-  // Admin + isActive combo - admin dashboard queries
-  @@index([role, isActive], map: "idx_user_role_active")
-  // Onboarding funnel analytics ke liye
-  @@index([onboardingCompleted], map: "idx_user_onboarding_completed")
-  // Verified users filter - email campaigns, trust scores
-  @@index([isVerified], map: "idx_user_is_verified")
-  // Leaderboard: public + active + points sort combo
-  @@index([isPublic, isActive, totalPoints(sort: Desc)], map: "idx_user_leaderboard")
-  // Longest streak leaderboard ke liye
+  @@index([email, isActive], map: "idx_user_email_active")
+  @@index([username, isActive], map: "idx_user_username_active")
+  @@index([totalPoints(sort: Desc)], map: "idx_user_points_desc")
+  @@index([currentStreak(sort: Desc)], map: "idx_user_current_streak_desc")
   @@index([longestStreak(sort: Desc)], map: "idx_user_longest_streak_desc")
-  // Signup source analytics (marketing attribution)
+  @@index([deletedAt], map: "idx_user_deleted_at")
+  @@index([isBanned], map: "idx_user_is_banned")
+  @@index([role], map: "idx_user_role")
+  @@index([role, isActive], map: "idx_user_role_active")
+  @@index([onboardingCompleted], map: "idx_user_onboarding_completed")
+  @@index([isVerified], map: "idx_user_is_verified")
+  @@index([isPublic, isActive, totalPoints(sort: Desc)], map: "idx_user_leaderboard")
   @@index([signupSource], map: "idx_user_signup_source")
-  // lastLoginAt - inactive user cleanup / re-engagement campaigns
   @@index([lastLoginAt], map: "idx_user_last_login_at")
+  @@index([isActive, isBanned], map: "idx_user_active_banned")
 }
 
 model Account {
@@ -509,7 +465,6 @@ model Account {
   id_token      String? @db.Text
   session_state String?
 
-  // Additional OAuth data
   providerProfileUrl String?
   providerUsername   String?
   providerEmail      String?
@@ -520,16 +475,11 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([provider, providerAccountId])
   @@index([userId])
   @@index([provider])
-  // ===== NEW INDEXES =====
-  // OAuth email se user dhundhne ke liye (provider email lookup)
   @@index([providerEmail], map: "idx_account_provider_email")
-  // providerUsername se search (e.g., GitHub username lookup)
   @@index([providerUsername], map: "idx_account_provider_username")
-  // userId + provider combo - user ke specific provider ka account
   @@index([userId, provider], map: "idx_account_user_provider")
 }
 
@@ -538,12 +488,10 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-
-  createdAt DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([expires])
 }
@@ -553,19 +501,15 @@ model VerificationToken {
   token      String   @unique
   expires    DateTime
 
-  // ===== EXISTING INDEXES =====
   @@unique([identifier, token])
   @@index([expires])
 }
 
 model ActiveSession {
-  id     String @id @default(cuid())
-  userId String
-
-  token String @unique
-
-  // Device Information
-  userAgent      String? @db.Text
+  id             String    @id @default(cuid())
+  userId         String
+  token          String    @unique
+  userAgent      String?   @db.Text
   ipAddress      String?
   device         String?
   deviceModel    String?
@@ -573,251 +517,183 @@ model ActiveSession {
   browserVersion String?
   os             String?
   osVersion      String?
-
-  // Location (from IP)
-  country     String?
-  countryCode String?
-  city        String?
-  region      String?
-  latitude    Float?
-  longitude   Float?
-
-  // Status
-  isValid   Boolean @default(true)
-  isCurrent Boolean @default(false)
-
-  // Activity
-  lastActiveAt DateTime @default(now())
-  expiresAt    DateTime
-
-  // Security
-  revokedAt     DateTime?
-  revokedReason String?
-
-  createdAt DateTime @default(now())
+  country        String?
+  countryCode    String?
+  city           String?
+  region         String?
+  latitude       Float?
+  longitude      Float?
+  isValid        Boolean   @default(true)
+  isCurrent      Boolean   @default(false)
+  lastActiveAt   DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?
+  createdAt      DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([token])
   @@index([isValid])
   @@index([expiresAt])
   @@index([lastActiveAt])
-  @@index([userId, isValid, expiresAt], name: "active_sessions_count_idx")
-  @@index([lastActiveAt, isValid])
-  @@index([userId, lastActiveAt])
-  // ===== NEW INDEXES =====
-  // Security: ek IP se suspicious multiple sessions detect karna
+  @@index([userId, isValid, expiresAt], map: "idx_active_session_user_valid_expires")
+  @@index([lastActiveAt, isValid], map: "idx_active_session_last_active_valid")
+  @@index([userId, lastActiveAt], map: "idx_active_session_user_last_active")
   @@index([ipAddress], map: "idx_active_session_ip_address")
-  // isCurrent flag - user ka current session jaldi fetch karna
   @@index([userId, isCurrent], map: "idx_active_session_user_current")
-  // Revoked sessions audit ke liye
   @@index([revokedAt], map: "idx_active_session_revoked_at")
 }
 
 model RefreshToken {
-  id     String @id @default(cuid())
-  userId String
-
-  token  String @unique
-  family String
-
-  deviceId String?
-
-  isValid Boolean @default(true)
-
-  expiresAt DateTime
-
+  id              String    @id @default(cuid())
+  userId          String
+  token           String    @unique
+  family          String
+  deviceId        String?
+  isValid         Boolean   @default(true)
+  expiresAt       DateTime
   revokedAt       DateTime?
   revokedReason   String?
   replacedByToken String?
-
-  createdAt DateTime @default(now())
+  createdAt       DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([token])
   @@index([family])
   @@index([isValid])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // deviceId se token lookup - device-specific session management
   @@index([deviceId], map: "idx_refresh_token_device_id")
-  // userId + isValid combo - valid tokens of a user
   @@index([userId, isValid], map: "idx_refresh_token_user_valid")
 }
 
 model PasswordReset {
-  id     String @id @default(cuid())
-  userId String
-
+  id        String    @id @default(cuid())
+  userId    String
   token     String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-
   ipAddress String?
-  userAgent String? @db.Text
-
-  createdAt DateTime @default(now())
+  userAgent String?   @db.Text
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([token])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // Unused reset tokens cleanup (usedAt IS NULL + expired)
   @@index([usedAt], map: "idx_password_reset_used_at")
-  // Security: brute force detection via IP
   @@index([ipAddress], map: "idx_password_reset_ip_address")
 }
 
 model EmailVerification {
-  id     String @id @default(cuid())
-  userId String
-
+  id         String    @id @default(cuid())
+  userId     String
   email      String
   token      String    @unique
   expiresAt  DateTime
   verifiedAt DateTime?
-
-  type String @default("verification")
-
+  type       String    @default("verification")
   verifiedIp String?
-
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([token])
   @@index([email])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // Pending verification dhundhna (verifiedAt IS NULL)
+  @@index([token, type], map: "idx_email_verification_token_type")
+  @@index([userId, type, verifiedAt], map: "idx_email_verification_user_type_verified")
   @@index([verifiedAt], map: "idx_email_verification_verified_at")
-  // Type-based queries (verification vs magic-link, etc.)
   @@index([type], map: "idx_email_verification_type")
 }
 
 model EmailChangeRequest {
-  id     String @id @default(cuid())
-  userId String
-
-  oldEmail String
-  newEmail String
-
-  oldEmailToken String @unique
-  newEmailToken String @unique
-
-  oldEmailVerified Boolean @default(false)
-  newEmailVerified Boolean @default(false)
-
-  expiresAt   DateTime
-  completedAt DateTime?
-  cancelledAt DateTime?
-
-  createdAt DateTime @default(now())
+  id               String    @id @default(cuid())
+  userId           String
+  oldEmail         String
+  newEmail         String
+  oldEmailToken    String    @unique
+  newEmailToken    String    @unique
+  oldEmailVerified Boolean   @default(false)
+  newEmailVerified Boolean   @default(false)
+  expiresAt        DateTime
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([oldEmailToken])
   @@index([newEmailToken])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // Pending requests check - completedAt IS NULL
   @@index([completedAt], map: "idx_email_change_completed_at")
-  // Old/new email se reverse lookup
   @@index([newEmail], map: "idx_email_change_new_email")
 }
 
 model TwoFactorAuth {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  secret String
-
-  isEnabled Boolean @default(false)
-  isPending Boolean @default(true)
-
-  verifiedAt DateTime?
-  lastUsedAt DateTime?
-
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  secret        String
+  isEnabled     Boolean   @default(false)
+  isPending     Boolean   @default(true)
+  verifiedAt    DateTime?
+  lastUsedAt    DateTime?
   recoveryEmail String?
   recoveryPhone String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== NEW INDEXES =====
-  // 2FA enabled users ka count / admin monitoring
   @@index([isEnabled], map: "idx_two_factor_is_enabled")
-  // Pending setup wale users ko nudge karna
   @@index([isPending], map: "idx_two_factor_is_pending")
 }
 
 model BackupCode {
-  id     String @id @default(cuid())
-  userId String
-
-  code String
-
+  id            String    @id @default(cuid())
+  userId        String
+  code          String
   usedAt        DateTime?
   usedIpAddress String?
-
-  createdAt DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([code])
-  // ===== NEW INDEXES =====
-  // Unused codes dhundhna (usedAt IS NULL) for user
   @@index([userId, usedAt], map: "idx_backup_code_user_used_at")
 }
 
 model LoginAttempt {
-  id     String  @id @default(cuid())
-  userId String?
-
-  email String
-
-  success       Boolean
-  failureReason String?
-
-  ipAddress String?
-  userAgent String? @db.Text
-  country   String?
-
-  twoFactorRequired Boolean @default(false)
-  twoFactorPassed   Boolean @default(false)
-
-  createdAt DateTime @default(now())
+  id                String   @id @default(cuid())
+  userId            String?
+  email             String
+  success           Boolean
+  failureReason     String?
+  ipAddress         String?
+  userAgent         String?  @db.Text
+  country           String?
+  twoFactorRequired Boolean  @default(false)
+  twoFactorPassed   Boolean  @default(false)
+  createdAt         DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([email])
   @@index([ipAddress])
   @@index([createdAt])
   @@index([success])
-  // ===== NEW INDEXES =====
-  // Brute force detection: email + success + createdAt (recent failed attempts)
+  @@index([userId, createdAt(sort: Desc)], map: "idx_login_attempt_user_created_desc")
+  @@index([email, createdAt(sort: Desc)], map: "idx_login_attempt_email_created_desc")
   @@index([email, success, createdAt], map: "idx_login_attempt_email_success_time")
-  // IP-based rate limiting: IP + success + createdAt
   @@index([ipAddress, success, createdAt], map: "idx_login_attempt_ip_success_time")
-  // Country-based suspicious activity monitoring
   @@index([country, createdAt], map: "idx_login_attempt_country_time")
 }
 
@@ -826,64 +702,50 @@ model LoginAttempt {
 // ============================================================================
 
 model Platform {
-  id String @id @default(cuid())
-
-  slug        String  @unique
-  name        String
-  displayName String?
-  description String? @db.Text
-
-  category    PlatformCategory
-  subcategory String?
-  tags        String[]         @default([])
-
-  authType     AuthType @default(NONE)
-  oauthConfig  Json?
-  apiKeyConfig Json?
-
-  icon            String?
-  logo            String?
-  color           String?
-  backgroundColor String?
-
-  website           String?
-  apiEndpoint       String?
-  profileUrlPattern String?
-
-  supportsAutoSync    Boolean @default(false)
-  supportsWebhook     Boolean @default(false)
-  supportsOAuth       Boolean @default(false)
-  supportsApiKey      Boolean @default(false)
-  requiresCredentials Boolean @default(false)
-
-  syncPriority Int @default(0)
-  syncInterval Int @default(1440)
-
-  rateLimit       Int?
-  rateLimitWindow Int?
-
-  dataPoints    Json?
-  scraperConfig Json?
-
-  isActive           Boolean @default(true)
-  isVerified         Boolean @default(true)
-  isBeta             Boolean @default(false)
-  maintenanceMode    Boolean @default(false)
-  maintenanceMessage String?
-
-  lastHealthCheck DateTime?
-  healthStatus    String?
-  healthMessage   String?
-
-  totalUsers      Int   @default(0)
-  successRate     Float @default(100)
-  avgSyncDuration Int?
-
-  setupGuideUrl  String?
-  helpArticleUrl String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String           @id @default(cuid())
+  slug                String           @unique
+  name                String
+  displayName         String?
+  description         String?          @db.Text
+  category            PlatformCategory
+  subcategory         String?
+  tags                String[]         @default([])
+  authType            AuthType         @default(NONE)
+  oauthConfig         Json?
+  apiKeyConfig        Json?
+  icon                String?
+  logo                String?
+  color               String?
+  backgroundColor     String?
+  website             String?
+  apiEndpoint         String?
+  profileUrlPattern   String?
+  supportsAutoSync    Boolean          @default(false)
+  supportsWebhook     Boolean          @default(false)
+  supportsOAuth       Boolean          @default(false)
+  supportsApiKey      Boolean          @default(false)
+  requiresCredentials Boolean          @default(false)
+  syncPriority        Int              @default(0)
+  syncInterval        Int              @default(1440)
+  rateLimit           Int?
+  rateLimitWindow     Int?
+  dataPoints          Json?
+  scraperConfig       Json?
+  isActive            Boolean          @default(true)
+  isVerified          Boolean          @default(true)
+  isBeta              Boolean          @default(false)
+  maintenanceMode     Boolean          @default(false)
+  maintenanceMessage  String?
+  lastHealthCheck     DateTime?
+  healthStatus        String?
+  healthMessage       String?
+  totalUsers          Int              @default(0)
+  successRate         Float            @default(100)
+  avgSyncDuration     Int?
+  setupGuideUrl       String?
+  helpArticleUrl      String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   users          UserPlatform[]
   trackerEntries TrackerEntry[]
@@ -891,89 +753,64 @@ model Platform {
   platformStats  PlatformDailyStats[]
   goals          Goal[]
 
-  // ===== EXISTING INDEXES =====
   @@index([category])
   @@index([isActive])
   @@index([slug])
   @@index([supportsAutoSync])
-  // ===== NEW INDEXES =====
-  // Category + isActive combo - browse platforms by category (most common query)
   @@index([category, isActive], map: "idx_platform_category_active")
-  // Beta platforms filter - beta feature flags
   @@index([isBeta], map: "idx_platform_is_beta")
-  // Maintenance mode check - global health check
   @@index([maintenanceMode], map: "idx_platform_maintenance_mode")
-  // Health monitoring dashboard
   @@index([healthStatus], map: "idx_platform_health_status")
-  // authType se filter - OAuth/API key supported platforms
   @@index([authType], map: "idx_platform_auth_type")
-  // isVerified platforms - show only verified ones in UI
   @@index([isVerified], map: "idx_platform_is_verified")
-  // Popularity sorting - most used platforms
   @@index([totalUsers(sort: Desc)], map: "idx_platform_total_users_desc")
 }
 
 model CustomPlatform {
-  id     String @id @default(cuid())
-  userId String
-
-  name        String
-  displayName String?
-  description String? @db.Text
-
-  category PlatformCategory
-
-  icon    String?
-  color   String?
-  website String?
-
+  id             String           @id @default(cuid())
+  userId         String
+  name           String
+  displayName    String?
+  description    String?          @db.Text
+  category       PlatformCategory
+  icon           String?
+  color          String?
+  website        String?
   trackingFields Json?
-
-  isActive  Boolean   @default(true)
-  deletedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive       Boolean          @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   trackerEntries TrackerEntry[]
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, name])
   @@index([userId])
   @@index([category])
   @@index([isActive])
   @@index([deletedAt])
-  // ===== NEW INDEXES =====
-  // userId + isActive combo - user ke active custom platforms
   @@index([userId, isActive], map: "idx_custom_platform_user_active")
-  // userId + category - category se user ka custom platform
   @@index([userId, category], map: "idx_custom_platform_user_category")
 }
 
 model UserPlatform {
-  id         String @id @default(cuid())
-  userId     String
-  platformId String
-
-  username       String?
-  profileUrl     String?
-  externalUserId String?
-
-  credentials    Json?
-  accessToken    String?   @db.Text
-  refreshToken   String?   @db.Text
-  tokenExpiresAt DateTime?
-
-  apiKey String? @db.Text
-
-  isActive   Boolean   @default(true)
-  isVerified Boolean   @default(false)
-  verifiedAt DateTime?
-
-  connectionStatus String  @default("pending")
-  connectionError  String?
-
+  id                  String     @id @default(cuid())
+  userId              String
+  platformId          String
+  username            String?
+  profileUrl          String?
+  externalUserId      String?
+  credentials         Json?
+  accessToken         String?    @db.Text
+  refreshToken        String?    @db.Text
+  tokenExpiresAt      DateTime?
+  apiKey              String?    @db.Text
+  isActive            Boolean    @default(true)
+  isVerified          Boolean    @default(false)
+  verifiedAt          DateTime?
+  connectionStatus    String     @default("pending")
+  connectionError     String?
   syncStatus          SyncStatus @default(IDLE)
   lastSyncedAt        DateTime?
   lastSyncError       String?
@@ -981,26 +818,20 @@ model UserPlatform {
   syncAttempts        Int        @default(0)
   consecutiveFailures Int        @default(0)
   nextSyncAt          DateTime?
-
-  cachedStats    Json?
-  statsUpdatedAt DateTime?
-
-  platformData Json?
-
-  autoSync     Boolean @default(true)
-  syncPriority Int     @default(0)
-
-  notifyOnSync  Boolean @default(false)
-  notifyOnError Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  cachedStats         Json?
+  statsUpdatedAt      DateTime?
+  platformData        Json?
+  autoSync            Boolean    @default(true)
+  syncPriority        Int        @default(0)
+  notifyOnSync        Boolean    @default(false)
+  notifyOnError       Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform Platform  @relation(fields: [platformId], references: [id], onDelete: Cascade)
   syncLogs SyncLog[]
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, platformId])
   @@index([userId])
   @@index([platformId])
@@ -1008,24 +839,17 @@ model UserPlatform {
   @@index([nextSyncAt])
   @@index([isActive])
   @@index([lastSyncedAt])
-  @@index([userId, platformId, isActive])
-  @@index([userId, syncStatus])
-  @@index([userId, isActive])
-  @@index([userId, updatedAt])
-  @@index([userId, platformId, syncStatus])
-  @@index([autoSync, syncStatus])
-  // ===== NEW INDEXES =====
-  // Token expiry cron job - expired tokens refresh karna
+  @@index([userId, platformId, isActive], map: "idx_user_platform_user_platform_active")
+  @@index([userId, syncStatus], map: "idx_user_platform_user_sync_status")
+  @@index([userId, isActive], map: "idx_user_platform_user_active")
+  @@index([userId, updatedAt], map: "idx_user_platform_user_updated")
+  @@index([userId, platformId, syncStatus], map: "idx_user_platform_user_platform_sync")
+  @@index([autoSync, syncStatus], map: "idx_user_platform_autosync_status")
   @@index([tokenExpiresAt], map: "idx_user_platform_token_expires_at")
-  // Connection status filter - failed/pending connections dashboard
   @@index([connectionStatus], map: "idx_user_platform_connection_status")
-  // consecutiveFailures - problematic connections detect karna
   @@index([consecutiveFailures], map: "idx_user_platform_consecutive_failures")
-  // platformId + isActive - platform ke active users count
   @@index([platformId, isActive], map: "idx_user_platform_platform_active")
-  // autoSync + nextSyncAt - sync scheduler ke liye
   @@index([autoSync, nextSyncAt], map: "idx_user_platform_autosync_next")
-  // isVerified filter - unverified connections alert
   @@index([isVerified], map: "idx_user_platform_is_verified")
 }
 
@@ -1034,241 +858,183 @@ model UserPlatform {
 // ============================================================================
 
 model TrackerEntry {
-  id               String  @id @default(cuid())
-  userId           String
-  platformId       String?
-  customPlatformId String?
-
-  date DateTime @db.Date
-
-  category    PlatformCategory?
-  subcategory String?
-
-  problemsSolved    Int @default(0)
-  problemsAttempted Int @default(0)
-
-  easyProblems   Int @default(0)
-  mediumProblems Int @default(0)
-  hardProblems   Int @default(0)
-
-  commits            Int @default(0)
-  pullRequests       Int @default(0)
-  pullRequestsMerged Int @default(0)
-  issuesOpened       Int @default(0)
-  issuesClosed       Int @default(0)
-  codeReviews        Int @default(0)
-  linesOfCode        Int @default(0)
-
-  projectsStarted   Int @default(0)
-  projectsCompleted Int @default(0)
-
-  coursesStarted       Int @default(0)
-  coursesCompleted     Int @default(0)
-  lessonsCompleted     Int @default(0)
-  modulesCompleted     Int @default(0)
-  certificationsEarned Int @default(0)
-  quizzesTaken         Int @default(0)
-  quizzesPassed        Int @default(0)
-
-  articlesRead       Int @default(0)
-  tutorialsCompleted Int @default(0)
-  documentationPages Int @default(0)
-
-  applicationsSubmitted Int @default(0)
-  applicationsViewed    Int @default(0)
-  interviewsScheduled   Int @default(0)
-  interviewsCompleted   Int @default(0)
-  offersReceived        Int @default(0)
-
-  contestsParticipated Int @default(0)
-  contestsCompleted    Int @default(0)
-  hackathonsJoined     Int @default(0)
-  hackathonsCompleted  Int @default(0)
-
-  mentoringSessions Int @default(0)
-  helpGiven         Int @default(0)
-  helpReceived      Int @default(0)
-  postsWritten      Int @default(0)
-  commentsWritten   Int @default(0)
-
-  timeSpent Int @default(0)
-  focusTime Int @default(0)
-
-  averageDifficulty Float?
-  accuracyRate      Float?
-  completionRate    Float?
-
-  rating       Int?
-  ratingChange Int?
-  rank         Int?
-  rankChange   Int?
-  points       Int?
-  pointsEarned Int?
-  streak       Int?
-  xpEarned     Int?
-
-  mood               String?
-  energyLevel        Int?
-  productivityRating Int?
-  notes              String? @db.Text
-
-  tags      String[] @default([])
-  topics    String[] @default([])
-  languages String[] @default([])
-
-  source          String  @default("manual")
-  syncLogId       String?
-  isAutoGenerated Boolean @default(false)
-
-  isVerified Boolean   @default(false)
-  verifiedAt DateTime?
-
-  customFields Json?
-
-  deletedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String            @id @default(cuid())
+  userId                String
+  platformId            String?
+  customPlatformId      String?
+  date                  DateTime          @db.Date
+  category              PlatformCategory?
+  subcategory           String?
+  problemsSolved        Int               @default(0)
+  problemsAttempted     Int               @default(0)
+  easyProblems          Int               @default(0)
+  mediumProblems        Int               @default(0)
+  hardProblems          Int               @default(0)
+  commits               Int               @default(0)
+  pullRequests          Int               @default(0)
+  pullRequestsMerged    Int               @default(0)
+  issuesOpened          Int               @default(0)
+  issuesClosed          Int               @default(0)
+  codeReviews           Int               @default(0)
+  linesOfCode           Int               @default(0)
+  projectsStarted       Int               @default(0)
+  projectsCompleted     Int               @default(0)
+  coursesStarted        Int               @default(0)
+  coursesCompleted      Int               @default(0)
+  lessonsCompleted      Int               @default(0)
+  modulesCompleted      Int               @default(0)
+  certificationsEarned  Int               @default(0)
+  quizzesTaken          Int               @default(0)
+  quizzesPassed         Int               @default(0)
+  articlesRead          Int               @default(0)
+  tutorialsCompleted    Int               @default(0)
+  documentationPages    Int               @default(0)
+  applicationsSubmitted Int               @default(0)
+  applicationsViewed    Int               @default(0)
+  interviewsScheduled   Int               @default(0)
+  interviewsCompleted   Int               @default(0)
+  offersReceived        Int               @default(0)
+  contestsParticipated  Int               @default(0)
+  contestsCompleted     Int               @default(0)
+  hackathonsJoined      Int               @default(0)
+  hackathonsCompleted   Int               @default(0)
+  mentoringSessions     Int               @default(0)
+  helpGiven             Int               @default(0)
+  helpReceived          Int               @default(0)
+  postsWritten          Int               @default(0)
+  commentsWritten       Int               @default(0)
+  timeSpent             Int               @default(0)
+  focusTime             Int               @default(0)
+  averageDifficulty     Float?
+  accuracyRate          Float?
+  completionRate        Float?
+  rating                Int?
+  ratingChange          Int?
+  rank                  Int?
+  rankChange            Int?
+  points                Int?
+  pointsEarned          Int?
+  streak                Int?
+  xpEarned              Int?
+  mood                  String?
+  energyLevel           Int?
+  productivityRating    Int?
+  notes                 String?           @db.Text
+  tags                  String[]          @default([])
+  topics                String[]          @default([])
+  languages             String[]          @default([])
+  source                String            @default("manual")
+  syncLogId             String?
+  isAutoGenerated       Boolean           @default(false)
+  isVerified            Boolean           @default(false)
+  verifiedAt            DateTime?
+  customFields          Json?
+  deletedAt             DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform       Platform?       @relation(fields: [platformId], references: [id], onDelete: SetNull)
   customPlatform CustomPlatform? @relation(fields: [customPlatformId], references: [id], onDelete: SetNull)
   syncLog        SyncLog?        @relation(fields: [syncLogId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, platformId, date])
   @@index([userId])
   @@index([platformId])
-  @@index([userId, createdAt], map: "tracker_user_created_idx")
-  @@index([userId, date(sort: Desc)], map: "tracker_user_date_desc_idx")
-  @@index([platformId, date])
-  @@index([userId, category])
-  @@index([userId, category, date])
-  @@index([userId, platformId, date])
-  @@index([source])
   @@index([date])
+  @@index([source])
   @@index([customPlatformId])
   @@index([syncLogId])
   @@index([deletedAt])
-  @@index([userId, date, problemsSolved], map: "tracker_user_date_problems_idx")
-  @@index([userId, date], map: "tracker_user_date_idx_v2")
-  @@index([userId, date, platformId])
-  // ===== NEW INDEXES =====
-  // isAutoGenerated filter - manual vs auto entries distinguish
+  @@index([userId, createdAt], map: "idx_tracker_user_created")
+  @@index([userId, date(sort: Desc)], map: "idx_tracker_user_date_desc")
+  @@index([platformId, date], map: "idx_tracker_platform_date")
+  @@index([userId, category], map: "idx_tracker_user_category")
+  @@index([userId, category, date], map: "idx_tracker_user_category_date")
+  @@index([userId, platformId, date], map: "idx_tracker_user_platform_date")
+  @@index([userId, date, problemsSolved], map: "idx_tracker_user_date_problems")
+  @@index([userId, date], map: "idx_tracker_user_date")
   @@index([userId, isAutoGenerated], map: "idx_tracker_user_auto_generated")
-  // Unverified entries admin review ke liye
   @@index([isVerified], map: "idx_tracker_is_verified")
-  // timeSpent > 0 filter - productivity analytics
   @@index([userId, date, timeSpent], map: "idx_tracker_user_date_time_spent")
-  // commits analytics - GIT category queries
   @@index([userId, date, commits], map: "idx_tracker_user_date_commits")
-  // Streak calculation - hadActivity check (date range scan)
   @@index([userId, deletedAt, date], map: "idx_tracker_user_deleted_date")
 }
 
 model DailyStats {
-  id     String   @id @default(cuid())
-  userId String
-  date   DateTime @db.Date
-
-  totalProblems     Int @default(0)
-  totalCommits      Int @default(0)
-  totalPullRequests Int @default(0)
-  totalTimeSpent    Int @default(0)
-  totalPoints       Int @default(0)
-
+  id                String    @id @default(cuid())
+  userId            String
+  date              DateTime  @db.Date
+  totalProblems     Int       @default(0)
+  totalCommits      Int       @default(0)
+  totalPullRequests Int       @default(0)
+  totalTimeSpent    Int       @default(0)
+  totalPoints       Int       @default(0)
   platformBreakdown Json?
   categoryBreakdown Json?
-
-  hadActivity Boolean @default(false)
-  streakDay   Int?
-
-  isComplete Boolean   @default(false)
-  computedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  hadActivity       Boolean   @default(false)
+  streakDay         Int?
+  isComplete        Boolean   @default(false)
+  computedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
   @@index([hadActivity])
-  @@index([userId, hadActivity, date])
-  // ===== NEW INDEXES =====
-  // Incomplete stats recalculation cron job ke liye
+  @@index([userId, hadActivity, date], map: "idx_daily_stats_user_activity_date")
   @@index([isComplete, date], map: "idx_daily_stats_incomplete_date")
-  // Date range mein activity wale users dhundhna (global analytics)
   @@index([date, hadActivity], map: "idx_daily_stats_date_activity")
-  // streakDay - streak calculation queries
   @@index([userId, streakDay], map: "idx_daily_stats_user_streak_day")
 }
 
 model StreakHistory {
-  id     String @id @default(cuid())
-  userId String
-
-  startDate DateTime @db.Date
-  endDate   DateTime @db.Date
-
-  length Int
-
-  isActive  Boolean @default(false)
-  isCurrent Boolean @default(false)
-
-  endReason String?
-
-  totalProblems Int @default(0)
-  totalCommits  Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  startDate     DateTime @db.Date
+  endDate       DateTime @db.Date
+  length        Int
+  isActive      Boolean  @default(false)
+  isCurrent     Boolean  @default(false)
+  endReason     String?
+  totalProblems Int      @default(0)
+  totalCommits  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([isCurrent])
   @@index([length])
   @@index([startDate])
-  @@index([userId, length(sort: Desc)])
-  // ===== NEW INDEXES =====
-  // Active streaks - ongoing streak monitor
+  @@index([userId, length(sort: Desc)], map: "idx_streak_history_user_length_desc")
   @@index([isActive], map: "idx_streak_history_is_active")
-  // endDate - streaks ending on specific date
   @@index([userId, endDate], map: "idx_streak_history_user_end_date")
-  // endReason analytics - why streaks break
   @@index([endReason], map: "idx_streak_history_end_reason")
 }
 
 model PlatformDailyStats {
-  id         String   @id @default(cuid())
-  platformId String
-  date       DateTime @db.Date
-
-  totalSyncs      Int @default(0)
-  successfulSyncs Int @default(0)
-  failedSyncs     Int @default(0)
-
+  id              String   @id @default(cuid())
+  platformId      String
+  date            DateTime @db.Date
+  totalSyncs      Int      @default(0)
+  successfulSyncs Int      @default(0)
+  failedSyncs     Int      @default(0)
   avgSyncDuration Int?
-
-  activeUsers    Int @default(0)
-  newConnections Int @default(0)
-
-  createdAt DateTime @default(now())
+  activeUsers     Int      @default(0)
+  newConnections  Int      @default(0)
+  createdAt       DateTime @default(now())
 
   platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([platformId, date])
   @@index([platformId])
   @@index([date])
-  // ===== NEW INDEXES =====
-  // Recent stats fetch - date DESC sort
   @@index([date(sort: Desc)], map: "idx_platform_daily_stats_date_desc")
-  // Failed syncs monitoring - problematic platforms
   @@index([platformId, failedSyncs], map: "idx_platform_daily_stats_failed")
 }
 
@@ -1277,293 +1043,213 @@ model PlatformDailyStats {
 // ============================================================================
 
 model Goal {
-  id         String  @id @default(cuid())
-  userId     String
-  platformId String?
-
-  title       String
-  description String? @db.Text
-
-  category     PlatformCategory
-  goalType     GoalType         @default(CUSTOM)
-  metric       GoalMetric       @default(PROBLEMS_SOLVED)
-  customMetric String?
-
+  id                 String           @id @default(cuid())
+  userId             String
+  platformId         String?
+  title              String
+  description        String?          @db.Text
+  category           PlatformCategory
+  goalType           GoalType         @default(CUSTOM)
+  metric             GoalMetric       @default(PROBLEMS_SOLVED)
+  customMetric       String?
   target             Int
-  progress           Int     @default(0)
-  progressPercentage Float   @default(0)
+  progress           Int              @default(0)
+  progressPercentage Float            @default(0)
   unit               String?
-
-  startDate DateTime  @default(now())
-  endDate   DateTime?
-  deadline  DateTime?
-
-  status      GoalStatus @default(ACTIVE)
-  completedAt DateTime?
-  failedAt    DateTime?
-
-  milestones Json?
-
-  currentStreakDays  Int  @default(0)
+  startDate          DateTime         @default(now())
+  endDate            DateTime?
+  deadline           DateTime?
+  status             GoalStatus       @default(ACTIVE)
+  completedAt        DateTime?
+  failedAt           DateTime?
+  milestones         Json?
+  currentStreakDays  Int              @default(0)
   requiredStreakDays Int?
-
-  isPublic  Boolean @default(false)
-  shareCode String? @unique
-
-  reminderEnabled Boolean @default(false)
-
-  daysActive       Int   @default(0)
-  avgDailyProgress Float @default(0)
-  bestDay          Json?
-
-  color String?
-  icon  String?
-
-  deletedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isPublic           Boolean          @default(false)
+  shareCode          String?          @unique
+  reminderEnabled    Boolean          @default(false)
+  daysActive         Int              @default(0)
+  avgDailyProgress   Float            @default(0)
+  bestDay            Json?
+  color              String?
+  icon               String?
+  deletedAt          DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform  Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
   reminders GoalReminder[]
   history   GoalHistory[]
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
-  @@index([userId, status])
+  @@index([userId, status], map: "idx_goal_user_status")
   @@index([category])
   @@index([deadline])
   @@index([shareCode])
   @@index([status])
   @@index([platformId])
-  @@index([isPublic, status])
+  @@index([isPublic, status], map: "idx_goal_public_status")
   @@index([deletedAt])
-  @@index([userId, createdAt])
-  @@index([userId, status, createdAt])
-  @@index([userId, status, deadline])
-  @@index([userId, deadline])
-  @@index([userId, category, status])
-  @@index([platformId, status])
-  // ===== NEW INDEXES =====
-  // goalType filter - daily/weekly goals dashboard
+  @@index([userId, createdAt], map: "idx_goal_user_created")
+  @@index([userId, status, createdAt], map: "idx_goal_user_status_created")
+  @@index([userId, status, deadline], map: "idx_goal_user_status_deadline")
+  @@index([userId, deadline], map: "idx_goal_user_deadline")
+  @@index([userId, category, status], map: "idx_goal_user_category_status")
+  @@index([platformId, status], map: "idx_goal_platform_status")
   @@index([userId, goalType], map: "idx_goal_user_goal_type")
-  // metric filter - problem-solving goals vs commit goals
   @@index([userId, metric], map: "idx_goal_user_metric")
-  // Completed goals analytics
   @@index([userId, completedAt], map: "idx_goal_user_completed_at")
-  // reminderEnabled - reminder scheduler ke liye
   @@index([reminderEnabled, status], map: "idx_goal_reminder_enabled_status")
-  // Public goals explore page
   @@index([isPublic, status, createdAt], map: "idx_goal_public_status_created")
 }
 
 model GoalReminder {
-  id     String @id @default(cuid())
-  goalId String
-  userId String
-
-  frequency String
-  time      String
-  timezone  String @default("UTC")
-
-  days Int[] @default([])
-
-  channel NotificationChannel @default(IN_APP)
-
-  isActive Boolean @default(true)
-
+  id         String              @id @default(cuid())
+  goalId     String
+  userId     String
+  frequency  String
+  time       String
+  timezone   String              @default("UTC")
+  days       Int[]               @default([])
+  channel    NotificationChannel @default(IN_APP)
+  isActive   Boolean             @default(true)
   lastSentAt DateTime?
   nextSendAt DateTime?
-  sendCount  Int       @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sendCount  Int                 @default(0)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
 
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([goalId])
   @@index([userId])
   @@index([nextSendAt])
   @@index([isActive])
-  // ===== NEW INDEXES =====
-  // Reminder scheduler: isActive + nextSendAt combo (most important query)
   @@index([isActive, nextSendAt], map: "idx_goal_reminder_active_next_send")
-  // channel filter - email vs push vs in-app reminders
   @@index([channel, isActive], map: "idx_goal_reminder_channel_active")
 }
 
 model GoalTemplate {
-  id String @id @default(cuid())
-
-  title       String
-  description String? @db.Text
-
-  category PlatformCategory
-  goalType GoalType
-  metric   GoalMetric
-
-  target   Int
-  duration Int
-
-  icon  String?
-  color String?
-
-  difficulty    String   @default("medium")
-  estimatedTime String?
-  tips          String[] @default([])
-
-  timesUsed         Int    @default(0)
-  successRate       Float  @default(0)
+  id                String           @id @default(cuid())
+  title             String
+  description       String?          @db.Text
+  category          PlatformCategory
+  goalType          GoalType
+  metric            GoalMetric
+  target            Int
+  duration          Int
+  icon              String?
+  color             String?
+  difficulty        String           @default("medium")
+  estimatedTime     String?
+  tips              String[]         @default([])
+  timesUsed         Int              @default(0)
+  successRate       Float            @default(0)
   avgCompletionTime Float?
+  isActive          Boolean          @default(true)
+  isFeatured        Boolean          @default(false)
+  sortOrder         Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
-  isActive   Boolean @default(true)
-  isFeatured Boolean @default(false)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([category])
   @@index([isActive])
   @@index([isFeatured])
   @@index([difficulty])
-  // ===== NEW INDEXES =====
-  // category + isActive combo - browse templates by category
   @@index([category, isActive], map: "idx_goal_template_category_active")
-  // Popular templates - most used first
   @@index([timesUsed(sort: Desc)], map: "idx_goal_template_times_used_desc")
-  // goalType filter
   @@index([goalType, isActive], map: "idx_goal_template_goal_type_active")
-  // isFeatured + isActive - homepage featured templates
   @@index([isFeatured, isActive, sortOrder], map: "idx_goal_template_featured_active_sort")
 }
 
 model GoalHistory {
-  id     String @id @default(cuid())
-  goalId String
-  userId String
-
-  data       Json
-  changeType String
-  changedBy  String?
-
+  id               String   @id @default(cuid())
+  goalId           String
+  userId           String
+  data             Json
+  changeType       String
+  changedBy        String?
   previousStatus   String?
   previousProgress Int?
-
-  createdAt DateTime @default(now())
+  createdAt        DateTime @default(now())
 
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([goalId])
   @@index([userId])
   @@index([changeType])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // goalId + changeType combo - specific change history
   @@index([goalId, changeType], map: "idx_goal_history_goal_change_type")
-  // goalId + createdAt - timeline view
   @@index([goalId, createdAt], map: "idx_goal_history_goal_created_at")
 }
 
 model Achievement {
-  id String @id @default(cuid())
-
-  slug        String @unique
-  title       String @unique
-  description String @db.Text
-
-  category PlatformCategory
-  tier     String           @default("bronze")
-
-  icon       String?
-  color      String?
-  badgeImage String?
-
-  points   Int    @default(0)
-  xpReward Int    @default(0)
-  rarity   String @default("common")
-
-  requirement     Json?
-  requirementText String?
-
-  thresholds Json?
-
-  isHidden Boolean @default(false)
-  isSecret Boolean @default(false)
-
-  isActive Boolean @default(true)
-
-  totalUnlocked    Int   @default(0)
-  unlockPercentage Float @default(0)
-
-  sortOrder Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String           @id @default(cuid())
+  slug             String           @unique
+  title            String           @unique
+  description      String           @db.Text
+  category         PlatformCategory
+  tier             String           @default("bronze")
+  icon             String?
+  color            String?
+  badgeImage       String?
+  points           Int              @default(0)
+  xpReward         Int              @default(0)
+  rarity           String           @default("common")
+  requirement      Json?
+  requirementText  String?
+  thresholds       Json?
+  isHidden         Boolean          @default(false)
+  isSecret         Boolean          @default(false)
+  isActive         Boolean          @default(true)
+  totalUnlocked    Int              @default(0)
+  unlockPercentage Float            @default(0)
+  sortOrder        Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   users UserAchievement[]
 
-  // ===== EXISTING INDEXES =====
   @@index([category])
   @@index([tier])
   @@index([isActive])
   @@index([isHidden])
   @@index([rarity])
-  // ===== NEW INDEXES =====
-  // category + tier combo - browse achievements by category & tier
   @@index([category, tier, isActive], map: "idx_achievement_category_tier_active")
-  // Most unlocked achievements - popularity sort
   @@index([totalUnlocked(sort: Desc)], map: "idx_achievement_total_unlocked_desc")
-  // isSecret filter - secret achievements reveal logic
   @@index([isSecret, isActive], map: "idx_achievement_secret_active")
-  // Points sort - high value achievements
   @@index([points(sort: Desc)], map: "idx_achievement_points_desc")
 }
 
 model UserAchievement {
-  id            String @id @default(cuid())
-  userId        String
-  achievementId String
-
-  progress           Int   @default(0)
-  progressPercentage Float @default(0)
-  currentThreshold   Int   @default(0)
-
-  unlockedAt DateTime @default(now())
-
-  notified   Boolean   @default(false)
-  notifiedAt DateTime?
-
-  isPinned Boolean @default(false)
-  isHidden Boolean @default(false)
-
-  createdAt DateTime @default(now())
+  id                 String    @id @default(cuid())
+  userId             String
+  achievementId      String
+  progress           Int       @default(0)
+  progressPercentage Float     @default(0)
+  currentThreshold   Int       @default(0)
+  unlockedAt         DateTime  @default(now())
+  notified           Boolean   @default(false)
+  notifiedAt         DateTime?
+  isPinned           Boolean   @default(false)
+  isHidden           Boolean   @default(false)
+  createdAt          DateTime  @default(now())
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, achievementId])
   @@index([userId])
   @@index([achievementId])
   @@index([unlockedAt])
   @@index([isPinned])
   @@index([notified])
-  // ===== NEW INDEXES =====
-  // User ke pinned achievements profile page pe show karna
   @@index([userId, isPinned], map: "idx_user_achievement_user_pinned")
-  // Unnotified achievements - notification queue
   @@index([userId, notified], map: "idx_user_achievement_user_notified")
-  // Hidden achievements filter
   @@index([userId, isHidden], map: "idx_user_achievement_user_hidden")
-  // Recently unlocked - activity feed
   @@index([userId, unlockedAt(sort: Desc)], map: "idx_user_achievement_user_unlocked_desc")
 }
 
@@ -1572,108 +1258,79 @@ model UserAchievement {
 // ============================================================================
 
 model Notification {
-  id     String @id @default(cuid())
-  userId String
-
-  type     NotificationType
-  channel  NotificationChannel  @default(IN_APP)
-  priority NotificationPriority @default(NORMAL)
-
-  title        String
-  message      String  @db.Text
-  shortMessage String?
-
-  actionUrl   String?
-  actionLabel String?
-
-  entityType String?
-  entityId   String?
-
-  imageUrl String?
-  metadata Json?
-
-  isRead Boolean   @default(false)
-  readAt DateTime?
-
-  isArchived Boolean   @default(false)
-  archivedAt DateTime?
-
-  isDismissed Boolean   @default(false)
-  dismissedAt DateTime?
-
-  isDelivered   Boolean   @default(false)
+  id            String               @id @default(cuid())
+  userId        String
+  type          NotificationType
+  channel       NotificationChannel  @default(IN_APP)
+  priority      NotificationPriority @default(NORMAL)
+  title         String
+  message       String               @db.Text
+  shortMessage  String?
+  actionUrl     String?
+  actionLabel   String?
+  entityType    String?
+  entityId      String?
+  imageUrl      String?
+  metadata      Json?
+  isRead        Boolean              @default(false)
+  readAt        DateTime?
+  isArchived    Boolean              @default(false)
+  archivedAt    DateTime?
+  isDismissed   Boolean              @default(false)
+  dismissedAt   DateTime?
+  isDelivered   Boolean              @default(false)
   deliveredAt   DateTime?
   deliveryError String?
-
-  scheduledFor DateTime?
-  sentAt       DateTime?
-
-  expiresAt DateTime?
-
-  updatedAt DateTime @default(now()) @updatedAt
-  createdAt DateTime @default(now())
+  scheduledFor  DateTime?
+  sentAt        DateTime?
+  expiresAt     DateTime?
+  updatedAt     DateTime             @default(now()) @updatedAt
+  createdAt     DateTime             @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
-  @@index([userId, isRead])
-  @@index([userId, type])
-  @@index([userId, createdAt])
-  @@index([userId, isRead, createdAt])
+  @@index([userId, isRead], map: "idx_notification_user_read")
+  @@index([userId, type], map: "idx_notification_user_type")
+  @@index([userId, createdAt], map: "idx_notification_user_created")
+  @@index([userId, isRead, createdAt], map: "idx_notification_user_read_created")
   @@index([isRead])
   @@index([scheduledFor])
   @@index([expiresAt])
-  @@index([entityType, entityId])
-  @@index([isDelivered, isRead])
-  // ===== NEW INDEXES =====
-  // Archived notifications - archive inbox view
+  @@index([entityType, entityId], map: "idx_notification_entity")
+  @@index([isDelivered, isRead], map: "idx_notification_delivered_read")
   @@index([userId, isArchived], map: "idx_notification_user_archived")
-  // Dismissed notifications filter
   @@index([userId, isDismissed], map: "idx_notification_user_dismissed")
-  // High priority unread notifications alert
   @@index([userId, priority, isRead], map: "idx_notification_user_priority_read")
-  // channel-wise undelivered notifications retry
   @@index([channel, isDelivered], map: "idx_notification_channel_delivered")
-  // Scheduled notifications processor
   @@index([scheduledFor, isDelivered], map: "idx_notification_scheduled_delivered")
 }
 
 model PushSubscription {
-  id     String @id @default(cuid())
-  userId String
-
-  endpoint String @unique
-  p256dh   String
-  auth     String
-
-  deviceId   String?
-  deviceName String?
-  userAgent  String? @db.Text
-  browser    String?
-  os         String?
-
-  isActive Boolean @default(true)
-
+  id           String    @id @default(cuid())
+  userId       String
+  endpoint     String    @unique
+  p256dh       String
+  auth         String
+  deviceId     String?
+  deviceName   String?
+  userAgent    String?   @db.Text
+  browser      String?
+  os           String?
+  isActive     Boolean   @default(true)
   lastUsedAt   DateTime?
   successCount Int       @default(0)
   failureCount Int       @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([isActive])
   @@index([endpoint])
-  // ===== NEW INDEXES =====
-  // userId + isActive - user ke active subscriptions fetch
   @@index([userId, isActive], map: "idx_push_subscription_user_active")
-  // High failure subscriptions cleanup
   @@index([failureCount], map: "idx_push_subscription_failure_count")
-  // deviceId se lookup - device-specific push management
   @@index([deviceId], map: "idx_push_subscription_device_id")
 }
 
@@ -1682,50 +1339,39 @@ model PushSubscription {
 // ============================================================================
 
 model SyncLog {
-  id             String  @id @default(cuid())
+  id             String     @id @default(cuid())
   userId         String
   platformId     String?
   userPlatformId String?
-
-  status SyncStatus
-
-  startedAt   DateTime  @default(now())
-  completedAt DateTime?
-  duration    Int?
-
-  itemsFound   Int @default(0)
-  itemsCreated Int @default(0)
-  itemsUpdated Int @default(0)
-  itemsSkipped Int @default(0)
-  itemsFailed  Int @default(0)
-
-  dataFromDate DateTime?
-  dataToDate   DateTime?
-
-  hasError     Boolean @default(false)
-  errorCode    String?
-  errorMessage String? @db.Text
-  errorStack   String? @db.Text
-
-  attemptNumber Int       @default(1)
-  maxAttempts   Int       @default(3)
-  nextRetryAt   DateTime?
-
-  triggeredBy   String  @default("manual")
-  triggerSource String?
-
-  requestId String?
-
-  logEntries Json?
-
-  createdAt DateTime @default(now())
+  status         SyncStatus
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+  duration       Int?
+  itemsFound     Int        @default(0)
+  itemsCreated   Int        @default(0)
+  itemsUpdated   Int        @default(0)
+  itemsSkipped   Int        @default(0)
+  itemsFailed    Int        @default(0)
+  dataFromDate   DateTime?
+  dataToDate     DateTime?
+  hasError       Boolean    @default(false)
+  errorCode      String?
+  errorMessage   String?    @db.Text
+  errorStack     String?    @db.Text
+  attemptNumber  Int        @default(1)
+  maxAttempts    Int        @default(3)
+  nextRetryAt    DateTime?
+  triggeredBy    String     @default("manual")
+  triggerSource  String?
+  requestId      String?
+  logEntries     Json?
+  createdAt      DateTime   @default(now())
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   platform       Platform?      @relation(fields: [platformId], references: [id], onDelete: SetNull)
   userPlatform   UserPlatform?  @relation(fields: [userPlatformId], references: [id], onDelete: SetNull)
   trackerEntries TrackerEntry[]
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([platformId])
   @@index([userPlatformId])
@@ -1733,20 +1379,14 @@ model SyncLog {
   @@index([createdAt])
   @@index([triggeredBy])
   @@index([hasError])
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
-  @@index([userPlatformId, status])
-  @@index([userId, status])
-  // ===== NEW INDEXES =====
-  // Retry queue - failed syncs jinhe retry karna hai
+  @@index([userId, createdAt], map: "idx_sync_log_user_created")
+  @@index([status, createdAt], map: "idx_sync_log_status_created")
+  @@index([userPlatformId, status], map: "idx_sync_log_user_platform_status")
+  @@index([userId, status], map: "idx_sync_log_user_status")
   @@index([nextRetryAt, status], map: "idx_sync_log_retry_queue")
-  // Error code analytics - most common errors
   @@index([errorCode], map: "idx_sync_log_error_code")
-  // Duration analytics - slow syncs detect karna
   @@index([platformId, duration], map: "idx_sync_log_platform_duration")
-  // userId + hasError - user ke failed syncs show karna
   @@index([userId, hasError], map: "idx_sync_log_user_has_error")
-  // requestId - tracing specific sync request
   @@index([requestId], map: "idx_sync_log_request_id")
 }
 
@@ -1755,218 +1395,158 @@ model SyncLog {
 // ============================================================================
 
 model Subscription {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  stripeCustomerId     String? @unique
-  stripeSubscriptionId String? @unique
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
   stripePriceId        String?
   stripeProductId      String?
-
-  tier            SubscriptionTier   @default(FREE)
-  status          SubscriptionStatus @default(ACTIVE)
-  billingInterval BillingInterval    @default(MONTHLY)
-
-  priceAmount Int?
-  currency    String @default("usd")
-
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime?
-
-  trialStart DateTime?
-  trialEnd   DateTime?
-  trialDays  Int?
-
-  cancelAtPeriodEnd Boolean   @default(false)
-  cancelAt          DateTime?
-  canceledAt        DateTime?
-  cancelReason      String?
-  cancelFeedback    String?   @db.Text
-
-  pausedAt  DateTime?
-  resumesAt DateTime?
-
-  platformLimit        Int @default(5)
-  syncFrequencyMinutes Int @default(1440)
-  exportLimitMonthly   Int @default(3)
-  apiRequestsDaily     Int @default(100)
-
-  currentPlatformCount Int       @default(0)
-  currentExportCount   Int       @default(0)
+  tier                 SubscriptionTier   @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  billingInterval      BillingInterval    @default(MONTHLY)
+  priceAmount          Int?
+  currency             String             @default("usd")
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  trialDays            Int?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  cancelAt             DateTime?
+  canceledAt           DateTime?
+  cancelReason         String?
+  cancelFeedback       String?            @db.Text
+  pausedAt             DateTime?
+  resumesAt            DateTime?
+  platformLimit        Int                @default(5)
+  syncFrequencyMinutes Int                @default(1440)
+  exportLimitMonthly   Int                @default(3)
+  apiRequestsDaily     Int                @default(100)
+  currentPlatformCount Int                @default(0)
+  currentExportCount   Int                @default(0)
   usageResetAt         DateTime?
-
-  features String[] @default([])
-
-  lastPaymentAt     DateTime?
-  lastPaymentAmount Int?
-  nextPaymentAt     DateTime?
-
-  appliedCouponId String?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  features             String[]           @default([])
+  lastPaymentAt        DateTime?
+  lastPaymentAmount    Int?
+  nextPaymentAt        DateTime?
+  appliedCouponId      String?
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @default(now()) @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   invoices      Invoice[]
   paymentEvents PaymentEvent[]
   appliedCoupon Coupon?        @relation(fields: [appliedCouponId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
   @@index([status])
   @@index([tier])
   @@index([appliedCouponId])
-  // ===== NEW INDEXES =====
-  // tier + status combo - PRO users count, active subscriptions
   @@index([tier, status], map: "idx_subscription_tier_status")
-  // Renewal alert - currentPeriodEnd approaching
   @@index([currentPeriodEnd], map: "idx_subscription_current_period_end")
-  // Trials ending soon - trial conversion campaigns
   @@index([trialEnd, status], map: "idx_subscription_trial_end_status")
-  // Cancellation scheduled - cancelAtPeriodEnd = true
   @@index([cancelAtPeriodEnd, currentPeriodEnd], map: "idx_subscription_cancel_at_period")
-  // Next payment due - payment reminders
   @@index([nextPaymentAt, status], map: "idx_subscription_next_payment_status")
-  // Paused subscriptions - resumesAt cron
   @@index([resumesAt, status], map: "idx_subscription_resumes_at_status")
-  // billingInterval analytics
   @@index([billingInterval, status], map: "idx_subscription_billing_interval_status")
 }
 
 model PaymentMethod {
-  id     String @id @default(cuid())
-  userId String
-
-  stripePaymentMethodId String @unique
-
-  type     String
-  brand    String?
-  last4    String?
-  expMonth Int?
-  expYear  Int?
-
-  isDefault Boolean @default(false)
-  isValid   Boolean @default(true)
-
-  billingName    String?
-  billingEmail   String?
-  billingPhone   String?
-  billingAddress Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  userId                String
+  stripePaymentMethodId String   @unique
+  type                  String
+  brand                 String?
+  last4                 String?
+  expMonth              Int?
+  expYear               Int?
+  isDefault             Boolean  @default(false)
+  isValid               Boolean  @default(true)
+  billingName           String?
+  billingEmail          String?
+  billingPhone          String?
+  billingAddress        Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([isDefault])
-  // ===== NEW INDEXES =====
-  // userId + isDefault - user ka default payment method
   @@index([userId, isDefault], map: "idx_payment_method_user_default")
-  // Invalid/expired cards cleanup
   @@index([userId, isValid], map: "idx_payment_method_user_valid")
-  // Expiring cards - card expiry alerts (month + year)
   @@index([expYear, expMonth], map: "idx_payment_method_expiry")
 }
 
 model Invoice {
-  id             String  @id @default(cuid())
-  userId         String
-  subscriptionId String?
-
-  stripeInvoiceId       String? @unique
+  id                    String    @id @default(cuid())
+  userId                String
+  subscriptionId        String?
+  stripeInvoiceId       String?   @unique
   stripePaymentIntentId String?
-
-  invoiceNumber String?
-
-  subtotal   Int
-  tax        Int    @default(0)
-  total      Int
-  amountPaid Int    @default(0)
-  amountDue  Int
-  currency   String @default("usd")
-
-  status String
-
-  invoiceDate DateTime
-  dueDate     DateTime?
-  paidAt      DateTime?
-  voidedAt    DateTime?
-
-  lineItems Json?
-
-  invoicePdfUrl    String?
-  hostedInvoiceUrl String?
-
-  billingReason String?
-
-  discountAmount Int?
-  couponId       String?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  invoiceNumber         String?
+  subtotal              Int
+  tax                   Int       @default(0)
+  total                 Int
+  amountPaid            Int       @default(0)
+  amountDue             Int
+  currency              String    @default("usd")
+  status                String
+  invoiceDate           DateTime
+  dueDate               DateTime?
+  paidAt                DateTime?
+  voidedAt              DateTime?
+  lineItems             Json?
+  invoicePdfUrl         String?
+  hostedInvoiceUrl      String?
+  billingReason         String?
+  discountAmount        Int?
+  couponId              String?
+  metadata              Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([subscriptionId])
   @@index([status])
   @@index([stripeInvoiceId])
   @@index([stripePaymentIntentId])
   @@index([invoiceDate])
-  // ===== NEW INDEXES =====
-  // userId + status - unpaid/overdue invoices
   @@index([userId, status], map: "idx_invoice_user_status")
-  // Paid invoices history
   @@index([userId, paidAt], map: "idx_invoice_user_paid_at")
-  // Overdue invoices - dueDate past + status != paid
   @@index([dueDate, status], map: "idx_invoice_due_date_status")
-  // couponId - coupon usage tracking on invoices
   @@index([couponId], map: "idx_invoice_coupon_id")
-  // Voided invoices
   @@index([voidedAt], map: "idx_invoice_voided_at")
 }
 
 model PaymentEvent {
-  id             String  @id @default(cuid())
-  userId         String?
-  subscriptionId String?
-
-  stripeEventId   String @unique
-  stripeEventType String
-
-  eventType String
-  status    PaymentStatus
-
-  amount   Int?
-  currency String?
-
-  failureCode    String?
-  failureMessage String?
-
+  id                    String        @id @default(cuid())
+  userId                String?
+  subscriptionId        String?
+  stripeEventId         String        @unique
+  stripeEventType       String
+  eventType             String
+  status                PaymentStatus
+  amount                Int?
+  currency              String?
+  failureCode           String?
+  failureMessage        String?
   stripePaymentIntentId String?
   stripeInvoiceId       String?
   stripeChargeId        String?
-
-  rawData Json?
-
-  processedAt     DateTime?
-  processingError String?
-
-  createdAt DateTime @default(now())
+  rawData               Json?
+  processedAt           DateTime?
+  processingError       String?
+  createdAt             DateTime      @default(now())
 
   user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([subscriptionId])
   @@index([stripeEventId])
@@ -1976,94 +1556,66 @@ model PaymentEvent {
   @@index([eventType])
   @@index([status])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // userId + createdAt - user ke recent payment events
   @@index([userId, createdAt], map: "idx_payment_event_user_created_at")
-  // eventType + status combo - failed payment analytics
   @@index([eventType, status], map: "idx_payment_event_type_status")
-  // Unprocessed events queue
   @@index([processedAt, createdAt], map: "idx_payment_event_processed_at")
-  // stripeEventType analytics
   @@index([stripeEventType, createdAt], map: "idx_payment_event_stripe_type_time")
 }
 
 model Coupon {
-  id String @id @default(cuid())
-
-  code        String  @unique
-  name        String
-  description String?
-
-  discountType  CouponDiscountType
-  discountValue Int
-  currency      String             @default("usd")
-
-  applicableTiers SubscriptionTier[] @default([])
-  applicablePlans String[]           @default([])
-
-  duration       CouponDuration @default(ONCE)
-  durationMonths Int?
-
+  id                    String             @id @default(cuid())
+  code                  String             @unique
+  name                  String
+  description           String?
+  discountType          CouponDiscountType
+  discountValue         Int
+  currency              String             @default("usd")
+  applicableTiers       SubscriptionTier[] @default([])
+  applicablePlans       String[]           @default([])
+  duration              CouponDuration     @default(ONCE)
+  durationMonths        Int?
   maxRedemptions        Int?
-  maxRedemptionsPerUser Int  @default(1)
-  currentRedemptions    Int  @default(0)
-
-  validFrom  DateTime  @default(now())
-  validUntil DateTime?
-
-  minimumAmount Int?
-
-  isActive Boolean @default(true)
-
-  stripeCouponId String? @unique
-
-  createdBy String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  maxRedemptionsPerUser Int                @default(1)
+  currentRedemptions    Int                @default(0)
+  validFrom             DateTime           @default(now())
+  validUntil            DateTime?
+  minimumAmount         Int?
+  isActive              Boolean            @default(true)
+  stripeCouponId        String?            @unique
+  createdBy             String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   redemptions   CouponRedemption[]
   subscriptions Subscription[]
 
-  // ===== EXISTING INDEXES =====
   @@index([code])
   @@index([isActive])
-  @@index([validFrom, validUntil])
+  @@index([validFrom, validUntil], map: "idx_coupon_validity")
   @@index([stripeCouponId])
-  // ===== NEW INDEXES =====
-  // Active + validity check - coupon apply karte waqt
   @@index([isActive, validUntil], map: "idx_coupon_active_valid_until")
-  // discountType filter - percentage vs fixed coupons
   @@index([discountType, isActive], map: "idx_coupon_discount_type_active")
-  // createdBy - admin ke apne coupons
   @@index([createdBy], map: "idx_coupon_created_by")
 }
 
 model CouponRedemption {
-  id       String @id @default(cuid())
-  couponId String
-  userId   String
-
+  id             String   @id @default(cuid())
+  couponId       String
+  userId         String
   subscriptionId String?
   invoiceId      String?
-
   discountAmount Int
   currency       String
-
-  redeemedAt DateTime @default(now())
+  redeemedAt     DateTime @default(now())
 
   coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([couponId, userId, subscriptionId])
   @@index([couponId])
   @@index([userId])
   @@index([redeemedAt])
-  // ===== NEW INDEXES =====
-  // invoiceId - invoice se coupon redemption lookup
   @@index([invoiceId], map: "idx_coupon_redemption_invoice_id")
-  // userId + redeemedAt - user ke coupon history
   @@index([userId, redeemedAt], map: "idx_coupon_redemption_user_redeemed_at")
 }
 
@@ -2072,48 +1624,35 @@ model CouponRedemption {
 // ============================================================================
 
 model ReferralReward {
-  id String @id @default(cuid())
-
-  referrerId String
-  referredId String
-
-  type   String               @default("signup")
-  status ReferralRewardStatus @default(PENDING)
-
-  rewardType     ReferralRewardType
-  rewardValue    Int
-  rewardCurrency String?
-
+  id               String               @id @default(cuid())
+  referrerId       String
+  referredId       String
+  type             String               @default("signup")
+  status           ReferralRewardStatus @default(PENDING)
+  rewardType       ReferralRewardType
+  rewardValue      Int
+  rewardCurrency   String?
   qualifyingAction String?
   qualifiedAt      DateTime?
-
-  paidAt        DateTime?
-  paymentMethod String?
-  paymentRef    String?
-
-  expiresAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  paidAt           DateTime?
+  paymentMethod    String?
+  paymentRef       String?
+  expiresAt        DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   referrer User @relation("ReferrerRewards", fields: [referrerId], references: [id], onDelete: Cascade)
   referred User @relation("ReferredRewards", fields: [referredId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([referrerId, referredId, type])
   @@index([referrerId])
   @@index([referredId])
   @@index([status])
   @@index([createdAt])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // type + status - pending signups, pending subscriptions
   @@index([type, status], map: "idx_referral_reward_type_status")
-  // referrerId + status - referrer ke pending rewards
   @@index([referrerId, status], map: "idx_referral_reward_referrer_status")
-  // Payout processing - earned rewards pending payout
   @@index([status, paidAt], map: "idx_referral_reward_status_paid_at")
-  // rewardType filter - cash vs credits vs days
   @@index([rewardType, status], map: "idx_referral_reward_type_reward_status")
 }
 
@@ -2122,103 +1661,77 @@ model ReferralReward {
 // ============================================================================
 
 model ExportJob {
-  id     String @id @default(cuid())
-  userId String
-
-  name String?
-
-  format       ExportFormat
-  dateFrom     DateTime?
-  dateTo       DateTime?
-  platforms    String[]           @default([])
-  categories   PlatformCategory[] @default([])
-  includeNotes Boolean            @default(true)
-  includeStats Boolean            @default(true)
-
-  status   ExportStatus @default(QUEUED)
-  progress Int          @default(0)
-
-  startedAt   DateTime?
-  completedAt DateTime?
-
-  fileUrl      String?
-  fileName     String?
-  fileSize     Int?
-  fileMimeType String?
-
-  hasError     Boolean @default(false)
-  errorMessage String?
-
-  expiresAt DateTime?
-
-  totalRecords    Int @default(0)
-  exportedRecords Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  userId          String
+  name            String?
+  format          ExportFormat
+  dateFrom        DateTime?
+  dateTo          DateTime?
+  platforms       String[]           @default([])
+  categories      PlatformCategory[] @default([])
+  includeNotes    Boolean            @default(true)
+  includeStats    Boolean            @default(true)
+  status          ExportStatus       @default(QUEUED)
+  progress        Int                @default(0)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  fileUrl         String?
+  fileName        String?
+  fileSize        Int?
+  fileMimeType    String?
+  hasError        Boolean            @default(false)
+  errorMessage    String?
+  expiresAt       DateTime?
+  totalRecords    Int                @default(0)
+  exportedRecords Int                @default(0)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([status])
   @@index([expiresAt])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // userId + status - user ke processing/queued jobs
   @@index([userId, status], map: "idx_export_job_user_status")
-  // Processing queue - QUEUED jobs processor
   @@index([status, createdAt], map: "idx_export_job_status_created_at")
-  // userId + createdAt - user ke recent exports
   @@index([userId, createdAt], map: "idx_export_job_user_created_at")
 }
 
 model ScheduledExport {
-  id     String @id @default(cuid())
-  userId String
-
-  name        String
-  description String?
-
-  frequency  String
-  dayOfWeek  Int?
-  dayOfMonth Int?
-  time       String
-  timezone   String @default("UTC")
-
+  id                String             @id @default(cuid())
+  userId            String
+  name              String
+  description       String?
+  frequency         String
+  dayOfWeek         Int?
+  dayOfMonth        Int?
+  time              String
+  timezone          String             @default("UTC")
   format            ExportFormat
   platforms         String[]           @default([])
   categories        PlatformCategory[] @default([])
   relativeDateRange String             @default("last_7_days")
-
-  deliveryMethod String  @default("email")
-  emailTo        String?
-  emailSubject   String?
-
-  isActive Boolean @default(true)
-
-  lastRunAt     DateTime?
-  lastRunStatus String?
-  lastRunJobId  String?
-  nextRunAt     DateTime?
-  runCount      Int       @default(0)
-  failureCount  Int       @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  deliveryMethod    String             @default("email")
+  emailTo           String?
+  emailSubject      String?
+  isActive          Boolean            @default(true)
+  lastRunAt         DateTime?
+  lastRunStatus     String?
+  lastRunJobId      String?
+  nextRunAt         DateTime?
+  runCount          Int                @default(0)
+  failureCount      Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([isActive])
   @@index([nextRunAt])
-  // ===== NEW INDEXES =====
-  // isActive + nextRunAt - scheduler ke liye most critical
   @@index([isActive, nextRunAt], map: "idx_scheduled_export_active_next_run")
-  // userId + isActive - user ke active schedules
   @@index([userId, isActive], map: "idx_scheduled_export_user_active")
-  // Failed exports monitoring
   @@index([failureCount], map: "idx_scheduled_export_failure_count")
 }
 
@@ -2227,112 +1740,87 @@ model ScheduledExport {
 // ============================================================================
 
 model UserSettings {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  theme         String  @default("system")
-  accentColor   String  @default("blue")
-  compactMode   Boolean @default(false)
-  fontSize      String  @default("medium")
-  reducedMotion Boolean @default(false)
-  highContrast  Boolean @default(false)
-
-  language     String @default("en")
-  timezone     String @default("UTC")
-  dateFormat   String @default("MM/DD/YYYY")
-  timeFormat   String @default("12h")
-  weekStartsOn Int    @default(0)
-  numberFormat String @default("en-US")
-
-  autoSync         Boolean @default(true)
-  syncFrequency    String  @default("daily")
-  syncOnLogin      Boolean @default(true)
-  syncInBackground Boolean @default(true)
-
-  publicProfile     Boolean @default(false)
-  showInLeaderboard Boolean @default(true)
-  allowAnalytics    Boolean @default(true)
-  allowCookies      Boolean @default(true)
-
-  dashboardLayout   Json?
-  defaultDateRange  String  @default("7d")
-  showWelcomeBanner Boolean @default(true)
-
-  keyboardShortcuts    Boolean @default(true)
-  soundEffects         Boolean @default(false)
-  desktopNotifications Boolean @default(true)
-
-  dataRetentionDays Int @default(365)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  theme                String   @default("system")
+  accentColor          String   @default("blue")
+  compactMode          Boolean  @default(false)
+  fontSize             String   @default("medium")
+  reducedMotion        Boolean  @default(false)
+  highContrast         Boolean  @default(false)
+  language             String   @default("en")
+  timezone             String   @default("UTC")
+  dateFormat           String   @default("MM/DD/YYYY")
+  timeFormat           String   @default("12h")
+  weekStartsOn         Int      @default(0)
+  numberFormat         String   @default("en-US")
+  autoSync             Boolean  @default(true)
+  syncFrequency        String   @default("daily")
+  syncOnLogin          Boolean  @default(true)
+  syncInBackground     Boolean  @default(true)
+  publicProfile        Boolean  @default(false)
+  showInLeaderboard    Boolean  @default(true)
+  allowAnalytics       Boolean  @default(true)
+  allowCookies         Boolean  @default(true)
+  dashboardLayout      Json?
+  defaultDateRange     String   @default("7d")
+  showWelcomeBanner    Boolean  @default(true)
+  keyboardShortcuts    Boolean  @default(true)
+  soundEffects         Boolean  @default(false)
+  desktopNotifications Boolean  @default(true)
+  dataRetentionDays    Int      @default(365)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== NEW INDEXES =====
-  // Leaderboard ke liye showInLeaderboard = true users
   @@index([showInLeaderboard], map: "idx_user_settings_show_leaderboard")
-  // Analytics opt-in users count
   @@index([allowAnalytics], map: "idx_user_settings_allow_analytics")
 }
 
 model NotificationPreferences {
-  id     String @id @default(cuid())
-  userId String @unique
-
-  enabled Boolean @default(true)
-
-  emailEnabled Boolean @default(true)
-  pushEnabled  Boolean @default(false)
-  inAppEnabled Boolean @default(true)
-  smsEnabled   Boolean @default(false)
-
-  emailAddress  String?
-  emailVerified Boolean @default(false)
-
-  achievementAlerts Boolean @default(true)
-  goalReminders     Boolean @default(true)
-  goalCompleted     Boolean @default(true)
-  streakAlerts      Boolean @default(true)
-  syncComplete      Boolean @default(false)
-  syncFailed        Boolean @default(true)
-  weeklyReport      Boolean @default(true)
-  monthlyReport     Boolean @default(true)
-  securityAlerts    Boolean @default(true)
-  billingAlerts     Boolean @default(true)
-  newFeatures       Boolean @default(true)
-  tips              Boolean @default(true)
-  communityUpdates  Boolean @default(false)
-  marketingEmails   Boolean @default(false)
-
-  quietHoursEnabled  Boolean @default(false)
-  quietHoursStart    String  @default("22:00")
-  quietHoursEnd      String  @default("08:00")
-  quietHoursTimezone String  @default("UTC")
-
-  digestEnabled   Boolean @default(false)
-  digestFrequency String  @default("daily")
-  digestTime      String  @default("09:00")
-  digestDay       Int     @default(1)
-
-  dndEnabled Boolean   @default(false)
-  dndUntil   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  enabled            Boolean   @default(true)
+  emailEnabled       Boolean   @default(true)
+  pushEnabled        Boolean   @default(false)
+  inAppEnabled       Boolean   @default(true)
+  smsEnabled         Boolean   @default(false)
+  emailAddress       String?
+  emailVerified      Boolean   @default(false)
+  achievementAlerts  Boolean   @default(true)
+  goalReminders      Boolean   @default(true)
+  goalCompleted      Boolean   @default(true)
+  streakAlerts       Boolean   @default(true)
+  syncComplete       Boolean   @default(false)
+  syncFailed         Boolean   @default(true)
+  weeklyReport       Boolean   @default(true)
+  monthlyReport      Boolean   @default(true)
+  securityAlerts     Boolean   @default(true)
+  billingAlerts      Boolean   @default(true)
+  newFeatures        Boolean   @default(true)
+  tips               Boolean   @default(true)
+  communityUpdates   Boolean   @default(false)
+  marketingEmails    Boolean   @default(false)
+  quietHoursEnabled  Boolean   @default(false)
+  quietHoursStart    String    @default("22:00")
+  quietHoursEnd      String    @default("08:00")
+  quietHoursTimezone String    @default("UTC")
+  digestEnabled      Boolean   @default(false)
+  digestFrequency    String    @default("daily")
+  digestTime         String    @default("09:00")
+  digestDay          Int       @default(1)
+  dndEnabled         Boolean   @default(false)
+  dndUntil           DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== NEW INDEXES =====
-  // Email campaign - users with emailEnabled = true
   @@index([emailEnabled], map: "idx_notif_pref_email_enabled")
-  // Push notification - pushEnabled users
   @@index([pushEnabled], map: "idx_notif_pref_push_enabled")
-  // Marketing emails filter
   @@index([marketingEmails], map: "idx_notif_pref_marketing_emails")
-  // Digest scheduler - digestEnabled + digestFrequency
   @@index([digestEnabled, digestFrequency], map: "idx_notif_pref_digest")
-  // DND users - dndUntil > now()
   @@index([dndEnabled, dndUntil], map: "idx_notif_pref_dnd")
 }
 
@@ -2341,107 +1829,76 @@ model NotificationPreferences {
 // ============================================================================
 
 model ApiKey {
-  id     String @id @default(cuid())
-  userId String
-
-  name        String
-  description String?
-
-  keyHash   String @unique
-  keyPrefix String
-
-  scopes String[] @default(["read"])
-
-  rateLimit       Int @default(100)
-  rateLimitWindow Int @default(60)
-
-  allowedIps     String[] @default([])
-  allowedOrigins String[] @default([])
-
-  isActive Boolean @default(true)
-
-  expiresAt DateTime?
-
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  description     String?
+  keyHash         String    @unique
+  keyPrefix       String
+  scopes          String[]  @default(["read"])
+  rateLimit       Int       @default(100)
+  rateLimitWindow Int       @default(60)
+  allowedIps      String[]  @default([])
+  allowedOrigins  String[]  @default([])
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime?
   lastUsedAt      DateTime?
   lastUsedIp      String?
   usageCount      Int       @default(0)
   usageCountDaily Int       @default(0)
   usageResetAt    DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([keyHash])
   @@index([isActive])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // userId + isActive - user ke active API keys list
   @@index([userId, isActive], map: "idx_api_key_user_active")
-  // Expiry + isActive - expired keys cleanup
   @@index([expiresAt, isActive], map: "idx_api_key_expires_active")
-  // Last used - inactive keys cleanup
   @@index([lastUsedAt], map: "idx_api_key_last_used_at")
-  // keyPrefix - partial key display aur lookup
   @@index([keyPrefix], map: "idx_api_key_prefix")
 }
 
 model AuditLog {
-  id     String  @id @default(cuid())
-  userId String?
-
-  action   AuditAction
-  category String?
-
-  entityType String?
-  entityId   String?
-
-  description String?
-  oldValue    Json?
-  newValue    Json?
-  changes     Json?
-  metadata    Json?
-
-  ipAddress String?
-  userAgent String? @db.Text
-
-  country String?
-  city    String?
-
+  id            String      @id @default(cuid())
+  userId        String?
+  action        AuditAction
+  category      String?
+  entityType    String?
+  entityId      String?
+  description   String?
+  oldValue      Json?
+  newValue      Json?
+  changes       Json?
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?     @db.Text
+  country       String?
+  city          String?
   requestId     String?
   requestPath   String?
   requestMethod String?
-
-  status       String  @default("success")
-  errorMessage String?
-
-  performedBy String?
-
-  createdAt DateTime @default(now())
+  status        String      @default("success")
+  errorMessage  String?
+  performedBy   String?
+  createdAt     DateTime    @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([action])
   @@index([entityType])
   @@index([entityId])
   @@index([createdAt])
   @@index([category])
-  @@index([userId, action, createdAt])
-  // ===== NEW INDEXES =====
-  // IP-based security monitoring - suspicious IPs
+  @@index([userId, action, createdAt], map: "idx_audit_log_user_action_created")
   @@index([ipAddress, createdAt], map: "idx_audit_log_ip_created_at")
-  // performedBy - admin ne kya kiya
   @@index([performedBy, createdAt], map: "idx_audit_log_performed_by")
-  // Failed actions monitoring
   @@index([status, createdAt], map: "idx_audit_log_status_created_at")
-  // requestPath analytics - most hit endpoints
   @@index([requestPath], map: "idx_audit_log_request_path")
-  // entityType + entityId + action - entity ka full history
   @@index([entityType, entityId, action], map: "idx_audit_log_entity_action")
 }
 
@@ -2450,97 +1907,70 @@ model AuditLog {
 // ============================================================================
 
 model Webhook {
-  id     String @id @default(cuid())
-  userId String
-
-  name        String
-  description String?
-
-  url        String
-  secret     String
-  httpMethod String @default("POST")
-  headers    Json?
-
-  events WebhookEventType[] @default([])
-
-  filters Json?
-
-  isActive Boolean @default(true)
-
-  maxRetries   Int @default(3)
-  retryDelayMs Int @default(1000)
-  timeoutMs    Int @default(30000)
-
-  successCount    Int       @default(0)
-  failureCount    Int       @default(0)
-  lastTriggeredAt DateTime?
-  lastSuccessAt   DateTime?
-  lastFailureAt   DateTime?
-
-  consecutiveFailures Int       @default(0)
+  id                  String             @id @default(cuid())
+  userId              String
+  name                String
+  description         String?
+  url                 String
+  secret              String
+  httpMethod          String             @default("POST")
+  headers             Json?
+  events              WebhookEventType[] @default([])
+  filters             Json?
+  isActive            Boolean            @default(true)
+  maxRetries          Int                @default(3)
+  retryDelayMs        Int                @default(1000)
+  timeoutMs           Int                @default(30000)
+  successCount        Int                @default(0)
+  failureCount        Int                @default(0)
+  lastTriggeredAt     DateTime?
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  consecutiveFailures Int                @default(0)
   lastError           String?
   disabledAt          DateTime?
   disabledReason      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([isActive])
-  // ===== NEW INDEXES =====
-  // userId + isActive - user ke active webhooks
   @@index([userId, isActive], map: "idx_webhook_user_active")
-  // Disabled webhooks review
   @@index([disabledAt], map: "idx_webhook_disabled_at")
-  // High failure webhooks - consecutiveFailures > threshold
   @@index([consecutiveFailures], map: "idx_webhook_consecutive_failures")
-  // lastTriggeredAt - recently triggered webhooks
   @@index([lastTriggeredAt], map: "idx_webhook_last_triggered_at")
 }
 
 model WebhookDelivery {
-  id        String @id @default(cuid())
-  webhookId String
-
-  event   WebhookEventType
-  payload Json
-
+  id             String                @id @default(cuid())
+  webhookId      String
+  event          WebhookEventType
+  payload        Json
   requestUrl     String
   requestHeaders Json?
-  requestBody    String? @db.Text
-
+  requestBody    String?               @db.Text
   status         WebhookDeliveryStatus @default(PENDING)
   responseCode   Int?
   responseBody   String?               @db.Text
   responseTimeMs Int?
-
-  errorMessage  String?
-  attemptNumber Int       @default(1)
-  nextRetryAt   DateTime?
-
-  createdAt DateTime @default(now())
+  errorMessage   String?
+  attemptNumber  Int                   @default(1)
+  nextRetryAt    DateTime?
+  createdAt      DateTime              @default(now())
 
   webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([webhookId])
   @@index([status])
   @@index([createdAt])
   @@index([nextRetryAt])
-  // ===== NEW INDEXES =====
-  // webhookId + status - webhook ke failed deliveries
   @@index([webhookId, status], map: "idx_webhook_delivery_webhook_status")
-  // webhookId + createdAt - delivery history timeline
   @@index([webhookId, createdAt], map: "idx_webhook_delivery_webhook_created_at")
-  // event type analytics - most triggered events
   @@index([event, createdAt], map: "idx_webhook_delivery_event_created_at")
-  // Retry queue - FAILED/RETRYING + nextRetryAt
   @@index([status, nextRetryAt], map: "idx_webhook_delivery_status_retry")
-  // responseCode analytics - 4xx/5xx errors
   @@index([responseCode], map: "idx_webhook_delivery_response_code")
 }
 
@@ -2549,93 +1979,68 @@ model WebhookDelivery {
 // ============================================================================
 
 model ShareLink {
-  id     String @id @default(cuid())
-  userId String
-
-  code String @unique
-
-  entityType ShareEntityType
-  entityId   String?
-
-  title       String?
-  description String?
-
-  isPublic      Boolean  @default(true)
-  requiresAuth  Boolean  @default(false)
-  allowedEmails String[] @default([])
-
-  password  String?
-  expiresAt DateTime?
-  maxViews  Int?
-
-  viewCount       Int       @default(0)
-  uniqueViewCount Int       @default(0)
+  id              String          @id @default(cuid())
+  userId          String
+  code            String          @unique
+  entityType      ShareEntityType
+  entityId        String?
+  title           String?
+  description     String?
+  isPublic        Boolean         @default(true)
+  requiresAuth    Boolean         @default(false)
+  allowedEmails   String[]        @default([])
+  password        String?
+  expiresAt       DateTime?
+  maxViews        Int?
+  viewCount       Int             @default(0)
+  uniqueViewCount Int             @default(0)
   lastViewedAt    DateTime?
-
-  allowEmbed   Boolean @default(true)
-  embedTheme   String  @default("auto")
-  embedSize    String  @default("medium")
-  showBranding Boolean @default(true)
-  customStyles Json?
-
-  isActive     Boolean   @default(true)
-  revokedAt    DateTime?
-  revokeReason String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  allowEmbed      Boolean         @default(true)
+  embedTheme      String          @default("auto")
+  embedSize       String          @default("medium")
+  showBranding    Boolean         @default(true)
+  customStyles    Json?
+  isActive        Boolean         @default(true)
+  revokedAt       DateTime?
+  revokeReason    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   viewLogs ShareViewLog[]
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([code])
-  @@index([entityType, entityId])
+  @@index([entityType, entityId], map: "idx_share_link_entity")
   @@index([isActive])
   @@index([expiresAt])
-  // ===== NEW INDEXES =====
-  // userId + isActive - user ke active share links
   @@index([userId, isActive], map: "idx_share_link_user_active")
-  // userId + entityType - type-wise share links
   @@index([userId, entityType], map: "idx_share_link_user_entity_type")
-  // Most viewed - popular shares analytics
   @@index([viewCount(sort: Desc)], map: "idx_share_link_view_count_desc")
-  // Revoked links
   @@index([revokedAt], map: "idx_share_link_revoked_at")
 }
 
 model ShareViewLog {
-  id          String @id @default(cuid())
-  shareLinkId String
-
+  id           String   @id @default(cuid())
+  shareLinkId  String
   viewerUserId String?
   ipHash       String?
-  userAgent    String? @db.Text
-
-  country String?
-  city    String?
-
-  referrer String?
-
-  isEmbed   Boolean @default(false)
-  embedHost String?
-
-  createdAt DateTime @default(now())
+  userAgent    String?  @db.Text
+  country      String?
+  city         String?
+  referrer     String?
+  isEmbed      Boolean  @default(false)
+  embedHost    String?
+  createdAt    DateTime @default(now())
 
   shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
   viewer    User?     @relation(fields: [viewerUserId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([shareLinkId])
   @@index([viewerUserId])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // shareLinkId + createdAt - timeline analytics
   @@index([shareLinkId, createdAt], map: "idx_share_view_log_link_created_at")
-  // Embed views analytics
   @@index([shareLinkId, isEmbed], map: "idx_share_view_log_link_embed")
-  // Country-wise analytics
   @@index([country, createdAt], map: "idx_share_view_log_country_time")
 }
 
@@ -2644,110 +2049,78 @@ model ShareViewLog {
 // ============================================================================
 
 model EmailTemplate {
-  id String @id @default(cuid())
-
-  slug        String  @unique
-  name        String
-  description String?
-
-  subject     String
-  htmlContent String  @db.Text
-  textContent String? @db.Text
-
-  variables   String[] @default([])
-  defaultData Json?
-
-  category String
-
-  isActive Boolean @default(true)
-  isSystem Boolean @default(false)
-
-  version         Int     @default(1)
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  description     String?
+  subject         String
+  htmlContent     String    @db.Text
+  textContent     String?   @db.Text
+  variables       String[]  @default([])
+  defaultData     Json?
+  category        String
+  isActive        Boolean   @default(true)
+  isSystem        Boolean   @default(false)
+  version         Int       @default(1)
   previousVersion String?
-
-  sentCount  Int       @default(0)
-  lastSentAt DateTime?
-
-  previewData Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  updatedBy String?
+  sentCount       Int       @default(0)
+  lastSentAt      DateTime?
+  previewData     Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  updatedBy       String?
 
   emailLogs EmailLog[]
 
-  // ===== EXISTING INDEXES =====
   @@index([slug])
   @@index([category])
   @@index([isActive])
-  // ===== NEW INDEXES =====
-  // category + isActive combo
   @@index([category, isActive], map: "idx_email_template_category_active")
-  // System templates - prevent delete
   @@index([isSystem], map: "idx_email_template_is_system")
-  // Most used templates - sentCount DESC
   @@index([sentCount(sort: Desc)], map: "idx_email_template_sent_count_desc")
 }
 
 model EmailLog {
-  id String @id @default(cuid())
-
-  templateId String?
-  userId     String?
-
+  id           String         @id @default(cuid())
+  templateId   String?
+  userId       String?
   to           String
-  cc           String[] @default([])
-  bcc          String[] @default([])
+  cc           String[]       @default([])
+  bcc          String[]       @default([])
   subject      String
   templateSlug String?
-
-  status EmailLogStatus @default(QUEUED)
-
-  provider   String?
-  providerId String?
-
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  openedAt    DateTime?
-  clickedAt   DateTime?
-  bouncedAt   DateTime?
-  failedAt    DateTime?
-
-  openCount  Int @default(0)
-  clickCount Int @default(0)
-
+  status       EmailLogStatus @default(QUEUED)
+  provider     String?
+  providerId   String?
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  openedAt     DateTime?
+  clickedAt    DateTime?
+  bouncedAt    DateTime?
+  failedAt     DateTime?
+  openCount    Int            @default(0)
+  clickCount   Int            @default(0)
   errorCode    String?
   errorMessage String?
-  retryCount   Int       @default(0)
+  retryCount   Int            @default(0)
   nextRetryAt  DateTime?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
+  metadata     Json?
+  createdAt    DateTime       @default(now())
 
   template EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([templateId])
   @@index([status])
   @@index([createdAt])
   @@index([to])
   @@index([providerId])
-  // ===== NEW INDEXES =====
-  // userId + status - user ke queued/failed emails
   @@index([userId, status], map: "idx_email_log_user_status")
-  // userId + createdAt - user email history
   @@index([userId, createdAt], map: "idx_email_log_user_created_at")
-  // status + createdAt - queued emails processor
   @@index([status, createdAt], map: "idx_email_log_status_created_at")
-  // to + status - delivery check
   @@index([to, status], map: "idx_email_log_to_status")
-  // Bounced emails - list cleanup
   @@index([bouncedAt], map: "idx_email_log_bounced_at")
-  // Retry queue
   @@index([nextRetryAt, status], map: "idx_email_log_retry_queue")
-  // templateSlug analytics - per-template stats
   @@index([templateSlug, status], map: "idx_email_log_template_slug_status")
 }
 
@@ -2756,46 +2129,32 @@ model EmailLog {
 // ============================================================================
 
 model Report {
-  id     String @id @default(cuid())
-  userId String
-
-  type String
-
-  periodStart DateTime
-  periodEnd   DateTime
-
-  title   String
-  summary String? @db.Text
-  data    Json
-
+  id              String    @id @default(cuid())
+  userId          String
+  type            String
+  periodStart     DateTime
+  periodEnd       DateTime
+  title           String
+  summary         String?   @db.Text
+  data            Json
   highlights      Json?
   insights        Json?
   recommendations Json?
-
-  status String @default("generated")
-
-  sentAt DateTime?
-  sentTo String?
-
-  pdfUrl String?
-
-  createdAt DateTime @default(now())
+  status          String    @default("generated")
+  sentAt          DateTime?
+  sentTo          String?
+  pdfUrl          String?
+  createdAt       DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([type])
   @@index([periodStart])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // userId + type combo - user ke weekly/monthly reports
   @@index([userId, type], map: "idx_report_user_type")
-  // userId + periodStart - date range reports
   @@index([userId, periodStart], map: "idx_report_user_period_start")
-  // status filter - generated vs sent
   @@index([status, createdAt], map: "idx_report_status_created_at")
-  // Unsent reports - sentAt IS NULL
   @@index([sentAt], map: "idx_report_sent_at")
 }
 
@@ -2804,131 +2163,91 @@ model Report {
 // ============================================================================
 
 model SupportTicket {
-  id     String @id @default(cuid())
-  userId String
-
-  ticketNumber String @unique
-  subject      String
-  description  String @db.Text
-
-  category String
-  priority TicketPriority @default(MEDIUM)
-
-  status TicketStatus @default(OPEN)
-
-  assignedTo String?
-
-  resolution String?   @db.Text
-  resolvedAt DateTime?
-
-  metadata    Json?
-  attachments String[] @default([])
-
+  id                 String         @id @default(cuid())
+  userId             String
+  ticketNumber       String         @unique
+  subject            String
+  description        String         @db.Text
+  category           String
+  priority           TicketPriority @default(MEDIUM)
+  status             TicketStatus   @default(OPEN)
+  assignedTo         String?
+  resolution         String?        @db.Text
+  resolvedAt         DateTime?
+  metadata           Json?
+  attachments        String[]       @default([])
   satisfactionRating Int?
   feedbackComment    String?
-
-  firstResponseAt  DateTime?
-  firstResponseSla Int?
-  resolutionSla    Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  firstResponseAt    DateTime?
+  firstResponseSla   Int?
+  resolutionSla      Int?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies TicketReply[]
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([status])
   @@index([priority])
   @@index([ticketNumber])
   @@index([createdAt])
   @@index([assignedTo])
-  // ===== NEW INDEXES =====
-  // userId + status - user ke open tickets
   @@index([userId, status], map: "idx_support_ticket_user_status")
-  // assignedTo + status - agent ka workload
   @@index([assignedTo, status], map: "idx_support_ticket_assigned_status")
-  // priority + status - critical open tickets
   @@index([priority, status], map: "idx_support_ticket_priority_status")
-  // category + status - category-wise tickets
   @@index([category, status], map: "idx_support_ticket_category_status")
-  // SLA breach monitoring - firstResponseAt IS NULL + old tickets
   @@index([firstResponseAt, createdAt], map: "idx_support_ticket_sla")
-  // Satisfaction rating analytics
   @@index([satisfactionRating], map: "idx_support_ticket_satisfaction")
-  // Resolved tickets timeline
   @@index([resolvedAt], map: "idx_support_ticket_resolved_at")
 }
 
 model TicketReply {
-  id       String  @id @default(cuid())
-  ticketId String
-  userId   String?
-
-  message String @db.Text
-
-  isStaffReply Boolean @default(false)
-  isAutoReply  Boolean @default(false)
-
-  attachments String[] @default([])
-
-  isInternal Boolean @default(false)
-
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  ticketId     String
+  userId       String?
+  message      String   @db.Text
+  isStaffReply Boolean  @default(false)
+  isAutoReply  Boolean  @default(false)
+  attachments  String[] @default([])
+  isInternal   Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   user   User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([ticketId])
   @@index([userId])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // Staff vs user replies filter
   @@index([ticketId, isStaffReply], map: "idx_ticket_reply_ticket_staff")
-  // Internal notes filter
   @@index([ticketId, isInternal], map: "idx_ticket_reply_ticket_internal")
 }
 
 model Feedback {
-  id     String  @id @default(cuid())
-  userId String?
-
-  type String
-
-  title   String?
-  message String  @db.Text
-
-  rating Int?
-
-  page       String?
-  userAgent  String?
-  screenshot String?
-
-  status String @default("new")
-
+  id          String    @id @default(cuid())
+  userId      String?
+  type        String
+  title       String?
+  message     String    @db.Text
+  rating      Int?
+  page        String?
+  userAgent   String?
+  screenshot  String?
+  status      String    @default("new")
   response    String?   @db.Text
   respondedAt DateTime?
   respondedBy String?
-
-  createdAt DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([type])
   @@index([status])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // type + status combo - new bugs, new feature requests
   @@index([type, status], map: "idx_feedback_type_status")
-  // Rating analytics - NPS score calculation
   @@index([rating], map: "idx_feedback_rating")
-  // page-wise feedback - specific page issues
   @@index([page, type], map: "idx_feedback_page_type")
-  // Unresponded feedback
   @@index([respondedAt, status], map: "idx_feedback_responded_at_status")
 }
 
@@ -2937,85 +2256,61 @@ model Feedback {
 // ============================================================================
 
 model KnowledgeBaseCategory {
-  id String @id @default(cuid())
-
-  slug        String  @unique
+  id          String    @id @default(cuid())
+  slug        String    @unique
   name        String
   description String?
   icon        String?
-
-  parentId String?
-
-  sortOrder Int     @default(0)
-  isActive  Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  parentId    String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   parent   KnowledgeBaseCategory?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
   children KnowledgeBaseCategory[] @relation("SubCategories")
   articles KnowledgeBaseArticle[]
 
-  // ===== EXISTING INDEXES =====
   @@index([parentId])
   @@index([isActive])
   @@index([slug])
-  // ===== NEW INDEXES =====
-  // parentId + isActive - active sub-categories
   @@index([parentId, isActive], map: "idx_kb_category_parent_active")
-  // sortOrder - ordered navigation
   @@index([isActive, sortOrder], map: "idx_kb_category_active_sort_order")
 }
 
 model KnowledgeBaseArticle {
-  id String @id @default(cuid())
-
-  slug    String  @unique
-  title   String
-  excerpt String? @db.Text
-  content String  @db.Text
-
-  categoryId String
-
-  metaTitle       String?
-  metaDescription String?
-
-  status      String    @default("draft")
-  publishedAt DateTime?
-
-  viewCount  Int @default(0)
-  helpfulYes Int @default(0)
-  helpfulNo  Int @default(0)
-
-  relatedArticleIds String[] @default([])
-  tags              String[] @default([])
-
-  isFeatured Boolean @default(false)
-  sortOrder  Int     @default(0)
-
-  authorId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String    @id @default(cuid())
+  slug              String    @unique
+  title             String
+  excerpt           String?   @db.Text
+  content           String    @db.Text
+  categoryId        String
+  metaTitle         String?
+  metaDescription   String?
+  status            String    @default("draft")
+  publishedAt       DateTime?
+  viewCount         Int       @default(0)
+  helpfulYes        Int       @default(0)
+  helpfulNo         Int       @default(0)
+  relatedArticleIds String[]  @default([])
+  tags              String[]  @default([])
+  isFeatured        Boolean   @default(false)
+  sortOrder         Int       @default(0)
+  authorId          String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   category KnowledgeBaseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([categoryId])
   @@index([status])
   @@index([slug])
   @@index([isFeatured])
   @@index([publishedAt])
-  // ===== NEW INDEXES =====
-  // status + publishedAt combo - published articles sorted by date
   @@index([status, publishedAt(sort: Desc)], map: "idx_kb_article_status_published_at")
-  // categoryId + status - published articles in a category
   @@index([categoryId, status], map: "idx_kb_article_category_status")
-  // authorId - author ke articles
   @@index([authorId], map: "idx_kb_article_author_id")
-  // Most viewed articles - popular articles
   @@index([viewCount(sort: Desc)], map: "idx_kb_article_view_count_desc")
-  // isFeatured + status + sortOrder - featured articles homepage
   @@index([isFeatured, status, sortOrder], map: "idx_kb_article_featured_status_sort")
 }
 
@@ -3024,85 +2319,59 @@ model KnowledgeBaseArticle {
 // ============================================================================
 
 model Waitlist {
-  id String @id @default(cuid())
-
-  email String  @unique
-  name  String?
-
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
   source       String?
   referralCode String?
   referredById String?
+  status       String    @default("waiting")
+  invitedAt    DateTime?
+  inviteCode   String?   @unique
+  joinedAt     DateTime?
+  position     Int?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  status String @default("waiting")
-
-  invitedAt  DateTime?
-  inviteCode String?   @unique
-  joinedAt   DateTime?
-
-  position Int?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([email])
   @@index([status])
   @@index([createdAt])
   @@index([inviteCode])
   @@index([position])
-  // ===== NEW INDEXES =====
-  // status + position - next to invite
   @@index([status, position], map: "idx_waitlist_status_position")
-  // source analytics - where signups are coming from
   @@index([source], map: "idx_waitlist_source")
-  // referredById - referral chain
   @@index([referredById], map: "idx_waitlist_referred_by_id")
-  // Invited but not joined - invitedAt IS NOT NULL + joinedAt IS NULL
   @@index([invitedAt, joinedAt], map: "idx_waitlist_invited_joined")
 }
 
 model NewsletterSubscriber {
-  id String @id @default(cuid())
-
-  email String  @unique
-  name  String?
-
-  topics    String[] @default([])
-  frequency String   @default("weekly")
-
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String?
+  topics            String[]  @default([])
+  frequency         String    @default("weekly")
   isActive          Boolean   @default(true)
   confirmedAt       DateTime?
   unsubscribedAt    DateTime?
   unsubscribeReason String?
+  unsubscribeToken  String    @unique @default(cuid())
+  confirmToken      String?   @unique
+  emailsSent        Int       @default(0)
+  emailsOpened      Int       @default(0)
+  emailsClicked     Int       @default(0)
+  source            String?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  unsubscribeToken String  @unique @default(cuid())
-  confirmToken     String? @unique
-
-  emailsSent    Int @default(0)
-  emailsOpened  Int @default(0)
-  emailsClicked Int @default(0)
-
-  source   String?
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([email])
   @@index([isActive])
   @@index([unsubscribeToken])
   @@index([confirmToken])
-  // ===== NEW INDEXES =====
-  // isActive + frequency - weekly/daily newsletter send
   @@index([isActive, frequency], map: "idx_newsletter_active_frequency")
-  // Unconfirmed subscribers - confirmation reminder
   @@index([confirmedAt, isActive], map: "idx_newsletter_confirmed_active")
-  // source analytics
   @@index([source], map: "idx_newsletter_source")
-  // High engagement subscribers (emailsOpened)
   @@index([emailsOpened(sort: Desc)], map: "idx_newsletter_emails_opened_desc")
 }
 
@@ -3111,90 +2380,63 @@ model NewsletterSubscriber {
 // ============================================================================
 
 model FeatureFlag {
-  id String @id @default(cuid())
-
-  key         String  @unique
-  name        String
-  description String?
-
-  isEnabled Boolean @default(false)
-
+  id                String             @id @default(cuid())
+  key               String             @unique
+  name              String
+  description       String?
+  isEnabled         Boolean            @default(false)
   enabledForAll     Boolean            @default(false)
   enabledUserIds    String[]           @default([])
   enabledTiers      SubscriptionTier[] @default([])
   enabledPercentage Int                @default(0)
+  rules             Json?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  rules Json?
-
-  metadata Json?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([key])
   @@index([isEnabled])
-  // ===== NEW INDEXES =====
-  // isEnabled + enabledForAll - globally enabled flags
   @@index([isEnabled, enabledForAll], map: "idx_feature_flag_enabled_for_all")
 }
 
 model SystemSettings {
-  id String @id @default(cuid())
-
-  key   String @unique
-  value Json
-
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
   description String?
   category    String?
+  isPublic    Boolean  @default(false)
+  isSecret    Boolean  @default(false)
+  encrypted   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
 
-  isPublic  Boolean @default(false)
-  isSecret  Boolean @default(false)
-  encrypted Boolean @default(false)
-
-  updatedAt DateTime @updatedAt
-  updatedBy String?
-
-  // ===== EXISTING INDEXES =====
   @@index([key])
   @@index([category])
   @@index([isPublic])
-  // ===== NEW INDEXES =====
-  // Public settings - frontend fetch
   @@index([isPublic, category], map: "idx_system_settings_public_category")
-  // Encrypted settings - security audit
   @@index([isSecret], map: "idx_system_settings_is_secret")
 }
 
 model MaintenanceWindow {
-  id String @id @default(cuid())
-
-  title   String
-  message String @db.Text
-
-  startTime DateTime
-  endTime   DateTime
-
+  id               String   @id @default(cuid())
+  title            String
+  message          String   @db.Text
+  startTime        DateTime
+  endTime          DateTime
   isActive         Boolean  @default(false)
   affectedServices String[] @default([])
   severity         String   @default("partial")
+  allowedIps       String[] @default([])
+  bypassSecrets    String[] @default([])
+  createdBy        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  allowedIps    String[] @default([])
-  bypassSecrets String[] @default([])
-
-  createdBy String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([isActive])
   @@index([startTime])
   @@index([endTime])
-  // ===== NEW INDEXES =====
-  // Active windows check - isActive + startTime + endTime
   @@index([isActive, startTime, endTime], map: "idx_maintenance_window_active_range")
-  // severity filter - critical maintenance alerts
   @@index([severity, isActive], map: "idx_maintenance_window_severity_active")
 }
 
@@ -3203,128 +2445,91 @@ model MaintenanceWindow {
 // ============================================================================
 
 model BlogPost {
-  id String @id @default(cuid())
-
-  slug    String  @unique
-  title   String
-  excerpt String? @db.Text
-  content String  @db.Text
-
-  authorId   String?
-  authorName String?
-
-  category String?
-  tags     String[] @default([])
-
-  featuredImage   String?
-  metaTitle       String?
-  metaDescription String?
-  metaKeywords    String[] @default([])
-
-  viewCount    Int @default(0)
-  likeCount    Int @default(0)
-  commentCount Int @default(0)
-  shareCount   Int @default(0)
-
-  status      String    @default("draft")
-  publishedAt DateTime?
-
-  isFeatured          Boolean @default(false)
-  allowComments       Boolean @default(true)
-  showTableOfContents Boolean @default(true)
-
-  readingTimeMinutes Int?
-  wordCount          Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  slug                String    @unique
+  title               String
+  excerpt             String?   @db.Text
+  content             String    @db.Text
+  authorId            String?
+  authorName          String?
+  category            String?
+  tags                String[]  @default([])
+  featuredImage       String?
+  metaTitle           String?
+  metaDescription     String?
+  metaKeywords        String[]  @default([])
+  viewCount           Int       @default(0)
+  likeCount           Int       @default(0)
+  commentCount        Int       @default(0)
+  shareCount          Int       @default(0)
+  status              String    @default("draft")
+  publishedAt         DateTime?
+  isFeatured          Boolean   @default(false)
+  allowComments       Boolean   @default(true)
+  showTableOfContents Boolean   @default(true)
+  readingTimeMinutes  Int?
+  wordCount           Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   comments BlogComment[]
   likes    BlogPostLike[]
 
-  // ===== EXISTING INDEXES =====
   @@index([slug])
   @@index([status])
   @@index([publishedAt])
   @@index([category])
   @@index([isFeatured])
-  // ===== NEW INDEXES =====
   @@index([status, publishedAt(sort: Desc)], map: "idx_blogpost_status_published_desc")
   @@index([category, status, publishedAt(sort: Desc)], map: "idx_blogpost_category_status_published")
   @@index([isFeatured, status, publishedAt(sort: Desc)], map: "idx_blogpost_featured_status_published")
   @@index([authorId, status, publishedAt(sort: Desc)], map: "idx_blogpost_author_status_published")
-  // authorId - author ke saare posts
-  @@index([authorId], map: "idx_blog_post_author_id")
-  // status + publishedAt - published posts sorted by date
-  @@index([status, publishedAt(sort: Desc)], map: "idx_blog_post_status_published_desc")
-  // category + status - category page published posts
-  @@index([category, status], map: "idx_blog_post_category_status")
-  // isFeatured + status - featured posts homepage
-  @@index([isFeatured, status], map: "idx_blog_post_featured_status")
-  // Most viewed - trending posts
   @@index([viewCount(sort: Desc)], map: "idx_blog_post_view_count_desc")
-  // Most liked - popular posts
   @@index([likeCount(sort: Desc)], map: "idx_blog_post_like_count_desc")
   @@index([tags], map: "idx_blog_post_tags", type: Gin)
 }
 
 model BlogComment {
-  id String @id @default(cuid())
-
-  postId   String
-  authorId String
-  parentId String?
-
-  content String @db.Text
-
-  likes Int @default(0)
-
-  isApproved Boolean @default(true)
-  isDeleted  Boolean @default(false)
-  isPinned   Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  postId     String
+  authorId   String
+  parentId   String?
+  content    String    @db.Text
+  likes      Int       @default(0)
+  isApproved Boolean   @default(true)
+  isDeleted  Boolean   @default(false)
+  isPinned   Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   post    BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
   parent  BlogComment?  @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
   replies BlogComment[] @relation("Replies")
 
-  // ===== EXISTING INDEXES =====
   @@index([postId])
   @@index([authorId])
   @@index([parentId])
   @@index([isApproved])
-  // ===== NEW INDEXES =====
-  // postId + isApproved + createdAt - approved comments sorted
   @@index([postId, isApproved, createdAt], map: "idx_blog_comment_post_approved_time")
-  // postId + isPinned - pinned comments top pe
   @@index([postId, isPinned], map: "idx_blog_comment_post_pinned")
-  // isDeleted filter - soft delete
   @@index([isDeleted, postId], map: "idx_blog_comment_deleted_post")
-  // Top level comments only (parentId IS NULL)
   @@index([postId, parentId, createdAt], map: "idx_blog_comment_post_parent_time")
 }
 
 model BlogPostLike {
-  id String @id @default(cuid())
-
-  postId String
-  userId String?
-  ipHash String?
-
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String?
+  ipHash    String?
   createdAt DateTime @default(now())
 
   post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // ===== EXISTING INDEXES =====
   @@unique([postId, userId])
   @@unique([postId, ipHash])
   @@index([postId])
-  // ===== NEW INDEXES =====
-  // userId ke liked posts history
   @@index([userId, createdAt], map: "idx_blog_post_like_user_created_at")
 }
 
@@ -3333,44 +2538,31 @@ model BlogPostLike {
 // ============================================================================
 
 model ChangelogEntry {
-  id String @id @default(cuid())
-
-  version     String
-  title       String
-  description String @db.Text
-
-  type String
-
-  changes Json
-
+  id             String    @id @default(cuid())
+  version        String
+  title          String
+  description    String    @db.Text
+  type           String
+  changes        Json
   pullRequestUrl String?
   issueUrl       String?
   docsUrl        String?
+  imageUrl       String?
+  videoUrl       String?
+  isPublished    Boolean   @default(false)
+  publishedAt    DateTime?
+  isBreaking     Boolean   @default(false)
+  isFeatured     Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  imageUrl String?
-  videoUrl String?
-
-  isPublished Boolean   @default(false)
-  publishedAt DateTime?
-  isBreaking  Boolean   @default(false)
-  isFeatured  Boolean   @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ===== EXISTING INDEXES =====
   @@index([version])
   @@index([isPublished])
   @@index([publishedAt])
   @@index([type])
-  // ===== NEW INDEXES =====
-  // isPublished + publishedAt - published entries sorted
   @@index([isPublished, publishedAt(sort: Desc)], map: "idx_changelog_published_at_desc")
-  // Breaking changes alert
   @@index([isBreaking, isPublished], map: "idx_changelog_breaking_published")
-  // type + isPublished - filter by change type
   @@index([type, isPublished], map: "idx_changelog_type_published")
-  // isFeatured changes - homepage highlights
   @@index([isFeatured, isPublished], map: "idx_changelog_featured_published")
 }
 
@@ -3379,27 +2571,20 @@ model ChangelogEntry {
 // ============================================================================
 
 model Bookmark {
-  id String @id @default(cuid())
-
+  id         String   @id @default(cuid())
   userId     String
   entityType String
   entityId   String
-
-  title String?
-  notes String?
-
-  createdAt DateTime @default(now())
+  title      String?
+  notes      String?
+  createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@unique([userId, entityType, entityId])
   @@index([userId])
   @@index([entityType])
-  // ===== NEW INDEXES =====
-  // userId + entityType - type-wise bookmarks
   @@index([userId, entityType], map: "idx_bookmark_user_entity_type")
-  // userId + createdAt - recently bookmarked
   @@index([userId, createdAt], map: "idx_bookmark_user_created_at")
 }
 
@@ -3411,12 +2596,8 @@ model RecentSearch {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // ===== EXISTING INDEXES =====
   @@index([userId])
   @@index([createdAt])
-  // ===== NEW INDEXES =====
-  // userId + createdAt DESC - most recent searches pehle
   @@index([userId, createdAt(sort: Desc)], map: "idx_recent_search_user_created_desc")
-  // query - search autocomplete / popular searches
   @@index([query], map: "idx_recent_search_query")
 }

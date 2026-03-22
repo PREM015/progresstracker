@@ -122,7 +122,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   logger.info('Magic link request received', { ip: clientIP, requestId });
   logger.debug('User agent', { userAgent, requestId });
   logger.debug('Device info', { deviceInfo, requestId });
-  
+
   try {
     // Rate limiting
     const rateLimitKey = `magic-link:${clientIP}`;
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ]);
 
     // Send magic link email
-    const magicLinkUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/magic-link?token=${rawToken}`;
+    const magicLinkUrl = `${process.env.NEXT_PUBLIC_APP_URL}/magic-link?token=${rawToken}`;
 
     const magicEmailResult = await emailService.send({
       to: email,
@@ -454,9 +454,11 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
         where: { id: user.id },
         data: { lastLoginAt: new Date(), lastActiveAt: new Date() },
       });
+    }, { timeout: 15000 });
 
-      // Record login
-      await tx.loginAttempt.create({
+    // Record login and audit log outside of the critical transaction
+    Promise.allSettled([
+      prisma.loginAttempt.create({
         data: {
           userId: user.id,
           email: user.email!,
@@ -464,10 +466,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
           ipAddress: clientIP,
           userAgent: userAgent?.slice(0, 255),
         },
-      });
-
-      // Audit log
-      await tx.auditLog.create({
+      }),
+      prisma.auditLog.create({
         data: {
           userId: user.id,
           action: 'LOGIN',
@@ -477,8 +477,8 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
           userAgent: userAgent?.slice(0, 255),
           status: 'success',
         },
-      });
-    });
+      })
+    ]).catch(err => logger.error('Failed to log login attempt/audit', { userId: user.id, requestId }, err));
 
     logger.info('Magic link login successful', { userId: user.id, ip: clientIP, requestId });
 

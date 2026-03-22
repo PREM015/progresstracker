@@ -20,7 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         where: {
             userId: session.user.id,
             achievement: {
-                name: { contains: query, mode: 'insensitive' }
+                title: { contains: query, mode: 'insensitive' }
             }
         },
         include: { achievement: true },

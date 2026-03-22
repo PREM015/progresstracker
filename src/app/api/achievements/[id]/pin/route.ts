@@ -133,7 +133,7 @@ export async function POST(
     );
   } catch (error) {
     log.error('Error toggling achievement pin', { id, requestId }, error);
-    return apiResponse.error(error, requestId);
+    return apiResponse.error(error,requestId);
   }
 }
 

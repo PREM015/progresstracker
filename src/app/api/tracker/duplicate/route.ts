@@ -89,7 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const originalEntry = await TrackerService.getEntryById(entryId, userId);
     
     if (!originalEntry) {
-      return addHeaders(apiResponse.error('Entry not found or unauthorized', 404, { meta: { requestId } }), requestId, rateLimitResult);
+      return addHeaders(apiResponse.notFound('Entry', requestId), requestId, rateLimitResult);
     }
 
     // Prepare duplicate data, removing IDs and timestamps

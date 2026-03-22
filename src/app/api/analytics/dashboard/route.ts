@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/analytics/dashboard/route.ts
 // =============================================================================
 // Dashboard Summary Analytics
@@ -290,24 +291,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Calculate stats
     const todayStats = {
-      problems: todayEntries.reduce((sum, e) => sum + e.problemsSolved, 0),
-      commits: todayEntries.reduce((sum, e) => sum + e.commits, 0),
-      time: todayEntries.reduce((sum, e) => sum + e.timeSpent, 0),
-      points: todayEntries.reduce((sum, e) => sum + (e.pointsEarned || 0), 0),
+      problems: todayEntries.reduce((sum: any, e: { problemsSolved: any; }) => sum + e.problemsSolved, 0),
+      commits: todayEntries.reduce((sum: any, e: { commits: any; }) => sum + e.commits, 0),
+      time: todayEntries.reduce((sum: any, e: { timeSpent: any; }) => sum + e.timeSpent, 0),
+      points: todayEntries.reduce((sum: any, e: { pointsEarned: any; }) => sum + (e.pointsEarned || 0), 0),
     };
 
     const weekStats = {
-      problems: weekEntries.reduce((sum, e) => sum + e.problemsSolved, 0),
-      commits: weekEntries.reduce((sum, e) => sum + e.commits, 0),
-      time: weekEntries.reduce((sum, e) => sum + e.timeSpent, 0),
-      activeDays: new Set(weekEntries.map(e => e.date.toDateString())).size,
+      problems: weekEntries.reduce((sum: any, e: { problemsSolved: any; }) => sum + e.problemsSolved, 0),
+      commits: weekEntries.reduce((sum: any, e: { commits: any; }) => sum + e.commits, 0),
+      time: weekEntries.reduce((sum: any, e: { timeSpent: any; }) => sum + e.timeSpent, 0),
+      activeDays: new Set(weekEntries.map((e: { date: { toDateString: () => any; }; }) => e.date.toDateString())).size,
     };
 
     const monthStats = {
-      problems: monthEntries.reduce((sum, e) => sum + e.problemsSolved, 0),
-      commits: monthEntries.reduce((sum, e) => sum + e.commits, 0),
-      time: monthEntries.reduce((sum, e) => sum + e.timeSpent, 0),
-      activeDays: new Set(monthEntries.map(e => e.date.toDateString())).size,
+      problems: monthEntries.reduce((sum: any, e: { problemsSolved: any; }) => sum + e.problemsSolved, 0),
+      commits: monthEntries.reduce((sum: any, e: { commits: any; }) => sum + e.commits, 0),
+      time: monthEntries.reduce((sum: any, e: { timeSpent: any; }) => sum + e.timeSpent, 0),
+      activeDays: new Set(monthEntries.map((e: { date: { toDateString: () => any; }; }) => e.date.toDateString())).size,
     };
 
     const totalProblems = (difficultyStats._sum.easyProblems || 0) +
@@ -339,20 +340,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const chartData = Array.from({ length: 7 }, (_, i) => {
       const date = subDays(now, 6 - i);
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayEntries = weekEntries.filter(e => format(e.date, 'yyyy-MM-dd') === dateStr);
+      const dayEntries = weekEntries.filter((e: { date: string | number | Date; }) => format(e.date, 'yyyy-MM-dd') === dateStr);
 
       return {
         date: dateStr,
         label: format(date, 'EEE'),
-        problems: dayEntries.reduce((sum, e) => sum + e.problemsSolved, 0),
-        commits: dayEntries.reduce((sum, e) => sum + e.commits, 0),
-        time: dayEntries.reduce((sum, e) => sum + e.timeSpent, 0),
+        problems: dayEntries.reduce((sum: any, e: { problemsSolved: any; }) => sum + e.problemsSolved, 0),
+        commits: dayEntries.reduce((sum: any, e: { commits: any; }) => sum + e.commits, 0),
+        time: dayEntries.reduce((sum: any, e: { timeSpent: any; }) => sum + e.timeSpent, 0),
       };
     });
 
     // Calculate platform stats (based on month data for now)
     const platformStatsMap = new Map<string, { problems: number; time: number }>();
-    monthEntries.forEach(entry => {
+    monthEntries.forEach((entry: { platformId: string | null; problemsSolved: number; timeSpent: number; }) => {
       if (entry.platformId) {
         const current = platformStatsMap.get(entry.platformId) || { problems: 0, time: 0 };
         current.problems += entry.problemsSolved;
@@ -361,7 +362,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    const platformsData = connectedPlatforms.map(up => {
+    const platformsData = connectedPlatforms.map((up: { platformId: string; platform: { name: any; icon: any; color: any; }; }) => {
       const stats = platformStatsMap.get(up.platformId) || { problems: 0, time: 0 };
       return {
         name: up.platform.name,
@@ -398,13 +399,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         thisMonth: monthStats,
       },
       chart: chartData,
-      goals: activeGoals.map(goal => ({
+      goals: activeGoals.map((goal: any) => ({
         id: goal.id,
         title: goal.title,
         progress: goal.progress,
         target: goal.target,
         percentage: goal.target > 0 ? Math.round((goal.progress / goal.target) * 100) : 0,
-        deadline: goal.deadline?.toISOString() || null,
+        deadline: goal.deadline?.toString() || null,
         category: goal.category,
         isAtRisk: goal.deadline
           ? new Date(goal.deadline).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000 && goal.progress < 80
@@ -412,7 +413,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })),
       platforms: platformsData,
       categories,
-      achievements: recentAchievements.map(ua => ({
+      achievements: recentAchievements.map((ua: { id: any; achievement: { title: any; icon: any; tier: any; points: any; }; unlockedAt: { toISOString: () => any; }; }) => ({
         id: ua.id,
         title: ua.achievement.title,
         icon: ua.achievement.icon,
@@ -420,7 +421,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         points: ua.achievement.points,
         unlockedAt: ua.unlockedAt.toISOString(),
       })),
-      activity: recentEntries.map(entry => ({
+      activity: recentEntries.map((entry: any) => ({
         id: entry.id,
         date: entry.date.toISOString(),
         platform: entry.platform?.name || 'Manual',

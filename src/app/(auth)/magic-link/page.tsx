@@ -1,7 +1,7 @@
 // app/(auth)/magic-link/page.tsx
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { z } from 'zod';
 import { signIn } from 'next-auth/react';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FormError } from '@/components/forms/FormError';
 import { FormSuccess } from '@/components/forms/FormSuccess';
-import { Loader2, Mail, Sparkles, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Mail, Sparkles, CheckCircle, XCircle, Clock } from 'lucide-react';
 import apiClient from '@/lib/apiClient';
 import Link from 'next/link';
 
@@ -23,7 +23,7 @@ function MagicLinkContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const callbackUrlParam = searchParams.get('callbackUrl');
 
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -31,43 +31,87 @@ function MagicLinkContent() {
   const [success, setSuccess] = useState(false);
 
   // Token verification states
-  const [verifyStatus, setVerifyStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>('idle');
+  const [verifyStatus, setVerifyStatus] = useState<
+    'idle' | 'verifying' | 'success' | 'expired' | 'error'
+  >('idle');
 
-  // If token is present, verify the magic link automatically
-  useEffect(() => {
-    if (token) {
-      verifyMagicLink();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  // Guard against React StrictMode double-firing
+  const verifyingRef = React.useRef(false);
 
-  const verifyMagicLink = async () => {
+  const verifyAndLogin = useCallback(async (tokenValue: string) => {
     setVerifyStatus('verifying');
+
     try {
-      const result = await signIn('email', {
-        token,
-        redirect: false,
+      // Step 1: Verify token via PUT /api/auth/magic-link
+      const verifyRes = await fetch('/api/auth/magic-link', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenValue }),
       });
 
-      if (result?.error) {
-        setVerifyStatus('error');
-        setError(result.error);
-      } else if (result?.ok) {
-        setVerifyStatus('success');
-        setTimeout(() => {
-          router.push(callbackUrl);
-        }, 2000);
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.success) {
+        // Distinguish between expired tokens and other errors
+        const errorText = String(verifyData.error ?? '').toLowerCase();
+        if (verifyRes.status === 400 && errorText.includes('expired')) {
+          setVerifyStatus('expired');
+          setError(verifyData.error);
+        } else {
+          setVerifyStatus('error');
+          setError(verifyData.error || 'Magic link is invalid or expired.');
+        }
+        return;
       }
+
+      console.log('[MAGIC-LINK-PAGE] Token verified for:', verifyData.user?.email);
+
+      // Step 2: Resolve callbackUrl (param → sessionStorage → /dashboard)
+      let callbackUrl = callbackUrlParam || '/dashboard';
+      if (callbackUrl === '/dashboard' && typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('auth_callback_url');
+        if (stored) {
+          callbackUrl = stored;
+          sessionStorage.removeItem('auth_callback_url');
+        }
+      }
+
+      // Step 3: Create NextAuth session — NextAuth handles the redirect
+      await signIn('credentials', {
+        email: verifyData.user.email,
+        loginType: 'magic-link',
+        callbackUrl,
+      });
+
+      // Fallback if signIn didn't redirect (shouldn't happen with redirect:true)
+      window.location.href = callbackUrl;
     } catch (err) {
-      console.error('Magic link verification error:', err);
+      console.error('[MAGIC-LINK-PAGE] Verification error:', err);
       setVerifyStatus('error');
       setError('Verification failed. The link may be invalid or expired.');
     }
-  };
+  }, [callbackUrlParam]);
 
-  // Token verification UI
-  if (token) {
-    if (verifyStatus === 'verifying') {
+  // If token is present, verify the magic link automatically
+  useEffect(() => {
+    if (token && !verifyingRef.current) {
+      verifyingRef.current = true;
+
+      // ✅ SECURITY: Remove token from URL immediately — prevents:
+      // - Token in browser history
+      // - Token leaking via Referer header
+      // - Token visible in analytics/monitoring
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/magic-link');
+      }
+
+      verifyAndLogin(token);
+    }
+  }, [token, verifyAndLogin]);
+
+  // ── Token Verification UI ────────────────────────────────────
+  if (token || verifyStatus !== 'idle') {
+    if (verifyStatus === 'idle' || verifyStatus === 'verifying') {
       return (
         <AuthCard title="Verifying Magic Link" showSocial={false}>
           <div className="flex flex-col items-center py-8">
@@ -92,6 +136,30 @@ function MagicLinkContent() {
       );
     }
 
+    if (verifyStatus === 'expired') {
+      return (
+        <AuthCard title="Link Expired" showSocial={false}>
+          <div className="text-center py-4 space-y-4">
+            <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
+              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <FormError
+              message={error || 'This magic link has expired. Magic links are valid for 15 minutes.'}
+              variant="block"
+            />
+            <div className="space-y-2 pt-2">
+              <Button className="w-full" onClick={() => router.push('/magic-link')}>
+                Request New Link
+              </Button>
+              <Button variant="ghost" className="w-full" asChild>
+                <Link href="/login">← Back to Login</Link>
+              </Button>
+            </div>
+          </div>
+        </AuthCard>
+      );
+    }
+
     if (verifyStatus === 'error') {
       return (
         <AuthCard title="Verification Failed" showSocial={false}>
@@ -105,7 +173,7 @@ function MagicLinkContent() {
                 Request New Link
               </Button>
               <Button variant="ghost" className="w-full" asChild>
-                <Link href="/login">Back to Login</Link>
+                <Link href="/login">← Back to Login</Link>
               </Button>
             </div>
           </div>
@@ -114,7 +182,7 @@ function MagicLinkContent() {
     }
   }
 
-  // Request form - success state
+  // ── Request form — sent successfully state ────────────────────
   if (success) {
     return (
       <AuthCard
@@ -152,7 +220,7 @@ function MagicLinkContent() {
     );
   }
 
-  // Request form
+  // ── Request form ──────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -172,7 +240,7 @@ function MagicLinkContent() {
       } else {
         setSuccess(true);
       }
-    } catch (err: any) {
+    } catch {
       setError('Failed to send magic link. Please try again.');
     } finally {
       setLoading(false);

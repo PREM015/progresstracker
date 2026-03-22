@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -45,7 +47,7 @@ export const POST = withErrorHandling(async (req: Request) => {
     );
   }
 
-  const { format, dateFrom, dateTo, metrics, platforms, categories } = validation.data;
+  const { format, dateFrom, dateTo,  platforms, categories } = validation.data;
 
   // Validate date range
   if (new Date(dateFrom) > new Date(dateTo)) {
@@ -70,11 +72,11 @@ export const POST = withErrorHandling(async (req: Request) => {
   }
 
   // Map format to Prisma Enum (uppercase)
-  // @ts-ignore
+ 
   const prismaFormat = format.toUpperCase();
 
   // Map categories to Prisma Enum (uppercase) if present
-  // @ts-ignore
+
   const prismaCategories = categories ? categories.map(c => c.toUpperCase()) : [];
 
   // Create ExportJob

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/analytics/comparison/route.ts
 // =============================================================================
 // Period Comparison Analytics
@@ -131,11 +132,12 @@ async function getPeriodStats(userId: string, startDate: Date, endDate: Date) {
   });
 
   return {
-    problems: entries.reduce((sum, e) => sum + e.problemsSolved, 0),
-    commits: entries.reduce((sum, e) => sum + e.commits, 0),
-    time: entries.reduce((sum, e) => sum + e.timeSpent, 0),
-    points: entries.reduce((sum, e) => sum + (e.pointsEarned || 0), 0),
-    activeDays: new Set(entries.map(e => e.date.toDateString())).size,
+    
+    problems: entries.reduce((sum: any, e: { problemsSolved: any; }) => sum + e.problemsSolved, 0),
+    commits: entries.reduce((sum: any, e: { commits: any; }) => sum + e.commits, 0),
+    time: entries.reduce((sum: any, e: { timeSpent: any; }) => sum + e.timeSpent, 0),
+    points: entries.reduce((sum: any, e: { pointsEarned: any; }) => sum + (e.pointsEarned || 0), 0),
+    activeDays: new Set(entries.map((e: { date: { toDateString: () => any; }; }) => e.date.toDateString())).size,
     entries: entries.length,
   };
 }

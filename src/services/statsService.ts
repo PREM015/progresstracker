@@ -1120,6 +1120,67 @@ export class StatsService {
     };
   }
 
+  /**
+   * Compare stats between two custom periods
+   */
+  static async comparePeriods(
+    userId: string,
+    period1: { start: Date; end: Date },
+    period2: { start: Date; end: Date },
+    platformId?: string
+  ) {
+    const fetchStats = async (start: Date, end: Date) => {
+      const entries = await prisma.trackerEntry.findMany({
+        where: {
+          userId,
+          date: { gte: start, lte: end },
+          ...(platformId ? { platformId } : {}),
+        },
+        select: {
+          problemsSolved: true,
+          commits: true,
+          timeSpent: true,
+        },
+      });
+
+      return {
+        totalProblems: entries.reduce((s: any, e: any) => s + e.problemsSolved, 0),
+        totalCommits: entries.reduce((s: any, e: any) => s + e.commits, 0),
+        totalTimeSpent: entries.reduce((s: any, e: any) => s + e.timeSpent, 0),
+        entryCount: entries.length,
+      };
+    };
+
+    const [stats1, stats2] = await Promise.all([
+      fetchStats(period1.start, period1.end),
+      fetchStats(period2.start, period2.end),
+    ]);
+
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    return {
+      period1: stats1,
+      period2: stats2,
+      comparison: {
+        problems: {
+          change: stats1.totalProblems - stats2.totalProblems,
+          changePercent: calculateChange(stats1.totalProblems, stats2.totalProblems),
+        },
+        commits: {
+          change: stats1.totalCommits - stats2.totalCommits,
+          changePercent: calculateChange(stats1.totalCommits, stats2.totalCommits),
+        },
+        time: {
+          change: stats1.totalTimeSpent - stats2.totalTimeSpent,
+          changePercent: calculateChange(stats1.totalTimeSpent, stats2.totalTimeSpent),
+        },
+      },
+    };
+  }
+
   // ===========================================================================
   // STREAK ANALYSIS (Uses differenceInDays)
   // ===========================================================================

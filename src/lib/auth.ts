@@ -6,6 +6,7 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
+import { sessionCache } from "@/lib/session-cache";
 import bcrypt from "bcryptjs";
 
 /* -------------------------------------------------------------------------- */
@@ -103,9 +104,107 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        loginType: { label: "Login Type", type: "text" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) {
+        if (!credentials) return null;
+
+        // --- Magic Link Login ---
+        // PUT /api/auth/magic-link already verified the token and created
+        // session/tokens. We just need to create the NextAuth session here
+        // by looking up the user from the verified email.
+        if (credentials.loginType === "magic-link" && credentials.email) {
+          console.log("[AUTH] Magic link session creation for:", credentials.email);
+
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          if (!user || !user.isActive || user.isBanned) {
+            console.log("[AUTH] ❌ Magic link user not found or inactive");
+            return null;
+          }
+
+          // Verify that this email actually has a recently-verified magic link
+          // (prevents forged signIn calls without going through PUT first)
+          const recentVerification = await prisma.emailVerification.findFirst({
+            where: {
+              userId: user.id,
+              type: "magic_link",
+              verifiedAt: {
+                not: null,
+                gte: new Date(Date.now() - 5 * 60 * 1000), // within last 5 minutes
+              },
+            },
+          });
+
+          if (!recentVerification) {
+            console.log("[AUTH] ❌ No recent magic link verification found for user");
+            return null;
+          }
+
+          console.log("[AUTH] ✅ Magic link user verified:", user.email);
+
+          return {
+            id: user.id,
+            email: user.email!,
+            emailVerified: user.emailVerified,
+            name: user.name,
+            image: user.image,
+            username: user.username,
+            role: user.role as "admin" | "user",
+            isAdmin: user.isAdmin,
+            permissions: user.permissions,
+            isActive: user.isActive,
+            isVerified: user.isVerified,
+            isBanned: user.isBanned,
+            banReason: user.banReason,
+            currentStreak: user.currentStreak,
+            longestStreak: user.longestStreak,
+            streakStartDate: user.streakStartDate,
+            streakFreezeCount: user.streakFreezeCount,
+            streakFreezeUsedAt: user.streakFreezeUsedAt,
+            totalProblems: user.totalProblems,
+            totalCommits: user.totalCommits,
+            totalProjects: user.totalProjects,
+            totalCertifications: user.totalCertifications,
+            totalAchievements: user.totalAchievements,
+            totalPoints: user.totalPoints,
+            preferredLanguage: user.preferredLanguage,
+            timezone: user.timezone,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            isPublic: user.isPublic ?? true,
+            showEmail: user.showEmail ?? false,
+            showLocation: user.showLocation ?? false,
+            showActivity: user.showActivity ?? true,
+            showAchievements: user.showAchievements ?? true,
+            showGoals: user.showGoals ?? true,
+            showPlatforms: user.showPlatforms ?? true,
+            showStreak: user.showStreak ?? true,
+            bio: user.bio,
+            location: user.location,
+            website: user.website,
+            company: user.company,
+            jobTitle: user.jobTitle,
+            githubUsername: user.githubUsername,
+            linkedinUrl: user.linkedinUrl,
+            twitterHandle: user.twitterHandle,
+            discordUsername: user.discordUsername,
+            lastActivityDate: user.lastActivityDate,
+            lastLoginAt: user.lastLoginAt,
+            lastActiveAt: user.lastActiveAt,
+            passwordChangedAt: user.passwordChangedAt,
+            deletedAt: user.deletedAt,
+            referralCode: user.referralCode,
+            referredBy: user.referredBy,
+            signupSource: user.signupSource,
+            rank: user.rank,
+          };
+        }
+
+        // --- Normal Email/Password Login ---
+        if (!credentials.email || !credentials.password) {
           throw new Error("Email and password are required");
         }
 
@@ -216,7 +315,7 @@ export const authOptions: NextAuthOptions = {
   /* -------------------------------- CALLBACKS ------------------------------ */
   callbacks: {
     async jwt({ token, user, account, trigger, session }) {
-      // Initial login
+      // Initial login — populate token from user object
       if (user) {
         token.id = user.id;
         token.email = user.email!;
@@ -227,11 +326,15 @@ export const authOptions: NextAuthOptions = {
         token.isVerified = user.isVerified;
       }
 
-      // Handle updates
+      // Profile update — sync token and bust session cache
       if (trigger === "update" && session?.user) {
         token.name = session.user.name;
         token.image = session.user.image;
         token.username = session.user.username;
+        // ✅ Bust cache so next session() call refreshes
+        if (token.id) {
+          sessionCache.invalidate(`session:${token.id}`);
+        }
       }
 
       if (account) {
@@ -242,6 +345,18 @@ export const authOptions: NextAuthOptions = {
     },
 
     async session({ session, token }) {
+      if (!token?.id) return session;
+
+      const cacheKey = `session:${token.id}`;
+
+      // ✅ Serve from cache whenever possible (avoids DB hit per request)
+      const cached = sessionCache.get(cacheKey) as typeof session.user | null;
+      if (cached) {
+        session.user = cached;
+        return session;
+      }
+
+      // Populate from JWT token data (fast path — no DB)
       if (session.user) {
         session.user.id = token.id;
         session.user.email = token.email ?? null;
@@ -251,7 +366,11 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
         session.user.isAdmin = token.isAdmin;
         session.user.isVerified = token.isVerified;
+
+        // ✅ Cache the session user so next calls skip this block
+        sessionCache.set(cacheKey, session.user);
       }
+
       return session;
     },
 
@@ -260,9 +379,22 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) return url;
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return `${baseUrl}/dashboard`;
+      // Auth paths that should NEVER be redirect destinations
+      const authPaths = ['/login', '/register', '/signup', '/forgot-password', '/api/auth'];
+
+      try {
+        const urlObj = new URL(url.startsWith('http') ? url : baseUrl + url);
+        const isAuthPath = authPaths.some((p) => urlObj.pathname.startsWith(p));
+
+        // ✅ Prevent redirect loops — never redirect to auth pages after sign-in
+        if (isAuthPath) return `${baseUrl}/dashboard`;
+
+        if (url.startsWith('/')) return `${baseUrl}${url}`;
+        if (urlObj.origin === baseUrl) return url;
+        return `${baseUrl}/dashboard`;
+      } catch {
+        return `${baseUrl}/dashboard`;
+      }
     },
   },
 
