@@ -153,7 +153,7 @@
     "playwright": "^1.57.0",
     "prettier": "^3.7.3",
     "puppeteer": "^24.31.0",
-    "shadcn": "^3.8.4",
+    "shadcn": "^4.0.8",
     "tailwindcss": "^4.1.17",
     "test-exclude": "^7.0.1",
     "ts-jest": "^29.4.5",
