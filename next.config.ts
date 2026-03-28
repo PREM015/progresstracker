@@ -3,8 +3,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactCompiler: true,
-  serverExternalPackages: ['ioredis', 'bullmq'],
+  serverExternalPackages: ['ioredis', 'bullmq', 'puppeteer'],
   async headers() {
     return [
       {

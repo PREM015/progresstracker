@@ -98,7 +98,7 @@ export interface StorageUsage {
 // CONSTANTS
 // =============================================================================
 
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
+const UPLOAD_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), 'public', 'uploads');
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_DOCUMENT_TYPES = ['application/pdf', 'text/plain', 'text/csv'];

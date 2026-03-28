@@ -1,6 +1,16 @@
 
-import puppeteer, { Browser, Page } from 'puppeteer';
+import type { Browser, Page } from 'puppeteer';
 import { logger } from '@/lib/logger';
+
+let puppeteer: any;
+
+if (typeof window === 'undefined') {
+  try {
+    puppeteer = require('puppeteer');
+  } catch {
+    logger.warn('Puppeteer not available in this environment');
+  }
+}
 
 class BrowserServiceClass {
     private browser: Browser | null = null;
@@ -61,6 +71,10 @@ class BrowserServiceClass {
                 ],
                 // Optional: executablePath if needed for specific environments
             });
+
+            if (!this.browser) {
+                throw new Error('Failed to launch browser instance');
+            }
 
             this.browser.on('disconnected', () => {
                 logger.warn('[BrowserService] Browser disconnected.');
