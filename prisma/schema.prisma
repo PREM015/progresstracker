@@ -1,10 +1,10 @@
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  
 }
 
 // ============================================================================
@@ -307,8 +307,8 @@ model User {
 
   // Social Links
   githubUsername  String?
-  linkedinUrl     String?
-  twitterHandle   String?
+  linkedinUrl    String?
+  twitterHandle  String?
   discordUsername String?
 
   // Profile Visibility
@@ -448,6 +448,14 @@ model User {
   @@index([signupSource], map: "idx_user_signup_source")
   @@index([lastLoginAt], map: "idx_user_last_login_at")
   @@index([isActive, isBanned], map: "idx_user_active_banned")
+  @@index([lastActivityDate], map: "idx_user_last_activity_date")
+  @@index([isPublic, isActive, totalProblems(sort: Desc)], map: "idx_user_leaderboard_problems")
+  @@index([isPublic, isActive, totalCommits(sort: Desc)], map: "idx_user_leaderboard_commits")
+  @@index([isPublic, isActive, totalAchievements(sort: Desc)], map: "idx_user_leaderboard_achievements")
+  @@index([preferredLanguage], map: "idx_user_preferred_language")
+  @@index([streakFreezeUsedAt], map: "idx_user_streak_freeze_used_at")
+  @@index([createdAt, isActive], map: "idx_user_created_active")
+  @@index([passwordChangedAt], map: "idx_user_password_changed_at")
 }
 
 model Account {
@@ -494,6 +502,7 @@ model Session {
 
   @@index([userId])
   @@index([expires])
+  @@index([userId, expires], map: "idx_session_user_expires")
 }
 
 model VerificationToken {
@@ -568,6 +577,9 @@ model RefreshToken {
   @@index([expiresAt])
   @@index([deviceId], map: "idx_refresh_token_device_id")
   @@index([userId, isValid], map: "idx_refresh_token_user_valid")
+  @@index([family, isValid], map: "idx_refresh_token_family_valid")
+  @@index([expiresAt, isValid], map: "idx_refresh_token_expires_valid")
+  @@index([revokedAt], map: "idx_refresh_token_revoked_at")
 }
 
 model PasswordReset {
@@ -587,6 +599,8 @@ model PasswordReset {
   @@index([expiresAt])
   @@index([usedAt], map: "idx_password_reset_used_at")
   @@index([ipAddress], map: "idx_password_reset_ip_address")
+  @@index([token, expiresAt], map: "idx_password_reset_token_expires")
+  @@index([userId, expiresAt, usedAt], map: "idx_password_reset_user_expires_used")
 }
 
 model EmailVerification {
@@ -634,6 +648,8 @@ model EmailChangeRequest {
   @@index([expiresAt])
   @@index([completedAt], map: "idx_email_change_completed_at")
   @@index([newEmail], map: "idx_email_change_new_email")
+  @@index([userId, completedAt, expiresAt], map: "idx_email_change_user_completed_expires")
+  @@index([cancelledAt], map: "idx_email_change_cancelled_at")
 }
 
 model TwoFactorAuth {
@@ -668,6 +684,7 @@ model BackupCode {
   @@index([userId])
   @@index([code])
   @@index([userId, usedAt], map: "idx_backup_code_user_used_at")
+  @@index([userId, code, usedAt], map: "idx_backup_code_user_code_used")
 }
 
 model LoginAttempt {
@@ -695,6 +712,8 @@ model LoginAttempt {
   @@index([email, success, createdAt], map: "idx_login_attempt_email_success_time")
   @@index([ipAddress, success, createdAt], map: "idx_login_attempt_ip_success_time")
   @@index([country, createdAt], map: "idx_login_attempt_country_time")
+  @@index([userId, success, createdAt], map: "idx_login_attempt_user_success_time")
+  @@index([twoFactorRequired, twoFactorPassed], map: "idx_login_attempt_2fa")
 }
 
 // ============================================================================
@@ -764,6 +783,11 @@ model Platform {
   @@index([authType], map: "idx_platform_auth_type")
   @@index([isVerified], map: "idx_platform_is_verified")
   @@index([totalUsers(sort: Desc)], map: "idx_platform_total_users_desc")
+  @@index([name], map: "idx_platform_name")
+  @@index([isActive, category, totalUsers(sort: Desc)], map: "idx_platform_active_category_popular")
+  @@index([supportsAutoSync, isActive, syncInterval], map: "idx_platform_auto_sync_active_interval")
+  @@index([successRate, isActive], map: "idx_platform_success_rate_active")
+  @@index([lastHealthCheck], map: "idx_platform_last_health_check")
 }
 
 model CustomPlatform {
@@ -792,6 +816,7 @@ model CustomPlatform {
   @@index([deletedAt])
   @@index([userId, isActive], map: "idx_custom_platform_user_active")
   @@index([userId, category], map: "idx_custom_platform_user_category")
+  @@index([userId, deletedAt], map: "idx_custom_platform_user_deleted")
 }
 
 model UserPlatform {
@@ -851,6 +876,10 @@ model UserPlatform {
   @@index([platformId, isActive], map: "idx_user_platform_platform_active")
   @@index([autoSync, nextSyncAt], map: "idx_user_platform_autosync_next")
   @@index([isVerified], map: "idx_user_platform_is_verified")
+  @@index([autoSync, isActive, nextSyncAt], map: "idx_user_platform_autosync_active_next")
+  @@index([isActive, lastSyncedAt], map: "idx_user_platform_active_last_synced")
+  @@index([tokenExpiresAt, isActive], map: "idx_user_platform_token_expires_active")
+  @@index([userId, isVerified, isActive], map: "idx_user_platform_user_verified_active")
 }
 
 // ============================================================================
@@ -959,6 +988,14 @@ model TrackerEntry {
   @@index([userId, date, timeSpent], map: "idx_tracker_user_date_time_spent")
   @@index([userId, date, commits], map: "idx_tracker_user_date_commits")
   @@index([userId, deletedAt, date], map: "idx_tracker_user_deleted_date")
+  @@index([tags], map: "idx_tracker_tags", type: Gin)
+  @@index([topics], map: "idx_tracker_topics", type: Gin)
+  @@index([languages], map: "idx_tracker_languages", type: Gin)
+  @@index([userId, mood, date], map: "idx_tracker_user_mood_date")
+  @@index([userId, deletedAt, date(sort: Desc)], map: "idx_tracker_user_not_deleted_date_desc")
+  @@index([userId, productivityRating, date], map: "idx_tracker_user_productivity_date")
+  @@index([userId, energyLevel, date], map: "idx_tracker_user_energy_date")
+  @@index([userId, customPlatformId, date], map: "idx_tracker_user_custom_platform_date")
 }
 
 model DailyStats {
@@ -989,6 +1026,10 @@ model DailyStats {
   @@index([isComplete, date], map: "idx_daily_stats_incomplete_date")
   @@index([date, hadActivity], map: "idx_daily_stats_date_activity")
   @@index([userId, streakDay], map: "idx_daily_stats_user_streak_day")
+  @@index([userId, date(sort: Desc)], map: "idx_daily_stats_user_date_desc")
+  @@index([date, totalProblems(sort: Desc)], map: "idx_daily_stats_date_problems_desc")
+  @@index([date, totalTimeSpent(sort: Desc)], map: "idx_daily_stats_date_time_desc")
+  @@index([isComplete, computedAt], map: "idx_daily_stats_incomplete_computed")
 }
 
 model StreakHistory {
@@ -1015,6 +1056,10 @@ model StreakHistory {
   @@index([isActive], map: "idx_streak_history_is_active")
   @@index([userId, endDate], map: "idx_streak_history_user_end_date")
   @@index([endReason], map: "idx_streak_history_end_reason")
+  @@index([userId, isCurrent], map: "idx_streak_history_user_current")
+  @@index([userId, startDate(sort: Desc)], map: "idx_streak_history_user_start_desc")
+  @@index([isActive, length(sort: Desc)], map: "idx_streak_history_active_length_desc")
+  @@index([endDate], map: "idx_streak_history_end_date_standalone")
 }
 
 model PlatformDailyStats {
@@ -1036,6 +1081,9 @@ model PlatformDailyStats {
   @@index([date])
   @@index([date(sort: Desc)], map: "idx_platform_daily_stats_date_desc")
   @@index([platformId, failedSyncs], map: "idx_platform_daily_stats_failed")
+  @@index([platformId, date(sort: Desc)], map: "idx_platform_daily_stats_platform_date_desc")
+  @@index([date, activeUsers(sort: Desc)], map: "idx_platform_daily_stats_date_users_desc")
+  @@index([date, newConnections(sort: Desc)], map: "idx_platform_daily_stats_date_connections_desc")
 }
 
 // ============================================================================
@@ -1102,6 +1150,11 @@ model Goal {
   @@index([userId, completedAt], map: "idx_goal_user_completed_at")
   @@index([reminderEnabled, status], map: "idx_goal_reminder_enabled_status")
   @@index([isPublic, status, createdAt], map: "idx_goal_public_status_created")
+  @@index([status, endDate], map: "idx_goal_status_end_date")
+  @@index([userId, status, progressPercentage], map: "idx_goal_user_status_progress")
+  @@index([userId, deletedAt, status], map: "idx_goal_user_deleted_status")
+  @@index([isPublic, status, progressPercentage(sort: Desc)], map: "idx_goal_public_progress_desc")
+  @@index([goalType, status, createdAt], map: "idx_goal_type_status_created")
 }
 
 model GoalReminder {
@@ -1129,6 +1182,9 @@ model GoalReminder {
   @@index([isActive])
   @@index([isActive, nextSendAt], map: "idx_goal_reminder_active_next_send")
   @@index([channel, isActive], map: "idx_goal_reminder_channel_active")
+  @@index([userId, isActive], map: "idx_goal_reminder_user_active")
+  @@index([isActive, nextSendAt, channel], map: "idx_goal_reminder_active_next_channel")
+  @@index([lastSentAt], map: "idx_goal_reminder_last_sent")
 }
 
 model GoalTemplate {
@@ -1162,6 +1218,9 @@ model GoalTemplate {
   @@index([timesUsed(sort: Desc)], map: "idx_goal_template_times_used_desc")
   @@index([goalType, isActive], map: "idx_goal_template_goal_type_active")
   @@index([isFeatured, isActive, sortOrder], map: "idx_goal_template_featured_active_sort")
+  @@index([title], map: "idx_goal_template_title")
+  @@index([difficulty, category, isActive], map: "idx_goal_template_difficulty_category_active")
+  @@index([isActive, successRate(sort: Desc)], map: "idx_goal_template_success_rate_desc")
 }
 
 model GoalHistory {
@@ -1222,6 +1281,9 @@ model Achievement {
   @@index([totalUnlocked(sort: Desc)], map: "idx_achievement_total_unlocked_desc")
   @@index([isSecret, isActive], map: "idx_achievement_secret_active")
   @@index([points(sort: Desc)], map: "idx_achievement_points_desc")
+  @@index([rarity, isActive], map: "idx_achievement_rarity_active")
+  @@index([category, isActive, points(sort: Desc)], map: "idx_achievement_category_active_points")
+  @@index([sortOrder, isActive], map: "idx_achievement_sort_order_active")
 }
 
 model UserAchievement {
@@ -1251,6 +1313,8 @@ model UserAchievement {
   @@index([userId, notified], map: "idx_user_achievement_user_notified")
   @@index([userId, isHidden], map: "idx_user_achievement_user_hidden")
   @@index([userId, unlockedAt(sort: Desc)], map: "idx_user_achievement_user_unlocked_desc")
+  @@index([achievementId, unlockedAt], map: "idx_user_achievement_achievement_unlocked")
+  @@index([userId, progressPercentage], map: "idx_user_achievement_user_progress")
 }
 
 // ============================================================================
@@ -1304,6 +1368,11 @@ model Notification {
   @@index([userId, priority, isRead], map: "idx_notification_user_priority_read")
   @@index([channel, isDelivered], map: "idx_notification_channel_delivered")
   @@index([scheduledFor, isDelivered], map: "idx_notification_scheduled_delivered")
+  @@index([createdAt], map: "idx_notification_created_at")
+  @@index([userId, channel, isRead], map: "idx_notification_user_channel_read")
+  @@index([expiresAt, isRead], map: "idx_notification_expires_read")
+  @@index([scheduledFor, isDelivered, sentAt], map: "idx_notification_scheduled_delivered_sent")
+  @@index([type, createdAt], map: "idx_notification_type_created")
 }
 
 model PushSubscription {
@@ -1388,6 +1457,10 @@ model SyncLog {
   @@index([platformId, duration], map: "idx_sync_log_platform_duration")
   @@index([userId, hasError], map: "idx_sync_log_user_has_error")
   @@index([requestId], map: "idx_sync_log_request_id")
+  @@index([userId, platformId, createdAt(sort: Desc)], map: "idx_sync_log_user_platform_created_desc")
+  @@index([hasError, createdAt(sort: Desc)], map: "idx_sync_log_has_error_created_desc")
+  @@index([platformId, status, duration], map: "idx_sync_log_platform_status_duration")
+  @@index([attemptNumber, status], map: "idx_sync_log_attempt_status")
 }
 
 // ============================================================================
@@ -1451,6 +1524,10 @@ model Subscription {
   @@index([nextPaymentAt, status], map: "idx_subscription_next_payment_status")
   @@index([resumesAt, status], map: "idx_subscription_resumes_at_status")
   @@index([billingInterval, status], map: "idx_subscription_billing_interval_status")
+  @@index([status, currentPeriodEnd], map: "idx_subscription_status_period_end")
+  @@index([pausedAt, resumesAt, status], map: "idx_subscription_paused_resumes_status")
+  @@index([billingInterval, status, priceAmount], map: "idx_subscription_interval_status_price")
+  @@index([usageResetAt], map: "idx_subscription_usage_reset_at")
 }
 
 model PaymentMethod {
@@ -1478,6 +1555,7 @@ model PaymentMethod {
   @@index([userId, isDefault], map: "idx_payment_method_user_default")
   @@index([userId, isValid], map: "idx_payment_method_user_valid")
   @@index([expYear, expMonth], map: "idx_payment_method_expiry")
+  @@index([expYear, expMonth, isValid], map: "idx_payment_method_expiry_valid")
 }
 
 model Invoice {
@@ -1522,6 +1600,9 @@ model Invoice {
   @@index([dueDate, status], map: "idx_invoice_due_date_status")
   @@index([couponId], map: "idx_invoice_coupon_id")
   @@index([voidedAt], map: "idx_invoice_voided_at")
+  @@index([userId, invoiceDate(sort: Desc)], map: "idx_invoice_user_date_desc")
+  @@index([paidAt, total], map: "idx_invoice_paid_at_total")
+  @@index([couponId, paidAt], map: "idx_invoice_coupon_paid_at")
 }
 
 model PaymentEvent {
@@ -1560,6 +1641,7 @@ model PaymentEvent {
   @@index([eventType, status], map: "idx_payment_event_type_status")
   @@index([processedAt, createdAt], map: "idx_payment_event_processed_at")
   @@index([stripeEventType, createdAt], map: "idx_payment_event_stripe_type_time")
+  @@index([status, failureCode], map: "idx_payment_event_status_failure")
 }
 
 model Coupon {
@@ -1596,6 +1678,8 @@ model Coupon {
   @@index([isActive, validUntil], map: "idx_coupon_active_valid_until")
   @@index([discountType, isActive], map: "idx_coupon_discount_type_active")
   @@index([createdBy], map: "idx_coupon_created_by")
+  @@index([isActive, currentRedemptions, maxRedemptions], map: "idx_coupon_active_redemptions")
+  @@index([applicableTiers], map: "idx_coupon_applicable_tiers", type: Gin)
 }
 
 model CouponRedemption {
@@ -1617,6 +1701,7 @@ model CouponRedemption {
   @@index([redeemedAt])
   @@index([invoiceId], map: "idx_coupon_redemption_invoice_id")
   @@index([userId, redeemedAt], map: "idx_coupon_redemption_user_redeemed_at")
+  @@index([subscriptionId], map: "idx_coupon_redemption_subscription_id")
 }
 
 // ============================================================================
@@ -1654,6 +1739,8 @@ model ReferralReward {
   @@index([referrerId, status], map: "idx_referral_reward_referrer_status")
   @@index([status, paidAt], map: "idx_referral_reward_status_paid_at")
   @@index([rewardType, status], map: "idx_referral_reward_type_reward_status")
+  @@index([expiresAt, status], map: "idx_referral_reward_expires_status")
+  @@index([status, paidAt, rewardType], map: "idx_referral_reward_status_paid_type")
 }
 
 // ============================================================================
@@ -1696,6 +1783,10 @@ model ExportJob {
   @@index([userId, status], map: "idx_export_job_user_status")
   @@index([status, createdAt], map: "idx_export_job_status_created_at")
   @@index([userId, createdAt], map: "idx_export_job_user_created_at")
+  @@index([status, startedAt], map: "idx_export_job_status_started")
+  @@index([hasError, createdAt(sort: Desc)], map: "idx_export_job_error_created_desc")
+  @@index([status, expiresAt], map: "idx_export_job_status_expires")
+  @@index([format, status], map: "idx_export_job_format_status")
 }
 
 model ScheduledExport {
@@ -1733,6 +1824,8 @@ model ScheduledExport {
   @@index([isActive, nextRunAt], map: "idx_scheduled_export_active_next_run")
   @@index([userId, isActive], map: "idx_scheduled_export_user_active")
   @@index([failureCount], map: "idx_scheduled_export_failure_count")
+  @@index([lastRunStatus, failureCount], map: "idx_scheduled_export_status_failures")
+  @@index([frequency, isActive], map: "idx_scheduled_export_frequency_active")
 }
 
 // ============================================================================
@@ -1822,6 +1915,9 @@ model NotificationPreferences {
   @@index([marketingEmails], map: "idx_notif_pref_marketing_emails")
   @@index([digestEnabled, digestFrequency], map: "idx_notif_pref_digest")
   @@index([dndEnabled, dndUntil], map: "idx_notif_pref_dnd")
+  @@index([weeklyReport, emailEnabled], map: "idx_notif_pref_weekly_report_email")
+  @@index([monthlyReport, emailEnabled], map: "idx_notif_pref_monthly_report_email")
+  @@index([digestEnabled, digestFrequency, digestTime], map: "idx_notif_pref_digest_details")
 }
 
 // ============================================================================
@@ -1860,6 +1956,9 @@ model ApiKey {
   @@index([expiresAt, isActive], map: "idx_api_key_expires_active")
   @@index([lastUsedAt], map: "idx_api_key_last_used_at")
   @@index([keyPrefix], map: "idx_api_key_prefix")
+  @@index([userId, lastUsedAt], map: "idx_api_key_user_last_used")
+  @@index([usageResetAt, isActive], map: "idx_api_key_usage_reset_active")
+  @@index([scopes], map: "idx_api_key_scopes", type: Gin)
 }
 
 model AuditLog {
@@ -1900,6 +1999,10 @@ model AuditLog {
   @@index([status, createdAt], map: "idx_audit_log_status_created_at")
   @@index([requestPath], map: "idx_audit_log_request_path")
   @@index([entityType, entityId, action], map: "idx_audit_log_entity_action")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_audit_log_user_created_desc")
+  @@index([entityType, entityId, createdAt(sort: Desc)], map: "idx_audit_log_entity_created_desc")
+  @@index([ipAddress, action, createdAt], map: "idx_audit_log_ip_action_time")
+  @@index([requestId], map: "idx_audit_log_request_id")
 }
 
 // ============================================================================
@@ -1942,6 +2045,9 @@ model Webhook {
   @@index([disabledAt], map: "idx_webhook_disabled_at")
   @@index([consecutiveFailures], map: "idx_webhook_consecutive_failures")
   @@index([lastTriggeredAt], map: "idx_webhook_last_triggered_at")
+  @@index([lastFailureAt, isActive], map: "idx_webhook_last_failure_active")
+  @@index([lastSuccessAt, isActive], map: "idx_webhook_last_success_active")
+  @@index([events], map: "idx_webhook_events", type: Gin)
 }
 
 model WebhookDelivery {
@@ -1972,6 +2078,8 @@ model WebhookDelivery {
   @@index([event, createdAt], map: "idx_webhook_delivery_event_created_at")
   @@index([status, nextRetryAt], map: "idx_webhook_delivery_status_retry")
   @@index([responseCode], map: "idx_webhook_delivery_response_code")
+  @@index([attemptNumber, status, nextRetryAt], map: "idx_webhook_delivery_attempt_status_retry")
+  @@index([event, status, createdAt], map: "idx_webhook_delivery_event_status_time")
 }
 
 // ============================================================================
@@ -2018,6 +2126,9 @@ model ShareLink {
   @@index([userId, entityType], map: "idx_share_link_user_entity_type")
   @@index([viewCount(sort: Desc)], map: "idx_share_link_view_count_desc")
   @@index([revokedAt], map: "idx_share_link_revoked_at")
+  @@index([expiresAt, isActive], map: "idx_share_link_expires_active")
+  @@index([entityType, isActive, createdAt], map: "idx_share_link_entity_active_created")
+  @@index([requiresAuth, isActive], map: "idx_share_link_requires_auth_active")
 }
 
 model ShareViewLog {
@@ -2042,6 +2153,8 @@ model ShareViewLog {
   @@index([shareLinkId, createdAt], map: "idx_share_view_log_link_created_at")
   @@index([shareLinkId, isEmbed], map: "idx_share_view_log_link_embed")
   @@index([country, createdAt], map: "idx_share_view_log_country_time")
+  @@index([shareLinkId, ipHash], map: "idx_share_view_log_link_ip")
+  @@index([isEmbed, embedHost], map: "idx_share_view_log_embed_host")
 }
 
 // ============================================================================
@@ -2122,6 +2235,10 @@ model EmailLog {
   @@index([bouncedAt], map: "idx_email_log_bounced_at")
   @@index([nextRetryAt, status], map: "idx_email_log_retry_queue")
   @@index([templateSlug, status], map: "idx_email_log_template_slug_status")
+  @@index([templateSlug, status, createdAt], map: "idx_email_log_template_status_time")
+  @@index([status, nextRetryAt, retryCount], map: "idx_email_log_retry_queue_count")
+  @@index([provider, status, createdAt], map: "idx_email_log_provider_status_time")
+  @@index([openedAt, templateId], map: "idx_email_log_opened_template")
 }
 
 // ============================================================================
@@ -2156,6 +2273,9 @@ model Report {
   @@index([userId, periodStart], map: "idx_report_user_period_start")
   @@index([status, createdAt], map: "idx_report_status_created_at")
   @@index([sentAt], map: "idx_report_sent_at")
+  @@index([userId, type, createdAt(sort: Desc)], map: "idx_report_user_type_created_desc")
+  @@index([status, sentAt], map: "idx_report_status_sent")
+  @@index([periodStart, periodEnd, type], map: "idx_report_period_type")
 }
 
 // ============================================================================
@@ -2200,6 +2320,9 @@ model SupportTicket {
   @@index([firstResponseAt, createdAt], map: "idx_support_ticket_sla")
   @@index([satisfactionRating], map: "idx_support_ticket_satisfaction")
   @@index([resolvedAt], map: "idx_support_ticket_resolved_at")
+  @@index([status, createdAt(sort: Desc)], map: "idx_support_ticket_status_created_desc")
+  @@index([status, firstResponseAt, createdAt], map: "idx_support_ticket_sla_breach")
+  @@index([resolvedAt, createdAt], map: "idx_support_ticket_resolution_time")
 }
 
 model TicketReply {
@@ -2221,6 +2344,8 @@ model TicketReply {
   @@index([createdAt])
   @@index([ticketId, isStaffReply], map: "idx_ticket_reply_ticket_staff")
   @@index([ticketId, isInternal], map: "idx_ticket_reply_ticket_internal")
+  @@index([ticketId, createdAt(sort: Desc)], map: "idx_ticket_reply_ticket_created_desc")
+  @@index([isStaffReply, createdAt], map: "idx_ticket_reply_staff_created")
 }
 
 model Feedback {
@@ -2256,16 +2381,16 @@ model Feedback {
 // ============================================================================
 
 model KnowledgeBaseCategory {
-  id          String    @id @default(cuid())
-  slug        String    @unique
+  id          String   @id @default(cuid())
+  slug        String   @unique
   name        String
   description String?
   icon        String?
   parentId    String?
-  sortOrder   Int       @default(0)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   parent   KnowledgeBaseCategory?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: Cascade)
   children KnowledgeBaseCategory[] @relation("SubCategories")
@@ -2312,6 +2437,9 @@ model KnowledgeBaseArticle {
   @@index([authorId], map: "idx_kb_article_author_id")
   @@index([viewCount(sort: Desc)], map: "idx_kb_article_view_count_desc")
   @@index([isFeatured, status, sortOrder], map: "idx_kb_article_featured_status_sort")
+  @@index([helpfulYes(sort: Desc), status], map: "idx_kb_article_helpful_yes_desc")
+  @@index([tags], map: "idx_kb_article_tags", type: Gin)
+  @@index([authorId, status, publishedAt], map: "idx_kb_article_author_status_published")
 }
 
 // ============================================================================
@@ -2343,6 +2471,9 @@ model Waitlist {
   @@index([source], map: "idx_waitlist_source")
   @@index([referredById], map: "idx_waitlist_referred_by_id")
   @@index([invitedAt, joinedAt], map: "idx_waitlist_invited_joined")
+  @@index([referralCode], map: "idx_waitlist_referral_code")
+  @@index([invitedAt, status], map: "idx_waitlist_invited_status")
+  @@index([joinedAt, status], map: "idx_waitlist_joined_status")
 }
 
 model NewsletterSubscriber {
@@ -2373,6 +2504,9 @@ model NewsletterSubscriber {
   @@index([confirmedAt, isActive], map: "idx_newsletter_confirmed_active")
   @@index([source], map: "idx_newsletter_source")
   @@index([emailsOpened(sort: Desc)], map: "idx_newsletter_emails_opened_desc")
+  @@index([confirmedAt, isActive, frequency], map: "idx_newsletter_confirmed_active_frequency")
+  @@index([emailsSent, emailsOpened, isActive], map: "idx_newsletter_engagement")
+  @@index([unsubscribedAt, unsubscribeReason], map: "idx_newsletter_unsubscribed")
 }
 
 // ============================================================================
@@ -2397,6 +2531,9 @@ model FeatureFlag {
   @@index([key])
   @@index([isEnabled])
   @@index([isEnabled, enabledForAll], map: "idx_feature_flag_enabled_for_all")
+  @@index([name], map: "idx_feature_flag_name")
+  @@index([enabledTiers], map: "idx_feature_flag_enabled_tiers", type: Gin)
+  @@index([enabledUserIds], map: "idx_feature_flag_enabled_user_ids", type: Gin)
 }
 
 model SystemSettings {
@@ -2438,6 +2575,7 @@ model MaintenanceWindow {
   @@index([endTime])
   @@index([isActive, startTime, endTime], map: "idx_maintenance_window_active_range")
   @@index([severity, isActive], map: "idx_maintenance_window_severity_active")
+  @@index([createdBy], map: "idx_maintenance_window_created_by")
 }
 
 // ============================================================================
@@ -2487,20 +2625,23 @@ model BlogPost {
   @@index([viewCount(sort: Desc)], map: "idx_blog_post_view_count_desc")
   @@index([likeCount(sort: Desc)], map: "idx_blog_post_like_count_desc")
   @@index([tags], map: "idx_blog_post_tags", type: Gin)
+  @@index([commentCount(sort: Desc), status], map: "idx_blog_post_comment_count_desc")
+  @@index([shareCount(sort: Desc), status], map: "idx_blog_post_share_count_desc")
+  @@index([readingTimeMinutes, status], map: "idx_blog_post_reading_time_status")
 }
 
 model BlogComment {
-  id         String    @id @default(cuid())
-  postId     String
-  authorId   String
-  parentId   String?
-  content    String    @db.Text
-  likes      Int       @default(0)
-  isApproved Boolean   @default(true)
-  isDeleted  Boolean   @default(false)
-  isPinned   Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  parentId  String?
+  content   String   @db.Text
+  likes     Int      @default(0)
+  isApproved Boolean @default(true)
+  isDeleted Boolean  @default(false)
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   post    BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
   author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -2515,6 +2656,8 @@ model BlogComment {
   @@index([postId, isPinned], map: "idx_blog_comment_post_pinned")
   @@index([isDeleted, postId], map: "idx_blog_comment_deleted_post")
   @@index([postId, parentId, createdAt], map: "idx_blog_comment_post_parent_time")
+  @@index([authorId, createdAt(sort: Desc)], map: "idx_blog_comment_author_created_desc")
+  @@index([postId, likes(sort: Desc)], map: "idx_blog_comment_post_likes_desc")
 }
 
 model BlogPostLike {
@@ -2531,6 +2674,7 @@ model BlogPostLike {
   @@unique([postId, ipHash])
   @@index([postId])
   @@index([userId, createdAt], map: "idx_blog_post_like_user_created_at")
+  @@index([userId], map: "idx_blog_post_like_user_id")
 }
 
 // ============================================================================
@@ -2586,6 +2730,8 @@ model Bookmark {
   @@index([entityType])
   @@index([userId, entityType], map: "idx_bookmark_user_entity_type")
   @@index([userId, createdAt], map: "idx_bookmark_user_created_at")
+  @@index([entityType, entityId], map: "idx_bookmark_entity_type_id")
+  @@index([userId, createdAt(sort: Desc)], map: "idx_bookmark_user_created_desc")
 }
 
 model RecentSearch {

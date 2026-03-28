@@ -1,0 +1,7 @@
+.next/types/validator.ts(611,39): error TS2306: File 'D:/code/projects/progresstracker/src/app/(dashboard)/billing/page.tsx' is not a module.
+.next/types/validator.ts(701,39): error TS2306: File 'D:/code/projects/progresstracker/src/app/(dashboard)/daily-stats/[date]/page.tsx' is not a module.
+.next/types/validator.ts(737,39): error TS2306: File 'D:/code/projects/progresstracker/src/app/(dashboard)/export/page.tsx' is not a module.
+.next/types/validator.ts(1475,39): error TS2306: File 'D:/code/projects/progresstracker/src/app/(dashboard)/webhooks/[id]/page.tsx' is not a module.
+.next/types/validator.ts(1484,39): error TS2306: File 'D:/code/projects/progresstracker/src/app/(dashboard)/webhooks/page.tsx' is not a module.
+src/app/api/admin/knowledge-base/route.ts(99,9): error TS2353: Object literal may only specify known properties, and 'readTimeMinutes' does not exist in type 'Without<KnowledgeBaseArticleCreateInput, KnowledgeBaseArticleUncheckedCreateInput> & KnowledgeBaseArticleUncheckedCreateInput'.
+src/app/api/knowledge-base/categories/[slug]/route.ts(30,13): error TS2353: Object literal may only specify known properties, and 'readTimeMinutes' does not exist in type 'KnowledgeBaseArticleSelect<DefaultArgs>'.

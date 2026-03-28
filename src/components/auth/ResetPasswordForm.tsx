@@ -95,6 +95,7 @@ export function ResetPasswordForm() {
       const response = await apiClient.post('/auth/reset-password', {
         token,
         password: data.password,
+         confirmPassword: data.confirmPassword,
       });
       if (response.success) {
         setSuccess('Password reset successfully! Redirecting to login...');

@@ -42,5 +42,6 @@ export * from './support';
 export * from './sync';
 export * from './tracker';
 export * from './ui';
+export { CopyButton } from './ui';
 export * from './waitlist';
 export * from './widgets';

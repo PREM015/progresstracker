@@ -61,3 +61,5 @@ review.md
 
 .vercel
 .env*.local
+plan.md
+plan.jsx
