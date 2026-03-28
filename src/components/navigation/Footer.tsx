@@ -4,7 +4,7 @@
 // ============================================================================
 
 import Link from 'next/link';
-import { Github, Twitter, Linkedin } from 'lucide-react';
+import { FaGithub, FaTwitter, FaLinkedin } from 'react-icons/fa';
 import { PUBLIC_ROUTES } from '@/constants/routes';
 
 export function Footer() {
@@ -25,15 +25,15 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               <Link href="https://github.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
-                <Github className="h-5 w-5" />
+                <FaGithub className="h-5 w-5" />
                 <span className="sr-only">GitHub</span>
               </Link>
               <Link href="https://twitter.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
-                <Twitter className="h-5 w-5" />
+                <FaTwitter className="h-5 w-5" />
                 <span className="sr-only">Twitter</span>
               </Link>
               <Link href="https://linkedin.com" target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
-                <Linkedin className="h-5 w-5" />
+                <FaLinkedin className="h-5 w-5" />
                 <span className="sr-only">LinkedIn</span>
               </Link>
             </div>

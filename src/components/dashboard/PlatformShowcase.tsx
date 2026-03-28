@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Code, Github, Briefcase, BookOpen, CheckCircle2, Terminal, Database, Globe, Layers } from 'lucide-react';
+import { Code, Briefcase, BookOpen, CheckCircle2, Terminal, Database, Globe, Layers } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { platforms } from '@/config/platforms';
@@ -16,7 +17,7 @@ const categoryMetadata = {
     },
     git: {
         name: 'Version Control',
-        icon: Github,
+        icon: FaGithub,
         color: 'text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800',
     },
     job: {

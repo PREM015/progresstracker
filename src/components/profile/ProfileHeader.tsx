@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Link as LinkIcon, Calendar, Edit3, Github, Twitter, Linkedin, Globe } from 'lucide-react';
+import { MapPin, Link as LinkIcon, Calendar, Edit3, Globe } from 'lucide-react';
+import { FaGithub, FaTwitter, FaLinkedin } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/common/Avatar';
 
@@ -125,17 +126,17 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className="flex items-center gap-4 pt-2">
             {user.socials?.github && (
               <a href={`https://github.com/${user.socials.github}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-black dark:hover:text-white transition-all">
-                <Github className="w-5 h-5" />
+                <FaGithub className="w-5 h-5" />
               </a>
             )}
             {user.socials?.twitter && (
               <a href={`https://twitter.com/${user.socials.twitter}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all">
-                <Twitter className="w-5 h-5" />
+                <FaTwitter className="w-5 h-5" />
               </a>
             )}
             {user.socials?.linkedin && (
               <a href={user.socials.linkedin} target="_blank" rel="noopener noreferrer" className="p-2 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all">
-                <Linkedin className="w-5 h-5" />
+                <FaLinkedin className="w-5 h-5" />
               </a>
             )}
           </div>

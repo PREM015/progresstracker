@@ -3,7 +3,7 @@
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 
-import { Github } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 import { useState } from 'react';
 
 // Simple Google Icon if not in project
@@ -53,7 +53,7 @@ export function SocialAuth() {
                 onClick={() => loginWithProvider('github')}
                 className="w-full"
             >
-                <Github className="mr-2 h-4 w-4" />
+                <FaGithub className="mr-2 h-4 w-4" />
                 GitHub
             </Button>
             <Button

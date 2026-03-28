@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Globe, Code, Briefcase, Github, Terminal, Database, Layers, BookOpen, CheckCircle2 } from "lucide-react";
+import { Search, Globe, Code, Briefcase, Terminal, Database, Layers, BookOpen, CheckCircle2 } from "lucide-react";
+import { FaGithub } from "react-icons/fa";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -30,7 +31,7 @@ export default function PlatformsPage() {
     const getCategoryIcon = (cat: string) => {
         switch (cat) {
             case "dsa": return <Code className="h-4 w-4" />;
-            case "git": return <Github className="h-4 w-4" />;
+            case "git": return <FaGithub className="h-4 w-4" />;
             case "job": return <Briefcase className="h-4 w-4" />;
             case "learning": return <BookOpen className="h-4 w-4" />;
             case "hackathon": return <Terminal className="h-4 w-4" />;

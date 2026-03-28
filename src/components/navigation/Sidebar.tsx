@@ -24,10 +24,11 @@ import {
   HelpCircle,
   User,
   Code,
-  Github,
+
   Briefcase,
   Zap
 } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/hooks/useSidebar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -57,7 +58,7 @@ export function Sidebar({ className }: SidebarProps) {
       items: [
         { href: DASHBOARD_ROUTES.PLATFORMS, label: 'All Platforms', icon: Layers },
         { href: `${DASHBOARD_ROUTES.PLATFORMS}?category=dsa`, label: 'Coding Platforms', icon: Code },
-        { href: `${DASHBOARD_ROUTES.PLATFORMS}?category=git`, label: 'Git Platforms', icon: Github },
+        { href: `${DASHBOARD_ROUTES.PLATFORMS}?category=git`, label: 'Git Platforms', icon: FaGithub },
         { href: `${DASHBOARD_ROUTES.PLATFORMS}?category=job`, label: 'Job Boards', icon: Briefcase },
       ],
     },

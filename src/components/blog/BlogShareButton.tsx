@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share2, Check, Copy, Twitter, Linkedin } from 'lucide-react';
+import { Share2, Check, Copy } from 'lucide-react';
+import { FaTwitter, FaLinkedin } from 'react-icons/fa';
 
 interface Props {
   url: string;
@@ -39,10 +40,10 @@ export function BlogShareButton({ url, title }: Props) {
             {copied ? 'Copied!' : 'Copy link'}
           </button>
           <button onClick={shareTwitter} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <Twitter className="h-4 w-4 text-sky-500" /> Twitter / X
+            <FaTwitter className="h-4 w-4 text-sky-500" /> Twitter / X
           </button>
           <button onClick={shareLinkedIn} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <Linkedin className="h-4 w-4 text-blue-600" /> LinkedIn
+            <FaLinkedin className="h-4 w-4 text-blue-600" /> LinkedIn
           </button>
         </div>
       )}

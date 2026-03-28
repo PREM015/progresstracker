@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { platforms } from '@/config/platforms';
 import { cn } from "@/lib/utils";
-import { Code, Github, Briefcase, BookOpen, CheckCircle2, Terminal, Database, Globe, Layers } from 'lucide-react';
+import { Code, Briefcase, BookOpen, CheckCircle2, Terminal, Database, Globe, Layers } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 
 // Map categories to icons/colors for visual consistency
 const categoryMetadata = {
   dsa: { icon: Code, color: 'text-orange-500 bg-orange-50 dark:bg-orange-900/10' },
-  git: { icon: Github, color: 'text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800' },
+  git: { icon: FaGithub, color: 'text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800' },
   job: { icon: Briefcase, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/10' },
   learning: { icon: BookOpen, color: 'text-green-600 bg-green-50 dark:bg-green-900/10' },
   other: { icon: Database, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/10' },
