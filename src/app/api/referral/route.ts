@@ -136,11 +136,48 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { referralCode: true },
+    });
+
+    if (!user?.referralCode) {
+      return addHeaders(
+        new NextResponse(null, { status: 404 }),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Parse query parameters to match GET filtering
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || undefined;
+
+    // Build where clause (matching GET logic)
+    const where: Prisma.UserWhereInput = {
+      referredBy: user.referralCode,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    // Get total count
+    const total = await prisma.user.count({ where });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -150,12 +187,8 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Get referral info
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Get or generate referral code
-   * - Calculate referral statistics
-   * - Get referral rewards/benefits
-   * - Return referral dashboard data
+ * Returns paginated list of users referred by the current user with reward information.
+ * Supports filtering by name/username/email and sorting by various fields.
  */
 export async function GET(
   request: NextRequest
@@ -192,15 +225,75 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Get user's referral info
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        referralCode: true,
+        referralCount: true,
+      } as any,
+    });
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    if (!user?.referralCode) {
+      return addHeaders(
+        apiResponse.notFound('User referral code not found', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Query referred users (paginated)
+    const where: Prisma.UserWhereInput = {
+      referredBy: user.referralCode,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    } as any;
+
+    const [referrals, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          createdAt: true,
+          image: true,
+          totalPoints: true,
+          isActive: true,
+        },
+        orderBy: {
+          [sortBy || 'createdAt']: sortOrder as 'asc' | 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    // Get referral rewards
+    const rewards = await prisma.referralReward.findMany({
+      where: { referrerId: userId },
+      select: {
+        id: true,
+        refereeId: true,
+        amount: true,
+        status: true,
+        createdAt: true,
+      } as any,
+    });
+
+    const rewardMap = new Map(rewards.map((r: any) => [r.refereeId, r]));
+
+    const data = referrals.map((ref: any) => ({
+      ...ref,
+      reward: rewardMap.get(ref.id) || null,
+    }));
 
     logger.info('GET referral completed', {
       userId,

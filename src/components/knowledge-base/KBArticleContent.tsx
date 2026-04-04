@@ -2,6 +2,7 @@
 'use client';
 
 import React from 'react';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Props {
   content: string;
@@ -18,7 +19,7 @@ export function KBArticleContent({ content }: Props) {
         prose-pre:bg-gray-900 prose-pre:text-gray-100
         prose-blockquote:border-l-blue-500 prose-blockquote:text-gray-600 dark:prose-blockquote:text-gray-400
         prose-img:rounded-xl"
-      dangerouslySetInnerHTML={{ __html: content }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
     />
   );
 }

@@ -161,6 +161,20 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
+    // Get user streaks
+    const userDb = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { currentStreak: true, longestStreak: true },
+    });
+
+    // Get real platform names
+    const platformIds = topPlatforms.map((p: any) => p.platformId).filter(Boolean) as string[];
+    const platforms = await prisma.platform.findMany({
+      where: { id: { in: platformIds } },
+      select: { id: true, name: true },
+    });
+    const platformMap = new Map(platforms.map((p: any) => [p.id, p.name]));
+
     // Format response to match TrackerSummary interface
     const responseData = {
       dateRange: {
@@ -183,19 +197,19 @@ export async function GET(request: NextRequest) {
         pointsPerDay: 0,
       },
       streaks: {
-        current: 0, // TODO: Fetch real streak
-        longest: 0,
+        current: userDb?.currentStreak || 0,
+        longest: userDb?.longestStreak || 0,
       },
       changes,
-      byPlatform: topPlatforms.map(p => ({
+      byPlatform: topPlatforms.map((p: any) => ({
         platformId: p.platformId,
-        platformName: p.platformId || "Unknown", // TODO: Resolve real name
+        platformName: p.platformId ? platformMap.get(p.platformId) || 'Unknown' : 'Unknown',
         entries: 0,
         problems: p._sum.problemsSolved || 0,
         commits: p._sum.commits || 0,
         time: p._sum.timeSpent || 0,
       })),
-      byCategory: topCategories.map(c => ({
+      byCategory: topCategories.map((c: any) => ({
         category: c.category,
         entries: 0,
         problems: c._sum.problemsSolved || 0,

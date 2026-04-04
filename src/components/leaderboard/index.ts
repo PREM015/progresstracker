@@ -9,3 +9,5 @@ export { LeaderboardFilters } from './LeaderboardFilters';
 export { LeaderboardCard } from './LeaderboardCard';
 export { TopPerformers } from './TopPerformers';
 export { UserRankBadge } from './UserRankBadge';
+export { PublicLeaderboard } from './PublicLeaderboard';
+

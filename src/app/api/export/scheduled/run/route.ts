@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -41,12 +40,7 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  scheduleId: z.string().cuid(),
 });
 
 
@@ -135,29 +129,18 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * POST - Run scheduled export now
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse scheduled export ID
-   * - Verify ownership of scheduled export
-   * - Trigger immediate export
-   * - Update lastRunAt
-   * - Return export job ID
+ * Triggers immediate execution of a scheduled export.
+ * - Verifies user ownership of scheduled export
+ * - Queues export job with current parameters
+ * - Updates last execution timestamp
+ * - Returns job ID for status tracking
  */
 export async function POST(
   request: NextRequest
@@ -198,16 +181,36 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Get scheduled export
+    const schedule = await prisma.scheduledExport.findUnique({
+      where: { id: data.scheduleId, userId },
+    });
+
+    if (!schedule) {
+      return addHeaders(
+        apiResponse.notFound('Scheduled export not found', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Create export job
+    const exportJob = await prisma.exportJob.create({
+      data: {
+        userId,
+        format: schedule.format,
+        status: 'PENDING',
+        templateId: (schedule as any).templateId,
+      } as any,
+    });
+
+    // Update lastRunAt
+    await prisma.scheduledExport.update({
+      where: { id: schedule.id },
+      data: { lastRunAt: new Date() },
+    });
+
+    const result = { jobId: exportJob.id, status: 'PENDING' };
 
     
     

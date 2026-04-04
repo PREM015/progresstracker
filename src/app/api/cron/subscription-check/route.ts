@@ -1,262 +1,151 @@
 // =============================================================================
-// cron/subscription-check/route.ts
+// cron/subscription-check/route.ts — Check subscription status
+// SECURITY: Protected by withCronAuth
 // =============================================================================
-// Description: Check subscription status
-// Methods: POST
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 5 requests/minute
-// Tags: cron, subscription, billing
-// Generated: 2026-02-02T11:57:44.589350
-// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-const RATE_LIMIT = 5;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
-
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `cron-subscription-check:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Check subscription status
- * 
- * TODO Implementation Checklist:
-   * - Validate cron secret or admin session
-   * - Get subscriptions expiring soon
-   * - Get subscriptions with failed payments
-   * - Send renewal reminder emails
-   * - Handle grace period expirations
-   * - Downgrade expired subscriptions
-   * - Return subscription status summary
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'CREATE' as AuditAction,
-        category: 'cron',
-        entityType: 'unknown',
-        description: `Created via ${requestId}`,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
-    });
-
-    logger.info('POST cron/subscription-check completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST cron/subscription-check failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
+import { withCronAuth } from '@/lib/server/cron-auth';
+import { addDays } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
+async function _cronHandler(request: NextRequest): Promise<NextResponse> {
+  const startTime = Date.now();
+  const result = { subscriptionsChecked: 0, expiringSoon: 0, failedPayments: 0, downgraded: 0, remindersSent: 0 };
 
+  try {
+    const now = new Date();
+    const in7Days = addDays(now, 7);
+
+    // 1. Find subscriptions expiring in next 7 days (not cancelled)
+    const expiringSubs = await prisma.subscription.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'TRIALING'] },
+        currentPeriodEnd: { gte: now, lte: in7Days },
+        cancelAtPeriodEnd: false,
+      },
+      include: {
+        user: { select: { email: true, name: true, id: true } },
+      },
+    });
+
+    result.expiringSoon = expiringSubs.length;
+    result.subscriptionsChecked += expiringSubs.length;
+
+    for (const sub of expiringSubs) {
+      try {
+        if (sub.user.email) {
+          const { emailService } = await import('@/lib/email');
+          const daysLeft = Math.ceil((sub.currentPeriodEnd!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          await emailService.send({
+            to: sub.user.email,
+            subject: `⏰ Your subscription renews in ${daysLeft} day(s)`,
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+                <h2>Subscription Renewal Reminder</h2>
+                <p>Hi ${sub.user.name || 'there'},</p>
+                <p>Your <strong>${sub.tier}</strong> subscription renews on <strong>${sub.currentPeriodEnd!.toLocaleDateString()}</strong>.</p>
+                <p>Make sure your payment method is up to date to avoid interruption.</p>
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px">Manage Billing</a>
+              </div>
+            `,
+          });
+          result.remindersSent++;
+        }
+      } catch (e) {
+        logger.warn('Failed to send renewal reminder', { userId: sub.userId, error: String(e) });
+      }
+    }
+
+    // 2. Find subscriptions with failed payments (PAST_DUE) older than grace period
+    const gracePeriodDate = addDays(now, -7); // 7-day grace period
+    const failedSubs = await prisma.subscription.findMany({
+      where: {
+        status: 'PAST_DUE',
+        updatedAt: { lt: gracePeriodDate },
+      },
+      include: {
+        user: { select: { email: true, name: true, id: true } },
+      },
+    });
+
+    result.failedPayments = failedSubs.length;
+    result.subscriptionsChecked += failedSubs.length;
+
+    for (const sub of failedSubs) {
+      try {
+        // Downgrade to FREE after grace period
+        await prisma.subscription.update({
+          where: { id: sub.id },
+          data: {
+            tier: 'FREE',
+            status: 'CANCELLED',
+            platformLimit: 3,
+            syncFrequencyMinutes: 1440,
+            exportLimitMonthly: 1,
+            apiRequestsDaily: 50,
+          },
+        });
+
+        result.downgraded++;
+
+        if (sub.user.email) {
+          const { emailService } = await import('@/lib/email');
+          await emailService.send({
+            to: sub.user.email,
+            subject: '⚠️ Your subscription has been downgraded to Free',
+            html: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+                <h2>Subscription Downgraded</h2>
+                <p>Hi ${sub.user.name || 'there'},</p>
+                <p>Due to a payment failure, your subscription has been downgraded to the <strong>Free</strong> plan.</p>
+                <p>To restore your previous plan, please update your payment method:</p>
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/billing" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px">Update Payment Method</a>
+              </div>
+            `,
+          });
+        }
+      } catch (e) {
+        logger.error('Failed to downgrade subscription', { userId: sub.userId }, e);
+      }
+    }
+
+    // 3. Find expired trial subscriptions
+    const expiredTrials = await prisma.subscription.findMany({
+      where: {
+        status: 'TRIALING',
+        trialEnd: { lt: now },
+      },
+    });
+
+    result.subscriptionsChecked += expiredTrials.length;
+
+    for (const trial of expiredTrials) {
+      try {
+        await prisma.subscription.update({
+          where: { id: trial.id },
+          data: { status: 'CANCELLED', tier: 'FREE', platformLimit: 3, syncFrequencyMinutes: 1440, exportLimitMonthly: 1, apiRequestsDaily: 50 },
+        });
+        result.downgraded++;
+      } catch (e) {
+        logger.error('Failed to expire trial', { userId: trial.userId }, e);
+      }
+    }
+
+    logger.info('Subscription check cron completed', { ...result, duration: Date.now() - startTime });
+
+    return NextResponse.json({
+      success: true,
+      data: { ...result, duration: Date.now() - startTime, timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    logger.error('Subscription check cron failed', {}, error);
+    return NextResponse.json({ error: 'Subscription check job failed' }, { status: 500 });
+  }
+}
+
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

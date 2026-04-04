@@ -41,14 +41,7 @@ const SECURITY_HEADERS = {
 // VALIDATION SCHEMAS
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
+// Upload routes use FormData, no body schema needed
 
 
 // =============================================================================
@@ -136,30 +129,19 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * POST - Attachment upload (support tickets, etc.)
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse file from multipart form
-   * - Validate allowed file types
-   * - Check user's storage quota
-   * - Scan file for security threats
-   * - Upload to storage with private access
-   * - Return signed URL with expiration
+ * Handles file uploads with security and quota validation.
+ * - Validates user authentication and checks storage quota
+ * - Parses multipart form data for file uploads
+ * - Validates file types and scans for security threats
+ * - Uploads file to secure storage with private access control
+ * - Returns signed URL with configured expiration time
  */
 export async function POST(
   request: NextRequest

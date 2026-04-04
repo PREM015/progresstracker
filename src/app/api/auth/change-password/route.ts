@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { applyRateLimit } from '@/lib/server/redis-rate-limit';
 import { emailService } from '@/lib/email';
 
 // =============================================================================
@@ -175,10 +175,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const userId = session.user.id;
 
     // Rate limiting
-    const rateLimitKey = `change-password:${userId}`;
-    const rateLimitResult = await checkLimit(authRateLimiter, 3, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("accountChange", userId);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Too many attempts. Please try again later.', code: 'RATE_LIMIT_EXCEEDED' },

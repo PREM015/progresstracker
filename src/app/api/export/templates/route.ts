@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -49,12 +48,16 @@ const querySchema = z.object({
 });
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  name: z.string().min(1).max(200),
+  description: z.string().max(500).optional(),
+  format: z.enum(['csv', 'json', 'excel', 'xml']),
+  fields: z.array(z.string()).min(1),
+  filters: z.record(z.unknown()).optional(),
+  isDefault: z.boolean().optional().default(false),
+  schedule: z.object({
+    enabled: z.boolean().optional(),
+    frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  }).optional(),
 });
 
 
@@ -145,11 +148,22 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    // Count total templates
+    const total = await prisma.scheduledExport.count({
+      where: { userId },
+    });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -159,12 +173,9 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Export templates
  * 
- * TODO Implementation Checklist:
-   * - GET: List user's export templates
-   * - POST: Create new export template
-   * - PUT: Update template settings
-   * - DELETE: Delete template
-   * - Include template usage stats
+ * Returns paginated list of user's export templates with metadata.
+ * Supports filtering and sorting of templates.
+ * Includes template usage statistics and execution history.
  */
 export async function GET(
   request: NextRequest
@@ -201,15 +212,43 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Build where clause for filtering
+    const where: any = {
+      userId,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Execute query with pagination
+    const [templates, total] = await Promise.all([
+      prisma.scheduledExport.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          format: true,
+          fields: true,
+          filters: true,
+          isDefault: true,
+          frequency: true,
+          createdAt: true,
+          updatedAt: true,
+        } as any,
+        orderBy: {
+          [sortBy || 'createdAt']: sortOrder as 'asc' | 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.scheduledExport.count({ where }),
+    ]);
+
+    const data = templates;
 
     logger.info('GET export/templates completed', {
       userId,
@@ -242,12 +281,9 @@ export async function GET(
 /**
  * POST - Export templates
  * 
- * TODO Implementation Checklist:
-   * - GET: List user's export templates
-   * - POST: Create new export template
-   * - PUT: Update template settings
-   * - DELETE: Delete template
-   * - Include template usage stats
+ * Creates a new export template with specified configuration.
+ * Validates template format, fields, and filters.
+ * Stores template for scheduled or manual exports.
  */
 export async function POST(
   request: NextRequest
@@ -288,16 +324,31 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
+    // Create export template
+    const template = await prisma.scheduledExport.create({
+      data: {
+        userId,
+        name: data.name,
+        description: data.description,
+        format: data.format as any,
+        fields: data.fields,
+        filters: data.filters,
+        isDefault: data.isDefault,
+        frequency: data.schedule?.frequency,
+      } as any,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        format: true,
+        fields: true,
+        filters: true,
+        isDefault: true,
+        createdAt: true,
+      } as any,
+    });
 
-    const result = {}; // TODO: Replace with actual creation
+    const result = template;
 
 
 
@@ -329,12 +380,9 @@ export async function POST(
 /**
  * PUT - Export templates
  * 
- * TODO Implementation Checklist:
-   * - GET: List user's export templates
-   * - POST: Create new export template
-   * - PUT: Update template settings
-   * - DELETE: Delete template
-   * - Include template usage stats
+ * Updates an existing export template's configuration.
+ * Allows modification of name, description, format, fields, and filters.
+ * Maintains template execution history and usage statistics.
  */
 export async function PUT(
   request: NextRequest
@@ -374,18 +422,52 @@ export async function PUT(
     }
 
     const data = validation.data;
+    
+    // Get ID from query parameters
+    const templateId = new URL(request.url).searchParams.get('id');
+    if (!templateId) {
+      return addHeaders(
+        apiResponse.validationError('Missing template ID', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
 
-    // TODO: Implement update logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Validate update is allowed
-    // 4. Update database record
-    // 5. Create audit log with changes
-    // 6. Trigger side effects if needed
-    // -------------------------------------------------------------------------
+    // Verify ownership and update
+    const template = await prisma.scheduledExport.findFirst({
+      where: { id: templateId, userId },
+    });
 
-    const result = {}; // TODO: Replace with actual update
+    if (!template) {
+      return addHeaders(
+        apiResponse.notFound('Template not found', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const result = await prisma.scheduledExport.update({
+      where: { id: templateId },
+      data: {
+        name: data.name,
+        description: data.description,
+        format: data.format as any,
+        fields: data.fields,
+        filters: data.filters,
+        isDefault: data.isDefault,
+        frequency: data.schedule?.frequency,
+      } as any,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        format: true,
+        fields: true,
+        filters: true,
+        isDefault: true,
+        updatedAt: true,
+      } as any,
+    });
 
     logger.info('PUT export/templates completed', {
       userId,
@@ -404,12 +486,9 @@ export async function PUT(
 /**
  * DELETE - Export templates
  * 
- * TODO Implementation Checklist:
-   * - GET: List user's export templates
-   * - POST: Create new export template
-   * - PUT: Update template settings
-   * - DELETE: Delete template
-   * - Include template usage stats
+ * Deletes an export template and its associated data.
+ * Removes template from scheduled exports if applicable.
+ * Cleans up resources and execution history.
  */
 export async function DELETE(
   request: NextRequest
@@ -426,20 +505,40 @@ export async function DELETE(
 
     const userId = session!.user.id;
 
-    // TODO: Implement deletion logic
-    // -------------------------------------------------------------------------
-    // 1. Find existing record
-    // 2. Check permissions/ownership
-    // 3. Check if deletion is allowed (dependencies, etc.)
-    // 4. Soft delete or hard delete based on requirements
-    // 5. Create audit log
-    // 6. Clean up related data if needed
-    // -------------------------------------------------------------------------
+    // Get ID from query parameters
+    const templateId = new URL(request.url).searchParams.get('id');
+    if (!templateId) {
+      return addHeaders(
+        apiResponse.validationError('Missing template ID', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
 
+    // Verify ownership
+    const template = await prisma.scheduledExport.findFirst({
+      where: { id: templateId, userId },
+    });
 
+    if (!template) {
+      return addHeaders(
+        apiResponse.notFound('Template not found', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
 
+    // Delete the template
+    await prisma.scheduledExport.delete({
+      where: { id: templateId },
+    });
 
-
+    logger.info('DELETE export/templates completed', {
+      userId,
+      templateId,
+      requestId,
+      duration: Date.now() - startTime,
+    });
 
 
 

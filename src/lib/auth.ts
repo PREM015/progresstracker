@@ -78,24 +78,11 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: parseInt(process.env.SESSION_MAX_AGE || "2592000"),
+    maxAge: parseInt(process.env.SESSION_MAX_AGE || "2592000"), // 30 days
   },
 
-  /* -------------------------------- COOKIES -------------------------------- */
-  cookies: {
-    sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
+  // ✅ REMOVED custom cookies config — let NextAuth handle automatically
+  // This fixes the cookie name mismatch with middleware
 
   /* -------------------------------- PROVIDERS ------------------------------- */
   providers: [
@@ -110,9 +97,6 @@ export const authOptions: NextAuthOptions = {
         if (!credentials) return null;
 
         // --- Magic Link Login ---
-        // PUT /api/auth/magic-link already verified the token and created
-        // session/tokens. We just need to create the NextAuth session here
-        // by looking up the user from the verified email.
         if (credentials.loginType === "magic-link" && credentials.email) {
           console.log("[AUTH] Magic link session creation for:", credentials.email);
 
@@ -125,8 +109,7 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Verify that this email actually has a recently-verified magic link
-          // (prevents forged signIn calls without going through PUT first)
+          // Verify that this email has a recently-verified magic link
           const recentVerification = await prisma.emailVerification.findFirst({
             where: {
               userId: user.id,
@@ -212,23 +195,17 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
-        if (
-          !user ||
-          !user.password ||
-          !user.isActive ||
-          user.isBanned
-        ) {
+        if (!user || !user.password || !user.isActive || user.isBanned) {
           throw new Error("Invalid credentials");
         }
 
-        const valid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
+        const valid = await bcrypt.compare(credentials.password, user.password);
 
         if (!valid) {
           throw new Error("Invalid credentials");
         }
+
+        console.log("[AUTH] ✅ Password verified for:", user.email);
 
         return {
           id: user.id,
@@ -239,7 +216,6 @@ export const authOptions: NextAuthOptions = {
           username: user.username,
           role: user.role as "admin" | "user",
           isAdmin: user.isAdmin,
-
           permissions: user.permissions,
           isActive: user.isActive,
           isVerified: user.isVerified,
@@ -268,7 +244,6 @@ export const authOptions: NextAuthOptions = {
           showGoals: user.showGoals ?? true,
           showPlatforms: user.showPlatforms ?? true,
           showStreak: user.showStreak ?? true,
-          // Optional fields can be null/undefined if not set
           bio: user.bio,
           location: user.location,
           website: user.website,
@@ -279,7 +254,6 @@ export const authOptions: NextAuthOptions = {
           twitterHandle: user.twitterHandle,
           discordUsername: user.discordUsername,
           lastActivityDate: user.lastActivityDate,
-
           lastLoginAt: user.lastLoginAt,
           lastActiveAt: user.lastActiveAt,
           passwordChangedAt: user.passwordChangedAt,
@@ -289,7 +263,6 @@ export const authOptions: NextAuthOptions = {
           signupSource: user.signupSource,
           rank: user.rank,
         };
-
       },
     }),
 
@@ -324,6 +297,8 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.isAdmin = user.isAdmin;
         token.isVerified = user.isVerified;
+        
+        console.log("[AUTH] ✅ JWT token created for:", user.email);
       }
 
       // Profile update — sync token and bust session cache
@@ -331,7 +306,6 @@ export const authOptions: NextAuthOptions = {
         token.name = session.user.name;
         token.image = session.user.image;
         token.username = session.user.username;
-        // ✅ Bust cache so next session() call refreshes
         if (token.id) {
           sessionCache.invalidate(`session:${token.id}`);
         }
@@ -349,14 +323,14 @@ export const authOptions: NextAuthOptions = {
 
       const cacheKey = `session:${token.id}`;
 
-      // ✅ Serve from cache whenever possible (avoids DB hit per request)
+      // Serve from cache whenever possible
       const cached = sessionCache.get(cacheKey) as typeof session.user | null;
       if (cached) {
         session.user = cached;
         return session;
       }
 
-      // Populate from JWT token data (fast path — no DB)
+      // Populate from JWT token data
       if (session.user) {
         session.user.id = token.id;
         session.user.email = token.email ?? null;
@@ -367,7 +341,6 @@ export const authOptions: NextAuthOptions = {
         session.user.isAdmin = token.isAdmin;
         session.user.isVerified = token.isVerified;
 
-        // ✅ Cache the session user so next calls skip this block
         sessionCache.set(cacheKey, session.user);
       }
 
@@ -386,7 +359,7 @@ export const authOptions: NextAuthOptions = {
         const urlObj = new URL(url.startsWith('http') ? url : baseUrl + url);
         const isAuthPath = authPaths.some((p) => urlObj.pathname.startsWith(p));
 
-        // ✅ Prevent redirect loops — never redirect to auth pages after sign-in
+        // Prevent redirect loops
         if (isAuthPath) return `${baseUrl}/dashboard`;
 
         if (url.startsWith('/')) return `${baseUrl}${url}`;
@@ -426,35 +399,27 @@ export const authOptions: NextAuthOptions = {
               pushEnabled: false,
               inAppEnabled: true,
               smsEnabled: false,
-
               goalReminders: true,
               goalCompleted: true,
-
               streakAlerts: true,
               syncComplete: false,
               syncFailed: true,
-
               weeklyReport: true,
               monthlyReport: false,
-
               securityAlerts: true,
               billingAlerts: true,
-
               newFeatures: true,
               tips: true,
               communityUpdates: false,
               marketingEmails: false,
-
               quietHoursEnabled: false,
               quietHoursStart: "22:00",
               quietHoursEnd: "08:00",
               quietHoursTimezone: "UTC",
-
               digestEnabled: false,
               digestFrequency: "daily",
               digestTime: "09:00",
               digestDay: 1,
-
               dndEnabled: false,
               dndUntil: null,
             },
@@ -472,3 +437,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/*                               END OF FILE                                  */
+/* -------------------------------------------------------------------------- */

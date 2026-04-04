@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { signJwt } from '@/lib/jwt';
-import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { applyRateLimit, check2FALockout, set2FALockout, clear2FALockout } from '@/lib/server/redis-rate-limit';
 import { decrypt } from '@/lib/crypto';
 
 // =============================================================================
@@ -114,10 +114,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     // Rate limiting
-    const rateLimitKey = `2fa-verify:${clientIP}`;
-    const rateLimitResult = await checkLimit(authRateLimiter, 5, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("twoFa", clientIP);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Too many attempts. Please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
@@ -235,6 +234,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Check 2FA lockout
+    const lockout = await check2FALockout(user.id);
+    if (lockout.locked) {
+      await constantTimeDelay(start);
+      return secureResponse(
+        { success: false, error: 'Maximum 2FA attempts exceeded. Try again in 15 minutes.', code: '2FA_LOCKED_OUT' },
+        429,
+        requestId
+      );
+    }
+
     if (!user.twoFactorAuth?.isEnabled) {
       await constantTimeDelay(start);
       return secureResponse(
@@ -291,6 +301,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       });
 
+      // Count recent failures to trigger lockout
+      const recentFailures = await prisma.loginAttempt.count({
+        where: {
+          userId: user.id,
+          success: false,
+          createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) }
+        }
+      });
+      
+      if (recentFailures >= 5) {
+        await set2FALockout(user.id);
+      }
+
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Invalid verification code', code: 'INVALID_CODE' },
@@ -314,6 +337,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
 
     // Complete login
+    await clear2FALockout(user.id);
+
     await prisma.$transaction(async (tx) => {
       // Mark temp token as used
       await tx.passwordReset.update({

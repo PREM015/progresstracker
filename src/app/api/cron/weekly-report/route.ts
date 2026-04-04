@@ -1,262 +1,165 @@
 // =============================================================================
-// cron/weekly-report/route.ts
+// cron/weekly-report/route.ts — Generate and send weekly reports
+// SECURITY: Protected by withCronAuth
 // =============================================================================
-// Description: Generate weekly reports
-// Methods: POST
-// Auth Required: True
-// Admin Only: True
-// Rate Limit: 5 requests/minute
-// Tags: cron, report, scheduled
-// Generated: 2026-02-02T11:57:44.584924
-// =============================================================================
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { z } from 'zod';
-import { Prisma, AuditAction } from '@prisma/client';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import apiResponse from '@/lib/apiResponse';
-
-// =============================================================================
-// CONSTANTS
-// =============================================================================
-
-const RATE_LIMIT = 5;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, HEAD',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
-
-const SECURITY_HEADERS = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Cache-Control': 'no-store',
-};
-
-// =============================================================================
-// VALIDATION SCHEMAS
-// =============================================================================
-
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
-
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Generate unique request ID for tracing
- */
-function generateRequestId(): string {
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 11)}`;
-}
-
-/**
- * Extract client IP from request
- */
-function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-}
-
-/**
- * Add standard headers to response
- */
-function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
-  rateLimitResult?: { limit: number; remaining: number }
-): NextResponse {
-  Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
-    response.headers.set(key, value);
-  });
-  response.headers.set('X-Request-ID', requestId);
-  
-  if (rateLimitResult) {
-    response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
-    response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
-  }
-  
-  return response;
-}
-
-/**
- * Validate admin session and check rate limits
- */
-async function validateAdminSession(request: NextRequest, requestId: string) {
-  const ip = getClientIp(request);
-  const rateLimitKey = `cron-weekly-report:${ip}`;
-  const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
-
-  if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.id) {
-    return { 
-      error: apiResponse.unauthorized('Authentication required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  const isAdmin = Boolean(session.user.isAdmin || session.user.role === 'admin');
-
-  if (!isAdmin) {
-    return { 
-      error: apiResponse.forbidden('Admin access required', requestId), 
-      session: null, 
-      rateLimitResult 
-    };
-  }
-
-  return { error: null, session, rateLimitResult };
-}
-
-// =============================================================================
-// HTTP METHOD HANDLERS
-// =============================================================================
-
-/**
- * OPTIONS - CORS preflight
- */
-export async function OPTIONS(): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  return addHeaders(new NextResponse(null, { status: 204 }), requestId);
-}
-
-/**
- * HEAD - Resource metadata
- */
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
-}
-
-/**
- * POST - Generate weekly reports
- * 
- * TODO Implementation Checklist:
-   * - Validate cron secret or admin session
-   * - Get users with weekly report enabled
-   * - Calculate week's statistics per user
-   * - Generate report data and highlights
-   * - Create Report records in database
-   * - Queue report emails for sending
-   * - Return job summary with counts
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
-
-  try {
-    const { error, session, rateLimitResult } = await validateAdminSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-    
-    const userId = session!.user.id;
-
-    // Parse request body
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid JSON body', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const validation = bodySchema.safeParse(body);
-
-    if (!validation.success) {
-      return addHeaders(
-        apiResponse.validationError('Validation failed', validation.error.errors, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    const data = validation.data;
-
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: 'CREATE' as AuditAction,
-        category: 'cron',
-        entityType: 'unknown',
-        description: `Created via ${requestId}`,
-        ipAddress: getClientIp(request),
-        performedBy: userId,
-      },
-    });
-
-    logger.info('POST cron/weekly-report completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST cron/weekly-report failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
-  }
-}
-
-
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
+import { withCronAuth } from '@/lib/server/cron-auth';
+import { startOfWeek, endOfWeek, subWeeks, getWeek } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Uncomment if route segment config is needed:
-// export const revalidate = 0;
-// export const fetchCache = 'force-no-store';
+async function _cronHandler(request: NextRequest): Promise<NextResponse> {
+  const startTime = Date.now();
+  const result = { usersProcessed: 0, reportsGenerated: 0, emailsSent: 0, errors: 0 };
 
+  try {
+    const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+    const lastWeekEnd = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+    const weekNumber = getWeek(lastWeekStart);
+    const year = lastWeekStart.getFullYear();
+
+    // Get users who want weekly reports (paginated)
+    const BATCH_SIZE = 100;
+    let offset = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const users = await prisma.user.findMany({
+        where: {
+          isActive: true,
+          email: { not: null },
+          notificationPrefs: {
+            enabled: true,
+            emailEnabled: true,
+            weeklyReport: true,
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          currentStreak: true,
+          longestStreak: true,
+          rank: true,
+        },
+        skip: offset,
+        take: BATCH_SIZE,
+      });
+
+      if (users.length < BATCH_SIZE) hasMore = false;
+      offset += BATCH_SIZE;
+
+      for (const user of users) {
+        result.usersProcessed++;
+
+        try {
+          // Get last week's tracker entries
+          const entries = await prisma.trackerEntry.findMany({
+            where: { userId: user.id, date: { gte: lastWeekStart, lte: lastWeekEnd } },
+            include: { platform: { select: { name: true, icon: true } } },
+          });
+
+          const problemsSolved = entries.reduce((s: number, e: any) => s + (e.problemsSolved || 0), 0);
+          const commits = entries.reduce((s: number, e: any) => s + (e.commits || 0), 0);
+          const timeSpent = entries.reduce((s: number, e: any) => s + (e.timeSpent || 0), 0);
+          const points = entries.reduce((s: number, e: any) => s + (e.points || 0), 0);
+
+          // Get prior week for comparison
+          const priorStart = startOfWeek(subWeeks(lastWeekStart, 1), { weekStartsOn: 1 });
+          const priorEnd = endOfWeek(subWeeks(lastWeekStart, 1), { weekStartsOn: 1 });
+          const priorEntries = await prisma.trackerEntry.findMany({
+            where: { userId: user.id, date: { gte: priorStart, lte: priorEnd } },
+          });
+
+          const priorProblems = priorEntries.reduce((s: number, e: any) => s + (e.problemsSolved || 0), 0);
+          const priorCommits = priorEntries.reduce((s: number, e: any) => s + (e.commits || 0), 0);
+          const priorTime = priorEntries.reduce((s: number, e: any) => s + (e.timeSpent || 0), 0);
+
+          const calcChange = (curr: number, prev: number) =>
+            prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
+
+          // Get goals completed last week
+          const goalsCompleted = await prisma.goal.count({
+            where: { userId: user.id, status: 'COMPLETED', completedAt: { gte: lastWeekStart, lte: lastWeekEnd } },
+          });
+          const totalGoals = await prisma.goal.count({ where: { userId: user.id, status: 'ACTIVE' } });
+
+          // Platform stats
+          const platformMap = new Map<string, { icon: string; count: number }>();
+          for (const e of entries) {
+            const name = e.platform?.name || 'Other';
+            const icon = e.platform?.icon || '🔗';
+            const existing = platformMap.get(name) || { icon, count: 0 };
+            platformMap.set(name, { ...existing, count: existing.count + e.problemsSolved + e.commits });
+          }
+          const platformStats = Array.from(platformMap.entries()).slice(0, 5).map(([name, data]) => ({
+            name,
+            icon: data.icon,
+            value: data.count,
+            label: 'activities',
+          }));
+
+          // Save report to DB
+          const report = await prisma.report.create({
+            data: {
+              userId: user.id,
+              type: 'weekly',
+              periodStart: lastWeekStart,
+              periodEnd: lastWeekEnd,
+              title: `Week ${weekNumber} Report`,
+              summary: `You solved ${problemsSolved} problems and made ${commits} commits this week.`,
+              status: 'generated',
+              data: { problemsSolved, commits, timeSpent, points } as never,
+            },
+          });
+          result.reportsGenerated++;
+
+          // Send email
+          if (user.email) {
+            const { emailService } = await import('@/lib/email');
+            await emailService.sendWeeklyReport(user.email, {
+              userName: user.name || 'there',
+              weekNumber,
+              year,
+              stats: {
+                problemsSolved,
+                problemsChange: calcChange(problemsSolved, priorProblems),
+                commits,
+                commitsChange: calcChange(commits, priorCommits),
+                timeSpent,
+                timeChange: calcChange(timeSpent, priorTime),
+                currentStreak: user.currentStreak,
+                longestStreak: user.longestStreak,
+                goalsCompleted,
+                goalsTotal: totalGoals,
+                rank: user.rank ?? undefined,
+              },
+              platformStats,
+            });
+            result.emailsSent++;
+          }
+        } catch (userErr) {
+          result.errors++;
+          logger.error('Weekly report failed for user', { userId: user.id }, userErr);
+        }
+      }
+    }
+
+    logger.info('Weekly report cron completed', { ...result, duration: Date.now() - startTime });
+
+    return NextResponse.json({
+      success: true,
+      data: { ...result, duration: Date.now() - startTime, timestamp: new Date().toISOString() },
+    });
+  } catch (error) {
+    logger.error('Weekly report cron failed', {}, error);
+    return NextResponse.json({ error: 'Weekly report job failed' }, { status: 500 });
+  }
+}
+
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

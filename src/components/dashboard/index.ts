@@ -73,6 +73,15 @@ export { LeaderboardWidget } from './LeaderboardWidget';
 export { QuickActions } from './QuickActions';
 
 // ============================================================================
+// DASHBOARD PAGES & VIEWS
+// ============================================================================
+export { FavoritesPage } from './FavoritesPage';
+export { SearchPage } from './SearchPage';
+export { DailyStats } from './DailyStats';
+export { ExportPage } from './ExportPage';
+export * from './feedback';
+
+// ============================================================================
 // MOTIVATION & ENGAGEMENT
 // ============================================================================
-export { MotivationWidget } from './MotivationWidget';
+export { MotivationWidget } from './MotivationWidget';

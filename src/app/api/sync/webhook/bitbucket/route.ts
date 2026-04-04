@@ -14,6 +14,7 @@ import { SyncQueue } from '@/services/sync/syncQueue';
 import { sseSyncService } from '@/services/sseSyncService';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import crypto from 'crypto';
 
 // =============================================================================
 // CONSTANTS
@@ -131,7 +132,12 @@ function verifyBitbucketSecret(request: NextRequest): boolean {
   
   // Check custom secret header if configured
   const headerSecret = request.headers.get('x-hook-secret');
-  return headerSecret === secret;
+  if (!headerSecret) return false;
+
+  const headerHash = crypto.createHash('sha256').update(headerSecret).digest();
+  const secretHash = crypto.createHash('sha256').update(secret).digest();
+
+  return crypto.timingSafeEqual(headerHash, secretHash);
 }
 
 // =============================================================================

@@ -291,3 +291,57 @@ export function calculateStreak(dates: Date[]): { current: number; longest: numb
 
   return { current, longest };
 }
+
+/**
+ * SSRF Prevention - Check if a URL points to a private/internal IP
+ */
+export function isPrivateIP(hostname: string): boolean {
+  // Common localhost/private patterns
+  const privatePatterns = [
+    /^localhost$/i,
+    /^127\./,
+    /^10\./,
+    /^172\.(1[6-9]|2[0-9]|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,
+    /^0\./,
+    /^::1$/,
+    /^fd[0-9a-f]{2}:/i,
+    /^fe[89ab][0-9a-f]:/i,
+  ];
+
+  if (privatePatterns.some((pattern) => pattern.test(hostname))) {
+    return true;
+  }
+
+  // More robust check would involve DNS resolution, 
+  // but for scrapers with hardcoded base URLs, we mainly check the dynamic parts.
+  return false;
+}
+
+/**
+ * Validate URL for SSRF
+ */
+export function validateUrlForSSRF(url: string): void {
+  try {
+    const parsed = new URL(url);
+    
+    // 1. Protocol Restriction
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error(`Forbidden protocol: ${parsed.protocol}`);
+    }
+
+    // 2. Private IP / Localhost check
+    if (isPrivateIP(parsed.hostname)) {
+      throw new Error(`Forbidden destination: ${parsed.hostname}`);
+    }
+
+    // 3. Port check (allow only standard web ports)
+    if (parsed.port && !['80', '443'].includes(parsed.port)) {
+      throw new Error(`Forbidden port: ${parsed.port}`);
+    }
+  } catch (error) {
+    logger.error('SSRF validation failed', { url, error: error instanceof Error ? error.message : String(error) });
+    throw new Error(`SSRF Validation Failed: ${error instanceof Error ? error.message : 'Invalid URL'}`);
+  }
+}

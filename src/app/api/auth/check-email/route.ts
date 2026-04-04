@@ -7,7 +7,7 @@ import crypto from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { applyRateLimit } from '@/lib/server/redis-rate-limit';
 
 // =============================================================================
 // CONFIGURATION
@@ -91,16 +91,10 @@ async function checkEmailAvailability(email: string): Promise<{
     return { available: false, reason: 'disposable_email' };
   }
 
-  // Check if email exists in database
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-
-  if (existingUser) {
-    return { available: false, reason: 'already_registered' };
-  }
-
+  // To completely prevent user enumeration, we do NOT check the database if the email exists.
+  // The actual collision check will happen during the registration submission.
+  
+  // Return true to satisfy the validation UI. If it's taken, the registration endpoint will handle the error safely.
   return { available: true };
 }
 
@@ -115,10 +109,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     // Rate limiting
-    const rateLimitKey = `check-email:${clientIP}`;
-    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("enumeration", clientIP);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
@@ -180,10 +173,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     // Rate limiting
-    const rateLimitKey = `check-email:${clientIP}`;
-    const rateLimitResult = await checkLimit(apiRateLimiter, 30, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("enumeration", clientIP);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },

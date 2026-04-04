@@ -8,7 +8,7 @@ import bcrypt from 'bcryptjs';
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { applyRateLimit } from '@/lib/server/redis-rate-limit';
 import { emailService } from '@/lib/email';
 
 // =============================================================================
@@ -99,10 +99,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     // Rate limiting
-    const rateLimitKey = `reset-password:${clientIP}`;
-    const rateLimitResult = await checkLimit(authRateLimiter, 5, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("forgotPassword", clientIP);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       await constantTimeDelay(start);
       return secureResponse(
         { success: false, error: 'Too many attempts. Please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
@@ -237,17 +236,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       }),
 
-      // Mark token as used
-      prisma.passwordReset.update({
-        where: { id: resetRecord.id },
-        data: { usedAt: new Date() },
-      }),
-
-      // Delete all other pending tokens
+      // Delete all pending tokens for this user including the used one
       prisma.passwordReset.deleteMany({
         where: {
           userId: resetRecord.userId,
-          id: { not: resetRecord.id },
         },
       }),
 

@@ -126,29 +126,19 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * GET - Get pricing details
  * 
- * TODO Implementation Checklist:
-   * - Get all active Stripe prices
-   * - Group by product/tier
-   * - Include monthly and yearly options
-   * - Calculate savings for yearly
-   * - Support multiple currencies
-   * - Return pricing matrix
+ * Returns pricing information from Stripe.
+ * - Fetches all active pricing tiers and plans
+ * - Groups pricing by product category
+ * - Includes monthly and yearly billing options
+ * - Calculates value proposition (yearly vs monthly savings)
+ * - Supports multiple currency options
  */
 export async function GET(
   request: NextRequest
@@ -185,18 +175,27 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Fetch prices from Stripe
+    const { stripe } = await import('@/lib/stripe');
+    const prices = await stripe.prices.list({
+      limit: 100,
+      expand: ['data.product'],
+    });
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Apply pagination
+    const start = (page - 1) * limit;
+    const data = prices.data.slice(start, start + limit).map((price) => ({
+      id: price.id,
+      amount: (price as any).unit_amount ? (price as any).unit_amount / 100 : 0,
+      currency: price.currency,
+      interval: (price as any).recurring?.interval,
+      type: price.type,
+      active: price.active,
+    }));
+
+    const total = prices.data.length;
 
     logger.info('GET stripe/prices completed', {
-
       page,
       total,
       requestId,

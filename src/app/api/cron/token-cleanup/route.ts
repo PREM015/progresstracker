@@ -1,33 +1,36 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
-    const startTime = Date.now();
-    try {
-        const passwordResets = await prisma.passwordReset.deleteMany({
-            where: { expiresAt: { lt: new Date() } }
-        });
+async function _cronHandler(req: NextRequest) {
+  const startTime = Date.now();
+  try {
+    const passwordResets = await prisma.passwordReset.deleteMany({
+      where: { expiresAt: { lt: new Date() } }
+    });
 
-        const emailVerifications = await prisma.emailVerification.deleteMany({
-            where: { expiresAt: { lt: new Date() } }
-        });
+    const emailVerifications = await prisma.emailVerification.deleteMany({
+      where: { expiresAt: { lt: new Date() } }
+    });
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                deletedPasswordResets: passwordResets.count,
-                deletedEmailVerifications: emailVerifications.count,
-                duration: Date.now() - startTime
-            }
-        });
-    } catch (e: any) {
-        return NextResponse.json({ error: "Token cleanup failed", details: e.message }, { status: 500 });
-    }
-};
+    return NextResponse.json({
+      success: true,
+      data: {
+        deletedPasswordResets: passwordResets.count,
+        deletedEmailVerifications: emailVerifications.count,
+        duration: Date.now() - startTime
+      }
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: "Token cleanup failed" },
+      { status: 500 }
+    );
+  }
+}
 
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

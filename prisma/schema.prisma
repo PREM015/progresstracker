@@ -1,10 +1,12 @@
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [pg_trgm]
 }
 
 // ============================================================================
@@ -13,6 +15,7 @@ datasource db {
 enum Role {
   user
   admin
+  superadmin
 }
 
 enum PlatformCategory {
@@ -46,6 +49,7 @@ enum SyncStatus {
   FAILED
   CANCELLED
   RATE_LIMITED
+  ERROR
 }
 
 enum NotificationType {
@@ -159,6 +163,7 @@ enum ExportFormat {
   PDF
   EXCEL
   XML
+  XLSX
 }
 
 enum ExportStatus {
@@ -196,6 +201,8 @@ enum AuditAction {
   WEBHOOK_TRIGGER
   SHARE_CREATE
   SHARE_ACCESS
+  IMPERSONATE_START
+  IMPERSONATE_END
 }
 
 enum TicketStatus {
@@ -372,6 +379,11 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   deletedAt         DateTime?
+  marketingEmails   Boolean   @default(false)
+  emailDigest       Boolean   @default(false)
+  pushNotifications Boolean   @default(false)
+  referralCount     Int       @default(0)
+  referralExpires   DateTime?
 
   // ===== RELATIONS =====
   accounts            Account[]
@@ -416,6 +428,8 @@ model User {
   referrerRewards     ReferralReward[] @relation("ReferrerRewards")
   referredRewards     ReferralReward[] @relation("ReferredRewards")
   feedback            Feedback[]
+  userFriends         UserFriend[]     @relation("UserFriends")
+  friendOf            UserFriend[]     @relation("FriendOf")
   bookmarks           Bookmark[]
   blogComments        BlogComment[]
   blogLikes           BlogPostLike[]
@@ -424,15 +438,15 @@ model User {
   recentSearches      RecentSearch[]
 
   // ===== INDEXES =====
-  @@index([email])
-  @@index([username])
-  @@index([isPublic])
-  @@index([isActive])
-  @@index([rank])
-  @@index([createdAt])
-  @@index([lastActiveAt])
-  @@index([referralCode])
-  @@index([referredBy])
+  @@index([email], map: "idx_user_email")
+  @@index([username], map: "idx_user_username")
+  @@index([isPublic], map: "idx_user_is_public")
+  @@index([isActive], map: "idx_user_is_active")
+  @@index([rank], map: "idx_user_rank")
+  @@index([createdAt], map: "idx_user_created_at")
+  @@index([lastActiveAt], map: "idx_user_last_active_at")
+  @@index([referralCode], map: "idx_user_referral_code")
+  @@index([referredBy], map: "idx_user_referred_by")
   @@index([email, isActive], map: "idx_user_email_active")
   @@index([username, isActive], map: "idx_user_username_active")
   @@index([totalPoints(sort: Desc)], map: "idx_user_points_desc")
@@ -456,6 +470,9 @@ model User {
   @@index([streakFreezeUsedAt], map: "idx_user_streak_freeze_used_at")
   @@index([createdAt, isActive], map: "idx_user_created_active")
   @@index([passwordChangedAt], map: "idx_user_password_changed_at")
+  @@index([username(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_user_username_gin")
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_user_name_gin")
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_user_email_gin")
 }
 
 model Account {
@@ -772,10 +789,10 @@ model Platform {
   platformStats  PlatformDailyStats[]
   goals          Goal[]
 
-  @@index([category])
-  @@index([isActive])
-  @@index([slug])
-  @@index([supportsAutoSync])
+  @@index([category], map: "idx_platform_category")
+  @@index([isActive], map: "idx_platform_is_active")
+  @@index([slug], map: "idx_platform_slug")
+  @@index([supportsAutoSync], map: "idx_platform_supports_auto_sync")
   @@index([category, isActive], map: "idx_platform_category_active")
   @@index([isBeta], map: "idx_platform_is_beta")
   @@index([maintenanceMode], map: "idx_platform_maintenance_mode")
@@ -788,6 +805,8 @@ model Platform {
   @@index([supportsAutoSync, isActive, syncInterval], map: "idx_platform_auto_sync_active_interval")
   @@index([successRate, isActive], map: "idx_platform_success_rate_active")
   @@index([lastHealthCheck], map: "idx_platform_last_health_check")
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_platform_name_gin")
+  @@index([slug(ops: raw("gin_trgm_ops"))], type: Gin, map: "idx_platform_slug_gin")
 }
 
 model CustomPlatform {
@@ -823,6 +842,7 @@ model UserPlatform {
   id                  String     @id @default(cuid())
   userId              String
   platformId          String
+  platformUsername    String?
   username            String?
   profileUrl          String?
   externalUserId      String?
@@ -880,6 +900,7 @@ model UserPlatform {
   @@index([isActive, lastSyncedAt], map: "idx_user_platform_active_last_synced")
   @@index([tokenExpiresAt, isActive], map: "idx_user_platform_token_expires_active")
   @@index([userId, isVerified, isActive], map: "idx_user_platform_user_verified_active")
+  @@index([userId, isActive])
 }
 
 // ============================================================================
@@ -996,6 +1017,9 @@ model TrackerEntry {
   @@index([userId, productivityRating, date], map: "idx_tracker_user_productivity_date")
   @@index([userId, energyLevel, date], map: "idx_tracker_user_energy_date")
   @@index([userId, customPlatformId, date], map: "idx_tracker_user_custom_platform_date")
+  @@index([userId, date])
+  @@index([userId, platformId, date])
+  @@index([userId, category, date])
 }
 
 model DailyStats {
@@ -1155,6 +1179,8 @@ model Goal {
   @@index([userId, deletedAt, status], map: "idx_goal_user_deleted_status")
   @@index([isPublic, status, progressPercentage(sort: Desc)], map: "idx_goal_public_progress_desc")
   @@index([goalType, status, createdAt], map: "idx_goal_type_status_created")
+  @@index([userId, deadline, status], map: "idx_goal_user_deadline_status")
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model GoalReminder {
@@ -1315,6 +1341,7 @@ model UserAchievement {
   @@index([userId, unlockedAt(sort: Desc)], map: "idx_user_achievement_user_unlocked_desc")
   @@index([achievementId, unlockedAt], map: "idx_user_achievement_achievement_unlocked")
   @@index([userId, progressPercentage], map: "idx_user_achievement_user_progress")
+  @@index([userId, isHidden, unlockedAt], map: "idx_user_achievement_user_hidden_unlocked")
 }
 
 // ============================================================================
@@ -1324,6 +1351,7 @@ model UserAchievement {
 model Notification {
   id            String               @id @default(cuid())
   userId        String
+  read          Boolean              @default(false)
   type          NotificationType
   channel       NotificationChannel  @default(IN_APP)
   priority      NotificationPriority @default(NORMAL)
@@ -1373,12 +1401,15 @@ model Notification {
   @@index([expiresAt, isRead], map: "idx_notification_expires_read")
   @@index([scheduledFor, isDelivered, sentAt], map: "idx_notification_scheduled_delivered_sent")
   @@index([type, createdAt], map: "idx_notification_type_created")
+  @@index([userId, isRead])
 }
 
 model PushSubscription {
-  id           String    @id @default(cuid())
-  userId       String
-  endpoint     String    @unique
+  id             String    @id @default(cuid())
+  userId         String
+  lastDelivered  DateTime?
+  lastClicked    DateTime?
+  endpoint       String    @unique
   p256dh       String
   auth         String
   deviceId     String?
@@ -1461,6 +1492,7 @@ model SyncLog {
   @@index([hasError, createdAt(sort: Desc)], map: "idx_sync_log_has_error_created_desc")
   @@index([platformId, status, duration], map: "idx_sync_log_platform_status_duration")
   @@index([attemptNumber, status], map: "idx_sync_log_attempt_status")
+  @@index([userId, status, createdAt], map: "idx_sync_log_user_status_created")
 }
 
 // ============================================================================
@@ -1712,6 +1744,7 @@ model ReferralReward {
   id               String               @id @default(cuid())
   referrerId       String
   referredId       String
+  amount           Int                  @default(0)
   type             String               @default("signup")
   status           ReferralRewardStatus @default(PENDING)
   rewardType       ReferralRewardType
@@ -1750,6 +1783,7 @@ model ReferralReward {
 model ExportJob {
   id              String             @id @default(cuid())
   userId          String
+  templateId      String?
   name            String?
   format          ExportFormat
   dateFrom        DateTime?
@@ -1792,6 +1826,7 @@ model ExportJob {
 model ScheduledExport {
   id                String             @id @default(cuid())
   userId            String
+  fields            String[]           @default([])
   name              String
   description       String?
   frequency         String
@@ -2090,6 +2125,7 @@ model ShareLink {
   id              String          @id @default(cuid())
   userId          String
   code            String          @unique
+  type            ShareEntityType @default(PROFILE)
   entityType      ShareEntityType
   entityId        String?
   title           String?
@@ -2134,6 +2170,7 @@ model ShareLink {
 model ShareViewLog {
   id           String   @id @default(cuid())
   shareLinkId  String
+  ipAddress    String?
   viewerUserId String?
   ipHash       String?
   userAgent    String?  @db.Text
@@ -2197,6 +2234,8 @@ model EmailLog {
   id           String         @id @default(cuid())
   templateId   String?
   userId       String?
+  email        String?
+  failureReason String?
   to           String
   cc           String[]       @default([])
   bcc          String[]       @default([])
@@ -2262,6 +2301,7 @@ model Report {
   sentTo          String?
   pdfUrl          String?
   createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2746,4 +2786,22 @@ model RecentSearch {
   @@index([createdAt])
   @@index([userId, createdAt(sort: Desc)], map: "idx_recent_search_user_created_desc")
   @@index([query], map: "idx_recent_search_query")
+}
+
+model NewsletterEvent {
+  id        String   @id @default(cuid())
+  email     String
+  event     String
+  createdAt DateTime @default(now())
+}
+
+model UserFriend {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  user      User     @relation("UserFriends", fields: [userId], references: [id])
+  friend    User     @relation("FriendOf", fields: [friendId], references: [id])
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, friendId])
 }

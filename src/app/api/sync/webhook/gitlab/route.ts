@@ -14,6 +14,7 @@ import { SyncQueue } from '@/services/sync/syncQueue';
 import { sseSyncService } from '@/services/sseSyncService';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import crypto from 'crypto';
 
 // =============================================================================
 // CONSTANTS
@@ -112,7 +113,12 @@ function verifyGitLabToken(token: string | null): boolean {
     return process.env.NODE_ENV === 'development';
   }
   
-  return token === expectedToken;
+  if (!token) return false;
+  
+  const tokenHash = crypto.createHash('sha256').update(token).digest();
+  const expectedHash = crypto.createHash('sha256').update(expectedToken).digest();
+
+  return crypto.timingSafeEqual(tokenHash, expectedHash);
 }
 
 // =============================================================================

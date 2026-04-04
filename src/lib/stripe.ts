@@ -252,6 +252,7 @@ export async function createCheckoutSession(options: {
   cancelUrl: string;
   trialDays?: number;
   metadata?: Record<string, string>;
+  idempotencyKey?: string;
 }): Promise<Stripe.Checkout.Session> {
   const startTime = Date.now();
 
@@ -272,6 +273,8 @@ export async function createCheckoutSession(options: {
         ? { trial_period_days: options.trialDays }
         : undefined,
       metadata: options.metadata,
+    }, {
+      idempotencyKey: options.idempotencyKey
     });
 
     logger.info('Checkout session created', {

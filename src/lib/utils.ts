@@ -15,3 +15,18 @@ export function getClientIp(req: NextRequest): string {
 export function generateRequestId(): string {
   return crypto.randomUUID();
 }
+
+export function formatCurrency(amount: number, currency: string = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(amount / 100);
+}
+
+export function formatDate(date: string | Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(new Date(date));
+}

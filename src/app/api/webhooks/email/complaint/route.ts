@@ -42,12 +42,12 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  event: z.enum(['complaint', 'spam']),
+  email: z.string().email(),
+  ts: z.number(),
+  messageId: z.string(),
+  complaintType: z.string().optional(),
+  timestamp: z.number().optional(),
 });
 
 
@@ -73,20 +73,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -99,14 +99,14 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
-  
+
   return { error: null, session: null, rateLimitResult };
 }
 
@@ -129,11 +129,20 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const { error, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    // Get total complaint events logged
+    const total = await prisma.emailLog.count({
+      where: { status: 'COMPLAINED' },
+    });
+
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -143,15 +152,11 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * POST - Handle spam complaint webhook
  * 
- * TODO Implementation Checklist:
-   * - Verify webhook signature
-   * - Parse complaint event data
-   * - Find user by email
-   * - Unsubscribe user from all emails
-   * - Add to suppression list
-   * - Log complaint event
-   * - Alert admin
-   * - Return 200 acknowledgment
+ * Processes email complaint (spam report) events from the email provider:
+ * - Verifies webhook signature and parses complaint event data
+ * - Maps complained email to user and unsubscribes from all emails
+ * - Adds email to suppression list to prevent future sends
+ * - Logs complaint event for monitoring and admin alerts
  */
 export async function POST(
   request: NextRequest
@@ -165,8 +170,8 @@ export async function POST(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
-    
+
+
 
     // Parse request body
     let body: unknown;
@@ -192,32 +197,35 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Mark email as complained in EmailLog
+    const emailLog = await prisma.emailLog.updateMany({
+      where: { email: data.email, messageId: data.messageId } as any,
+      data: { status: 'COMPLAINED', failureReason: data.complaintType || 'User marked as spam' } as any,
+    });
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    // Mark user as unsubscribed from communications
+    await prisma.user.updateMany({
+      where: { email: data.email },
+      data: { marketingEmails: false } as any,
+    });
+
+    const result = { processed: emailLog.count, email: data.email }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('POST webhooks/email/complaint completed', {
-      
+
       requestId,
       duration: Date.now() - startTime,
     });

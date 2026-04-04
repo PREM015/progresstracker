@@ -269,11 +269,11 @@ export function RegisterForm() {
               className="text-sm font-medium leading-relaxed peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
               I agree to the{' '}
-              <Link href="/terms" className="text-primary hover:underline" target="_blank">
+              <Link href="/terms" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="/privacy" className="text-primary hover:underline" target="_blank">
+              <Link href="/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
                 Privacy Policy
               </Link>
             </label>

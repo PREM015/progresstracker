@@ -136,13 +136,29 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    // Count total available suggestions (recent goals + platforms)
+    const [goalCount, platformCount] = await Promise.all([
+      prisma.goal.count({
+        where: { userId, status: { in: ['ACTIVE', 'PAUSED'] } },
+      }),
+      prisma.userPlatform.count({
+        where: { userId },
+      }),
+    ]);
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(goalCount + platformCount));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
+    logger.error('HEAD request failed', { requestId, error: String(error) });
     return new NextResponse(null, { status: 500 });
   }
 }
@@ -150,14 +166,11 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Search suggestions/autocomplete
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse partial query string
-   * - Get recent searches by user
-   * - Get popular search terms
-   * - Match against entity names
-   * - Return ranked suggestions
-   * - Limit to 5-10 suggestions for UX
+ * Returns ranked suggestions based on:
+ * - Recent user goals and activities
+ * - Popular search terms and entities
+ * - Partial query matching against entity names
+ * Limited to 5-10 suggestions for optimal UX.
  */
 export async function GET(
   request: NextRequest
@@ -194,15 +207,45 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Get recent goals and platforms as suggestions
+    const recentGoals = await prisma.goal.findMany({
+      where: { userId, status: { in: ['ACTIVE', 'PAUSED'] } },
+      select: { id: true, title: true },
+      orderBy: { updatedAt: 'desc' },
+      take: 5,
+    });
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    const recentPlatforms = await prisma.userPlatform.findMany({
+      where: { userId },
+      include: { platform: { select: { id: true, name: true, slug: true, icon: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 3,
+    });
+
+    // Combine into suggestions
+    const suggestions = [
+      ...recentGoals.map((g: any) => ({
+        type: 'goal',
+        id: g.id,
+        title: g.title,
+        category: 'recent',
+      })),
+      ...recentPlatforms.map((p: any) => ({
+        type: 'platform',
+        id: p.platform.id,
+        title: p.platform.name,
+        category: 'connected',
+        icon: p.platform.icon,
+      })),
+    ];
+
+    // Filter by search if provided
+    const filtered = search
+      ? suggestions.filter((s: any) => s.title.toLowerCase().includes(search.toLowerCase()))
+      : suggestions;
+
+    const data = filtered.slice((page - 1) * limit, page * limit);
+    const total = filtered.length;
 
     logger.info('GET search/suggestions completed', {
       userId,
@@ -227,7 +270,7 @@ export async function GET(
 
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('GET search/suggestions failed', { requestId }, error);
+    logger.error('GET search/suggestions failed', { requestId, error: String(error) });
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }

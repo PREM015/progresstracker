@@ -1,34 +1,35 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
-    const startTime = Date.now();
-    try {
-        // Find users with active streaks but no activity today
-        // Placeholder for real reminder logic matching prompt requirements
-        const users = await prisma.user.count({
-            where: {
-                currentStreak: { gt: 0 },
-                notificationPrefs: { is: { emailEnabled: true } }
-            }
-        });
+async function _cronHandler(req: NextRequest) {
+  const startTime = Date.now();
+  try {
+    const users = await prisma.user.count({
+      where: {
+        currentStreak: { gt: 0 },
+        notificationPrefs: { is: { emailEnabled: true } }
+      }
+    });
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                eligibleUsers: users,
-                remindersSent: 0, // Mock sending
-                duration: Date.now() - startTime
-            }
-        });
-    } catch (e: any) {
-        return NextResponse.json({ error: "Streak reminder failed", details: e.message }, { status: 500 });
-    }
-};
+    return NextResponse.json({
+      success: true,
+      data: {
+        eligibleUsers: users,
+        remindersSent: 0, // Placeholder for actual send logic
+        duration: Date.now() - startTime
+      }
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: "Streak reminder failed" },
+      { status: 500 }
+    );
+  }
+}
 
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

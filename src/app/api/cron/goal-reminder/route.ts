@@ -1,14 +1,10 @@
-
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-// import { sendNotification } from "@/services/notificationService";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const dynamic = "force-dynamic";
 
+async function _cronHandler(req: NextRequest) {
   const startTime = Date.now();
   const now = new Date();
 
@@ -31,14 +27,13 @@ export const POST = async (req: Request) => {
 
     for (const reminder of dueReminders) {
       try {
-        // Send notification (mocked)
+        // Send notification (placeholder)
         // await sendNotification(reminder.user, reminder.goal);
         sent++;
 
         // Update nextSendAt
-        // Simple daily increment for now as we don't have full frequency logic library here
         const nextSend = new Date(now);
-        nextSend.setDate(now.getDate() + 1); // Default to tomorrow
+        nextSend.setDate(now.getDate() + 1);
 
         await prisma.goalReminder.update({
           where: { id: reminder.id },
@@ -63,10 +58,14 @@ export const POST = async (req: Request) => {
         duration: Date.now() - startTime
       }
     });
-
   } catch (e: any) {
-    return NextResponse.json({ error: "Goal reminder job failed", details: e.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Goal reminder job failed" },
+      { status: 500 }
+    );
   }
-};
+}
 
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

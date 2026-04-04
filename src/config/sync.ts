@@ -166,11 +166,16 @@ export const SYNC_STATUS_CONFIG: Record<SyncStatus, {
   },
   RATE_LIMITED: {
     label: 'Rate Limited',
-    color: '#8B5CF6',
-    icon: 'Clock',
+    color: 'text-amber-500',
+    icon: 'AlertTriangle',
     isTerminal: true,
   },
-};
+  ERROR: {
+    label: 'Error',
+    color: 'text-red-500',
+    icon: 'XCircle',
+  },
+} as any;
 
 // =============================================================================
 // MAIN CONFIGURATION

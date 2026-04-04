@@ -5,8 +5,6 @@ import { prisma } from "@/lib/prisma";
 import apiResponse from "@/lib/apiResponse";
 import { generateRequestId } from "@/lib/utils";
 
-// TODO: Implement this route
-
 
 export async function GET(
   request: NextRequest, 

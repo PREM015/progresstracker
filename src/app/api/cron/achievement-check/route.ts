@@ -1,18 +1,15 @@
-
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { checkUserAchievements } from "@/services/achievementService"; // Assumed to exist
+import { checkUserAchievements } from "@/services/achievementService";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const dynamic = "force-dynamic";
 
+async function _cronHandler(req: NextRequest) {
   const startTime = Date.now();
   let usersChecked = 0;
   let achievementsUnlocked = 0;
-  const newUnlocks = [];
+  const newUnlocks: unknown[] = [];
   let errors = 0;
 
   const BATCH_SIZE = 100;
@@ -40,7 +37,6 @@ export const POST = async (req: Request) => {
           const result = await checkUserAchievements(user.id);
           if (Array.isArray(result) && result.length > 0) {
             achievementsUnlocked += result.length;
-            // @ts-ignore - bypass deep array push type mismatch issues easily
             newUnlocks.push(...result);
           }
         } catch (e) {
@@ -62,8 +58,13 @@ export const POST = async (req: Request) => {
     });
 
   } catch (e: any) {
-    return NextResponse.json({ error: "Internal Server Error", details: e.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
-};
+}
 
-export const GET = POST; // Allow GET for easier testing/Vercel cron
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

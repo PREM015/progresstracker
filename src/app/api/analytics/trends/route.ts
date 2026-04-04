@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
+import { CacheService } from '@/services/cacheService';
 import { subDays, startOfDay, endOfDay, format, eachDayOfInterval, startOfWeek, startOfMonth } from 'date-fns';
 
 // =============================================================================
@@ -258,6 +259,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    const cacheKey = `stats:trends:${userId}:${Buffer.from(searchParams.toString()).toString('base64')}`;
+    const cachedData = await CacheService.get(cacheKey);
+
+    if (cachedData) {
+      logger.info('Trend analysis served from cache', { userId, requestId });
+      return addHeaders(
+        apiResponse.success(cachedData, { meta: { requestId, cached: true, duration: Date.now() - startTime } }),
+        requestId,
+        rateLimitResult
+      );
+    }
+
     const params = queryValidation.data;
     const endDate = endOfDay(new Date());
     const startDate = startOfDay(subDays(endDate, params.days));
@@ -471,6 +484,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     };
 
+    await CacheService.set(cacheKey, response, 120).catch(() => {});
+
     logger.info('Trend analysis fetched', {
       userId,
       metric: params.metric,
@@ -482,7 +497,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     return addHeaders(
-      apiResponse.success(response, { meta: { requestId } }),
+      apiResponse.success(response, { meta: { requestId, duration: Date.now() - startTime } }),
       requestId,
       rateLimitResult
     );

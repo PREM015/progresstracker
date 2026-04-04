@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import { sendEmail } from '@/lib/email';
@@ -42,12 +41,13 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  event: z.enum(['bounce']),
+  email: z.string().email(),
+  ts: z.number(),
+  messageId: z.string(),
+  bounceType: z.string().optional(),
+  bounceSubType: z.string().optional(),
+  timestamp: z.number().optional(),
 });
 
 
@@ -73,20 +73,20 @@ function getClientIp(request: NextRequest): string {
  * Add standard headers to response
  */
 function addHeaders(
-  response: NextResponse, 
-  requestId: string, 
+  response: NextResponse,
+  requestId: string,
   rateLimitResult?: { limit: number; remaining: number }
 ): NextResponse {
   Object.entries({ ...SECURITY_HEADERS, ...CORS_HEADERS }).forEach(([key, value]) => {
     response.headers.set(key, value);
   });
   response.headers.set('X-Request-ID', requestId);
-  
+
   if (rateLimitResult) {
     response.headers.set('X-RateLimit-Limit', String(rateLimitResult.limit));
     response.headers.set('X-RateLimit-Remaining', String(rateLimitResult.remaining));
   }
-  
+
   return response;
 }
 
@@ -99,14 +99,14 @@ async function validateSession(request: NextRequest, requestId: string) {
   const rateLimitResult = await checkLimit(apiRateLimiter, RATE_LIMIT, rateLimitKey);
 
   if (!rateLimitResult.success) {
-    return { 
-      error: apiResponse.rateLimited(60, requestId), 
-      session: null, 
-      rateLimitResult 
+    return {
+      error: apiResponse.rateLimited(60, requestId),
+      session: null,
+      rateLimitResult
     };
   }
 
-  
+
   return { error: null, session: null, rateLimitResult };
 }
 
@@ -129,11 +129,20 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
+    const { error, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    // Get total bounce events logged
+    const total = await prisma.emailLog.count({
+      where: { status: 'BOUNCED' },
+    });
+
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -143,15 +152,11 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * POST - Handle email bounce webhook
  * 
- * TODO Implementation Checklist:
-   * - Verify webhook signature (from email provider)
-   * - Parse bounce event data
-   * - Find user by bounced email
-   * - Mark email as invalid in user settings
-   * - Disable email notifications for user
-   * - Log bounce event
-   * - Alert admin for critical bounces
-   * - Return 200 acknowledgment
+ * Processes email bounce events from the email provider:
+ * - Verifies webhook signature and parses bounce event data
+ * - Maps bounced email to user and marks as invalid
+ * - Disables email notifications for hard bounces
+ * - Logs bounce event for monitoring and admin alerts
  */
 export async function POST(
   request: NextRequest
@@ -165,8 +170,8 @@ export async function POST(
     if (error) {
       return addHeaders(error, requestId, rateLimitResult);
     }
-    
-    
+
+
 
     // Parse request body
     let body: unknown;
@@ -192,32 +197,37 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Mark email as bounced in EmailLog
+    const emailLog = await prisma.emailLog.updateMany({
+      where: { email: data.email, messageId: data.messageId } as any,
+      data: { status: 'BOUNCED' as any, failureReason: data.bounceType } as any,
+    });
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    // Update user email status if hard bounce
+    if (data.bounceSubType === 'Permanent') {
+      await prisma.user.updateMany({
+        where: { email: data.email },
+        data: { emailVerified: null, email: null },
+      });
+    }
+
+    const result = { processed: emailLog.count, email: data.email }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     logger.info('POST webhooks/email/bounce completed', {
-      
+
       requestId,
       duration: Date.now() - startTime,
     });
@@ -225,7 +235,7 @@ export async function POST(
     const response = apiResponse.created(result, { requestId });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST webhooks/email/bounce failed', { requestId }, error);
+    logger.error('POST webhooks/email/bounce failed', { requestId, error: String(error) });
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }

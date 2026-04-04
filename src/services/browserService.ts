@@ -111,16 +111,21 @@ class BrowserServiceClass {
                 return;
             }
 
-            // 2. SSRF Protection (Basic)
-            // Block access to localhost, private IPs, and metadata services
-            // Note: A robust solution requires DNS resolution check, but this blocks obvious attempts.
-            if (
+            // 2. SSRF Protection (Comprehensive)
+            // Block access to localhost, private IPs (RFC 1918/4193), and cloud metadata services
+            const isForbidden = 
                 url.includes('localhost') ||
                 url.includes('127.0.0.1') ||
                 url.includes('0.0.0.0') ||
-                url.includes('169.254.') || // AWS Metadata
-                url.includes('::1')
-            ) {
+                url.includes('169.254.') || // AWS/GCP/Azure Metadata
+                url.includes('10.') ||      // Private Class A
+                url.includes('192.168.') || // Private Class C
+                url.match(/172\.(1[6-9]|2[0-9]|3[01])\./) || // Private Class B
+                url.includes('::1') ||
+                url.match(/^fd[0-9a-f]{2}:/i) || 
+                url.match(/^fe[89ab][0-9a-f]:/i);
+
+            if (isForbidden) {
                 logger.warn(`[BrowserService] Blocked potential SSRF request to: ${url}`);
                 req.abort();
                 return;

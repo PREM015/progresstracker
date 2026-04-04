@@ -83,6 +83,7 @@ const createCheckoutSchema = z.object({
   interval: z.enum(['MONTHLY', 'YEARLY']).default('MONTHLY'),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
+  idempotencyKey: z.string().max(100).optional(),
 });
 
 // =============================================================================
@@ -304,6 +305,8 @@ export async function POST(request: NextRequest) {
         address: 'auto',
         name: 'auto',
       },
+    }, {
+      idempotencyKey: validated.idempotencyKey,
     });
 
     log.info('Checkout session created', {

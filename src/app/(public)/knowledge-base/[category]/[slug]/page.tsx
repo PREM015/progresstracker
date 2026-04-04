@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export default function KnowledgeBaseArticlePage() {
     const params = useParams();
@@ -59,7 +60,7 @@ export default function KnowledgeBaseArticlePage() {
                 </div>
 
                 <div className="prose prose-lg max-w-none">
-                    <div dangerouslySetInnerHTML={{ __html: article.content }} />
+                    <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }} />
                 </div>
 
                 <footer className="mt-12 pt-8 border-t border-gray-200">

@@ -1,21 +1,13 @@
-// src/app/api/cron/daily-sync/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import {prisma} from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { SyncService } from '@/services/syncService';
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-// Verify cron secret (Vercel Cron or custom)
-const CRON_SECRET = process.env.CRON_SECRET;
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+async function _cronHandler(req: NextRequest) {
   try {
-    // Verify authorization
-    const authHeader = req.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     logger.info('Starting daily sync cron job...');
 
     // Get all users with auto-sync enabled
@@ -47,24 +39,17 @@ export async function GET(req: NextRequest) {
       await Promise.allSettled(
         batch.map(async ({ userId }) => {
           try {
-            // Get user's connected platforms
             const connectedPlatforms = await prisma.userPlatform.findMany({
               where: { userId },
               include: { platform: true },
             });
 
             if (connectedPlatforms.length === 0) {
-              results.push({
-                userId,
-                success: true,
-                platforms: 0,
-              });
+              results.push({ userId, success: true, platforms: 0 });
               return;
             }
 
-            // Trigger sync (don't wait for completion)
             const job = await SyncService.syncAllPlatforms(userId);
-
             results.push({
               userId,
               success: true,
@@ -72,11 +57,7 @@ export async function GET(req: NextRequest) {
             });
           } catch (error: any) {
             console.error(`Daily sync failed for user ${userId}:`, error);
-            results.push({
-              userId,
-              success: false,
-              error: error.message,
-            });
+            results.push({ userId, success: false, error: error.message });
           }
         })
       );
@@ -103,13 +84,12 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('Daily sync cron error:', error);
     return NextResponse.json(
-      { error: error.message || 'Daily sync failed' },
+      { error: 'Daily sync failed' },
       { status: 500 }
     );
   }
 }
 
-// Support POST for manual triggers
-export async function POST(req: NextRequest) {
-  return GET(req);
-}
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

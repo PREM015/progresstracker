@@ -1,28 +1,30 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
-    const startTime = Date.now();
-    try {
-        // Mocking report due computation as Prisma schema does not have scheduledReport model
-        const dueReports: any[] = [];
+async function _cronHandler(req: NextRequest) {
+  const startTime = Date.now();
+  try {
+    // Placeholder — scheduledReport model not yet in schema
+    const dueReports: unknown[] = [];
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                reportsFound: dueReports.length,
-                reportsProcessed: 0, // Mock
-                duration: Date.now() - startTime
-            }
-        });
-    } catch (e: any) {
-        return NextResponse.json({ error: "Scheduled reports failed", details: e.message }, { status: 500 });
-    }
-};
+    return NextResponse.json({
+      success: true,
+      data: {
+        reportsFound: dueReports.length,
+        reportsProcessed: 0,
+        duration: Date.now() - startTime
+      }
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: "Scheduled reports failed" },
+      { status: 500 }
+    );
+  }
+}
 
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

@@ -13,6 +13,7 @@
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server';
+import { tasks } from '@trigger.dev/sdk/v3';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma, withTransaction } from '@/lib/prisma';
@@ -745,20 +746,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Schedule verification if requested
     if (verifyConnections && result.successful > 0) {
-      // TODO: Queue background job for verification
-      logger.info('Verification scheduled for connected platforms', {
-        userId,
-        count: result.successful,
-      });
+      try {
+        const platformIds = result.results.filter(r => r.success).map(r => r.platformId);
+        const verificationJob = await tasks.trigger('platform-verification', {
+          userId,
+          platformIds
+        });
+        logger.info('Verification scheduled for connected platforms', { userId, count: result.successful });
+      } catch (err) {
+        logger.warn('Failed to queue verification job', { userId, error: String(err) });
+      }
     }
 
     // Schedule initial sync if requested
     if (scheduleSync && result.successful > 0) {
-      // TODO: Queue background sync job
-      logger.info('Initial sync scheduled for connected platforms', {
-        userId,
-        count: result.successful,
-      });
+      try {
+        const platformIds = result.results.filter(r => r.success).map(r => r.platformId);
+        const syncJob = await tasks.trigger('platform-sync-all', {
+          userId,
+          platformIds,
+          immediate: true
+        });
+        logger.info('Initial sync scheduled for connected platforms', { userId, count: result.successful });
+      } catch (err) {
+        logger.warn('Failed to queue sync job', { userId, error: String(err) });
+      }
     }
 
     const statusCode = result.failed > 0 ? 207 : 201; // 207 Multi-Status if partial success

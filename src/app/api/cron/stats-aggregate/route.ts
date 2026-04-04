@@ -1,31 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
-    const startTime = Date.now();
-    try {
-        // Aggregate daily usage and stats
-        const usersCount = await prisma.user.count();
-        const entriesCount = await prisma.trackerEntry.count();
+async function _cronHandler(req: NextRequest) {
+  const startTime = Date.now();
+  try {
+    const usersCount = await prisma.user.count();
+    const entriesCount = await prisma.trackerEntry.count();
 
-        // In a real scenario, write these to a daily stats table
+    return NextResponse.json({
+      success: true,
+      data: {
+        totalUsers: usersCount,
+        totalEntries: entriesCount,
+        duration: Date.now() - startTime
+      }
+    });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: "Stats aggregation failed" },
+      { status: 500 }
+    );
+  }
+}
 
-        return NextResponse.json({
-            success: true,
-            data: {
-                totalUsers: usersCount,
-                totalEntries: entriesCount,
-                duration: Date.now() - startTime
-            }
-        });
-    } catch (e: any) {
-        return NextResponse.json({ error: "Stats aggregation failed", details: e.message }, { status: 500 });
-    }
-};
-
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

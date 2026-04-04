@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export default function DocsSlugPage() {
   const params = useParams();
@@ -55,7 +56,7 @@ export default function DocsSlugPage() {
         <article className="max-w-4xl">
           <h1 className="text-5xl font-bold mb-8">{doc.title}</h1>
           <div className="prose prose-lg max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: doc.content }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.content) }} />
           </div>
         </article>
       </main>

@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import apiResponse from '@/lib/apiResponse';
 import { UnauthorizedError } from '@/lib/apiError';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { CacheService } from '@/services/cacheService';
 
 // =============================================================================
 // CONSTANTS
@@ -212,6 +213,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
     }
 
+    const cacheKey = `api:platforms:status:${userId}`;
+    const cachedData = await CacheService.get(cacheKey);
+    
+    if (cachedData) {
+      log.info('Platform status served from cache', { userId, requestId });
+      return addHeaders(
+        apiResponse.success(cachedData, { meta: { requestId, cached: true, duration: Date.now() - startTime } }),
+        requestId,
+        rateLimitResult
+      );
+    }
+
     // Get user's platform connections with sync status
     const connections = await prisma.userPlatform.findMany({
       where: { userId },
@@ -278,6 +291,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }),
     ]);
 
+    const responseData = {
+      platforms: platformStatuses,
+      summary,
+      syncStats: {
+        last24Hours: {
+          total: totalSyncs,
+          successful: successfulSyncs,
+          failed: failedSyncs,
+          successRate: totalSyncs > 0 ? Math.round((successfulSyncs / totalSyncs) * 100) : 100,
+        },
+      },
+    };
+
+    // Cache the response data for 30 seconds
+    await CacheService.set(cacheKey, responseData, 30).catch(() => {});
+
     log.info('Platform status fetched', {
       userId,
       totalConnections: connections.length,
@@ -287,21 +316,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     return addHeaders(
-      apiResponse.success(
-        {
-          platforms: platformStatuses,
-          summary,
-          syncStats: {
-            last24Hours: {
-              total: totalSyncs,
-              successful: successfulSyncs,
-              failed: failedSyncs,
-              successRate: totalSyncs > 0 ? Math.round((successfulSyncs / totalSyncs) * 100) : 100,
-            },
-          },
-        },
-        { meta: { requestId, duration: Date.now() - startTime } }
-      ),
+      apiResponse.success(responseData, { meta: { requestId, duration: Date.now() - startTime } }),
       requestId,
       rateLimitResult
     );

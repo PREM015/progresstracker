@@ -26,14 +26,7 @@ export const redis = (redisUrl && redisToken && !redisUrl.includes('your-upstash
     ping: async () => 'PONG',
   } as unknown as Redis;
 
-// Basic health check on startup
-if (redis.ping) {
-  redis.ping().then(() => {
-    console.log('Redis connection established');
-  }).catch((err) => {
-    console.warn("Redis unavailable — running in fallback mode", err);
-  });
-}
+
 
 /**
  * Cache utilities

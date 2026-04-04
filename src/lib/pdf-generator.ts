@@ -370,7 +370,7 @@ export async function fetchReportData(
 
     // Calculate stats
     const stats = entries.reduce(
-      (acc, entry) => {
+      (acc: { totalProblems: number, totalCommits: number, totalTimeSpent: number, currentStreak: number, platformsActive: number, goalsCompleted: number }, entry: any) => {
         acc.totalProblems += entry.problemsSolved;
         acc.totalCommits += entry.commits;
         acc.totalTimeSpent += entry.timeSpent;
@@ -381,7 +381,7 @@ export async function fetchReportData(
 
     // Platform breakdown
     const platformMap = new Map<string, { problems: number; commits: number; timeSpent: number }>();
-    entries.forEach((entry) => {
+    entries.forEach((entry: any) => {
       const platformName = entry.platform?.name || 'Other';
       const existing = platformMap.get(platformName) || { problems: 0, commits: 0, timeSpent: 0 };
       platformMap.set(platformName, {
@@ -399,7 +399,7 @@ export async function fetchReportData(
     stats.platformsActive = platformBreakdown.length;
 
     // Daily activity
-    const dailyActivity = entries.map((entry) => ({
+    const dailyActivity = entries.map((entry: any) => ({
       date: format(entry.date, 'MMM dd'),
       problems: entry.problemsSolved,
       commits: entry.commits,
@@ -427,7 +427,7 @@ export async function fetchReportData(
     });
 
     const previousStats = previousEntries.reduce(
-      (acc, entry) => {
+      (acc: { totalProblems: number, totalCommits: number }, entry: any) => {
         acc.totalProblems += entry.problemsSolved;
         acc.totalCommits += entry.commits;
         return acc;
@@ -528,9 +528,40 @@ export async function generateAndSaveReport(
       },
     });
 
-    // TODO: Upload PDF to S3/storage and get URL
-    // For now, we'll store it as base64 or save locally
-    const pdfUrl = `/reports/${report.id}.pdf`;
+    // Upload PDF to Supabase storage
+    let pdfUrl = `/reports/${report.id}.pdf`; // fallback
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const bucketName = process.env.SUPABASE_BUCKET_NAME || 'progresstracker-files';
+
+      if (supabaseUrl && supabaseServiceKey) {
+        const fileName = `reports/${userId}/${report.id}.pdf`;
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/pdf',
+            'x-upsert': 'true',
+          },
+          body: pdfBuffer as unknown as BodyInit,
+        });
+
+        if (uploadResponse.ok) {
+          pdfUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+          logger.info('PDF uploaded to Supabase storage', { reportId: report.id, url: pdfUrl });
+        } else {
+          const errText = await uploadResponse.text();
+          logger.warn('PDF upload to Supabase failed, using fallback URL', { error: errText });
+        }
+      } else {
+        logger.warn('Supabase storage not configured, using fallback URL');
+      }
+    } catch (uploadError) {
+      logger.error('PDF upload error, using fallback URL', { reportId: report.id }, uploadError);
+    }
 
     // Update report with PDF URL
     await prisma.report.update({

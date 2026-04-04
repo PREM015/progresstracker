@@ -1,7 +1,7 @@
 // src/services/reportService.ts
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { Prisma } from '@prisma/client';
+import apiResponse from '@/lib/apiResponse';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 const log = logger.child({ service: 'ReportService' });
@@ -57,10 +57,10 @@ class ReportService {
           periodEnd: data.periodEnd,
           title: this.generateTitle(data.type, data.periodStart, data.periodEnd),
           summary: this.generateSummary(reportData),
-          data: reportData as unknown as Prisma.InputJsonValue,
-          highlights: reportData.highlights as Prisma.InputJsonValue,
-          insights: reportData.insights as Prisma.InputJsonValue,
-          recommendations: reportData.recommendations as Prisma.InputJsonValue,
+          data: reportData as unknown as any,
+          highlights: reportData.highlights as any,
+          insights: reportData.insights as any,
+          recommendations: reportData.recommendations as any,
           status: 'generated',
         },
       });
@@ -171,7 +171,7 @@ class ReportService {
 
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { email: true },
+        select: { email: true, name: true },
       });
 
       const email = sendTo || user?.email;
@@ -180,7 +180,38 @@ class ReportService {
         throw new Error('No email address available');
       }
 
-      // TODO: Implement email sending logic
+      // Implement email sending logic using the existing emailService
+      const { emailService } = await import('@/lib/email');
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://progresstracker.app';
+      const downloadUrl = report.pdfUrl
+        ? report.pdfUrl.startsWith('http')
+          ? report.pdfUrl
+          : `${appUrl}${report.pdfUrl}`
+        : `${appUrl}/reports/${report.id}`;
+
+      const reportData = report.data as Record<string, unknown> | null;
+      const statsObj = (reportData as { stats?: Record<string, number> } | null)?.stats;
+
+      await emailService.sendReportGenerated(email, {
+        userName: user?.name || 'there',
+        reportType: report.type as 'weekly' | 'monthly' | 'yearly' | 'custom',
+        reportId: report.id,
+        periodStart: report.periodStart.toISOString(),
+        periodEnd: report.periodEnd.toISOString(),
+        stats: {
+          problemsSolved: statsObj?.totalProblems ?? 0,
+          commits: statsObj?.totalCommits ?? 0,
+          timeSpent: statsObj?.totalTimeSpent ?? 0,
+          streak: statsObj?.currentStreak ?? 0,
+          goalsCompleted: statsObj?.goalsCompleted ?? 0,
+          achievementsUnlocked: 0,
+        },
+        downloadUrl,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        highlights: [],
+      });
+
+      log.info('Report email sent', { reportId, email });
 
       await prisma.report.update({
         where: { id: reportId },
@@ -237,14 +268,14 @@ class ReportService {
         },
       });
 
-      const totalProblems = entries.reduce((s, e) => s + e.problemsSolved, 0);
-      const totalCommits = entries.reduce((s, e) => s + e.commits, 0);
-      const totalPullRequests = entries.reduce((s, e) => s + e.pullRequests, 0);
-      const totalTimeSpent = entries.reduce((s, e) => s + e.timeSpent, 0);
-      const totalPoints = entries.reduce((s, e) => s + (e.points || 0), 0);
+      const totalProblems = entries.reduce((s: number, e: any) => s + (e.problemsSolved || 0), 0);
+      const totalCommits = entries.reduce((s: number, e: any) => s + (e.commits || 0), 0);
+      const totalPullRequests = entries.reduce((s: number, e: any) => s + (e.pullRequests || 0), 0);
+      const totalTimeSpent = entries.reduce((s: number, e: any) => s + (e.timeSpent || 0), 0);
+      const totalPoints = entries.reduce((s: number, e: any) => s + (e.points || 0), 0);
 
       const uniqueDays = new Set(
-        entries.map((e) => e.date.toISOString().split('T')[0])
+        entries.map((e: any) => e.date.toISOString().split('T')[0])
       ).size;
 
       const stats = {

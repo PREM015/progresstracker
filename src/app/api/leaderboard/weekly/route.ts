@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import apiResponse from '@/lib/apiResponse';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
+import { CacheService } from '@/services/cacheService';
 
 const RATE_LIMIT = 50;
 const SECURITY_HEADERS = {
@@ -68,6 +69,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const { page, limit } = Validation.data;
     const skip = (page - 1) * limit;
+
+    const cacheKey = `api:leaderboard:weekly:p${page}:l${limit}`;
+    const cachedData = await CacheService.get(cacheKey) as { data: any[], pagination: any } | null;
+
+    if (cachedData) {
+      logger.info('GET weekly leaderboard served from cache', { page, requestId });
+      return addHeaders(
+        apiResponse.paginated(cachedData.data, cachedData.pagination, { meta: { requestId, cached: true, duration: Date.now() - startTime } }),
+        requestId,
+        rateLimitResult
+      );
+    }
 
     const end = new Date();
     const start = getStartOfWeek(end);
@@ -141,17 +154,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       };
     });
 
+    const pagination = {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page < Math.ceil(total / limit),
+      hasPreviousPage: page > 1,
+    };
+
+    const responseData = { data, pagination };
+
+    await CacheService.set(cacheKey, responseData, 300).catch(() => {});
+
     logger.info('GET weekly leaderboard completed', { page, total, requestId, duration: Date.now() - startTime });
 
     return addHeaders(
-      apiResponse.paginated(data, {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      }, { meta: { requestId } }),
+      apiResponse.paginated(data, pagination, { meta: { requestId, duration: Date.now() - startTime } }),
       requestId,
       rateLimitResult
     );

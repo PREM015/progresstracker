@@ -30,8 +30,10 @@ export * from './onboarding';
 export * from './platforms';
 export * from './profile';
 export * from './providers';
-export { AboutPage, BlogList, BlogPost, BlogSidebar, PrivacyPage, TermsPage, WaitlistPage } from './public';
+export * from './newsletter';
+export * from './public';
 export * from './referral';
+
 export * from './reports';
 export * from './seo/MetaTags';
 export * from './seo/JsonLd';

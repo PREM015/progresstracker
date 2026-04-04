@@ -357,8 +357,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // TODO: Send deletion confirmation email with token
-    // await sendDeletionConfirmationEmail(user.email, deletionToken);
+    // Send deletion confirmation email with token
+    try {
+      if (user.email) {
+        const { emailService } = await import('@/lib/email');
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://progresstracker.app';
+        await emailService.send({
+          to: user.email,
+          subject: '⚠️ Confirm your account deletion - ProgressTracker',
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+              <h2 style="color:#dc2626">⚠️ Account Deletion Request</h2>
+              <p>We received a request to permanently delete your ProgressTracker account.</p>
+              <p style="background:#fef2f2;border:1px solid #fca5a5;padding:16px;border-radius:8px">
+                <strong>This action is IRREVERSIBLE.</strong> All your data, progress, and settings will be permanently erased.
+              </p>
+              <p>Your confirmation token is:</p>
+              <code style="background:#f3f4f6;padding:12px 24px;font-size:18px;display:block;text-align:center;border-radius:6px;letter-spacing:2px">${deletionToken}</code>
+              <p>This token expires in <strong>30 minutes</strong>.</p>
+              <p>If you did not request this, please ignore this email or contact support immediately.</p>
+              <p>— The ProgressTracker Team<br><a href="${appUrl}/support">Contact Support</a></p>
+            </div>
+          `,
+        });
+      }
+    } catch (emailError) {
+      logger.warn('Failed to send deletion confirmation email', { userId, requestId, error: emailError });
+    }
 
     logger.info('Deletion token generated', {
       userId,
@@ -480,7 +505,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     consumeDeletionToken(token);
 
     // Perform permanent deletion in transaction
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Delete all user-related data
       // Order matters due to foreign key constraints
 
@@ -577,8 +602,21 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       duration: Date.now() - startTime,
     });
 
-    // TODO: Send deletion confirmation email
-    // await sendDeletionCompleteEmail(user.email);
+    // Send final deletion confirmation email
+    try {
+      if (user.email) {
+        const { emailService } = await import('@/lib/email');
+        await emailService.sendAccountDeleted(user.email, {
+          userName: user.username || 'User',
+          email: user.email,
+          deletedAt: new Date().toISOString(),
+          dataRetentionDays: 0,
+          feedbackUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://progresstracker.app'}/feedback`,
+        });
+      }
+    } catch (emailError) {
+      logger.warn('Failed to send final deletion email', { requestId, error: emailError });
+    }
 
     const response = apiResponse.success(
       {

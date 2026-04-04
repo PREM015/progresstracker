@@ -366,8 +366,22 @@ export const AUDIT_ACTION_CONFIG: Record<PrismaAuditAction, {
     color: '',
     severity: 'low',
     category: ''
+  },
+  IMPERSONATE_START: {
+    label: 'Impersonation Started',
+    icon: 'UserPlus',
+    color: '#8B5CF6',
+    severity: 'high',
+    category: 'admin'
+  },
+  IMPERSONATE_END: {
+    label: 'Impersonation Ended',
+    icon: 'UserMinus',
+    color: '#10B981',
+    severity: 'medium',
+    category: 'admin'
   }
-};
+} as any;
 
 /** Status configuration */
 export const AUDIT_STATUS_CONFIG: Record<AuditStatus, {

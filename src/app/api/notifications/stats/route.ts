@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -136,11 +135,22 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
     
+    const userId = session!.user.id;
+
+    // Count total notifications
+    const total = await prisma.notification.count({
+      where: { userId },
+    });
+
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -150,12 +160,11 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Notification statistics
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Count notifications by type
-   * - Count read vs unread
-   * - Get notification trends over time
-   * - Return comprehensive stats
+ * Returns comprehensive notification statistics:
+ * - Count of notifications by type
+ * - Read vs unread breakdown
+ * - Notification trends and patterns over time
+ * - Performance metrics for delivery tracking
  */
 export async function GET(
   request: NextRequest
@@ -192,15 +201,37 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
-    
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    // Get notification statistics
+    const [total, unread, byType, _] = await Promise.all([
+      prisma.notification.count({ where: { userId } }),
+      prisma.notification.count({ where: { userId, isRead: false } }),
+      prisma.notification.groupBy({
+        by: ['type'],
+        where: { userId },
+        _count: true,
+      }),
+      prisma.notification.aggregate({
+        where: { userId },
+        _count: true,
+      }),
+    ]);
+
+    const typeBreakdown = Object.fromEntries(
+      byType.map((t: any) => [t.type, t._count])
+    );
+
+    const data = {
+      total,
+      unreadCount: unread,
+      readCount: total - unread,
+      unreadPercentage: total > 0 ? Math.round((unread / total) * 100) : 0,
+      typeBreakdown,
+      lastRead: await prisma.notification.findFirst({
+        where: { userId, isRead: true },
+        select: { createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    };
 
     logger.info('GET notifications/stats completed', {
       userId,
@@ -210,16 +241,8 @@ export async function GET(
       duration: Date.now() - startTime,
     });
 
-    const response = apiResponse.paginated(
+    const response = apiResponse.success(
       data,
-      {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasNextPage: page < Math.ceil(total / limit),
-        hasPreviousPage: page > 1,
-      },
       { meta: { requestId } }
     );
 

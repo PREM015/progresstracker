@@ -5,7 +5,7 @@ import { userAgentManager } from './userAgentManager';
 import { rateLimitManager } from './rateLimitManager';
 import { proxyManager } from './proxyManager';
 import { ScraperErrorCode } from './constants';
-import { dateUtils, sleep, retryWithBackoff } from './utils';
+import { dateUtils, sleep, retryWithBackoff, validateUrlForSSRF } from './utils';
 import type {
   ScraperCredentials,
   ScraperEntry,
@@ -147,7 +147,10 @@ export abstract class BaseScraper {
     url: string,
     config?: AxiosRequestConfig
   ): Promise<AxiosResponse<T>> {
-    // Wait for rate limit
+    // 0. SSRF Prevention
+    validateUrlForSSRF(url);
+
+    // 1. Wait for rate limit
     await rateLimitManager.acquire(this.platformSlug);
 
     const requestConfig: AxiosRequestConfig = {

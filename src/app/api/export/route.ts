@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { CacheService } from '@/services/cacheService';
 import { ExportService } from '@/services/exportService';
 import { stripeService } from '@/services/stripeService';
 import type { 
@@ -498,7 +499,14 @@ async function processExportJob(exportJobId: string, userId: string): Promise<vo
     }
 
     // Calculate file size safely
-    const fileSize = calculateDataSize(result.data);
+    const fileSize = calculateDataSize(result.data || result.content);
+
+    // Store in Redis with a 7-day TTL instead of permanent S3 storage for better data hygiene
+    if (result.content) {
+      await CacheService.set(`export:file:${exportJobId}`, result.content, 7 * 24 * 60 * 60).catch((err) => {
+         log.error('Failed to cache export file payload', { exportJobId }, err);
+      });
+    }
 
     // Update job with results
     await prisma.exportJob.update({

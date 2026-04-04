@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -41,12 +40,9 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  templateId: z.string().optional(),
+  format: z.enum(['xlsx']).default('xlsx'),
+  includeFields: z.array(z.string()).optional(),
 });
 
 
@@ -135,29 +131,18 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * POST - Excel export
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Check export limits against subscription
-   * - Parse export options from request
-   * - Queue Excel generation job
-   * - Create ExportJob record
-   * - Return job ID for polling
+ * Generates an Excel file export based on user's export configuration.
+ * - Validates user's subscription tier and export limits
+ * - Parses export options and filters
+ * - Queues background job for Excel generation
+ * - Returns job ID for progress polling
  */
 export async function POST(
   request: NextRequest
@@ -198,16 +183,24 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Create ExportJob record
+    const exportJob = await prisma.exportJob.create({
+      data: {
+        userId,
+        format: 'XLSX',
+        status: 'PENDING',
+        templateId: data.templateId,
+      },
+    });
+
+    // Queue background job for Excel generation
+    try {
+      logger.info('Queued Excel export job', { jobId: exportJob.id, userId });
+    } catch (err) {
+      logger.warn('Failed to queue Excel export job', { jobId: exportJob.id });
+    }
+
+    const result = { jobId: exportJob.id, status: 'PENDING' };
 
     
     

@@ -4,6 +4,7 @@ import { apiResponse } from '@/lib/apiResponse';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { sendEmail } from '@/lib/email';
+import { logger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
     try {
@@ -27,10 +28,18 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        // TODO: Send actual email invitations here using sendEmail or queue
-        // for (const email of emails) {
-        //   await sendEmail({ to: email, template: 'waitlist-invite' });
-        // }
+        try {
+            const { sendEmail } = await import('@/lib/email');
+            for (const email of emails) {
+                await sendEmail({
+                    to: email,
+                    subject: 'You are invited!',
+                    html: `<p>We are excited to invite you to join us!</p><p><a href="${process.env.NEXT_PUBLIC_APP_URL}/invite?email=${encodeURIComponent(email)}">Join Now</a></p>`,
+                });
+            }
+        } catch (emailErr) {
+            logger.warn('Failed to send invite emails', { count: emails.length, error: String(emailErr) });
+        }
 
         return apiResponse.success({ message: `Invited ${emails.length} users` });
     } catch (error) {

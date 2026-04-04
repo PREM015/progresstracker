@@ -2,135 +2,108 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
 
 /**
  * API Route: /api/export/scheduled/[id]
  * 
- * @description TODO: Add description
+ * @description Manage individual scheduled export
  * @created 2026-01-26
  */
 
-// GET - Fetch data
+const updateSchema = z.object({
+  frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  format: z.enum(['XLSX', 'XML', 'CSV']).optional(),
+  isActive: z.boolean().optional(),
+});
+
+// GET - Fetch scheduled export  
 export async function GET(
   request: NextRequest, { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // TODO: Implement GET logic
+    const { id } = await params;
+    const schedule = await prisma.scheduledExport.findUnique({
+      where: { id, userId: session.user.id },
+    }).catch(() => null);
 
-    return NextResponse.json({
-      success: true,
-      data: {},
-    });
+    if (!schedule) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    logger.info('Scheduled export fetched', { id, userId: session.user.id });
+    return NextResponse.json({ success: true, data: schedule });
   } catch (error) {
-    console.error('[EXPORT_SCHEDULED_ID_GET]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error('GET scheduled export failed', {}, error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// POST - Create new data
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const body = await request.json();
-
-    // TODO: Validate body
-    // TODO: Implement POST logic
-
-    return NextResponse.json({
-      success: true,
-      data: {},
-    }, { status: 201 });
-  } catch (error) {
-    console.error('[EXPORT_SCHEDULED_ID_POST]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// PUT - Update data
+// PUT - Update scheduled export
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
     const { id } = await params;
+    const body = await request.json();
+    const validation = updateSchema.safeParse(body);
 
-    // TODO: Validate body
-    // TODO: Implement PUT logic
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Validation failed', details: validation.error.errors }, { status: 400 });
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: {},
-    });
+    const updated = await prisma.scheduledExport.update({
+      where: { id, userId: session.user.id },
+      data: validation.data,
+    }).catch(() => null);
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    logger.info('Scheduled export updated', { id, userId: session.user.id });
+    return NextResponse.json({ success: true, data: updated });
   } catch (error) {
-    console.error('[EXPORT_SCHEDULED_ID_PUT]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error('PUT scheduled export failed', {}, error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// DELETE - Remove data
+// DELETE - Remove scheduled export
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
+    await prisma.scheduledExport.delete({
+      where: { id, userId: session.user.id },
+    }).catch(() => null);
 
-    // TODO: Implement DELETE logic
-
-    return NextResponse.json({
-      success: true,
-      message: 'Deleted successfully',
-    });
+    logger.info('Scheduled export deleted', { id, userId: session.user.id });
+    return NextResponse.json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
-    console.error('[EXPORT_SCHEDULED_ID_DELETE]', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logger.error('DELETE scheduled export failed', {}, error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';

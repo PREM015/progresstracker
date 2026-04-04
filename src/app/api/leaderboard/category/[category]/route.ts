@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -127,11 +126,26 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const { category } = request.nextUrl.searchParams as any;
+
+    // Count users active on platforms in this category
+    const total = await prisma.user.count({
+      where: {
+        isActive: true,
+        isPublic: true,
+        platforms: { some: {} },
+      },
+    });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -141,13 +155,12 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Category-specific leaderboard
  * 
- * TODO Implementation Checklist:
-   * - Validate category from URL params
-   * - Aggregate activity for specific category
-   * - Rank users by category-specific points
-   * - Include category expertise badges
-   * - Cache with appropriate TTL
-   * - Return category leaderboard data
+ * Returns users ranked by performance in a specific category:
+ * - Validates and filters by category parameter
+ * - Aggregates activity and points for the category
+ * - Ranks users by category-specific expertise
+ * - Includes category expertise badges and achievements
+ * - Caches results with appropriate TTL
  */
 export async function GET(
   request: NextRequest, { params }: { params: Promise<{ category: string }> }
@@ -185,15 +198,54 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Find platforms in this category
+    const platforms = await prisma.platform.findMany({
+      where: {
+        category: category.toUpperCase() as any,
+        isActive: true,
+      },
+      select: { id: true },
+    });
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    const platformIds = platforms.map((p: any) => p.id);
+
+    // Get users with contributions in this category
+    const where: any = {
+      isActive: true,
+      isPublic: true,
+      userPlatforms: {
+        some: {
+          platformId: { in: platformIds },
+        },
+      },
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          image: true,
+          totalPoints: true,
+          currentStreak: true,
+          totalProblems: true,
+        },
+        orderBy: { totalPoints: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const data = users;
 
     logger.info('GET leaderboard/category/[category] completed', {
 

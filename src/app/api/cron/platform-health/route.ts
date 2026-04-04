@@ -1,13 +1,10 @@
-
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-export const POST = async (req: Request) => {
-  const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export const dynamic = "force-dynamic";
 
+async function _cronHandler(req: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -24,7 +21,14 @@ export const POST = async (req: Request) => {
 
       if (target) {
         try {
-          const res = await fetch(target, { method: 'HEAD', timeout: 5000 } as any);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(target, {
+            method: 'HEAD',
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
           if (res.ok) {
             status = 'healthy';
             message = 'OK';
@@ -34,7 +38,7 @@ export const POST = async (req: Request) => {
           }
         } catch (e: any) {
           status = 'down';
-          message = e.message;
+          message = e.name === 'AbortError' ? 'Timeout' : 'Connection failed';
         }
       }
 
@@ -68,10 +72,14 @@ export const POST = async (req: Request) => {
         duration: Date.now() - startTime
       }
     });
-
   } catch (e: any) {
-    return NextResponse.json({ error: "Platform health check failed", details: e.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Platform health check failed" },
+      { status: 500 }
+    );
   }
-};
+}
 
-export const GET = POST;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

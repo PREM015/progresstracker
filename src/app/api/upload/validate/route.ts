@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import apiResponse from "@/lib/apiResponse";
 import { generateRequestId } from "@/lib/utils";
-import fileUploadService from "@/services/fileUploadService";
+import { validateFile } from "@/services/fileValidation";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return apiResponse.validationError('No file provided');
     }
 
-    const validation = fileUploadService.validateFile(file, {
+    const validation = validateFile(file, {
         maxSize: 10 * 1024 * 1024,
         allowedTypes: ['image/jpeg', 'image/png', 'application/pdf']
     });

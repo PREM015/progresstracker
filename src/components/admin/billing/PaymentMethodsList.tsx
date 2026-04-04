@@ -5,9 +5,14 @@ import { useAdminPaymentMethods } from '@/hooks/useAdminBilling';
 export function PaymentMethodsList() {
     const { methods, isLoading: loading } = useAdminPaymentMethods();
 
-    // TODO: Add Loading UI
     if (loading) {
-        return <div className="p-8 text-center text-zinc-500">Loading payment methods...</div>;
+        return (
+            <div className="space-y-4 p-6">
+                <div className="h-16 w-full bg-zinc-800/50 animate-pulse rounded-lg"></div>
+                <div className="h-16 w-full bg-zinc-800/50 animate-pulse rounded-lg"></div>
+                <div className="h-16 w-full bg-zinc-800/50 animate-pulse rounded-lg"></div>
+            </div>
+        );
     }
 
     return (

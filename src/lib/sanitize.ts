@@ -171,8 +171,23 @@ export function sanitizeHtml(html: string, options: SanitizeOptions = {}): strin
     config.ALLOW_UNKNOWN_PROTOCOLS = false;
   }
 
+  // Hook to enforce rel="noopener noreferrer" for external links
+  DOMPurify.addHook('afterSanitizeAttributes', function(node) {
+    if (node.tagName === 'A') {
+      const href = node.getAttribute('href');
+      // If href is external, enforce secure target and rel
+      if (href && /^https?:\/\//i.test(href)) {
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+  });
+
   // Sanitize with DOMPurify
   content = DOMPurify.sanitize(content, config);
+
+  // Clean up hook to prevent bleeding into other DOMPurify calls
+  DOMPurify.removeHook('afterSanitizeAttributes');
 
   // Additional pattern-based cleaning
   DANGEROUS_PATTERNS.forEach(pattern => {
@@ -748,6 +763,12 @@ export function sanitizeObject<T extends Record<string, unknown>>(
   const result = { ...obj };
 
   for (const key in result) {
+    // Prototype pollution protection
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      delete result[key];
+      continue;
+    }
+
     const value = result[key];
 
     if (typeof value === 'string') {

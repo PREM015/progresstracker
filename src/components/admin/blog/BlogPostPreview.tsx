@@ -1,4 +1,5 @@
 'use client';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 export function BlogPostPreview({ post }: any) {
     if (!post) return null;
@@ -21,7 +22,7 @@ export function BlogPostPreview({ post }: any) {
 
             <div
                 className="text-zinc-400 prose prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: post.content }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
             />
         </div>
     );

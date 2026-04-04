@@ -373,8 +373,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     });
 
-    // TODO: Send deactivation confirmation email
-    // await sendDeactivationEmail(user.email, reactivationDeadline);
+    // Send deactivation confirmation email
+    try {
+      if (user.email) {
+        const { emailService } = await import('@/lib/email');
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://progresstracker.app';
+        await emailService.send({
+          to: user.email,
+          subject: 'Your ProgressTracker account has been deactivated',
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto">
+              <h2>Account Deactivated</h2>
+              <p>Your ProgressTracker account has been deactivated.</p>
+              <p>Your data will be retained for 30 days until <strong>${reactivationDeadline.toLocaleDateString()}</strong>.</p>
+              <p>To reactivate, log in before that date:</p>
+              <a href="${appUrl}/auth/signin" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px">Reactivate Account</a>
+            </div>
+          `,
+        });
+      }
+    } catch (emailError) {
+      logger.warn('Failed to send deactivation email', { userId, requestId, error: String(emailError) });
+    }
 
     logger.info('Account deactivated', {
       userId,

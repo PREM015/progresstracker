@@ -41,12 +41,7 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  code: z.string().min(1),
 });
 
 
@@ -126,28 +121,19 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * POST - Validate referral code
  * 
- * TODO Implementation Checklist:
-   * - Parse referral code from request
-   * - Find user with matching referralCode
-   * - Check if code is still valid
-   * - Return validation status
-   * - Include referrer info (partial)
+ * Validates and retrieves information about a referral code.
+ * - Parses and validates referral code format
+ * - Finds user associated with code
+ * - Checks code validity and status
+ * - Returns partial referrer info for display
+ * - Returns validation status for use
  */
 export async function POST(
   request: NextRequest
@@ -188,16 +174,28 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
+    // Check if referral code exists and is valid
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode: data.code },
+      select: { id: true, name: true, username: true, referralCode: true },
+    });
 
-    const result = {}; // TODO: Replace with actual creation
+    if (!referrer) {
+      return addHeaders(
+        apiResponse.validationError('Invalid referral code', undefined, requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    const result = {
+      valid: true,
+      referrer: {
+        id: referrer.id,
+        name: referrer.name,
+        username: referrer.username,
+      },
+    };
 
 
 

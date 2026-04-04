@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -40,14 +39,7 @@ const SECURITY_HEADERS = {
 // VALIDATION SCHEMAS
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
+const bodySchema = z.object({});
 
 
 // =============================================================================
@@ -135,28 +127,18 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
 /**
  * POST - Generate referral code
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Check if user already has code
-   * - Generate unique referral code
-   * - Update user.referralCode
-   * - Return new referral code and URL
+ * Generates or retrieves a unique referral code for the user.
+ * - Checks if user already has an active referral code
+ * - Generates unique code if needed
+ * - Updates user record with referral code
+ * - Returns referral code and shareable URL
  */
 export async function POST(
   request: NextRequest
@@ -197,16 +179,23 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
+    // Generate new referral code
+    const { nanoid } = await import('nanoid');
+    const newCode = nanoid(8);
 
-    const result = {}; // TODO: Replace with actual creation
+    // Update user with new referral code
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { referralCode: newCode },
+      select: { id: true, referralCode: true, email: true },
+    });
+
+    const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/refer?code=${user.referralCode}`;
+    const result = {
+      code: user.referralCode,
+      shareUrl,
+      createdAt: new Date(),
+    };
 
 
 

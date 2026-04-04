@@ -117,8 +117,16 @@ export async function POST(req: NextRequest) {
       email: entry.email,
     });
 
-    // TODO: Send confirmation email
-    // await sendUnsubscribeConfirmationEmail(entry.email);
+    try {
+      const { sendEmail } = await import('@/lib/email');
+      await sendEmail({
+        to: email,
+        subject: 'Unsubscribed from Waitlist',
+        html: '<p>You have been unsubscribed from our waitlist.</p>',
+      });
+    } catch (emailErr) {
+      logger.warn('Failed to send unsubscribe confirmation', { email, error: String(emailErr) });
+    }
 
     return NextResponse.json(successResponse);
   } catch (error) {

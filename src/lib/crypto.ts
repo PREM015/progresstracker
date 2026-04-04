@@ -65,3 +65,32 @@ export function decrypt(ciphertext: string): string {
 export function hash(text: string): string {
   return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
 }
+
+/**
+ * Compare two strings in constant time to prevent timing attacks
+ */
+export function timingSafeStringEqual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return false;
+  }
+  
+  if (a.length !== b.length) {
+    // Return early if lengths differ, but we shouldn't leak length info ideally.
+    // For string comparisons where we need timing safety, lengths are usually fixed (e.g. tokens)
+    return false;
+  }
+  
+  try {
+    const bufferA = Buffer.from(a);
+    const bufferB = Buffer.from(b);
+    
+    // Ensure buffers are same length to avoid timingSafeEqual throwing an error
+    if (bufferA.length !== bufferB.length) return false;
+    
+    // @ts-ignore - crypto is available in Node.js
+    const crypto = require('crypto');
+    return crypto.timingSafeEqual(bufferA, bufferB);
+  } catch (error) {
+    return false;
+  }
+}

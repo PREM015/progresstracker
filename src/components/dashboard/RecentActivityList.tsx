@@ -81,7 +81,7 @@ export function RecentActivityList({ activities = [], className }: RecentActivit
                                         transition={{ delay: 0.6 + (idx * 0.05) }}
                                         className="group relative flex gap-4 p-4 rounded-2xl bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 border border-transparent hover:border-black/10 dark:hover:border-white/10 transition-all duration-300 backdrop-blur-sm"
                                     >
-                                        <div className="mt-1 flex-shrink-0">
+                                        <div className="mt-1 shrink-0">
                                             <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
                                                 {getIcon(item.type)}
                                             </div>
@@ -101,13 +101,13 @@ export function RecentActivityList({ activities = [], className }: RecentActivit
 
                                             <div className="flex items-center gap-3 mt-3">
                                                 {item.platform && (
-                                                    <span className="flex items-center gap-1.5 text-[9px] px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/5 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-[0.1em]">
+                                                    <span className="flex items-center gap-1.5 text-[9px] px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-black/5 dark:border-white/5 text-zinc-600 dark:text-zinc-300 font-black uppercase tracking-widest">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                                                         {item.platform}
                                                     </span>
                                                 )}
                                                 {typeof item.points === 'number' && item.points > 0 && (
-                                                    <span className="text-[9px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-black uppercase tracking-[0.1em]">
+                                                    <span className="text-[9px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-black uppercase tracking-widest">
                                                         +{item.points} PTS
                                                     </span>
                                                 )}

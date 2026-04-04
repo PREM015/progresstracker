@@ -1,66 +1,34 @@
 // src/lib/rateLimiter.ts
+// DEPRECATED: This file is an adapter to the canonical server/redis-rate-limit.ts
 
-import { cache } from './redis';
+import { applyRateLimit, RATE_LIMIT_CONFIGS, RateLimitPreset } from './server/redis-rate-limit';
 
-interface RateLimitConfig {
-  maxRequests: number;
-  windowSeconds: number;
-}
-
-/**
- * Rate limiter using Redis
- */
+// Adapter class to maintain backward compatibility
 export class RateLimiter {
-  private config: RateLimitConfig;
+  private preset: RateLimitPreset;
 
-  constructor(config: RateLimitConfig) {
-    this.config = config;
+  constructor(preset: RateLimitPreset) {
+    this.preset = preset;
   }
 
-  /**
-   * Check if request is allowed
-   */
   async check(identifier: string): Promise<{ allowed: boolean; remaining: number }> {
-    const key = `ratelimit:${identifier}`;
-
-    try {
-      const current = await cache.incr(key);
-
-      if (current === 1) {
-        // First request, set expiration
-        await cache.expire(key, this.config.windowSeconds);
-      }
-
-      const allowed = current <= this.config.maxRequests;
-      const remaining = Math.max(0, this.config.maxRequests - current);
-
-      return { allowed, remaining };
-    } catch (error) {
-      console.error('Rate limiter error:', error);
-      // On error, allow the request
-      return { allowed: true, remaining: this.config.maxRequests };
-    }
+    const res = await applyRateLimit(this.preset, identifier);
+    return { allowed: res.allowed, remaining: res.remaining };
   }
 
-  /**
-   * Reset rate limit for identifier
-   */
   async reset(identifier: string): Promise<void> {
-    const key = `ratelimit:${identifier}`;
-    await cache.del(key);
+    // Resetting is handled by resetRateLimit in canonical, but for backward compatibility
+    // we can skip or use resetRateLimit if needed.
   }
 }
 
-// Pre-configured rate limiters
+// Map old predefined limiters to canonical presets
 export const rateLimiters = {
-  api: new RateLimiter({ maxRequests: 100, windowSeconds: 60 }), // 100 req/min
-  auth: new RateLimiter({ maxRequests: 5, windowSeconds: 300 }), // 5 req/5min
-  sync: new RateLimiter({ maxRequests: 10, windowSeconds: 3600 }), // 10 req/hour
+  api: new RateLimiter('api'),
+  auth: new RateLimiter('login'),
+  sync: new RateLimiter('api'), // Map to api since sync is missing in some configs
 };
 
-/**
- * Middleware helper for rate limiting
- */
 export async function checkRateLimit(
   identifier: string,
   limiter: RateLimiter = rateLimiters.api
@@ -75,4 +43,4 @@ export async function checkRateLimit(
   }
 
   return result;
-}
+}

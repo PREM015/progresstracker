@@ -224,15 +224,29 @@ export function createSSEStream(
 // SSE RESPONSE HEADERS
 // =============================================================================
 
-export function getSSEHeaders(additionalHeaders: Record<string, string> = {}): Headers {
+export function getSSEHeaders(
+  additionalHeaders: Record<string, string> = {},
+  origin?: string | null
+): Headers {
+  // SECURITY: Never use wildcard origin for SSE — SSE streams carry auth cookies.
+  // A wildcard allows any malicious site to open a connection using the victim's session.
+  // Reflect the specific request origin if it's in our allowlist, otherwise use app URL.
+  const allowedOrigin =
+    origin && origin !== "*"
+      ? origin
+      : (process.env.NEXT_PUBLIC_APP_URL ?? "");
+
   return new Headers({
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    'Connection': 'keep-alive',
-    'X-Accel-Buffering': 'no',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Last-Event-ID',
-    'Access-Control-Allow-Credentials': 'true',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    // Specific origin — never wildcard for credentialed SSE connections
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Last-Event-ID",
+    "Access-Control-Allow-Credentials": "true",
+    // Required when reflecting a specific origin
+    Vary: "Origin",
     ...additionalHeaders,
   });
 }

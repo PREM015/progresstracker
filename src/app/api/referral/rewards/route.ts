@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -136,11 +135,22 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    // Get total reward count
+    const total = await prisma.referralReward.count({
+      where: { referrerId: userId },
+    });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -150,13 +160,12 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Referral rewards
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Get earned rewards list
-   * - Get pending rewards
-   * - Get reward history
-   * - Calculate total value
-   * - Return rewards summary
+ * Returns paginated list of referral rewards:
+ * - Earned and completed rewards
+ * - Pending rewards awaiting fulfillment
+ * - Historical reward activity and timeline
+ * - Total applicable rewards value
+ * - Reward fulfillment status and details
  */
 export async function GET(
   request: NextRequest
@@ -193,15 +202,26 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    const where: any = {
+      referrerId: userId,
+    };
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    const [rewards, total] = await Promise.all([
+      prisma.referralReward.findMany({
+        where,
+        include: {
+          referee: {
+            select: { id: true, name: true, username: true, email: true },
+          },
+        } as any,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.referralReward.count({ where }),
+    ]);
+
+    const data = rewards;
 
     logger.info('GET referral/rewards completed', {
       userId,

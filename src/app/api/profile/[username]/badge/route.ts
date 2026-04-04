@@ -4,8 +4,6 @@ import { logger } from "@/lib/logger";
 import { apiRateLimiter, checkLimit } from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/utils";
 
-// TODO: Implement this route
-
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',

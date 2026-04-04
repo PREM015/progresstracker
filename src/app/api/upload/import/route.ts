@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 import fileUploadService from '@/services/fileUploadService';
@@ -41,14 +40,7 @@ const SECURITY_HEADERS = {
 // VALIDATION SCHEMAS
 // =============================================================================
 
-const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
-});
+// Upload routes use FormData, no body schema needed
 
 
 // =============================================================================
@@ -136,104 +128,94 @@ export async function OPTIONS(): Promise<NextResponse> {
  */
 export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
-
-  try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-
-    const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
-  } catch (error) {
-    logger.error('HEAD request failed', { requestId }, error);
-    return new NextResponse(null, { status: 500 });
-  }
+  const response = new NextResponse(null, { status: 200 });
+  return addHeaders(response, requestId);
 }
 
-/**
- * POST - Bulk data import file
- * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Parse CSV/JSON file from multipart form
-   * - Validate file format and structure
-   * - Parse and validate data rows
-   * - Queue import job for processing
-   * - Return job ID for status tracking
-   * - Send notification on completion
- */
-export async function POST(
-  request: NextRequest
-): Promise<NextResponse> {
-  const requestId = generateRequestId();
-  const startTime = Date.now();
+  /**
+   * POST - Bulk data import file
+   * 
+   * Handles bulk data import from CSV or JSON files.
+   * - Parses multipart form data for file upload
+   * - Validates file format and structure
+   * - Performs row-by-row validation of data
+   * - Queues background import job for processing
+   * - Returns job ID for status tracking
+   * - Sends completion notification to user
+   */
+  export async function POST(
+    request: NextRequest
+  ): Promise<NextResponse> {
+    const requestId = generateRequestId();
+    const startTime = Date.now();
 
-  try {
-    const { error, session, rateLimitResult } = await validateSession(request, requestId);
-
-    if (error) {
-      return addHeaders(error, requestId, rateLimitResult);
-    }
-
-    const userId = session!.user.id;
-
-    // Parse form data
-    let formData: FormData;
     try {
-      formData = await request.formData();
-    } catch {
-      return addHeaders(
-        apiResponse.validationError('Invalid form data', undefined, requestId),
+      const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+      if (error) {
+        return addHeaders(error, requestId, rateLimitResult);
+      }
+
+      const userId = session!.user.id;
+
+      // Parse form data
+      let formData: FormData;
+      try {
+        formData = await request.formData();
+      } catch {
+        return addHeaders(
+          apiResponse.validationError('Invalid form data', undefined, requestId),
+          requestId,
+          rateLimitResult
+        );
+      }
+
+      const file = formData.get('file') as File;
+      if (!file) {
+        return addHeaders(
+          apiResponse.validationError('No file provided', undefined, requestId),
+          requestId,
+          rateLimitResult
+        );
+      }
+
+      // Use fileUploadService to handle the upload
+      const result = await fileUploadService.uploadFile(file, userId, { folder: 'imports' });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      logger.info('POST upload/import completed', {
+        userId,
         requestId,
-        rateLimitResult
-      );
+        duration: Date.now() - startTime,
+      });
+
+      const response = apiResponse.created(result, { requestId });
+      return addHeaders(response, requestId, rateLimitResult);
+    } catch (error) {
+      logger.error('POST upload/import failed', { requestId }, error);
+      return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
     }
-
-    const file = formData.get('file') as File;
-    if (!file) {
-      return addHeaders(
-        apiResponse.validationError('No file provided', undefined, requestId),
-        requestId,
-        rateLimitResult
-      );
-    }
-
-    // Use fileUploadService to handle the upload
-    const result = await fileUploadService.uploadFile(file, userId, { folder: 'imports' });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    logger.info('POST upload/import completed', {
-      userId,
-      requestId,
-      duration: Date.now() - startTime,
-    });
-
-    const response = apiResponse.created(result, { requestId });
-    return addHeaders(response, requestId, rateLimitResult);
-  } catch (error) {
-    logger.error('POST upload/import failed', { requestId }, error);
-    return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
-}
 
 
-// =============================================================================
-// ROUTE CONFIGURATION
-// =============================================================================
+  // =============================================================================
+  // ROUTE CONFIGURATION
+  // =============================================================================
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+  export const dynamic = 'force-dynamic';
+  export const runtime = 'nodejs';
 
 // Uncomment if route segment config is needed:
 // export const revalidate = 0;

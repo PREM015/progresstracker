@@ -1,24 +1,16 @@
 // src/app/api/cron/streak-check/route.ts
 // Cron job to check streak status and send notifications
+// SECURITY: Protected by withCronAuth (Bearer token + optional IP allowlist)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { streakService } from '@/services/streakService';
 import { logger } from '@/lib/logger';
+import { withCronAuth } from '@/lib/server/cron-auth';
 
-// Verify cron secret to prevent unauthorized access
-const CRON_SECRET = process.env.CRON_SECRET;
-
-export async function GET(request: NextRequest) {
+async function handleStreakCheck(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
 
   try {
-    // Verify authorization
-    const authHeader = request.headers.get('authorization');
-    if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
-      logger.warn('Unauthorized cron access attempt');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Get action type from query
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action') || 'at-risk';
@@ -69,7 +61,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Also support POST for flexibility
-export async function POST(request: NextRequest) {
-  return GET(request);
-}
+export const GET = withCronAuth(handleStreakCheck);
+export const POST = withCronAuth(handleStreakCheck);
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;

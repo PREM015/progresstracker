@@ -1,34 +1,21 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupExpiredRecords, optimizeTables } from '@/lib/cleanup';
 import { prisma } from '@/lib/prisma';
 import { subDays } from 'date-fns';
+import { withCronAuth } from '@/lib/server/cron-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-async function handleCleanup(request: NextRequest): Promise<NextResponse> {
-  // ── Authorization ──────────────────────────────────────────
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    console.error('[CRON] CRON_SECRET is not configured');
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    console.warn('[CRON] Unauthorized cleanup attempt from:', request.headers.get('x-forwarded-for') ?? 'unknown');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+async function _cronHandler(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
   console.log('[CRON] Starting database cleanup...');
 
   try {
-    // ── Core auth record cleanup ────────────────────────────
+    // Core auth record cleanup
     const authResult = await cleanupExpiredRecords();
 
-    // ── Additional: old notifications (90 days, already read) ─
+    // Old notifications (90 days, already read)
     let notificationsDeleted = 0;
     try {
       const notifResult = await prisma.notification.deleteMany({
@@ -43,7 +30,7 @@ async function handleCleanup(request: NextRequest): Promise<NextResponse> {
       authResult.errors.push(`notifications: ${err instanceof Error ? err.message : String(err)}`);
     }
 
-    // ── Table statistics refresh (helps query planner) ──────
+    // Table statistics refresh (helps query planner)
     try {
       await optimizeTables();
     } catch (err) {
@@ -76,14 +63,12 @@ async function handleCleanup(request: NextRequest): Promise<NextResponse> {
   } catch (err) {
     console.error('[CRON] Cleanup failed:', err);
     return NextResponse.json(
-      {
-        error: 'Cleanup failed',
-        message: err instanceof Error ? err.message : 'Unknown error',
-      },
+      { error: 'Cleanup failed' },
       { status: 500 }
     );
   }
 }
 
-export const GET = handleCleanup;
-export const POST = handleCleanup;
+// SECURITY: withCronAuth validates CRON_SECRET and optional IP allowlist
+export const GET = withCronAuth(_cronHandler);
+export const POST = withCronAuth(_cronHandler);

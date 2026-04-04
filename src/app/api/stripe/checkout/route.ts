@@ -19,6 +19,7 @@ const checkoutSchema = z.object({
     priceId: z.string(),
     successUrl: z.string().url().optional(),
     cancelUrl: z.string().url().optional(),
+    idempotencyKey: z.string().max(100).optional(),
 });
 
 function generateRequestId(): string {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return addHeaders(apiResponse.validationError('Invalid input', validation.error.errors, requestId), requestId, rateLimitResult);
         }
 
-        const { priceId, successUrl, cancelUrl } = validation.data;
+        const { priceId, successUrl, cancelUrl, idempotencyKey } = validation.data;
 
         // Validate priceId belongs to a valid plan
         const plan = getPlanByPriceId(priceId);
@@ -112,7 +113,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             cancelUrl: cUrl,
             metadata: {
                 userId: session.user.id,
-            }
+            },
+            idempotencyKey
         });
 
         logger.info('POST stripe checkout completed', { userId: session.user.id, sessionId: checkoutSession.id, requestId, duration: Date.now() - startTime });

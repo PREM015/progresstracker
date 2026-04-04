@@ -153,6 +153,16 @@ export async function GET(req: NextRequest) {
     const userId = session.user.id;
     const clientId = crypto.randomUUID();
 
+    // Prevent reconnection spam
+    const { applyRateLimit } = await import('@/lib/server/redis-rate-limit');
+    const rateLimitResult = await applyRateLimit('sseReconnect', `user:${userId}`);
+    if (!rateLimitResult.allowed) {
+      return new NextResponse(
+        JSON.stringify({ success: false, error: 'Too many connection attempts', code: 'RATE_LIMIT_EXCEEDED' }),
+        { status: 429, headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId, 'Retry-After': String(rateLimitResult.retryAfter || 60) } }
+      );
+    }
+
     log.info('SSE notifications connection', { userId, clientId, lastEventId });
 
     const { stream, send, close, getStats } = createSSEStream({
@@ -180,11 +190,18 @@ export async function GET(req: NextRequest) {
     });
 
     if (!addResult.success) {
+      close();
       return new NextResponse(
         JSON.stringify({ success: false, error: addResult.error, code: 'CONNECTION_LIMIT' }),
         { status: 429, headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId } }
       );
     }
+
+    // Handle client disconnect
+    req.signal.addEventListener('abort', () => {
+      log.info('SSE notifications client aborted connection', { userId, clientId });
+      close();
+    });
 
     // Send initial data
     setTimeout(async () => {

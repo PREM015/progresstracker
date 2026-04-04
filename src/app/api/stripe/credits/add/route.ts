@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import apiResponse from '@/lib/apiResponse';
 
+import { adminAuth } from '@/middleware/adminAuth';
+
 const SECURITY_HEADERS = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
@@ -12,6 +14,10 @@ const SECURITY_HEADERS = {
 };
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+    // 1. Admin Auth Check
+    const authError = await adminAuth(request);
+    if (authError) return authError;
+
     // Placeholder for adding credits
     return NextResponse.json({ message: 'Use /api/stripe/credits POST instead or implement product purchase' }, { status: 501, headers: SECURITY_HEADERS });
 }

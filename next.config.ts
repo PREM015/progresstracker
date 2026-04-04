@@ -1,28 +1,102 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+// ============================================================================
+// SECURITY HEADERS
+// Applied to all routes. CSP nonces are handled per-request in middleware.ts.
+// ============================================================================
+const securityHeaders = [
+  // Prevent MIME-type sniffing
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // Prevent clickjacking
+  { key: "X-Frame-Options", value: "DENY" },
+  // Enable browser XSS filtering (legacy browsers)
+  { key: "X-XSS-Protection", value: "1; mode=block" },
+  // HSTS: force HTTPS for 1 year including subdomains
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains; preload",
+  },
+  // Strict referrer policy
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Disable browser features we don't use
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=()",
+  },
+  // DNS prefetch for performance while keeping security
+  { key: "X-DNS-Prefetch-Control", value: "on" },
+  // Content Security Policy
+  // Note: 'unsafe-inline' for scripts is NOT set; use nonces in middleware for strict CSP.
+  // 'unsafe-inline' for styles is required for many CSS-in-JS libraries.
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      // Allow scripts from self + nonce-based inline (nonce injected by middleware)
+      // Sentry CDN + tunnelRoute monitoring allowed
+      "script-src 'self' 'unsafe-eval' https://js.stripe.com https://*.sentry.io",
+      // Styles: self + inline needed for Tailwind/shadcn
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // Images: self, data URIs (avatars), all HTTPS (external platform avatars/badges)
+      "img-src 'self' data: blob: https:",
+      // Fonts: self + Google Fonts
+      "font-src 'self' https://fonts.gstatic.com",
+      // Fetch/XHR/WebSocket: self + SSE + Stripe + Sentry
+      "connect-src 'self' wss: https://api.stripe.com https://*.sentry.io https://o*.ingest.sentry.io",
+      // Frames: Stripe payment elements only
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      // Workers: self only (service worker)
+      "worker-src 'self' blob:",
+      // No external form actions
+      "form-action 'self'",
+      // Block embedding in iframes entirely
+      "frame-ancestors 'none'",
+      // Upgrade HTTP to HTTPS
+      "upgrade-insecure-requests",
+    ].join("; "),
+  },
+];
+
 const nextConfig: NextConfig = {
   /* config options here */
-  serverExternalPackages: ['ioredis', 'bullmq', 'puppeteer'],
+  serverExternalPackages: ["ioredis", "bullmq", "puppeteer"],
+  // Hide "X-Powered-By: Next.js" header — prevents fingerprinting
+  poweredByHeader: false,
+
   async headers() {
     return [
+      // ── Security headers on all routes ───────────────────────────────
       {
-        source: '/:all*(svg|jpg|png)',
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      // ── Static asset caching ─────────────────────────────────────────
+      {
+        source: "/:all*(svg|jpg|png|webp|avif|ico)",
         locale: false,
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },
       {
-        source: '/fonts/:path*',
+        source: "/fonts/:path*",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
+        ],
+      },
+      // ── SSE endpoints: disable buffering ─────────────────────────────
+      {
+        source: "/api/sse/:path*",
+        headers: [
+          { key: "X-Accel-Buffering", value: "no" },
+          { key: "Cache-Control", value: "no-cache, no-transform" },
         ],
       },
     ];

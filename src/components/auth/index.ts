@@ -18,3 +18,7 @@ export { default as ChangePasswordForm } from './ChangePasswordForm';
 export { default as ChangeEmailForm } from './ChangeEmailForm';
 export { default as AccountDeletion } from './AccountDeletion';
 export { default as SignUpForm } from './SignUpForm';
+export { MagicLinkRequest } from './MagicLinkRequest';
+export { MagicLinkVerify } from './MagicLinkVerify';
+export { OAuthCallback } from './OAuthCallback';
+export { VerifyShell } from './VerifyShell';

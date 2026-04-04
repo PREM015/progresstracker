@@ -17,16 +17,22 @@ const globalForPrisma = globalThis as unknown as {
  */
 function createPrismaClient(): PrismaClient {
   // Connection pool configuration
+  // SECURITY/PERF: Serverless functions share a pool per cold-start instance.
+  // max:20 per instance × N instances = connection exhaustion on PostgreSQL (default limit: 100).
+  // Recommended: max:10 for serverless, min:2 to keep a warm connection ready.
+  const isProduction = process.env.NODE_ENV === "production";
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL?.includes('sslmode=require')
-      ? process.env.DATABASE_URL.replace('sslmode=require', 'sslmode=verify-full')
-      : process.env.DATABASE_URL,
-    max: 20, // Maximum number of connections
-    idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-    connectionTimeoutMillis: 10000, // Fail after 10 seconds if can't connect
+    connectionString: process.env.DATABASE_URL,
+    max: isProduction ? 10 : 5, // Serverless-safe pool size
+    min: 2,                     // Keep 2 connections warm to reduce cold-start latency
+    idleTimeoutMillis: 30_000,  // Close idle connections after 30 seconds
+    connectionTimeoutMillis: 10_000, // Fail after 10 seconds if can't connect
     allowExitOnIdle: true,
-    // Kill any single query after 5s to prevent runaway queries
-    statement_timeout: 5000,
+    // Kill any single query after 8s to prevent runaway queries
+    // (increased from 5s to handle complex aggregation queries)
+    statement_timeout: 8_000,
+    // Enforce SSL in production — prevents unencrypted DB connections
+    ssl: isProduction ? { rejectUnauthorized: true } : undefined,
   });
 
   // Handle pool errors

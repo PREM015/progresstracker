@@ -14,7 +14,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
 
@@ -127,11 +126,34 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    // Parse query parameters to match GET filtering
+    const searchParams = request.nextUrl.searchParams;
+    const search = searchParams.get('search') || undefined;
+
+    // Build where clause (matching GET logic)
+    const where: any = {
+      isActive: true,
+      isPublic: true,
+      ...(search && {
+        OR: [
+          { username: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    // Get total count
+    const total = await prisma.user.count({ where });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -141,14 +163,9 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Global leaderboard
  * 
- * TODO Implementation Checklist:
-   * - Parse pagination and filter params
-   * - Get top users by points/activity
-   * - Include only users with public profiles
-   * - Calculate user rank
-   * - Get current user's rank if authenticated
-   * - Cache results for performance
-   * - Return paginated leaderboard data
+ * Returns a paginated list of top-ranked users sorted by points/activity.
+ * Only includes users with public profiles.
+ * Supports filtering by username/name and sorting by points, streak, or problems.
  */
 export async function GET(
   request: NextRequest
@@ -187,7 +204,7 @@ export async function GET(
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: Prisma.UserWhereInput = {
+    const where: any = {
       isActive: true,
       isPublic: true, // Only show public profiles
       ...(search && {
@@ -199,7 +216,7 @@ export async function GET(
     };
 
     // Determine sort order
-    let orderBy: Prisma.UserOrderByWithRelationInput = { totalPoints: 'desc' };
+    let orderBy: any = { totalPoints: 'desc' };
     if (sortBy === 'streak') {
       orderBy = { currentStreak: sortOrder };
     } else if (sortBy === 'problems') {
@@ -234,7 +251,7 @@ export async function GET(
     // Note: This is page-relative rank. For absolute rank, we'd need to trust the 'rank' field or calculate offset.
     // Using 'rank' field from DB is better if the cron job updates it. 
     // If 'rank' is null, fallback to calculated.
-    const data = users.map((user, index) => ({
+    const data = users.map((user: any, index: number) => ({
       ...user,
       displayRank: user.rank ?? (skip + index + 1),
     }));

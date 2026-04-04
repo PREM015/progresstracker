@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// ===== FILE: proxy.ts =====
+
 import { withAuth } from "next-auth/middleware";
 import { NextResponse, NextRequest } from "next/server";
 import { Redis } from "@upstash/redis";
@@ -28,7 +31,9 @@ const PUBLIC_PATHS = [
   '/api/cron',
   '/api/platforms',
   '/api/leaderboard',
-  '/api/achievements'
+  '/api/achievements',
+  '/api/stats/public',
+  '/api/notifications/unread-count',
 ];
 
 // ─── Routes that authenticated users should be REDIRECTED from ──
@@ -105,12 +110,13 @@ async function rateLimit(request: NextRequest) {
   }
 }
 
-// ✅ Helper function - Static files ko check karo
+// Helper function - Check static files
 function isStaticFile(pathname: string): boolean {
   const staticExtensions = [
     '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.webmanifest',
     '.woff', '.woff2', '.ttf', '.eot', '.otf',
     '.mp4', '.webm', '.mp3', '.wav',
+    '.css', '.js', '.map',
   ];
 
   return staticExtensions.some(ext => pathname.endsWith(ext));
@@ -123,7 +129,7 @@ export default withAuth(
   async function middleware(req: any) {
     const { pathname } = req.nextUrl;
 
-    // ✅ Static files ko directly pass karo (middleware execute na ho)
+    // Static files - pass directly
     if (isStaticFile(pathname)) {
       return NextResponse.next();
     }
@@ -131,8 +137,14 @@ export default withAuth(
     const token = req.nextauth?.token;
     const isAuthenticated = !!token;
 
-    // ── Redirect authenticated users away from auth pages ──────
+    // Debug logging (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[PROXY] ${pathname} | Auth: ${isAuthenticated} | Token ID: ${token?.id || 'none'}`);
+    }
+
+    // Redirect authenticated users away from auth pages
     if (isAuthenticated && isAuthOnlyPath(pathname)) {
+      console.log(`[PROXY] Redirecting authenticated user from ${pathname} to /dashboard`);
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
 
@@ -143,7 +155,7 @@ export default withAuth(
       response.headers.set(key, value);
     });
 
-    // Rate limiting only for API
+    // Rate limiting only for API (excluding auth and cron)
     if (pathname.startsWith("/api") && !pathname.startsWith('/api/auth') && !pathname.startsWith('/api/cron')) {
       const { success, limit, remaining, reset } = await rateLimit(req);
       response.headers.set("X-RateLimit-Limit", limit.toString());
@@ -161,32 +173,51 @@ export default withAuth(
     return response;
   },
   {
+    // ✅ CRITICAL: Pass secret so middleware can decode JWT token
+    secret: process.env.NEXTAUTH_SECRET,
+    
+    // ✅ Tell middleware where login page is
+    pages: {
+      signIn: "/login",
+      error: "/login",
+    },
+
     callbacks: {
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname;
 
-        // ✅ Static files ko skip karo
+        // Static files - always allow
         if (isStaticFile(pathname)) {
           return true;
         }
 
-        // Public paths
+        // Public paths - always allow
         if (isPublicPath(pathname)) {
           return true;
         }
 
-        // Admin routes
-        if (pathname.startsWith("/admin")) return token?.role === "admin" || token?.isAdmin === true;
+        // Admin routes - require admin role
+        if (pathname.startsWith("/admin")) {
+          const isAdmin = token?.role === "admin" || token?.isAdmin === true;
+          if (!isAdmin && process.env.NODE_ENV === 'development') {
+            console.log(`[PROXY] Admin access denied for ${pathname}`);
+          }
+          return isAdmin;
+        }
 
-        // All other routes require login
-        return !!token;
+        // All other routes require authentication
+        const hasToken = !!token;
+        if (!hasToken && process.env.NODE_ENV === 'development') {
+          console.log(`[PROXY] Auth required for ${pathname} - no token found`);
+        }
+        return hasToken;
       },
     },
   }
 );
 
 // -------------------
-// Matcher - More Specific
+// Matcher - Exclude static files and auth endpoints
 // -------------------
 export const config = {
   matcher: [

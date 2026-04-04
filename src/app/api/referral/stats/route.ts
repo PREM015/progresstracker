@@ -136,11 +136,22 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
+    const { error, session, rateLimitResult } = await validateSession(request, requestId);
+
+    if (error) {
+      return addHeaders(error, requestId, rateLimitResult);
+    }
+
+    const userId = session!.user.id;
+
+    // Get total referral count
+    const total = await prisma.referralReward.count({
+      where: { referrerId: userId },
+    });
 
     const response = new NextResponse(null, { status: 200 });
-    return addHeaders(response, requestId);
+    response.headers.set('X-Total-Count', String(total));
+    return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
     logger.error('HEAD request failed', { requestId }, error);
     return new NextResponse(null, { status: 500 });
@@ -150,14 +161,12 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 /**
  * GET - Referral statistics
  * 
- * TODO Implementation Checklist:
-   * - Validate session and get current user
-   * - Count total referrals
-   * - Count converted referrals
-   * - Calculate conversion rate
-   * - Get referral timeline
-   * - Calculate earned rewards
-   * - Return comprehensive stats
+ * Returns comprehensive referral statistics:
+ * - Total and converted referral counts
+ * - Referral conversion rate
+ * - Timeline and history of referrals
+ * - Earned rewards and incentives
+ * - Detailed performance metrics
  */
 export async function GET(
   request: NextRequest
@@ -194,15 +203,53 @@ export async function GET(
 
     const { page, limit, search, sortBy, sortOrder } = queryValidation.data;
 
-    // TODO: Implement data fetching logic
-    // -------------------------------------------------------------------------
-    // 1. Build Prisma where clause based on filters
-    // 2. Execute query with pagination
-    // 3. Transform data as needed
-    // -------------------------------------------------------------------------
+    // Get referral statistics
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        referralCode: true,
+        referralCount: true,
+      } as any,
+    });
 
-    const data: unknown[] = []; // TODO: Replace with actual query
-    const total = 0; // TODO: Get actual count
+    if (!user?.referralCode) {
+      return addHeaders(
+        apiResponse.notFound('User referral code not found', requestId),
+        requestId,
+        rateLimitResult
+      );
+    }
+
+    // Count referrals and calculate stats
+    const totalReferrals = await prisma.user.count({
+      where: { referredBy: user.referralCode } as any,
+    });
+
+    const activeReferrals = await prisma.user.count({
+      where: { referredBy: user.referralCode, isActive: true } as any,
+    });
+
+    const rewards = await prisma.referralReward.aggregate({
+      where: { referrerId: userId },
+      _sum: { amount: true } as any,
+      _count: true,
+    });
+
+    // Calculate conversion rate
+    const conversionRate = totalReferrals > 0 ? (activeReferrals / totalReferrals) * 100 : 0;
+
+    const data = {
+      totalReferrals,
+      activeReferrals,
+      conversionRate: Math.round(conversionRate * 100) / 100,
+      totalRewardsEarned: (rewards._sum as any)?.amount || 0,
+      totalRewardsCount: rewards._count,
+      referralCode: user.referralCode,
+      referralUrl: `${process.env.NEXT_PUBLIC_APP_URL}/join?ref=${user.referralCode}`,
+    };
+
+    const totalCount = 1; // Single stats object
+    const total = totalCount;
 
     logger.info('GET referral/stats completed', {
       userId,
@@ -213,7 +260,7 @@ export async function GET(
     });
 
     const response = apiResponse.paginated(
-      data,
+      [data],
       {
         page,
         limit,

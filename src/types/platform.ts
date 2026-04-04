@@ -101,7 +101,8 @@ export type SyncStatus =
   | 'partial'
   | 'failed'
   | 'cancelled'
-  | 'rate_limited';
+  | 'rate_limited'
+  | 'error';
 
 /**
  * Map sync status to Prisma enum
@@ -115,7 +116,8 @@ export const SyncStatusMap: Record<SyncStatus, PrismaSyncStatus> = {
   failed: 'FAILED',
   cancelled: 'CANCELLED',
   rate_limited: 'RATE_LIMITED',
-} as const;
+  error: 'ERROR',
+} as any;
 
 /**
  * Reverse map: Prisma enum to config sync status
@@ -129,7 +131,8 @@ export const ReverseSyncStatusMap: Record<PrismaSyncStatus, SyncStatus> = {
   FAILED: 'failed',
   CANCELLED: 'cancelled',
   RATE_LIMITED: 'rate_limited',
-} as const;
+  ERROR: 'error',
+} as any;
 
 // =============================================================================
 // CATEGORY TYPE (for UI display)

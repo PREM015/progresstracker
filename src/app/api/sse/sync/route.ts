@@ -203,6 +203,16 @@ export async function GET(req: NextRequest) {
     const userId = session.user.id;
     const clientId = crypto.randomUUID();
 
+    // Prevent reconnection spam
+    const { applyRateLimit } = await import('@/lib/server/redis-rate-limit');
+    const rateLimitResult = await applyRateLimit('sseReconnect', `user:${userId}`);
+    if (!rateLimitResult.allowed) {
+      return new NextResponse(
+        JSON.stringify({ success: false, error: 'Too many connection attempts', code: 'RATE_LIMIT_EXCEEDED' }),
+        { status: 429, headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId, 'Retry-After': String(rateLimitResult.retryAfter || 60) } }
+      );
+    }
+
     log.info('SSE sync connection requested', {
       userId,
       clientId,
@@ -225,7 +235,7 @@ export async function GET(req: NextRequest) {
     });
 
     // 3. Register connection
-    sseConnectionManager.addConnection({
+    const addResult = sseConnectionManager.addConnection({
       id: clientId,
       userId,
       controller,
@@ -234,6 +244,31 @@ export async function GET(req: NextRequest) {
       channel: CHANNEL,
       metadata: { userAgent, ip },
       ...getStats(),
+    });
+
+    if (!addResult.success) {
+      log.warn('SSE connection limit reached', { userId, clientId });
+      close();
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: addResult.error || 'Connection limit reached',
+          code: 'CONNECTION_LIMIT',
+        }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Request-ID': requestId,
+          },
+        }
+      );
+    }
+
+    // Handle client disconnect
+    req.signal.addEventListener('abort', () => {
+      log.info('SSE sync client aborted connection', { userId, clientId });
+      close();
     });
 
     // 4. Send initial sync status

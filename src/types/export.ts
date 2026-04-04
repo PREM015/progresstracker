@@ -573,10 +573,10 @@ export function fromPrismaExportFormat(format: PrismaExportFormat): ExportFormat
     PDF: 'pdf',
     EXCEL: 'excel',
     XML: 'xml',
-  };
+  } as any;
   return reverseMap[format];
 }
-
+ 
 /** Convert lowercase status to Prisma enum value */
 export function toPrismaExportStatus(status: ExportStatus): PrismaExportStatus {
   const statusMap: Record<ExportStatus, PrismaExportStatus> = {

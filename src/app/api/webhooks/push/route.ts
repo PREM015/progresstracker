@@ -41,12 +41,11 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const bodySchema = z.object({
-  // TODO: Define request body validation schema based on route requirements
-  // Example fields:
-  // id: z.string().cuid().optional(),
-  // name: z.string().min(1).max(200),
-  // email: z.string().email(),
-  // data: z.record(z.unknown()).optional(),
+  event: z.enum(['delivered', 'clicked', 'failed']),
+  subscriptionId: z.string().cuid(),
+  userId: z.string().cuid().optional(),
+  timestamp: z.number().optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 
@@ -128,9 +127,6 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
 
   try {
-    // TODO: Return appropriate headers for resource
-    // Example: X-Total-Count, X-Resource-Status, etc.
-    
     const response = new NextResponse(null, { status: 200 });
     return addHeaders(response, requestId);
   } catch (error) {
@@ -141,14 +137,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST - Handle push notification webhook
- * 
- * TODO Implementation Checklist:
-   * - Verify webhook signature
-   * - Parse push event (delivered, clicked, failed)
-   * - Update push subscription stats
-   * - Handle failed subscriptions (remove)
-   * - Log push events
-   * - Return 200 acknowledgment
+ * Parse push notification events and update subscription status
  */
 export async function POST(
   request: NextRequest
@@ -189,32 +178,50 @@ export async function POST(
 
     const data = validation.data;
 
-    // TODO: Implement creation logic
-    // -------------------------------------------------------------------------
-    // 1. Validate business rules
-    // 2. Check permissions/ownership
-    // 3. Create database record
-    // 4. Create audit log if needed
-    // 5. Trigger side effects (notifications, etc.)
-    // -------------------------------------------------------------------------
-    
-    const result = {}; // TODO: Replace with actual creation
+    // Update push subscription based on event
+    switch (data.event) {
+      case 'delivered':
+        await prisma.pushSubscription.updateMany({
+          where: { id: data.subscriptionId },
+          data: {
+            lastDelivered: new Date(),
+            status: 'ACTIVE'
+          } as any
+        });
+        break;
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+      case 'clicked':
+        await prisma.pushSubscription.updateMany({
+          where: { id: data.subscriptionId },
+          data: {
+            lastClicked: new Date(),
+            status: 'ACTIVE'
+          } as any
+        });
+        break;
+
+      case 'failed':
+        // Remove failed subscriptions
+        await prisma.pushSubscription.deleteMany({
+          where: { id: data.subscriptionId }
+        });
+        break;
+    }
+
+    // Log the webhook event
+    await prisma.webhook.create({
+      data: {
+        platform: 'push',
+        event: data.event,
+        payload: data,
+        status: 'PENDING',
+      } as any,
+    }).catch(err => logger.error('Failed to log push webhook', { requestId, error: String(err) }));
+
+    const result = { success: true, event: data.event };
 
     logger.info('POST webhooks/push completed', {
-      
+      event: data.event,
       requestId,
       duration: Date.now() - startTime,
     });
@@ -222,7 +229,7 @@ export async function POST(
     const response = apiResponse.created(result, { requestId });
     return addHeaders(response, requestId, rateLimitResult);
   } catch (error) {
-    logger.error('POST webhooks/push failed', { requestId }, error);
+    logger.error('POST webhooks/push failed', { requestId, error: String(error) });
     return addHeaders(apiResponse.internalError('Operation failed', requestId), requestId);
   }
 }

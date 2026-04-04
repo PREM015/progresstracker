@@ -7,8 +7,7 @@ import crypto from 'crypto';
 
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { authRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { sendEmail as _unused } from '@/lib/email'; // legacy
+import { applyRateLimit } from '@/lib/server/redis-rate-limit';
 import { emailService } from '@/lib/email';
 
 // =============================================================================
@@ -90,10 +89,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     // Rate limiting
-    const rateLimitKey = `forgot-password:${clientIP}`;
-    const rateLimitResult = await checkLimit(authRateLimiter, 5, rateLimitKey);
+    const rateLimitResult = await applyRateLimit("forgotPassword", clientIP);
 
-    if (!rateLimitResult.success) {
+    if (!rateLimitResult.allowed) {
       logger.warn('Forgot password rate limit exceeded', { ip: clientIP, requestId });
       await constantTimeDelay(start);
       return secureResponse(
@@ -162,6 +160,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // If user doesn't exist or is inactive, still return success (prevent enumeration)
     if (!user || user.deletedAt || !user.isActive || user.isBanned) {
       logger.debug('Forgot password for non-existent/inactive user', { email, requestId });
+      
+      // Mitigation against timing attacks to prevent user enumeration
+      const bcrypt = require('bcryptjs');
+      await bcrypt.hash('dummy', 12).catch(() => {});
+      
       await constantTimeDelay(start);
       return secureResponse(GENERIC_SUCCESS, 200, requestId);
     }

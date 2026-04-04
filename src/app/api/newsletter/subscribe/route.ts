@@ -96,8 +96,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     });
 
-    // TODO: Send confirmation email
-    // await emailService.sendConfirmation(newSubscriber.email, newSubscriber.unsubscribeToken);
+    try {
+      const { sendEmail } = await import('@/lib/email');
+      await sendEmail({
+        to: newSubscriber.email,
+        subject: 'Newsletter Subscription Confirmation',
+        html: `<p>Thank you for subscribing to our newsletter!</p><p><a href="${process.env.NEXT_PUBLIC_APP_URL}/api/newsletter/unsubscribe?token=${newSubscriber.unsubscribeToken}">Unsubscribe</a></p>`,
+      });
+    } catch (emailErr) {
+      logger.warn('Failed to send subscription confirmation email', { email, error: String(emailErr) });
+    }
 
     logger.info('New newsletter subscriber created', { email, requestId, duration: Date.now() - startTime });
 

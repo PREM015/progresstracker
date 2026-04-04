@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export default function BlogPostPage() {
   const params = useParams();
@@ -67,7 +68,7 @@ export default function BlogPostPage() {
         )}
 
         <div className="prose prose-lg max-w-none">
-          <div dangerouslySetInnerHTML={{ __html: post.content }} />
+          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }} />
         </div>
 
         <footer className="mt-12 pt-8 border-t border-gray-200">

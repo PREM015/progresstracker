@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import apiResponse from '@/lib/apiResponse';
+import { CacheService } from '@/services/cacheService';
 
 export async function GET(request: NextRequest) {
     try {
@@ -14,6 +15,13 @@ export async function GET(request: NextRequest) {
         }
 
         const userId = session.user.id;
+
+        const cacheKey = `stats:overview:${userId}`;
+        const cachedData = await CacheService.get(cacheKey);
+
+        if (cachedData) {
+            return apiResponse.success(cachedData);
+        }
 
         // Fetch dashboard stats
         const [goalsCount, problemsSolved, currentStreak, achievements] = await Promise.all([
@@ -64,6 +72,8 @@ export async function GET(request: NextRequest) {
                 color: 'from-purple-500 to-purple-700',
             },
         ];
+
+        await CacheService.set(cacheKey, widgets, 60).catch(() => {});
 
         return apiResponse.success(widgets);
     } catch (error) {
