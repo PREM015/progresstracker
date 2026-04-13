@@ -16,8 +16,8 @@ export async function GET(request: NextRequest) {
 
     if (!session || !session.user?.email) {
       return NextResponse.json(
-        { count: 0, success: false, message: "Unauthorized" },
-        { status: 401 }
+        { count: 0, success: true },
+        { status: 200 }
       );
     }
 

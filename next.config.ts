@@ -35,7 +35,7 @@ const securityHeaders = [
       "default-src 'self'",
       // Allow scripts from self + nonce-based inline (nonce injected by middleware)
       // Sentry CDN + tunnelRoute monitoring allowed
-      "script-src 'self' 'unsafe-eval' https://js.stripe.com https://*.sentry.io",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://*.sentry.io",
       // Styles: self + inline needed for Tailwind/shadcn
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Images: self, data URIs (avatars), all HTTPS (external platform avatars/badges)
@@ -43,7 +43,7 @@ const securityHeaders = [
       // Fonts: self + Google Fonts
       "font-src 'self' https://fonts.gstatic.com",
       // Fetch/XHR/WebSocket: self + SSE + Stripe + Sentry
-      "connect-src 'self' wss: https://api.stripe.com https://*.sentry.io https://o*.ingest.sentry.io",
+      "connect-src 'self' wss: https://api.stripe.com https://*.sentry.io https://o4510561499873280.ingest.sentry.io",
       // Frames: Stripe payment elements only
       "frame-src https://js.stripe.com https://hooks.stripe.com",
       // Workers: self only (service worker)
@@ -60,9 +60,42 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   /* config options here */
-  serverExternalPackages: ["ioredis", "bullmq", "puppeteer"],
+  serverExternalPackages: ["ioredis", "bullmq", "puppeteer", "fs", "path", "crypto"],
+
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Prevent fs/path modules from being bundled client-side
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+      };
+    }
+    return config;
+  },
+
+  // Explicitly define output file tracing exclusions
+  outputFileTracingExcludes: {
+    '*': [
+      './node_modules/@swc/core-linux-x64-gnu',
+      './node_modules/@swc/core-linux-x64-musl',
+      './node_modules/@esbuild/**/*',
+    ],
+  },
+
+  // Scope file tracing to prevent whole-project tracing
+  outputFileTracingRoot: process.cwd(),
+
   // Hide "X-Powered-By: Next.js" header — prevents fingerprinting
   poweredByHeader: false,
+  
+  // Better error reporting
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
 
   async headers() {
     return [

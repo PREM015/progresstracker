@@ -76,7 +76,7 @@ export function DifficultyDistribution({ data, className }: DifficultyDistributi
                         </div>
                     ) : (
                         <div className="flex flex-col h-full">
-                            <div className="flex-1 w-full min-h-[180px] relative">
+                            <div className="flex-1 w-full min-h-[250px] relative">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <RechartsPie>
                                         <Pie

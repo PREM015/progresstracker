@@ -155,8 +155,19 @@ export default withAuth(
       response.headers.set(key, value);
     });
 
-    // Rate limiting only for API (excluding auth and cron)
-    if (pathname.startsWith("/api") && !pathname.startsWith('/api/auth') && !pathname.startsWith('/api/cron')) {
+    const RATE_LIMITED_PATHS = [
+      '/api/user',
+      '/api/dashboard',
+      '/api/analytics',
+      '/api/goals',
+      '/api/platforms/sync'
+    ];
+
+    const needsRateLimit = RATE_LIMITED_PATHS.some(
+      path => pathname.startsWith(path)
+    );
+
+    if (needsRateLimit) {
       const { success, limit, remaining, reset } = await rateLimit(req);
       response.headers.set("X-RateLimit-Limit", limit.toString());
       response.headers.set("X-RateLimit-Remaining", remaining.toString());
@@ -221,6 +232,6 @@ export default withAuth(
 // -------------------
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|icon-.*|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.css$|.*\\.js$|.*\\.woff2?$|.*\\.ttf$|.*\\.map$|api/auth|api/cron).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|icon-.*|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.jpeg$|.*\\.gif$|.*\\.webp$|.*\\.ico$|.*\\.css$|.*\\.js$|.*\\.woff2?$|.*\\.ttf$|.*\\.map$|api/auth|api/cron|monitoring).*)',
   ],
 };

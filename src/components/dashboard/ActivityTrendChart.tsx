@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -65,38 +65,55 @@ export function ActivityTrendChart({
 
   const userName = user?.name ? user.name.toUpperCase() : 'DEVELOPER';
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
   useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
-
-    const fetchTrends = async () => {
-      try {
-        const days = timeRangeConfig[timeRange].days;
-        const res = await fetch(`/api/analytics/trends?days=${days}&metric=all&groupBy=day`);
-
-        if (!res.ok) throw new Error('Failed to fetch trend data');
-
-        const json = (await res.json()) as ApiSuccess<TrendsResponse>;
-
-        if (!json?.success) throw new Error('Invalid response format');
-
-        if (isMounted) {
-          setData(json.data?.data || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch trend data:', err);
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : 'Failed to load data');
-          setData([]);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        });
       }
     };
 
-    fetchTrends();
-    return () => { isMounted = false; };
+    // Initial measurement
+    updateDimensions();
+
+    // Update on window resize
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    const days = timeRangeConfig[timeRange].days;
+    fetch(`/api/analytics/trends?days=${days}&metric=all&groupBy=day`, {
+      signal: controller.signal,
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch trend data');
+        return res.json() as Promise<ApiSuccess<TrendsResponse>>;
+      })
+      .then(json => {
+        if (!json?.success) throw new Error('Invalid response format');
+        setData(json.data?.data || []);
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return; // unmounted — discard silently
+        console.error('Failed to fetch trend data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        setData([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [timeRange]);
 
   const chartData = useMemo(() => {
@@ -152,8 +169,9 @@ export function ActivityTrendChart({
         </div>
 
         {/* Chart Area */}
-        <div className="flex-1 p-4 sm:p-6 min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
+        <div ref={containerRef} className="flex-1 w-full min-h-[250px] p-4 sm:p-6">
+          {dimensions.width > 0 && dimensions.height > 0 && (
+          <ResponsiveContainer width={dimensions.width} height={dimensions.height}>
             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
               <defs>
                 <linearGradient id="gradient-contrib" x1="0" y1="0" x2="0" y2="1">
@@ -206,6 +224,7 @@ export function ActivityTrendChart({
               />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
       </div>
     </motion.div>

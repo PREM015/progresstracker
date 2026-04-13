@@ -53,7 +53,15 @@ interface SocialLoginButtonsProps {
   className?: string;
 }
 
-export default function SocialLoginButtons({
+export default function SocialLoginButtons(props: SocialLoginButtonsProps) {
+  return (
+    <React.Suspense fallback={<div className="h-12 w-full animate-pulse bg-muted rounded-xl" />}>
+      <SocialLoginButtonsInner {...props} />
+    </React.Suspense>
+  );
+}
+
+function SocialLoginButtonsInner({
   onlyProviders = ['github', 'google'],
   layout = 'vertical',
   size = 'md',

@@ -14,7 +14,7 @@ import { logger } from '@/lib/logger';
 import apiResponse from '@/lib/apiResponse';
 import { UnauthorizedError } from '@/lib/apiError';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
-import { CacheService } from '@/services/cacheService';
+import { withCache } from '@/lib/withCache';
 
 // =============================================================================
 // CONSTANTS
@@ -191,7 +191,7 @@ export async function HEAD(request: NextRequest): Promise<NextResponse> {
  *
  * Get platform health status for all user's connections
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function getPlatformStatusHandler(request: NextRequest): Promise<NextResponse> {
   const requestId = generateRequestId();
   const startTime = Date.now();
 
@@ -211,18 +211,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     if (!rateLimitResult.success) {
       return addHeaders(apiResponse.rateLimited(60, requestId), requestId, rateLimitResult);
-    }
-
-    const cacheKey = `api:platforms:status:${userId}`;
-    const cachedData = await CacheService.get(cacheKey);
-    
-    if (cachedData) {
-      log.info('Platform status served from cache', { userId, requestId });
-      return addHeaders(
-        apiResponse.success(cachedData, { meta: { requestId, cached: true, duration: Date.now() - startTime } }),
-        requestId,
-        rateLimitResult
-      );
     }
 
     // Get user's platform connections with sync status
@@ -266,30 +254,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Calculate summary
     const summary = categorizeConnections(platformStatuses);
 
-    // Get sync statistics for last 24 hours
+    // Get sync statistics for last 24 hours.
+    // Uses a single groupBy instead of 3 separate COUNT queries — 1 DB round-trip.
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [successfulSyncs, failedSyncs, totalSyncs] = await Promise.all([
-      prisma.syncLog.count({
-        where: {
-          userId,
-          status: 'SUCCESS',
-          createdAt: { gte: last24Hours },
-        },
-      }),
-      prisma.syncLog.count({
-        where: {
-          userId,
-          status: 'FAILED',
-          createdAt: { gte: last24Hours },
-        },
-      }),
-      prisma.syncLog.count({
-        where: {
-          userId,
-          createdAt: { gte: last24Hours },
-        },
-      }),
-    ]);
+    const syncCountRows = await prisma.syncLog.groupBy({
+      by: ['status'],
+      where: { userId, createdAt: { gte: last24Hours } },
+      _count: { status: true },
+    });
+
+    const successfulSyncs = syncCountRows.find(r => r.status === 'SUCCESS')?._count.status ?? 0;
+    const failedSyncs     = syncCountRows.find(r => r.status === 'FAILED' )?._count.status ?? 0;
+    const totalSyncs      = syncCountRows.reduce((n, r) => n + r._count.status, 0);
 
     const responseData = {
       platforms: platformStatuses,
@@ -303,9 +279,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       },
     };
-
-    // Cache the response data for 30 seconds
-    await CacheService.set(cacheKey, responseData, 30).catch(() => {});
 
     log.info('Platform status fetched', {
       userId,
@@ -325,6 +298,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return addHeaders(apiResponse.error(error, requestId), requestId);
   }
 }
+
+/**
+ * GET /api/platforms/status
+ *
+ * Wrapped with SWR cache (30 s fresh + 15 s stale window).
+ * Cache key is per-user so one user's data never bleeds into another's.
+ * Falls back to handler on cache miss or Redis error.
+ */
+export const GET = withCache(getPlatformStatusHandler, {
+  ttl: 30,
+  staleTtl: 15,
+  timingLabel: 'platforms.status',
+  keyGenerator: async (req: NextRequest) => {
+    const session = await getServerSession(authOptions);
+    // Return null to skip cache for unauthenticated requests (they get 401 anyway)
+    return session?.user?.id ? `api:platforms:status:v2:${session.user.id}` : null;
+  },
+});
 
 // =============================================================================
 // ROUTE CONFIGURATION

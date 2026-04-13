@@ -59,8 +59,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const { searchParams } = request.nextUrl;
     const Validation = querySchema.safeParse({
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
     });
 
     if (!Validation.success) {
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Fetch user details
     const userIds = groupedStats.map(s => s.userId);
-    const users = await prisma.user.findMany({
+    const users = userIds.length > 0 ? await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: {
         id: true,
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         image: true,
         rank: true,
       }
-    });
+    }) : [];
 
     // Map results
     const data = groupedStats.map((stat, index) => {

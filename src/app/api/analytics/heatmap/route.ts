@@ -17,7 +17,7 @@ import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { apiRateLimiter, checkLimit } from '@/lib/rateLimit';
 import apiResponse from '@/lib/apiResponse';
-import { subMonths, subYears, startOfDay, endOfDay, format, eachDayOfInterval } from 'date-fns';
+import { subMonths, subYears, startOfDay, endOfDay, format, eachDayOfInterval, subDays } from 'date-fns';
 
 // =============================================================================
 // CONSTANTS
@@ -43,7 +43,7 @@ const SECURITY_HEADERS = {
 // =============================================================================
 
 const querySchema = z.object({
-  range: z.enum(['3m', '6m', '1y', 'all']).default('1y'),
+  range: z.enum(['1w', '1m', '3m', '6m', '1y', 'all']).default('1y'),
   metric: z.enum(['problems', 'commits', 'time', 'activity']).default('activity'),
   platformId: z.string().optional(),
 });
@@ -172,6 +172,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     let startDate: Date;
 
     switch (params.range) {
+      case '1w':
+        startDate = startOfDay(subDays(endDate, 7));
+        break;
+      case '1m':
+        startDate = startOfDay(subMonths(endDate, 1));
+        break;
       case '3m':
         startDate = startOfDay(subMonths(endDate, 3));
         break;

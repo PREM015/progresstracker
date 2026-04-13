@@ -46,14 +46,17 @@ export const cache = {
   },
 
   /**
-   * Set cached value with optional expiration
+   * Set cached value with optional expiration.
+   * NOTE: Do NOT call JSON.stringify here — @upstash/redis serializes automatically.
+   * Double-stringifying produces stored strings instead of objects on read-back.
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async set<T>(key: string, value: T, expirationSeconds?: number): Promise<void> {
     try {
       if (expirationSeconds) {
-        await redis.setex(key, expirationSeconds, JSON.stringify(value));
+        await redis.set(key, value as any, { ex: expirationSeconds });
       } else {
-        await redis.set(key, JSON.stringify(value));
+        await redis.set(key, value as any);
       }
     } catch (error) {
       console.error('Redis set error:', error);

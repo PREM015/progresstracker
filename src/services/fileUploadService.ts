@@ -4,6 +4,10 @@
 // PURPOSE: File upload handling - storage, validation, processing
 // ============================================================================
 
+import 'server-only';
+import path from 'path';
+import fs from 'fs/promises';
+import sharp from 'sharp';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import crypto from 'crypto';
@@ -18,7 +22,7 @@ const log = logger.child({ service: 'FileUploadService' });
 // =============================================================================
 
 export interface UploadOptions {
-    maxSize?: number; // in bytes
+    maxSize?: number;
     allowedTypes?: string[];
     folder?: string;
     generateThumbnail?: boolean;
@@ -88,12 +92,40 @@ export interface StorageUsage {
 // CONSTANTS
 // =============================================================================
 
-// Do NOT call process.cwd() or import fs/path/sharp at module scope —
-// Turbopack's static NFT tracer will trace the entire project.
-// All filesystem imports are done dynamically inside each function.
+// Use UPLOAD_DIR env var if set, otherwise resolve statically at module load time.
+// The /*turbopackIgnore: true*/ comment prevents Turbopack from tracing
+// filesystem operations originating from this path, avoiding the
+// "matches 10369 files" and NFT whole-project warnings.
+const UPLOAD_BASE_DIR: string = process.env.UPLOAD_DIR
+    ?? path.join(/*turbopackIgnore: true*/ process.cwd(), 'public', 'uploads');
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_DOCUMENT_TYPES = ['application/pdf', 'text/plain', 'text/csv'];
+
+// =============================================================================
+// HELPERS — centralise all path construction here so Turbopack only sees
+// joins rooted at the statically-ignored UPLOAD_BASE_DIR constant.
+// =============================================================================
+
+/**
+ * Build an absolute filesystem path under UPLOAD_BASE_DIR.
+ * All path.join calls that touch UPLOAD_BASE_DIR must go through here
+ * so Turbopack's static analyser sees a single, narrow pattern.
+ */
+function toAbsPath(...segments: string[]): string {
+    // turbopackIgnore keeps Turbopack from expanding UPLOAD_BASE_DIR
+    // into a glob that matches thousands of project files.
+    return path.join(/*turbopackIgnore: true*/ UPLOAD_BASE_DIR, ...segments);
+}
+
+/**
+ * Build the public URL path for a local upload.
+ * Kept separate so we never accidentally expose the absolute FS path.
+ */
+function toPublicUrl(...segments: string[]): string {
+    return '/uploads/' + segments.join('/');
+}
 
 // =============================================================================
 // SERVICE METHODS
@@ -101,7 +133,7 @@ const ALLOWED_DOCUMENT_TYPES = ['application/pdf', 'text/plain', 'text/csv'];
 
 export const fileUploadService = {
     /**
-     * Upload a file
+     * Upload a file to R2 or local storage.
      */
     async uploadFile(
         file: File,
@@ -109,13 +141,6 @@ export const fileUploadService = {
         options: UploadOptions = {}
     ): Promise<UploadResult> {
         try {
-            // Dynamic imports: keeps path/fs/sharp out of the static module graph
-            // so Turbopack's NFT tracer doesn't trace the whole project.
-            const path = await import('path');
-            const { writeFile, mkdir } = await import('fs/promises');
-            const sharp = (await import('sharp')).default;
-            const uploadDir = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'public', 'uploads');
-
             const {
                 maxSize = MAX_FILE_SIZE,
                 allowedTypes = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_DOCUMENT_TYPES],
@@ -125,11 +150,7 @@ export const fileUploadService = {
             } = options;
 
             // Validate file
-            const validation = this.validateFile(file, {
-                maxSize,
-                allowedTypes,
-            });
-
+            const validation = this.validateFile(file, { maxSize, allowedTypes });
             if (!validation.valid) {
                 throw new Error(validation.errors.join(', '));
             }
@@ -137,72 +158,76 @@ export const fileUploadService = {
             // Generate unique filename
             const ext = path.extname(file.name);
             const filename = `${crypto.randomUUID()}${ext}`;
-            const uploadPath = path.join(folder, filename);
-            const fullPath = path.join(uploadDir, uploadPath);
 
             // Convert File to Buffer
             const buffer = Buffer.from(await file.arrayBuffer());
 
-            // Process image if needed
+            // Optionally resize
             let processedBuffer = buffer;
             if (file.type.startsWith('image/') && resize) {
                 const processed = await this.processImage(file, resize);
-                processedBuffer = Buffer.from(await (await fetch(processed.url)).arrayBuffer());
+                processedBuffer = Buffer.from(
+                    await (await fetch(processed.url)).arrayBuffer()
+                );
             }
 
             let url = '';
             let thumbnailUrl: string | undefined;
 
             if (isR2Configured) {
-                // Upload to Cloudflare R2
-                const command = new PutObjectCommand({
+                // ── R2 upload ──────────────────────────────────────────────
+                // R2 key is a simple string join — no filesystem tracing involved.
+                const r2Key = `${folder}/${filename}`;
+
+                await s3Client.send(new PutObjectCommand({
                     Bucket: R2_BUCKET_NAME,
-                    Key: uploadPath,
+                    Key: r2Key,
                     Body: processedBuffer,
                     ContentType: file.type,
-                });
+                }));
 
-                await s3Client.send(command);
+                const publicDomain =
+                    process.env.NEXT_PUBLIC_R2_PUBLIC_URL ??
+                    process.env.R2_ENDPOINT?.replace('https://', 'https://pub-');
 
-                const publicDomain = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_ENDPOINT?.replace('https://', 'https://pub-');
-                url = `${publicDomain}/${uploadPath}`;
+                url = `${publicDomain}/${r2Key}`;
 
-                // Generate thumbnail if requested
                 if (generateThumbnail && file.type.startsWith('image/')) {
-                    const thumbnailFilename = `thumb_${filename}`;
-                    const thumbnailPath = path.join(folder, thumbnailFilename);
+                    const thumbKey = `${folder}/thumb_${filename}`;
 
                     const thumbnailBuffer = await sharp(buffer)
                         .resize(200, 200, { fit: 'cover' })
                         .toBuffer();
 
-                    const thumbCommand = new PutObjectCommand({
+                    await s3Client.send(new PutObjectCommand({
                         Bucket: R2_BUCKET_NAME,
-                        Key: thumbnailPath,
+                        Key: thumbKey,
                         Body: thumbnailBuffer,
                         ContentType: file.type,
-                    });
+                    }));
 
-                    await s3Client.send(thumbCommand);
-                    thumbnailUrl = `${publicDomain}/${thumbnailPath}`;
+                    thumbnailUrl = `${publicDomain}/${thumbKey}`;
                 }
             } else {
-                // Fallback to local storage
-                await mkdir(path.dirname(fullPath), { recursive: true });
-                await writeFile(fullPath, processedBuffer);
-                url = `/uploads/${uploadPath}`;
+                // ── Local storage ──────────────────────────────────────────
+                // All absolute paths go through toAbsPath() which carries
+                // the turbopackIgnore annotation on UPLOAD_BASE_DIR.
+                const fullPath = toAbsPath(folder, filename);
 
-                // Generate thumbnail if requested
+                await fs.mkdir(path.dirname(fullPath), { recursive: true });
+                await fs.writeFile(fullPath, processedBuffer);
+
+                url = toPublicUrl(folder, filename);
+
                 if (generateThumbnail && file.type.startsWith('image/')) {
-                    const thumbnailFilename = `thumb_${filename}`;
-                    const thumbnailPath = path.join(folder, thumbnailFilename);
-                    const thumbnailFullPath = path.join(uploadDir, thumbnailPath);
+                    const thumbFilename = `thumb_${filename}`;
+                    const thumbFullPath = toAbsPath(folder, thumbFilename);
 
                     await sharp(buffer)
                         .resize(200, 200, { fit: 'cover' })
-                        .toFile(thumbnailFullPath);
+                        .toFile(thumbFullPath);
 
-                    thumbnailUrl = `/uploads/${thumbnailPath}`;
+                    thumbnailUrl = toPublicUrl(folder, thumbFilename);
                 }
             }
 
@@ -214,13 +239,7 @@ export const fileUploadService = {
                 storage: isR2Configured ? 'R2' : 'local',
             });
 
-            return {
-                url,
-                filename,
-                size: file.size,
-                mimeType: file.type,
-                thumbnailUrl,
-            };
+            return { url, filename, size: file.size, mimeType: file.type, thumbnailUrl };
         } catch (error) {
             log.error('Error uploading file', { userId }, error);
             throw error;
@@ -228,31 +247,28 @@ export const fileUploadService = {
     },
 
     /**
-     * Upload user avatar
+     * Upload user avatar and persist the URL to the database.
      */
     async uploadAvatar(userId: string, file: File): Promise<string> {
         try {
-            // Validate it's an image
             if (!file.type.startsWith('image/')) {
                 throw new Error('Avatar must be an image');
             }
 
             const result = await this.uploadFile(file, userId, {
                 folder: 'avatars',
-                maxSize: 5 * 1024 * 1024, // 5MB
+                maxSize: 5 * 1024 * 1024,
                 allowedTypes: ALLOWED_IMAGE_TYPES,
                 resize: { width: 400, height: 400 },
                 generateThumbnail: true,
             });
 
-            // Update user avatar
             await prisma.user.update({
                 where: { id: userId },
                 data: { image: result.url },
             });
 
             log.info('Avatar uploaded', { userId, url: result.url });
-
             return result.url;
         } catch (error) {
             log.error('Error uploading avatar', { userId }, error);
@@ -261,7 +277,7 @@ export const fileUploadService = {
     },
 
     /**
-     * Upload attachment for an entity
+     * Upload an attachment and return its metadata.
      */
     async uploadAttachment(
         file: File,
@@ -274,9 +290,7 @@ export const fileUploadService = {
                 folder: `attachments/${entityType}`,
             });
 
-            // Store attachment metadata in database
-            // Note: You'd need an Attachment model in your schema
-            const attachment = {
+            const attachment: Attachment = {
                 id: crypto.randomUUID(),
                 filename: file.name,
                 url: result.url,
@@ -286,13 +300,7 @@ export const fileUploadService = {
                 entityId,
             };
 
-            log.info('Attachment uploaded', {
-                userId,
-                entityType,
-                entityId,
-                filename: file.name,
-            });
-
+            log.info('Attachment uploaded', { userId, entityType, entityId, filename: file.name });
             return attachment;
         } catch (error) {
             log.error('Error uploading attachment', { userId, entityType, entityId }, error);
@@ -301,8 +309,7 @@ export const fileUploadService = {
     },
 
     /**
-     * Generate presigned URL for direct upload
-     * In production, this would generate S3 presigned URLs
+     * Generate a presigned URL for direct client-side upload.
      */
     async generatePresignedUrl(
         filename: string,
@@ -312,16 +319,9 @@ export const fileUploadService = {
         try {
             const uploadId = crypto.randomUUID();
             const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-            // In production, generate S3 presigned URL
             const url = `/api/upload/direct/${uploadId}`;
 
-            log.info('Presigned URL generated', {
-                userId,
-                filename,
-                contentType,
-                uploadId,
-            });
+            log.info('Presigned URL generated', { userId, filename, contentType, uploadId });
 
             return {
                 url,
@@ -338,26 +338,17 @@ export const fileUploadService = {
     },
 
     /**
-     * Validate file against rules
+     * Validate a file against the given rules.
      */
     validateFile(file: File, rules: ValidationRules): ValidationResult {
         return validateFile(file, rules);
     },
 
     /**
-     * Process image (resize, compress, format conversion)
+     * Resize / reformat an image and save it locally.
      */
-    async processImage(
-        file: File,
-        options: ImageProcessOptions
-    ): Promise<ProcessedImage> {
+    async processImage(file: File, options: ImageProcessOptions): Promise<ProcessedImage> {
         try {
-            // Dynamic imports: see uploadFile for rationale
-            const path = await import('path');
-            const { writeFile, mkdir } = await import('fs/promises');
-            const sharp = (await import('sharp')).default;
-            const uploadDir = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'public', 'uploads');
-
             const {
                 width,
                 height,
@@ -367,7 +358,6 @@ export const fileUploadService = {
             } = options;
 
             const buffer = Buffer.from(await file.arrayBuffer());
-
             let pipeline = sharp(buffer);
 
             if (width || height) {
@@ -385,20 +375,20 @@ export const fileUploadService = {
             const processed = await pipeline.toBuffer();
             const metadata = await sharp(processed).metadata();
 
-            // Save processed image
             const filename = `${crypto.randomUUID()}.${format}`;
-            const uploadPath = path.join('processed', filename);
-            const fullPath = path.join(uploadDir, uploadPath);
 
-            await mkdir(path.dirname(fullPath), { recursive: true });
-            await writeFile(fullPath, processed);
+            // Use toAbsPath so all local FS joins share the same turbopackIgnore root.
+            const fullPath = toAbsPath('processed', filename);
+
+            await fs.mkdir(path.dirname(fullPath), { recursive: true });
+            await fs.writeFile(fullPath, processed);
 
             return {
-                url: `/uploads/${uploadPath}`,
-                width: metadata.width || 0,
-                height: metadata.height || 0,
+                url: toPublicUrl('processed', filename),
+                width: metadata.width ?? 0,
+                height: metadata.height ?? 0,
                 size: processed.length,
-                format: metadata.format || format,
+                format: metadata.format ?? format,
             };
         } catch (error) {
             log.error('Error processing image', {}, error);
@@ -407,46 +397,40 @@ export const fileUploadService = {
     },
 
     /**
-     * Delete file
+     * Delete a file from R2 or local storage.
      */
     async deleteFile(fileUrl: string): Promise<void> {
         try {
             if (isR2Configured && !fileUrl.startsWith('/uploads/')) {
-                // Delete from R2
-                const publicDomain = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || process.env.R2_ENDPOINT?.replace('https://', 'https://pub-');
+                const publicDomain =
+                    process.env.NEXT_PUBLIC_R2_PUBLIC_URL ??
+                    process.env.R2_ENDPOINT?.replace('https://', 'https://pub-');
+
                 const key = fileUrl.replace(`${publicDomain}/`, '');
 
-                const command = new DeleteObjectCommand({
+                await s3Client.send(new DeleteObjectCommand({
                     Bucket: R2_BUCKET_NAME,
                     Key: key,
-                });
-
-                await s3Client.send(command);
+                }));
             } else {
-                // Delete from local storage
-                const path = await import('path');
-                const { unlink } = await import('fs/promises');
-                const uploadDir = process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'public', 'uploads');
-                const filePath = fileUrl.replace('/uploads/', '');
-                const fullPath = path.join(uploadDir, filePath);
-
-                await unlink(fullPath);
+                // Strip the leading /uploads/ prefix, then resolve via toAbsPath.
+                const relativePath = fileUrl.replace(/^\/uploads\//, '');
+                const fullPath = toAbsPath(relativePath);
+                await fs.unlink(fullPath);
             }
 
             log.info('File deleted', { fileUrl, storage: isR2Configured ? 'R2' : 'local' });
         } catch (error) {
             log.error('Error deleting file', { fileUrl }, error);
-            // Don't throw - file might not exist
+            // Don't throw — file may already be gone
         }
     },
 
     /**
-     * Get file metadata
+     * Return basic metadata for a file URL.
      */
     async getFileMetadata(fileUrl: string): Promise<FileMetadata | null> {
         try {
-            // In production, this would query from database or S3
-            // For now, return mock data
             return {
                 filename: fileUrl.split('/').pop() ?? fileUrl,
                 size: 0,
@@ -461,15 +445,13 @@ export const fileUploadService = {
     },
 
     /**
-     * List user's uploaded files
+     * List files uploaded by a user (stub — replace with DB query).
      */
     async listUserFiles(
         userId: string,
         options: { limit?: number; offset?: number; type?: string } = {}
     ): Promise<FileMetadata[]> {
         try {
-            // In production, query from database
-            // For now, return empty array
             return [];
         } catch (error) {
             log.error('Error listing user files', { userId }, error);
@@ -478,17 +460,12 @@ export const fileUploadService = {
     },
 
     /**
-     * Cleanup orphaned files (files not referenced in database)
+     * Remove files that are no longer referenced in the database (stub).
      */
     async cleanupOrphanedFiles(): Promise<{ deleted: number; freed: number }> {
         try {
-            // In production, scan uploads directory and compare with database
             log.info('Cleanup orphaned files completed', { deleted: 0, freed: 0 });
-
-            return {
-                deleted: 0,
-                freed: 0,
-            };
+            return { deleted: 0, freed: 0 };
         } catch (error) {
             log.error('Error cleaning up orphaned files', {}, error);
             return { deleted: 0, freed: 0 };
@@ -496,12 +473,11 @@ export const fileUploadService = {
     },
 
     /**
-     * Get storage usage for user
+     * Return storage quota information for a user (stub — replace with DB query).
      */
     async getStorageUsage(userId: string): Promise<StorageUsage> {
         try {
-            // In production, sum file sizes from database
-            const storageLimit = 1024 * 1024 * 1024; // 1GB
+            const storageLimit = 1024 * 1024 * 1024; // 1 GB
             const used = 0;
 
             return {

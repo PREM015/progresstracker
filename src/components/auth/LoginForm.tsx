@@ -49,6 +49,14 @@ function getSafeCallbackUrl(raw: string): string {
 }
 
 export function LoginForm() {
+  return (
+    <React.Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-muted-foreground" /></div>}>
+      <LoginFormInner />
+    </React.Suspense>
+  );
+}
+
+function LoginFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

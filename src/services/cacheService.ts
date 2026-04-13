@@ -34,7 +34,7 @@ export class CacheService {
       const key = this.generateKey('user', userId);
       const data = await cache.get(key);
       if (data) {
-        log.info('User cache hit', { userId });
+        log.debug('User cache hit', { userId });
         performanceTracking.trackCacheAccess(true);
       } else {
         performanceTracking.trackCacheAccess(false);
@@ -67,7 +67,7 @@ export class CacheService {
       const key = this.generateKey('stats', userId);
       const data = await cache.get(key);
       if (data) {
-        log.info('Stats cache hit', { userId });
+        log.debug('Stats cache hit', { userId });
         performanceTracking.trackCacheAccess(true);
       } else {
         performanceTracking.trackCacheAccess(false);
@@ -155,7 +155,7 @@ export class CacheService {
   static async set(key: string, data: unknown, ttl: number = 3600) {
     try {
       await cache.set(key, data, ttl);
-      log.info('Data cached', { key, ttl });
+      log.debug('Data cached', { key, ttl });
     } catch (error) {
       log.error('Error caching data', { key }, error);
     }
@@ -168,7 +168,7 @@ export class CacheService {
     try {
       const data = await cache.get(key);
       if (data) {
-        log.info('Cache hit', { key });
+        log.debug('Cache hit', { key });
         performanceTracking.trackCacheAccess(true);
       } else {
         performanceTracking.trackCacheAccess(false);
