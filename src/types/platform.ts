@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ===== FILE: src/types/platform.ts =====
 // Complete platform types matching Prisma schema
 
@@ -57,7 +58,7 @@ export const ReverseCategoryMap: Record<PrismaPlatformCategory, PlatformCategory
   COMPANY: 'company',
   DESIGN: 'design',
   DATA_SCIENCE: 'data_science',
-  OTHER: 'other',
+  OTHER: 'other',           
 } as const;
 
 /**
