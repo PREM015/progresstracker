@@ -47,17 +47,25 @@ export const BentoGridItem = ({
                 >
                     <div className="w-full transition duration-300 flex flex-col h-full z-10 relative">
                         {header}
-                        <div className="group-hover/bento:translate-x-2 transition duration-300 ease-out mt-4">
-                            <div className="mb-2 mt-2 w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 group-hover/bento:rotate-12 transition-transform duration-300">
-                                {icon}
+                        {(title || description || icon) && (
+                            <div className="group-hover/bento:translate-x-2 transition duration-300 ease-out mt-4">
+                                {icon && (
+                                    <div className="mb-2 mt-2 w-10 h-10 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 group-hover/bento:rotate-12 transition-transform duration-300">
+                                        {icon}
+                                    </div>
+                                )}
+                                {title && (
+                                    <div className="font-sans font-bold text-foreground mb-2 text-lg">
+                                        {title}
+                                    </div>
+                                )}
+                                {description && (
+                                    <div className="font-sans font-normal text-muted-foreground text-sm leading-relaxed">
+                                        {description}
+                                    </div>
+                                )}
                             </div>
-                            <div className="font-sans font-bold text-foreground mb-2 text-lg">
-                                {title}
-                            </div>
-                            <div className="font-sans font-normal text-muted-foreground text-sm leading-relaxed">
-                                {description}
-                            </div>
-                        </div>
+                        )}
                     </div>
                 </GlassCard>
             </Spotlight>

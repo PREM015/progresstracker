@@ -33,7 +33,7 @@ export default function AnalyticsPage() {
       <AnalyticsFilters onFilterChange={() => { }} />
       <OverviewStats />
 
-      <BentoGrid className="md:auto-rows-[20rem]">
+      <BentoGrid className="md:grid-rows-[20rem_20rem_auto] md:auto-rows-auto">
         {/* Row 1: Trends & Distribution */}
         <BentoGridItem
           className="md:col-span-2"

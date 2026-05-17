@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 interface ProductivityScoreProps {
   className?: string;
@@ -105,20 +106,21 @@ export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
   };
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-xl p-6 ${className}`}>
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Productivity Score</h3>
+    <div className={cn("bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 h-full flex flex-col", className)}>
+      <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-6">Productivity Score</h3>
 
       <div className="text-center mb-8">
-        <div className={`text-6xl font-bold mb-2 ${getScoreColor(scoreData.overall)}`}>
+        <div className={cn("text-6xl font-bold mb-2", getScoreColor(scoreData.overall))}>
           {scoreData.overall}
         </div>
-        <div className="text-sm text-gray-600 flex items-center justify-center gap-2">
+        <div className="text-sm text-zinc-600 dark:text-zinc-400 flex items-center justify-center gap-2">
           <span>Overall Score</span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${scoreData.trend === 'improving' ? 'bg-green-100 text-green-700' :
-            scoreData.trend === 'stable' ? 'bg-gray-100 text-gray-700' :
-              'bg-red-100 text-red-700'
-            }`}
-          >
+          <span className={cn(
+            "px-2 py-1 rounded-full text-xs font-medium",
+            scoreData.trend === 'improving' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+              scoreData.trend === 'stable' ? 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' :
+                'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          )}>
             {scoreData.trend === 'improving' && 'Improving'}
             {scoreData.trend === 'stable' && 'Stable'}
             {scoreData.trend === 'declining' && 'Declining'}
@@ -126,18 +128,20 @@ export const ProductivityScore: React.FC<ProductivityScoreProps> = ({
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1">
         {Object.entries(scoreData.breakdown).map(([key, value]) => (
           <div key={key}>
             <div className="flex items-center justify-between mb-2 text-sm">
-              <span className="font-medium text-gray-700 capitalize">{key}</span>
-              <span className={`font-bold ${getScoreColor(value)}`}>{value}</span>
+              <span className="font-medium text-zinc-700 dark:text-zinc-300 capitalize">{key}</span>
+              <span className={cn("font-bold", getScoreColor(value))}>{value}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-2">
               <div
-                className={`h-2 rounded-full ${value >= 80 ? 'bg-green-500' :
-                  value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}
+                className={cn(
+                  "h-2 rounded-full",
+                  value >= 80 ? 'bg-green-500' :
+                    value >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                )}
                 style={{ width: `${value}%` }}
               />
             </div>

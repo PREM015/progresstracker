@@ -116,7 +116,7 @@ export const InsightsCard: React.FC<InsightsCardProps> = ({
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-4 h-full", className)}>
       {insights.map((insight) => (
         <div
           key={insight.id}

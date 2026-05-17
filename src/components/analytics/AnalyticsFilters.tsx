@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { platforms, CATEGORY_TO_PRISMA } from '@/config/platforms';
 
 interface AnalyticsFiltersProps {
   onFilterChange: (filters: FilterState) => void;
@@ -17,10 +18,51 @@ interface AnalyticsFiltersProps {
 
 interface FilterState {
   timeRange?: string;
+  category?: string;
   platform?: string;
   metric?: string;
   groupBy?: string;
 }
+
+// Dynamically generate categories from config
+const formatCategoryLabel = (cat: string) => {
+  const map: Record<string, string> = {
+    dsa: 'DSA & Coding',
+    job: 'Jobs',
+    git: 'Version Control',
+    learning: 'Learning',
+    hackathon: 'Hackathons',
+    opensource: 'Open Source',
+    company: 'Companies',
+    design: 'Design',
+    data_science: 'Data Science',
+    other: 'Other'
+  };
+  return map[cat] || cat.replace('_', ' ').toUpperCase();
+};
+
+const CATEGORIES = [
+  { value: 'all', label: 'All Categories' },
+  ...Object.keys(CATEGORY_TO_PRISMA).map(cat => ({
+    value: cat,
+    label: formatCategoryLabel(cat)
+  }))
+];
+
+// Dynamically generate platforms by category from config
+const PLATFORMS_BY_CATEGORY: Record<string, { value: string, label: string }[]> = {
+  all: [
+    { value: 'all', label: 'All Platforms' },
+    ...platforms.map(p => ({ value: p.id, label: p.name }))
+  ]
+};
+
+Object.keys(CATEGORY_TO_PRISMA).forEach(cat => {
+  PLATFORMS_BY_CATEGORY[cat] = [
+    { value: 'all', label: `All ${formatCategoryLabel(cat)}` },
+    ...platforms.filter(p => p.category === cat).map(p => ({ value: p.id, label: p.name }))
+  ];
+});
 
 export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
   onFilterChange,
@@ -28,16 +70,25 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
 }) => {
   const [filters, setFilters] = useState<FilterState>({
     timeRange: 'last_30_days',
+    category: 'all',
     platform: 'all',
     metric: 'all',
     groupBy: 'day',
   });
 
   const updateFilter = (key: keyof FilterState, value: string) => {
-    const newFilters = { ...filters, [key]: value };
+    let newFilters = { ...filters, [key]: value };
+    
+    // Cascade Category -> Platform reset
+    if (key === 'category') {
+      newFilters.platform = 'all';
+    }
+
     setFilters(newFilters);
     onFilterChange(newFilters);
   };
+
+  const currentPlatforms = PLATFORMS_BY_CATEGORY[filters.category || 'all'] || PLATFORMS_BY_CATEGORY['all'];
 
   return (
     <div className={cn("glass-card p-6 flex flex-col gap-6", className)}>
@@ -46,7 +97,7 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Parameters</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="space-y-2">
           <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest pl-1">Time Range</label>
           <Select
@@ -67,6 +118,25 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
         </div>
 
         <div className="space-y-2">
+          <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest pl-1">Category</label>
+          <Select
+            value={filters.category}
+            onValueChange={(val) => updateFilter('category', val)}
+          >
+            <SelectTrigger className="w-full bg-zinc-100 dark:bg-zinc-800/50 border-none font-bold text-xs h-10 rounded-xl">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-zinc-200 dark:border-zinc-800">
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.value} value={cat.value} className="font-bold text-xs uppercase tracking-widest">
+                  {cat.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <label className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest pl-1">Platform</label>
           <Select
             value={filters.platform}
@@ -76,10 +146,11 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
               <SelectValue placeholder="Platform" />
             </SelectTrigger>
             <SelectContent className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border-zinc-200 dark:border-zinc-800">
-              <SelectItem value="all" className="font-bold text-xs uppercase tracking-widest">All Platforms</SelectItem>
-              <SelectItem value="leetcode" className="font-bold text-xs uppercase tracking-widest">LeetCode</SelectItem>
-              <SelectItem value="github" className="font-bold text-xs uppercase tracking-widest">GitHub</SelectItem>
-              <SelectItem value="hackerrank" className="font-bold text-xs uppercase tracking-widest">HackerRank</SelectItem>
+              {currentPlatforms.map(plat => (
+                <SelectItem key={plat.value} value={plat.value} className="font-bold text-xs uppercase tracking-widest">
+                  {plat.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -125,3 +196,4 @@ export const AnalyticsFilters: React.FC<AnalyticsFiltersProps> = ({
 };
 
 export default AnalyticsFilters;
+

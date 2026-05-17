@@ -68,8 +68,8 @@ export const PredictionsCard: React.FC<PredictionsCardProps> = ({
   }
 
   return (
-    <Card className={cn("border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden", className)}>
-      <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+    <Card className={cn("border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden h-full flex flex-col", className)}>
+      <CardHeader className="bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800 pb-4 shrink-0">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
             <Sparkles className="w-4 h-4" />
@@ -80,7 +80,7 @@ export const PredictionsCard: React.FC<PredictionsCardProps> = ({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 flex-1">
         <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
           {predictions.map((pred, idx) => (
             <div key={idx} className="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors">
