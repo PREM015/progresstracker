@@ -183,6 +183,21 @@ function DashboardContent() {
               <SkillsRadarWidget />
             </Suspense>
           </motion.div>
+
+          {/* Moved from right column to balance height */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <motion.div variants={itemVariants}>
+              <Suspense fallback={<Skeleton className="h-80 rounded-xl bg-zinc-100 dark:bg-zinc-900/50" />}>
+                <LeaderboardWidget />
+              </Suspense>
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <Suspense fallback={<Skeleton className="h-48 rounded-xl bg-zinc-100 dark:bg-zinc-900/50" />}>
+                <MotivationWidget />
+              </Suspense>
+            </motion.div>
+          </div>
         </div>
 
         {/* Right Column - 1/3 width */}
@@ -221,17 +236,6 @@ function DashboardContent() {
             </Suspense>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <Suspense fallback={<Skeleton className="h-80 rounded-xl bg-zinc-100 dark:bg-zinc-900/50" />}>
-              <LeaderboardWidget />
-            </Suspense>
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <Suspense fallback={<Skeleton className="h-48 rounded-xl bg-zinc-100 dark:bg-zinc-900/50" />}>
-              <MotivationWidget />
-            </Suspense>
-          </motion.div>
         </div>
       </div>
 

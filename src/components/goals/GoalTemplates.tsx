@@ -54,12 +54,14 @@ export const GoalTemplates: React.FC<GoalTemplatesProps> = ({
     </div>;
   }
 
+  const categories = ['all', ...Array.from(new Set(templates.map(t => t.category)))];
+
   return (
     <div className={className}>
       <div className="mb-8">
         <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-6 tracking-tight">Rapid Goal Setup</h3>
         <div className="flex gap-2.5 flex-wrap">
-          {['all', 'learning', 'fitness', 'career', 'personal'].map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
@@ -70,7 +72,7 @@ export const GoalTemplates: React.FC<GoalTemplatesProps> = ({
                   : "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-600"
               )}
             >
-              {cat}
+              {cat.replace('_', ' ')}
             </button>
           ))}
         </div>

@@ -33,13 +33,20 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
 
   useEffect(() => {
     const params = new URLSearchParams({
-      ...(category && { category }),
-      timeRange,
       limit: limit.toString(),
     });
 
+    let endpoint = '/api/leaderboard';
+    if (category && category !== 'overall') {
+      endpoint = `/api/leaderboard/category/${category}`;
+    } else if (timeRange === 'week') {
+      endpoint = '/api/leaderboard/weekly';
+    } else if (timeRange === 'month') {
+      endpoint = '/api/leaderboard/monthly';
+    }
+
     setLoading(true);
-    fetch(`/api/leaderboard?${params}`)
+    fetch(`${endpoint}?${params}`)
       .then(r => r.json())
       .then(data => {
         // Normalize all API response shapes into a flat array of entries
@@ -65,7 +72,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           userId: u.userId ?? u.id ?? String(idx),
           username: u.username ?? u.name ?? 'Anonymous',
           avatar: u.avatar ?? u.image ?? undefined,
-          score: u.score ?? u.totalPoints ?? 0,
+          score: u.score ?? u.totalPoints ?? u.points ?? 0,
           change: u.change ?? undefined,
         }));
 

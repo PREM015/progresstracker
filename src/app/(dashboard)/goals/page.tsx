@@ -76,8 +76,10 @@ export default function GoalsPage() {
       {/* Progress Overview Grid - Moved to Top */}
       <GoalStats userId={userId} className="mb-2" />
 
-      <div className="grid lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3 space-y-8">
+      <div className="space-y-12">
+        <GoalTemplates onSelectTemplate={handleTemplateSelect} />
+
+        <div className="space-y-8">
           {showForm && (
             <GoalForm
               goalId={initialFormData?.id}
@@ -99,10 +101,6 @@ export default function GoalsPage() {
             filters={filters}
             onEdit={handleEditGoal}
           />
-        </div>
-
-        <div className="lg:col-span-1 space-y-8">
-          <GoalTemplates onSelectTemplate={handleTemplateSelect} />
         </div>
       </div>
     </div>
