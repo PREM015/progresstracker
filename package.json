@@ -156,7 +156,7 @@
     "react-is": "^19.2.4",
     "shadcn": "^4.0.8",
     "tailwindcss": "^4.1.17",
-    "test-exclude": "^7.0.1",
+    "test-exclude": "^8.0.0",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
